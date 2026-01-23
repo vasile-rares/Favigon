@@ -1,3 +1,4 @@
+using DevBox.API.Middlewares;
 using DevBox.Application;
 using DevBox.Infrastructure;
 
@@ -25,6 +26,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+app.UseMiddleware<ExceptionHandlerMiddleware>();
 
 await app.Services.SeedInfrastructureAsync();
 

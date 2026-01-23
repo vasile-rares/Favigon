@@ -1,12 +1,12 @@
 using DevBox.Domain.Entities;
-using DevBox.Infrastructure.Context;
+using AppDbContext = DevBox.Infrastructure.Context.DbContext;
 using Microsoft.EntityFrameworkCore;
 
 namespace DevBox.Infrastructure.Seeding;
 
 public static class UserSeeder
 {
-  public static async Task SeedAsync(DevBoxDbContext context)
+  public static async Task SeedAsync(AppDbContext context)
   {
     await context.Database.EnsureCreatedAsync();
 

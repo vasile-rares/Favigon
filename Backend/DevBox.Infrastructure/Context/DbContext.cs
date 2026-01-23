@@ -3,9 +3,9 @@ using DevBox.Domain.Entities;
 
 namespace DevBox.Infrastructure.Context;
 
-public class DevBoxDbContext : DbContext
+public class DbContext : Microsoft.EntityFrameworkCore.DbContext
 {
-    public DevBoxDbContext(DbContextOptions<DevBoxDbContext> options)
+    public DbContext(DbContextOptions<DbContext> options)
         : base(options)
     {
     }
