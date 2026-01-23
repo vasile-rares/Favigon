@@ -4,9 +4,9 @@ using Microsoft.Extensions.Configuration;
 
 namespace DevBox.Infrastructure.Context
 {
-    public class DbContextFactory : IDesignTimeDbContextFactory<DbContext>
+    public class DbContextFactory : IDesignTimeDbContextFactory<DevBoxDbContext>
     {
-        public DbContext CreateDbContext(string[] args)
+        public DevBoxDbContext CreateDbContext(string[] args)
         {
             var basePath = Path.Combine(Directory.GetCurrentDirectory(), "../DevBox.API");
 
@@ -19,10 +19,10 @@ namespace DevBox.Infrastructure.Context
 
             var connectionString = config.GetConnectionString("DevBoxDb");
 
-            var optionsBuilder = new DbContextOptionsBuilder<DbContext>();
+            var optionsBuilder = new DbContextOptionsBuilder<DevBoxDbContext>();
             optionsBuilder.UseSqlServer(connectionString);
 
-            return new DbContext(optionsBuilder.Options);
+            return new DevBoxDbContext(optionsBuilder.Options);
         }
     }
 }

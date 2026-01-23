@@ -1,15 +1,15 @@
 using DevBox.Application.Interfaces;
 using DevBox.Domain.Entities;
-using AppDbContext = DevBox.Infrastructure.Context.DbContext;
+using DevBox.Infrastructure.Context;
 using Microsoft.EntityFrameworkCore;
 
 namespace DevBox.Infrastructure.Repositories;
 
 public class UserRepository : IUserRepository
 {
-  private readonly AppDbContext _context;
+  private readonly DevBoxDbContext _context;
 
-  public UserRepository(AppDbContext context)
+  public UserRepository(DevBoxDbContext context)
   {
     _context = context;
   }

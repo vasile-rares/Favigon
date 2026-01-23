@@ -1,5 +1,5 @@
 using DevBox.Application.Interfaces;
-using AppDbContext = DevBox.Infrastructure.Context.DbContext;
+using DevBox.Infrastructure.Context;
 using DevBox.Infrastructure.Repositories;
 using DevBox.Infrastructure.Seeding;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +12,7 @@ public static class ServiceCollectionExtensions
 {
   public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
   {
-    services.AddDbContext<AppDbContext>(options =>
+    services.AddDbContext<DevBoxDbContext>(options =>
       options.UseSqlServer(configuration.GetConnectionString("DevBoxDb")));
 
     services.AddScoped<IUserRepository, UserRepository>();
@@ -23,7 +23,7 @@ public static class ServiceCollectionExtensions
   public static async Task SeedInfrastructureAsync(this IServiceProvider serviceProvider)
   {
     using var scope = serviceProvider.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var dbContext = scope.ServiceProvider.GetRequiredService<DevBoxDbContext>();
     await UserSeeder.SeedAsync(dbContext);
   }
 
