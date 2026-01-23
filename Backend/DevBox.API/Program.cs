@@ -1,12 +1,10 @@
-using Microsoft.EntityFrameworkCore;
-using DevBox.Infrastructure.Context;
-using DevBox.Domain.Entities;
-using DevBox.Infrastructure.Seeding;
+using DevBox.Application;
+using DevBox.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<DevBoxDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DevBoxDb")));
+builder.Services.AddApplication();
+builder.Services.AddInfrastructure(builder.Configuration);
 
 builder.Services.AddCors(options =>
 {
@@ -28,12 +26,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var dbContext = scope.ServiceProvider.GetRequiredService<DevBoxDbContext>();
-
-    RolesSeeder.Seed(dbContext);
-}
+await app.Services.SeedInfrastructureAsync();
 
 if (app.Environment.IsDevelopment())
 {
