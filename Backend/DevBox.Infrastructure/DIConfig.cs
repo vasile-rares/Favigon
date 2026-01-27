@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
       options.UseSqlServer(configuration.GetConnectionString("DevBoxDb")));
 
     services.AddScoped<IUserRepository, UserRepository>();
+    services.AddScoped<IProjectRepository, ProjectRepository>();
 
     return services;
   }

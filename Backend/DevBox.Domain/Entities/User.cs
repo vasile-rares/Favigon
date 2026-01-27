@@ -28,7 +28,7 @@ public class User
     [MaxLength(20)]
     public string Role { get; set; } = "User";
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime CreatedAt { get; set; }
 
-
+    public ICollection<Project> Projects { get; set; } = new List<Project>();
 }
