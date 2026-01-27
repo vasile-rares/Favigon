@@ -11,8 +11,5 @@ public class ProjectUpdateRequest
   [RegularExpression("^(Vanilla|React|Angular)$", ErrorMessage = "Type must be Vanilla, React, or Angular")]
   public string Type { get; set; } = string.Empty;
 
-  [Required, MaxLength(260)]
-  public string RootPath { get; set; } = string.Empty;
-
   public bool IsPublic { get; set; }
 }

@@ -2,6 +2,7 @@ using DevBox.Application.DTOs.Requests;
 using DevBox.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace DevBox.API.Controllers;
 
@@ -42,7 +43,13 @@ public class ProjectsController : ControllerBase
   [HttpPost]
   public async Task<IActionResult> Create([FromBody] ProjectCreateRequest request)
   {
-    var created = await _projectService.CreateAsync(request);
+    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdValue, out var userId))
+    {
+      return Unauthorized();
+    }
+
+    var created = await _projectService.CreateAsync(request, userId);
     return CreatedAtAction(nameof(GetById), new { id = created.ProjectId }, created);
   }
 
