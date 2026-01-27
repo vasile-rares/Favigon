@@ -1,3 +1,4 @@
+using DevBox.Application.DTOs.Requests;
 using DevBox.Application.Interfaces;
 using DevBox.Domain.Entities;
 
@@ -22,32 +23,38 @@ public class UserService : IUserService
     return _userRepository.GetByIdAsync(id);
   }
 
-  public async Task<User> CreateAsync(User user)
+  public async Task<User> CreateAsync(UserCreateRequest request)
   {
-    user.Username = user.Username.Trim().ToLowerInvariant();
-    user.DisplayName = user.DisplayName.Trim();
+    request.Username = request.Username.Trim().ToLowerInvariant();
+    request.DisplayName = request.DisplayName.Trim();
+    request.Email = request.Email.Trim();
 
-    if (string.IsNullOrWhiteSpace(user.Role))
-    {
-      user.Role = "User";
-    }
-
-    var existingByUsername = await _userRepository.GetByUsernameAsync(user.Username);
+    var existingByUsername = await _userRepository.GetByUsernameAsync(request.Username);
     if (existingByUsername != null)
     {
       throw new InvalidOperationException("Username already exists.");
     }
 
-    var existingByEmail = await _userRepository.GetByEmailAsync(user.Email);
+    var existingByEmail = await _userRepository.GetByEmailAsync(request.Email);
     if (existingByEmail != null)
     {
       throw new InvalidOperationException("Email already exists.");
     }
 
+    var user = new User
+    {
+      Username = request.Username,
+      DisplayName = request.DisplayName,
+      Email = request.Email,
+      PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
+      ProfilePictureUrl = request.ProfilePictureUrl,
+      Role = string.IsNullOrWhiteSpace(request.Role) ? "User" : request.Role
+    };
+
     return await _userRepository.AddAsync(user);
   }
 
-  public async Task<User?> UpdateAsync(int id, User updated)
+  public async Task<User?> UpdateAsync(int id, UserUpdateRequest request)
   {
     var existing = await _userRepository.GetByIdAsync(id);
     if (existing == null)
@@ -55,7 +62,11 @@ public class UserService : IUserService
       return null;
     }
 
-    var normalizedUsername = updated.Username.Trim().ToLowerInvariant();
+    request.Username = request.Username.Trim().ToLowerInvariant();
+    request.DisplayName = request.DisplayName.Trim();
+    request.Email = request.Email.Trim();
+
+    var normalizedUsername = request.Username;
     if (!string.Equals(existing.Username, normalizedUsername, StringComparison.Ordinal))
     {
       var byUsername = await _userRepository.GetByUsernameAsync(normalizedUsername);
@@ -65,21 +76,24 @@ public class UserService : IUserService
       }
     }
 
-    if (!string.Equals(existing.Email, updated.Email, StringComparison.OrdinalIgnoreCase))
+    if (!string.Equals(existing.Email, request.Email, StringComparison.OrdinalIgnoreCase))
     {
-      var byEmail = await _userRepository.GetByEmailAsync(updated.Email);
+      var byEmail = await _userRepository.GetByEmailAsync(request.Email);
       if (byEmail != null && byEmail.Id != id)
       {
         throw new InvalidOperationException("Email already exists.");
       }
     }
 
-    existing.DisplayName = updated.DisplayName.Trim();
+    existing.DisplayName = request.DisplayName;
     existing.Username = normalizedUsername;
-    existing.Email = updated.Email;
-    existing.PasswordHash = updated.PasswordHash;
-    existing.ProfilePictureUrl = updated.ProfilePictureUrl;
-    existing.Role = string.IsNullOrWhiteSpace(updated.Role) ? existing.Role : updated.Role;
+    existing.Email = request.Email;
+    if (!string.IsNullOrWhiteSpace(request.Password))
+    {
+      existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+    }
+    existing.ProfilePictureUrl = request.ProfilePictureUrl;
+    existing.Role = string.IsNullOrWhiteSpace(request.Role) ? existing.Role : request.Role;
 
     await _userRepository.UpdateAsync(existing);
     return existing;

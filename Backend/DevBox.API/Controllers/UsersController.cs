@@ -1,11 +1,14 @@
+using DevBox.Application.DTOs.Requests;
 using DevBox.Application.Interfaces;
 using DevBox.Domain.Entities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DevBox.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class UsersController : ControllerBase
 {
   private readonly IUserService _userService;
@@ -16,14 +19,14 @@ public class UsersController : ControllerBase
   }
 
   [HttpGet]
-  public async Task<ActionResult<IReadOnlyList<User>>> GetAll()
+  public async Task<IActionResult> GetAll()
   {
     var users = await _userService.GetAllAsync();
     return Ok(users);
   }
 
   [HttpGet("{id:int}")]
-  public async Task<ActionResult<User>> GetById(int id)
+  public async Task<IActionResult> GetById(int id)
   {
     var user = await _userService.GetByIdAsync(id);
     if (user == null)
@@ -35,16 +38,16 @@ public class UsersController : ControllerBase
   }
 
   [HttpPost]
-  public async Task<ActionResult<User>> Create([FromBody] User user)
+  public async Task<IActionResult> Create([FromBody] UserCreateRequest request)
   {
-    var created = await _userService.CreateAsync(user);
+    var created = await _userService.CreateAsync(request);
     return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
   }
 
   [HttpPut("{id:int}")]
-  public async Task<ActionResult<User>> Update(int id, [FromBody] User user)
+  public async Task<IActionResult> Update(int id, [FromBody] UserUpdateRequest request)
   {
-    var updated = await _userService.UpdateAsync(id, user);
+    var updated = await _userService.UpdateAsync(id, request);
     if (updated == null)
     {
       return NotFound();
@@ -54,6 +57,7 @@ public class UsersController : ControllerBase
   }
 
   [HttpDelete("{id:int}")]
+  [Authorize(Roles = "Admin")]
   public async Task<IActionResult> Delete(int id)
   {
     var deleted = await _userService.DeleteAsync(id);

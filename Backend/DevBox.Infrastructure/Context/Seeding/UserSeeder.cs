@@ -18,7 +18,7 @@ public static class UserSeeder
             DisplayName = "Admin",
             Username = "admin",
             Email = "admin@devbox.local",
-            PasswordHash = "Admin123!",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin123!"),
             Role = "Admin",
             ProfilePictureUrl = null
           },
@@ -27,7 +27,7 @@ public static class UserSeeder
             DisplayName = "User",
             Username = "user",
             Email = "user@devbox.local",
-            PasswordHash = "User123!",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("User123!"),
             Role = "User",
             ProfilePictureUrl = null
           }
