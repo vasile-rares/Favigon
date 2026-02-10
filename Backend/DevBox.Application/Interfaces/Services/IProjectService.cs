@@ -7,8 +7,8 @@ public interface IProjectService
 {
   Task<IReadOnlyList<ProjectResponse>> GetAllAsync();
   Task<IReadOnlyList<ProjectResponse>> GetByUserIdAsync(int userId);
-  Task<ProjectResponse?> GetByIdAsync(int id);
+  Task<ProjectResponse?> GetByIdAsync(int id, int userId);
   Task<ProjectResponse> CreateAsync(ProjectCreateRequest request, int userId);
-  Task<ProjectResponse?> UpdateAsync(int id, ProjectUpdateRequest request);
-  Task<bool> DeleteAsync(int id);
+  Task<ProjectResponse?> UpdateAsync(int id, ProjectUpdateRequest request, int userId);
+  Task<bool> DeleteAsync(int id, int userId);
 }

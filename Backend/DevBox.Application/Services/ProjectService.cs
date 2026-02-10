@@ -53,9 +53,9 @@ public class ProjectService : IProjectService
     return _mapper.Map<List<ProjectResponse>>(projects);
   }
 
-  public async Task<ProjectResponse?> GetByIdAsync(int id)
+  public async Task<ProjectResponse?> GetByIdAsync(int id, int userId)
   {
-    var project = await _projectRepository.GetByIdAsync(id);
+    var project = await _projectRepository.GetByIdAsync(id, userId);
     return project == null ? null : _mapper.Map<ProjectResponse>(project);
   }
 
@@ -96,9 +96,9 @@ public class ProjectService : IProjectService
     }
   }
 
-  public async Task<ProjectResponse?> UpdateAsync(int id, ProjectUpdateRequest request)
+  public async Task<ProjectResponse?> UpdateAsync(int id, ProjectUpdateRequest request, int userId)
   {
-    var existing = await _projectRepository.GetByIdAsync(id);
+    var existing = await _projectRepository.GetByIdAsync(id, userId);
     if (existing == null)
     {
       return null;
@@ -112,7 +112,7 @@ public class ProjectService : IProjectService
     {
       EnsureProjectsRootConfigured();
 
-      var user = await _userRepository.GetByIdAsync(existing.UserId);
+      var user = await _userRepository.GetByIdAsync(userId);
       if (user == null)
       {
         throw new ArgumentException("User not found.");
@@ -137,9 +137,9 @@ public class ProjectService : IProjectService
     return _mapper.Map<ProjectResponse>(existing);
   }
 
-  public async Task<bool> DeleteAsync(int id)
+  public async Task<bool> DeleteAsync(int id, int userId)
   {
-    var existing = await _projectRepository.GetByIdAsync(id);
+    var existing = await _projectRepository.GetByIdAsync(id, userId);
     if (existing == null)
     {
       return false;

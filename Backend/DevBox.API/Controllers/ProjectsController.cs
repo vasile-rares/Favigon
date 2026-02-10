@@ -19,19 +19,28 @@ public class ProjectsController : ControllerBase
   }
 
   [HttpGet]
-  public async Task<IActionResult> GetAll([FromQuery] int? userId)
+  public async Task<IActionResult> GetAll()
   {
-    var projects = userId.HasValue
-      ? await _projectService.GetByUserIdAsync(userId.Value)
-      : await _projectService.GetAllAsync();
+    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdValue, out var userId))
+    {
+      return Unauthorized();
+    }
 
+    var projects = await _projectService.GetByUserIdAsync(userId);
     return Ok(projects);
   }
 
   [HttpGet("{id:int}")]
   public async Task<IActionResult> GetById(int id)
   {
-    var project = await _projectService.GetByIdAsync(id);
+    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdValue, out var userId))
+    {
+      return Unauthorized();
+    }
+
+    var project = await _projectService.GetByIdAsync(id, userId);
     if (project == null)
     {
       return NotFound();
@@ -56,7 +65,13 @@ public class ProjectsController : ControllerBase
   [HttpPut("{id:int}")]
   public async Task<IActionResult> Update(int id, [FromBody] ProjectUpdateRequest request)
   {
-    var updated = await _projectService.UpdateAsync(id, request);
+    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdValue, out var userId))
+    {
+      return Unauthorized();
+    }
+
+    var updated = await _projectService.UpdateAsync(id, request, userId);
     if (updated == null)
     {
       return NotFound();
@@ -68,7 +83,13 @@ public class ProjectsController : ControllerBase
   [HttpDelete("{id:int}")]
   public async Task<IActionResult> Delete(int id)
   {
-    var deleted = await _projectService.DeleteAsync(id);
+    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdValue, out var userId))
+    {
+      return Unauthorized();
+    }
+
+    var deleted = await _projectService.DeleteAsync(id, userId);
     return deleted ? NoContent() : NotFound();
   }
 

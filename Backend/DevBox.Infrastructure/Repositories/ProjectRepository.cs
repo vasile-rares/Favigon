@@ -27,9 +27,9 @@ public class ProjectRepository : IProjectRepository
         .ToListAsync();
   }
 
-  public Task<Project?> GetByIdAsync(int id)
+  public Task<Project?> GetByIdAsync(int id, int userId)
   {
-    return _context.Projects.FirstOrDefaultAsync(p => p.Id == id);
+    return _context.Projects.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
   }
 
   public Task<bool> ExistsByUserAndRootPathAsync(int userId, string rootPath, int? excludeProjectId = null)
