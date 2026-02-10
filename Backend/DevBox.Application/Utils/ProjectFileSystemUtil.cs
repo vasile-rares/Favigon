@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 
 namespace DevBox.Application.Utils;
@@ -7,6 +8,49 @@ public static class ProjectFileSystemUtil
   private static string BuildAbsolutePath(string projectsRoot, string relativePath)
   {
     return Path.GetFullPath(Path.Combine(projectsRoot, relativePath));
+  }
+
+  public static string BuildProjectRootAbsolutePath(string projectsRoot, string projectRelativePath)
+  {
+    return BuildAbsolutePath(projectsRoot, projectRelativePath);
+  }
+
+  public static bool TryResolveProjectFilePath(
+    string projectsRoot,
+    string projectRelativePath,
+    string fileRelativePath,
+    out string absolutePath)
+  {
+    absolutePath = string.Empty;
+    if (string.IsNullOrWhiteSpace(fileRelativePath) || Path.IsPathRooted(fileRelativePath))
+    {
+      return false;
+    }
+
+    var projectRootAbsolute = BuildProjectRootAbsolutePath(projectsRoot, projectRelativePath);
+    var normalizedRelative = fileRelativePath
+      .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar);
+    var combined = Path.Combine(projectRootAbsolute, normalizedRelative);
+    var resolved = Path.GetFullPath(combined);
+
+    if (!resolved.StartsWith(projectRootAbsolute, StringComparison.OrdinalIgnoreCase))
+    {
+      return false;
+    }
+
+    absolutePath = resolved;
+    return true;
+  }
+
+  public static void WriteFileContent(string absolutePath, string content)
+  {
+    var directory = Path.GetDirectoryName(absolutePath);
+    if (!string.IsNullOrWhiteSpace(directory))
+    {
+      Directory.CreateDirectory(directory);
+    }
+
+    File.WriteAllText(absolutePath, content);
   }
 
   public static string BuildRelativePath(string username, string projectName)

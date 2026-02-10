@@ -7,6 +7,7 @@ using DevBox.Domain.Entities;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using System.IO;
+using System.Linq;
 
 namespace DevBox.Application.Services;
 
@@ -149,6 +150,124 @@ public class ProjectService : IProjectService
     await _projectRepository.DeleteAsync(existing);
     ProjectFileSystemUtil.TryDeleteDirectory(_projectsRootAbsolute, existing.RootPath);
 
+    return true;
+  }
+
+  public async Task<IReadOnlyList<ProjectFileEntryResponse>?> GetFilesAsync(int projectId, int userId)
+  {
+    EnsureProjectsRootConfigured();
+
+    var project = await _projectRepository.GetByIdAsync(projectId, userId);
+    if (project == null)
+    {
+      return null;
+    }
+
+    var projectRootAbsolute = ProjectFileSystemUtil.BuildProjectRootAbsolutePath(
+      _projectsRootAbsolute,
+      project.RootPath);
+
+    if (!Directory.Exists(projectRootAbsolute))
+    {
+      return Array.Empty<ProjectFileEntryResponse>();
+    }
+
+    var excludedDirectories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+      "bin",
+      "obj",
+      ".git",
+      ".vs",
+      "node_modules"
+    };
+
+    bool IsExcluded(string relativePath)
+    {
+      var segments = relativePath
+        .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+        .Where(segment => !string.IsNullOrWhiteSpace(segment));
+
+      return segments.Any(segment => excludedDirectories.Contains(segment));
+    }
+
+    var files = Directory.EnumerateFiles(projectRootAbsolute, "*", SearchOption.AllDirectories)
+      .Select(path => new
+      {
+        AbsolutePath = path,
+        RelativePath = Path.GetRelativePath(projectRootAbsolute, path)
+      })
+      .Where(item => !IsExcluded(item.RelativePath))
+      .Select(item => new ProjectFileEntryResponse
+      {
+        Path = item.RelativePath.Replace(Path.DirectorySeparatorChar, '/'),
+        Name = Path.GetFileName(item.RelativePath),
+        Extension = Path.GetExtension(item.RelativePath),
+        Size = new FileInfo(item.AbsolutePath).Length
+      })
+      .OrderBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
+      .ToList();
+
+    return files;
+  }
+
+  public async Task<ProjectFileContentResponse?> GetFileContentAsync(
+    int projectId,
+    int userId,
+    string relativePath)
+  {
+    EnsureProjectsRootConfigured();
+
+    var project = await _projectRepository.GetByIdAsync(projectId, userId);
+    if (project == null)
+    {
+      return null;
+    }
+
+    if (!ProjectFileSystemUtil.TryResolveProjectFilePath(
+      _projectsRootAbsolute,
+      project.RootPath,
+      relativePath,
+      out var absolutePath))
+    {
+      return null;
+    }
+
+    if (!File.Exists(absolutePath))
+    {
+      return null;
+    }
+
+    var content = await File.ReadAllTextAsync(absolutePath);
+    return new ProjectFileContentResponse
+    {
+      Path = relativePath,
+      Content = content
+    };
+  }
+
+  public async Task<bool> UpdateFileContentAsync(
+    int projectId,
+    int userId,
+    ProjectFileUpdateRequest request)
+  {
+    EnsureProjectsRootConfigured();
+
+    var project = await _projectRepository.GetByIdAsync(projectId, userId);
+    if (project == null)
+    {
+      return false;
+    }
+
+    if (!ProjectFileSystemUtil.TryResolveProjectFilePath(
+      _projectsRootAbsolute,
+      project.RootPath,
+      request.Path,
+      out var absolutePath))
+    {
+      return false;
+    }
+
+    ProjectFileSystemUtil.WriteFileContent(absolutePath, request.Content ?? string.Empty);
     return true;
   }
 

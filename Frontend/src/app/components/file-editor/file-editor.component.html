@@ -1,0 +1,34 @@
+<div class="file-editor-container">
+  <div class="editor-header">
+    <h2>Monaco Editor - Prototipare Editare Fișiere</h2>
+    <div class="file-selector">
+      @if (isLoading()) {
+        <span class="status">Se încarcă fișierele...</span>
+      }
+      @if (errorMessage()) {
+        <span class="status error">{{ errorMessage() }}</span>
+      }
+      @for (file of files(); track file.path) {
+        <button
+          [class.active]="currentFile() === file"
+          (click)="switchFile(file)">
+          {{ file.name }}
+        </button>
+      }
+    </div>
+    <div class="editor-actions">
+      <button
+        class="primary"
+        [disabled]="!currentFile() || isSaving()"
+        (click)="saveCurrentFile()">
+        {{ isSaving() ? 'Se salvează...' : 'Salvează' }}
+      </button>
+      @if (saveMessage()) {
+        <span class="status">{{ saveMessage() }}</span>
+      }
+    </div>
+  </div>
+  <div class="editor-wrapper">
+    <div #editorContainer class="editor-container"></div>
+  </div>
+</div>
