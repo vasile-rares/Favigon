@@ -1,4 +1,4 @@
-import {
+﻿import {
   Component,
   signal,
   viewChild,
@@ -45,7 +45,7 @@ export class FileEditorComponent implements OnDestroy {
   readonly saveMessage = signal<string | null>(null);
 
   private readonly seedLogin = {
-    email: 'user@devbox.local',
+    email: 'user@prismatic.local',
     password: 'User123!',
   };
 

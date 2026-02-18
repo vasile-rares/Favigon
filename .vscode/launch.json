@@ -9,11 +9,11 @@
             "args": [
                 "run",
                 "--project",
-                "${workspaceFolder}/Backend/DevBox.API/DevBox.API.csproj",
+                "${workspaceFolder}/Backend/Prismatic.API/Prismatic.API.csproj",
                 "--launch-profile",
                 "https"
             ],
-            "cwd": "${workspaceFolder}/Backend/DevBox.API",
+            "cwd": "${workspaceFolder}/Backend/Prismatic.API",
             "console": "integratedTerminal",
             "stopAtEntry": false,
             "serverReadyAction": {
