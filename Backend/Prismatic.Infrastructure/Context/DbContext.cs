@@ -24,23 +24,23 @@ public class PrismaticDbContext : Microsoft.EntityFrameworkCore.DbContext
 
         modelBuilder.Entity<User>()
             .Property(u => u.CreatedAt)
-            .HasDefaultValueSql("GETUTCDATE()")
+            .HasDefaultValueSql("NOW()")
             .ValueGeneratedOnAdd();
 
-      modelBuilder.Entity<User>()
-          .HasMany(u => u.Projects)
-          .WithOne(p => p.User)
-          .HasForeignKey(p => p.UserId)
-          .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<User>()
+            .HasMany(u => u.Projects)
+            .WithOne(p => p.User)
+            .HasForeignKey(p => p.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<Project>()
             .Property(p => p.CreatedAt)
-            .HasDefaultValueSql("GETUTCDATE()")
+            .HasDefaultValueSql("NOW()")
             .ValueGeneratedOnAdd();
 
         modelBuilder.Entity<Project>()
             .Property(p => p.UpdatedAt)
-            .HasDefaultValueSql("GETUTCDATE()")
+            .HasDefaultValueSql("NOW()")
             .ValueGeneratedOnAddOrUpdate();
     }
 

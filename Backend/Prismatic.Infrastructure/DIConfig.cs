@@ -13,7 +13,7 @@ public static class ServiceCollectionExtensions
   public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
   {
     services.AddDbContext<PrismaticDbContext>(options =>
-      options.UseSqlServer(configuration.GetConnectionString("PrismaticDb")));
+      options.UseNpgsql(configuration.GetConnectionString("PrismaticDb")));
 
     services.AddScoped<IUserRepository, UserRepository>();
     services.AddScoped<IProjectRepository, ProjectRepository>();

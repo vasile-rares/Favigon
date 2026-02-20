@@ -20,7 +20,7 @@ namespace Prismatic.Infrastructure.Context
             var connectionString = config.GetConnectionString("PrismaticDb");
 
             var optionsBuilder = new DbContextOptionsBuilder<PrismaticDbContext>();
-            optionsBuilder.UseSqlServer(connectionString);
+            optionsBuilder.UseNpgsql(connectionString);
 
             return new PrismaticDbContext(optionsBuilder.Options);
         }
