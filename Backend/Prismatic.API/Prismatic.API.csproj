@@ -21,10 +21,4 @@
     <ProjectReference Include="..\Prismatic.Infrastructure\Prismatic.Infrastructure.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Content Include="Templates\Vanilla\**\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-  </ItemGroup>
-
 </Project>

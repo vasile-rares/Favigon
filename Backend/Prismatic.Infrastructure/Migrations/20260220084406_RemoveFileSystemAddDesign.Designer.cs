@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Prismatic.Infrastructure.Context;
@@ -11,9 +12,11 @@ using Prismatic.Infrastructure.Context;
 namespace Prismatic.Infrastructure.Migrations
 {
     [DbContext(typeof(PrismaticDbContext))]
-    partial class PrismaticDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260220084406_RemoveFileSystemAddDesign")]
+    partial class RemoveFileSystemAddDesign
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -35,12 +38,6 @@ namespace Prismatic.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasDefaultValueSql("NOW()");
 
-                    b.Property<string>("DesignJson")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("jsonb")
-                        .HasDefaultValue("{}");
-
                     b.Property<bool>("IsPublic")
                         .HasColumnType("boolean");
 
@@ -48,6 +45,10 @@ namespace Prismatic.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Type")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAddOrUpdate()
@@ -62,6 +63,34 @@ namespace Prismatic.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Projects");
+                });
+
+            modelBuilder.Entity("Prismatic.Domain.Entities.ProjectDesign", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("DesignJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW()");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId")
+                        .IsUnique();
+
+                    b.ToTable("ProjectDesigns");
                 });
 
             modelBuilder.Entity("Prismatic.Domain.Entities.User", b =>
@@ -123,6 +152,22 @@ namespace Prismatic.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Prismatic.Domain.Entities.ProjectDesign", b =>
+                {
+                    b.HasOne("Prismatic.Domain.Entities.Project", "Project")
+                        .WithOne("Design")
+                        .HasForeignKey("Prismatic.Domain.Entities.ProjectDesign", "ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("Prismatic.Domain.Entities.Project", b =>
+                {
+                    b.Navigation("Design");
                 });
 
             modelBuilder.Entity("Prismatic.Domain.Entities.User", b =>

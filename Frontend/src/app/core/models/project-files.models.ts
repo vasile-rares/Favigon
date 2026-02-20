@@ -2,8 +2,6 @@ export interface ProjectResponse {
   projectId: number;
   userId: number;
   name: string;
-  type: string;
-  rootPath: string;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;

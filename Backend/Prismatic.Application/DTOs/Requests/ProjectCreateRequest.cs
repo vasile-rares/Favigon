@@ -7,9 +7,5 @@ public class ProjectCreateRequest
   [Required, MaxLength(100)]
   public string Name { get; set; } = string.Empty;
 
-  [Required, MaxLength(20)]
-  [RegularExpression("^(Vanilla|React|Angular)$", ErrorMessage = "Type must be Vanilla, React, or Angular")]
-  public string Type { get; set; } = string.Empty;
-
   public bool IsPublic { get; set; }
 }

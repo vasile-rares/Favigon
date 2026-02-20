@@ -32,14 +32,6 @@ public class ProjectRepository : IProjectRepository
     return _context.Projects.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
   }
 
-  public Task<bool> ExistsByUserAndRootPathAsync(int userId, string rootPath, int? excludeProjectId = null)
-  {
-    return _context.Projects.AnyAsync(p =>
-      p.UserId == userId &&
-      p.RootPath == rootPath &&
-      (!excludeProjectId.HasValue || p.Id != excludeProjectId.Value));
-  }
-
   public async Task<Project> AddAsync(Project project)
   {
     _context.Projects.Add(project);

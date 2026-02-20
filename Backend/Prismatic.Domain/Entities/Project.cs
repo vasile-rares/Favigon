@@ -17,12 +17,8 @@ public class Project
     [Required, MaxLength(100)]
     public string Name { get; set; } = null!;
 
-    [Required, MaxLength(20)]
-    [RegularExpression("^(Vanilla|React|Angular)$", ErrorMessage = "Type must be Vanilla, React, or Angular")]
-    public string Type { get; set; } = null!;
-
-    [Required, MaxLength(260)]
-    public string RootPath { get; set; } = null!;
+    [Required]
+    public string DesignJson { get; set; } = "{}";
 
     public bool IsPublic { get; set; }
 

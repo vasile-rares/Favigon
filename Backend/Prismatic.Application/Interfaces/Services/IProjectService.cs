@@ -11,7 +11,6 @@ public interface IProjectService
   Task<ProjectResponse> CreateAsync(ProjectCreateRequest request, int userId);
   Task<ProjectResponse?> UpdateAsync(int id, ProjectUpdateRequest request, int userId);
   Task<bool> DeleteAsync(int id, int userId);
-  Task<IReadOnlyList<ProjectFileEntryResponse>?> GetFilesAsync(int projectId, int userId);
-  Task<ProjectFileContentResponse?> GetFileContentAsync(int projectId, int userId, string relativePath);
-  Task<bool> UpdateFileContentAsync(int projectId, int userId, ProjectFileUpdateRequest request);
+  Task<ProjectDesignResponse?> GetDesignByProjectIdAsync(int projectId, int userId);
+  Task<ProjectDesignResponse?> SaveDesignAsync(int projectId, int userId, ProjectDesignSaveRequest request);
 }

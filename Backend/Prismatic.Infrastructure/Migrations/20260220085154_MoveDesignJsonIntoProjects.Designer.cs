@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Prismatic.Infrastructure.Context;
@@ -11,9 +12,11 @@ using Prismatic.Infrastructure.Context;
 namespace Prismatic.Infrastructure.Migrations
 {
     [DbContext(typeof(PrismaticDbContext))]
-    partial class PrismaticDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260220085154_MoveDesignJsonIntoProjects")]
+    partial class MoveDesignJsonIntoProjects
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -48,6 +51,10 @@ namespace Prismatic.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Type")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .ValueGeneratedOnAddOrUpdate()

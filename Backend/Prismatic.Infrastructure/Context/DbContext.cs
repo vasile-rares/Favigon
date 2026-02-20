@@ -42,6 +42,11 @@ public class PrismaticDbContext : Microsoft.EntityFrameworkCore.DbContext
             .Property(p => p.UpdatedAt)
             .HasDefaultValueSql("NOW()")
             .ValueGeneratedOnAddOrUpdate();
+
+        modelBuilder.Entity<Project>()
+            .Property(p => p.DesignJson)
+            .HasColumnType("jsonb")
+            .HasDefaultValue("{}");
     }
 
     public override int SaveChanges()

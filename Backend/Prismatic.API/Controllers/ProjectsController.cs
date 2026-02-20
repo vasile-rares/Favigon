@@ -93,8 +93,8 @@ public class ProjectsController : ControllerBase
     return deleted ? NoContent() : NotFound();
   }
 
-  [HttpGet("{id:int}/files")]
-  public async Task<IActionResult> GetFiles(int id)
+  [HttpGet("{id:int}/design")]
+  public async Task<IActionResult> GetDesign(int id)
   {
     var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
     if (!int.TryParse(userIdValue, out var userId))
@@ -102,17 +102,17 @@ public class ProjectsController : ControllerBase
       return Unauthorized();
     }
 
-    var files = await _projectService.GetFilesAsync(id, userId);
-    if (files == null)
+    var design = await _projectService.GetDesignByProjectIdAsync(id, userId);
+    if (design == null)
     {
       return NotFound();
     }
 
-    return Ok(files);
+    return Ok(design);
   }
 
-  [HttpGet("{id:int}/files/content")]
-  public async Task<IActionResult> GetFileContent(int id, [FromQuery] string path)
+  [HttpPut("{id:int}/design")]
+  public async Task<IActionResult> SaveDesign(int id, [FromBody] ProjectDesignSaveRequest request)
   {
     var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
     if (!int.TryParse(userIdValue, out var userId))
@@ -120,34 +120,13 @@ public class ProjectsController : ControllerBase
       return Unauthorized();
     }
 
-    var fileContent = await _projectService.GetFileContentAsync(id, userId, path);
-    if (fileContent == null)
+    var saved = await _projectService.SaveDesignAsync(id, userId, request);
+    if (saved == null)
     {
       return NotFound();
     }
 
-    return Ok(fileContent);
-  }
-
-  [HttpPut("{id:int}/files/content")]
-  [HttpPost("{id:int}/files/content")]
-  public async Task<IActionResult> UpdateFileContent(
-    int id,
-    [FromBody] ProjectFileUpdateRequest request)
-  {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
-    {
-      return Unauthorized();
-    }
-
-    if (request == null || string.IsNullOrWhiteSpace(request.Path))
-    {
-      return BadRequest();
-    }
-
-    var updated = await _projectService.UpdateFileContentAsync(id, userId, request);
-    return updated ? NoContent() : NotFound();
+    return Ok(saved);
   }
 
 }

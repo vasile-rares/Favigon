@@ -14,14 +14,12 @@ public class MappingProfile : Profile
 
     CreateMap<ProjectCreateRequest, Project>()
       .ForMember(dest => dest.Id, opt => opt.Ignore())
-      .ForMember(dest => dest.RootPath, opt => opt.Ignore())
       .ForMember(dest => dest.User, opt => opt.Ignore())
       .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
       .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
 
     CreateMap<ProjectUpdateRequest, Project>()
       .ForMember(dest => dest.Id, opt => opt.Ignore())
-      .ForMember(dest => dest.RootPath, opt => opt.Ignore())
       .ForMember(dest => dest.UserId, opt => opt.Ignore())
       .ForMember(dest => dest.User, opt => opt.Ignore())
       .ForMember(dest => dest.CreatedAt, opt => opt.Ignore());
