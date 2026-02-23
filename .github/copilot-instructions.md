@@ -24,6 +24,7 @@
 - Preserve cookie-based JWT authentication behavior unless a migration is explicitly requested.
 - Keep authorization at endpoint/service boundaries and enforce resource ownership checks.
 - Centralize exception-to-HTTP mapping in middleware; avoid duplicating error translation in controllers.
+- Ensure all error messages and user-facing text are in English; translate any Romanian text if found.
 
 ## Data and Persistence Conventions
 
@@ -47,9 +48,11 @@
 
 - Follow the design philosophy and component styling of **PrimeUI** (https://primeui.com/), specifically the Dark Mode theme.
 - Ensure all new UI components match the "premium" look and feel established in the Project Dashboard and Canvas.
+- Use CSS nesting to organize styles hierarchically and improve readability.
 
 ## Change Guidelines for AI Agents
 
 - Make minimal, focused changes and avoid unrelated refactors.
 - Keep public contracts stable unless explicitly asked to evolve them.
 - Favor consistency with existing naming, folder structure, and coding style over new patterns.
+- Avoid excessive or redundant comments.

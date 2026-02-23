@@ -137,10 +137,10 @@ export class AuthPage {
         localStorage.removeItem(this.rememberedEmailKey);
       }
 
-      this.successMessage.set(response.message || 'Login reușit.');
+      this.successMessage.set(response.message || 'Login successful.');
       this.router.navigate(['/dashboard']);
-    } catch (error) {
-      this.errorMessage.set(this.mapAuthError(error, 'Nu am putut face login.'));
+    } catch (error: any) {
+      this.errorMessage.set(error.error?.message || error.error?.title || 'Could not log in.');
     } finally {
       this.isSubmitting.set(false);
     }
@@ -168,39 +168,17 @@ export class AuthPage {
         }),
       );
 
-      this.successMessage.set(response.message || 'Cont creat cu succes.');
+      this.successMessage.set(response.message || 'Account created successfully.');
       this.switchMode('login');
       this.loginForm.patchValue({
         email: payload.email.trim(),
       });
-    } catch (error) {
-      this.errorMessage.set(this.mapAuthError(error, 'Nu am putut crea contul.'));
+    } catch (error: any) {
+      this.errorMessage.set(
+        error.error?.message || error.error?.title || 'Could not create account.',
+      );
     } finally {
       this.isSubmitting.set(false);
     }
-  }
-
-  private mapAuthError(error: unknown, fallback: string): string {
-    if (!(error instanceof HttpErrorResponse)) {
-      return fallback;
-    }
-
-    if (typeof error.error?.message === 'string' && error.error.message.trim().length > 0) {
-      return error.error.message;
-    }
-
-    if (error.status === 400) {
-      return 'Datele trimise nu sunt valide.';
-    }
-
-    if (error.status === 401) {
-      return 'Email sau parolă incorectă.';
-    }
-
-    if (error.status === 409) {
-      return 'Există deja un cont cu aceste date.';
-    }
-
-    return fallback;
   }
 }

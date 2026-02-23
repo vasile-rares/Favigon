@@ -1,0 +1,18 @@
+<div
+  class="alert relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground"
+  [class.bg-background]="variant === 'default'"
+  [class.text-foreground]="variant === 'default'"
+  [class.border-destructive-50]="variant === 'destructive'"
+  [class.text-destructive]="variant === 'destructive'"
+  [class.dark:border-destructive]="variant === 'destructive'"
+  [class.dest-bg]="variant === 'destructive'"
+
+  [class.border-success-50]="variant === 'success'"
+  [class.text-success]="variant === 'success'"
+  [class.dark:border-success]="variant === 'success'"
+  [class.success-bg]="variant === 'success'"
+  role="alert"
+>
+  <ng-content select="svg"></ng-content>
+  <ng-content></ng-content>
+</div>

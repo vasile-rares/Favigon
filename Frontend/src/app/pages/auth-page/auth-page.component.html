@@ -1,13 +1,9 @@
-@if (errorMessage()) {
-  <div class="fixed top-4 right-4 z-50 p-4 rounded-md bg-red-950/50 border border-red-900 text-red-200 text-sm">
-    {{ errorMessage() }}
-  </div>
-}
-
+<!-- Global Error/Success Messages if needed, but user asked to remove Alert Component -->
+<!-- We will rely on inline form errors for validation -->
 @if (successMessage()) {
-  <div class="fixed top-4 right-4 z-50 p-4 rounded-md bg-green-950/50 border border-green-900 text-green-200 text-sm">
-    {{ successMessage() }}
-  </div>
+    <div class="alert alert-success">
+        {{ successMessage() }}
+    </div>
 }
 
 <div class="card">
@@ -24,21 +20,35 @@
     @if (mode() === 'login') {
       <form [formGroup]="loginForm" (ngSubmit)="submitLogin()">
         <div class="field-group">
-          <div class="field">
-            <label class="field-label" for="login-email">Email address</label>
+          <div class="field" [class.error-text]="loginForm.controls.email.invalid && loginForm.controls.email.touched">
+            <label class="field-label" for="login-email">
+              Email address
+              @if (loginForm.controls.email.invalid && loginForm.controls.email.touched) {
+                <span class="error-text">*</span>
+              }
+            </label>
             <input
               id="login-email"
               type="email"
               class="input"
               placeholder="name@example.com"
               formControlName="email"
-              [class.border-red-500]="loginForm.controls.email.invalid && loginForm.controls.email.touched"
             >
+            @if (loginForm.controls.email.invalid && loginForm.controls.email.touched) {
+              <div class="field-error">
+                Please enter a valid email address.
+              </div>
+            }
           </div>
 
-          <div class="field">
+          <div class="field" [class.error-text]="loginForm.controls.password.invalid && loginForm.controls.password.touched">
             <div class="field-header">
-              <label class="field-label" for="login-password">Password</label>
+              <label class="field-label" for="login-password">
+                Password
+                @if (loginForm.controls.password.invalid && loginForm.controls.password.touched) {
+                  <span class="error-text">*</span>
+                }
+              </label>
               <a class="forgot-password" href="#">Forgot password?</a>
             </div>
             <div class="input-group">
@@ -52,24 +62,25 @@
               <div class="input-group-addon">
                 <button type="button" class="input-group-button" (click)="togglePasswordVisibility()" aria-label="Toggle password visibility">
                   @if (showPassword()) {
-                    <!-- ViewOffSlashIcon (Hugeicons style simulation) -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/>
-                      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/>
-                      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/>
-                      <line x1="2" x2="22" y1="2" y2="22"/>
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye-off"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
                   } @else {
-                    <!-- ViewIcon (Hugeicons style simulation) -->
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
-                      <circle cx="12" cy="12" r="3"/>
-                    </svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-eye"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
                   }
                 </button>
               </div>
             </div>
+            @if (loginForm.controls.password.invalid && loginForm.controls.password.touched) {
+              <div class="field-error">
+                Password is required.
+              </div>
+            }
           </div>
+
+          @if (errorMessage()) {
+            <div class="field-error">
+              {{ errorMessage() }}
+            </div>
+          }
 
           <button type="submit" class="btn btn-primary" [disabled]="isSubmitting()">
              {{ isSubmitting() ? 'Signing in...' : 'Sign in' }}
@@ -80,23 +91,58 @@
       <!-- Register Form Ported to New Style -->
       <form [formGroup]="registerForm" (ngSubmit)="submitRegister()">
         <div class="field-group">
-          <div class="field">
-            <label class="field-label" for="reg-displayname">Display Name</label>
+          <div class="field" [class.error-text]="registerForm.controls.displayName.invalid && registerForm.controls.displayName.touched">
+            <label class="field-label" for="reg-displayname">
+              Display Name
+              @if (registerForm.controls.displayName.invalid && registerForm.controls.displayName.touched) {
+                <span class="error-text">*</span>
+              }
+            </label>
             <input id="reg-displayname" type="text" class="input" placeholder="John Doe" formControlName="displayName">
+            @if (registerForm.controls.displayName.invalid && registerForm.controls.displayName.touched) {
+              <div class="field-error">Display Name is required.</div>
+            }
           </div>
 
-          <div class="field">
-            <label class="field-label" for="reg-username">Username</label>
+          <div class="field" [class.error-text]="registerForm.controls.username.invalid && registerForm.controls.username.touched">
+            <label class="field-label" for="reg-username">
+              Username
+              @if (registerForm.controls.username.invalid && registerForm.controls.username.touched) {
+                <span class="error-text">*</span>
+              }
+            </label>
             <input id="reg-username" type="text" class="input" placeholder="johndoe" formControlName="username">
+            @if (registerForm.controls.username.invalid && registerForm.controls.username.touched) {
+              <div class="field-error">
+                @if (registerForm.controls.username.hasError('required')) { Username is required. }
+                @else if (registerForm.controls.username.hasError('pattern')) { Username can only contain letters, numbers, and underscores. }
+              </div>
+            }
           </div>
 
-          <div class="field">
-            <label class="field-label" for="reg-email">Email address</label>
+          <div class="field" [class.error-text]="registerForm.controls.email.invalid && registerForm.controls.email.touched">
+            <label class="field-label" for="reg-email">
+              Email address
+              @if (registerForm.controls.email.invalid && registerForm.controls.email.touched) {
+                <span class="error-text">*</span>
+              }
+            </label>
             <input id="reg-email" type="email" class="input" placeholder="name@example.com" formControlName="email">
+            @if (registerForm.controls.email.invalid && registerForm.controls.email.touched) {
+              <div class="field-error">
+                 @if (registerForm.controls.email.hasError('required')) { Email is required. }
+                 @else if (registerForm.controls.email.hasError('email')) { Please enter a valid email address. }
+              </div>
+            }
           </div>
 
-          <div class="field">
-            <label class="field-label" for="reg-password">Password</label>
+          <div class="field" [class.error-text]="registerForm.controls.password.invalid && registerForm.controls.password.touched">
+            <label class="field-label" for="reg-password">
+              Password
+              @if (registerForm.controls.password.invalid && registerForm.controls.password.touched) {
+                <span class="error-text">*</span>
+              }
+            </label>
              <div class="input-group">
               <input
                 id="reg-password"
@@ -125,10 +171,29 @@
                 </button>
               </div>
             </div>
+            @if (registerForm.controls.password.invalid && registerForm.controls.password.touched) {
+               <div class="password-requirements">
+                 @if (registerForm.controls.password.hasError('pattern') || registerForm.controls.password.hasError('minlength')) {
+                    <div class="requirement-item">
+                       <div class="requirement-bullet"></div> Must be at least 8 characters.
+                    </div>
+                    <div class="requirement-item">
+                       <div class="requirement-bullet"></div> Must contain at least one number, one uppercase, and one lowercase letter.
+                    </div>
+                 } @else if (registerForm.controls.password.hasError('required')) {
+                    <div class="field-error">Password is required.</div>
+                 }
+               </div>
+            }
           </div>
 
-          <div class="field">
-            <label class="field-label" for="reg-confirm">Confirm Password</label>
+          <div class="field" [class.error-text]="registerForm.controls.confirmPassword.invalid && registerForm.controls.confirmPassword.touched">
+            <label class="field-label" for="reg-confirm">
+              Confirm Password
+              @if (registerForm.controls.confirmPassword.invalid && registerForm.controls.confirmPassword.touched) {
+                <span class="error-text">*</span>
+              }
+            </label>
              <input
                 id="reg-confirm"
                 type="password"
@@ -136,7 +201,19 @@
                 placeholder="Confirm your password"
                 formControlName="confirmPassword"
               >
+              @if (registerForm.controls.confirmPassword.invalid && registerForm.controls.confirmPassword.touched) {
+                <div class="field-error">
+                   @if (registerForm.controls.confirmPassword.hasError('required')) { Please confirm your password. }
+                   @else if (registerForm.controls.confirmPassword.hasError('passwordMismatch')) { Passwords do not match. }
+                </div>
+              }
           </div>
+
+          @if (errorMessage()) {
+            <div class="field-error">
+              {{ errorMessage() }}
+            </div>
+          }
 
           <button type="submit" class="btn btn-primary" [disabled]="isSubmitting()">
              {{ isSubmitting() ? 'Creating account...' : 'Create account' }}
@@ -159,17 +236,16 @@
     </button>
   </div>
 
-  <div class="card-footer" style="flex-direction: column; gap: 1rem;">
+  <div class="card-footer">
     <p class="terms-text">
       By clicking continue, you agree to our <a href="#" class="terms-link">Terms of Service</a>
     </p>
 
-    <p class="terms-text" style="color: #71717a;">
+    <p class="footer-text">
       {{ mode() === 'login' ? "Don't have an account?" : "Already have an account?" }}
       <button
         type="button"
-        class="terms-link"
-        style="background: none; border: none; padding: 0; cursor: pointer; font-size: inherit; font-family: inherit;"
+        class="footer-action-btn"
         (click)="switchMode(mode() === 'login' ? 'register' : 'login')">
         {{ mode() === 'login' ? 'Sign up' : 'Sign in' }}
       </button>
