@@ -1,0 +1,116 @@
+<div class="canvas-layout">
+  <nav class="top-bar">
+    <div class="top-bar-left">
+      <div class="logo-button">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L2 22H22L12 2Z" fill="url(#paint0_linear)" stroke="white" stroke-width="2" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="paint0_linear" x1="12" y1="2" x2="12" y2="22" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#FF3366"/>
+              <stop offset="1" stop-color="#BA265D"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+
+      <div class="breadcrumbs">
+        <div class="breadcrumb-item">
+          <span class="org-color"></span>
+          <span>My Organization</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+        <div class="breadcrumb-separator">/</div>
+        <div class="breadcrumb-item">
+          <span>Acme Corp.</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="top-bar-center">
+      <!-- Optional: File Name or Actions -->
+    </div>
+
+    <div class="top-bar-right">
+      <button class="icon-text-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Feedback</span>
+      </button>
+      <button class="icon-text-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        <span>Project settings</span>
+      </button>
+      <button class="icon-btn" title="Open folder">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      </button>
+      <div class="user-avatar">
+        <div class="avatar-circle"></div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="workspace">
+    <aside class="toolbar">
+      <!-- <div class="toolbar-header">
+        <h2>Prismatic</h2>
+      </div> -->
+      <!-- Removed header since we have top bar now -->
+      <div class="tools">
+        <button
+          [class.active]="currentTool() === 'select'"
+          (click)="selectTool('select')"
+          title="Selectează (V)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>
+        </button>
+        <button
+          [class.active]="currentTool() === 'frame'"
+          (click)="selectTool('frame')"
+          title="Cadru (F)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        </button>
+        <button
+          [class.active]="currentTool() === 'rectangle'"
+          (click)="selectTool('rectangle')"
+          title="Dreptunghi (R)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+        </button>
+        <button
+          [class.active]="currentTool() === 'circle'"
+          (click)="selectTool('circle')"
+          title="Cerc (O)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+        </button>
+        <button
+          [class.active]="currentTool() === 'text'"
+          (click)="selectTool('text')"
+          title="Text (T)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <main class="canvas-container" (click)="onCanvasClick($event)">
+      <div
+        *ngFor="let el of elements()"
+        class="canvas-element"
+        [class.selected]="selectedElementId() === el.id"
+        [class.frame]="el.type === 'frame'"
+        [class.rectangle]="el.type === 'rectangle'"
+        [class.circle]="el.type === 'circle'"
+        [class.text]="el.type === 'text'"
+        [style.left.px]="el.x"
+        [style.top.px]="el.y"
+        [style.width.px]="el.width"
+        [style.height.px]="el.height"
+        [style.background-color]="el.type !== 'text' ? el.fill : 'transparent'"
+        (pointerdown)="onElementPointerDown($event, el.id)">
+
+        <ng-container *ngIf="el.type === 'text'">
+          <span [style.font-size.px]="el.fontSize">{{ el.text }}</span>
+        </ng-container>
+
+        <div class="selection-outline" *ngIf="selectedElementId() === el.id"></div>
+      </div>
+    </main>
+  </div>
+</div>
