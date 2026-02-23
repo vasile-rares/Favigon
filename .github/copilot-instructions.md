@@ -43,6 +43,11 @@
 - Preserve credentialed frontend requests for authenticated API flows unless auth strategy is intentionally changed.
 - When introducing new backend capabilities, ensure frontend service contracts are updated in the same change.
 
+## Design & UI Guidelines
+
+- Follow the design philosophy and component styling of **PrimeUI** (https://primeui.com/), specifically the Dark Mode theme.
+- Ensure all new UI components match the "premium" look and feel established in the Project Dashboard and Canvas.
+
 ## Change Guidelines for AI Agents
 
 - Make minimal, focused changes and avoid unrelated refactors.

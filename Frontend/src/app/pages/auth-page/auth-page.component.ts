@@ -138,7 +138,7 @@ export class AuthPage {
       }
 
       this.successMessage.set(response.message || 'Login reușit.');
-      this.router.navigate(['/canvas']);
+      this.router.navigate(['/dashboard']);
     } catch (error) {
       this.errorMessage.set(this.mapAuthError(error, 'Nu am putut face login.'));
     } finally {

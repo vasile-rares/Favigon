@@ -1,175 +1,178 @@
-<div class="auth-page">
-  <div class="auth-card">
-    <h1>Prismatic Auth</h1>
+@if (errorMessage()) {
+  <div class="fixed top-4 right-4 z-50 p-4 rounded-md bg-red-950/50 border border-red-900 text-red-200 text-sm">
+    {{ errorMessage() }}
+  </div>
+}
 
-    <div class="mode-toggle">
-      <button
-        type="button"
-        [class.active]="mode() === 'login'"
-        (click)="switchMode('login')">
-        Login
-      </button>
-      <button
-        type="button"
-        [class.active]="mode() === 'register'"
-        (click)="switchMode('register')">
-        Register
-      </button>
-    </div>
+@if (successMessage()) {
+  <div class="fixed top-4 right-4 z-50 p-4 rounded-md bg-green-950/50 border border-green-900 text-green-200 text-sm">
+    {{ successMessage() }}
+  </div>
+}
 
-    @if (errorMessage()) {
-      <div class="message error">{{ errorMessage() }}</div>
-    }
+<div class="card">
+  <div class="card-header">
+    <h1 class="card-title">
+      {{ mode() === 'login' ? 'Sign in' : 'Create an account' }}
+    </h1>
+    <p class="card-description">
+      {{ mode() === 'login' ? 'Enter your email and password to access your account' : 'Enter your details below to create your account' }}
+    </p>
+  </div>
 
-    @if (successMessage()) {
-      <div class="message success">{{ successMessage() }}</div>
-    }
-
+  <div class="card-content">
     @if (mode() === 'login') {
-      <form [formGroup]="loginForm" (ngSubmit)="submitLogin()" novalidate>
-        <label>
-          Email
-          <input type="email" formControlName="email" />
-        </label>
-        @if (loginForm.controls.email.touched && loginForm.controls.email.errors) {
-          <p class="field-error">
-            @if (loginForm.controls.email.errors['required']) {
-              Email-ul este obligatoriu.
-            } @else if (loginForm.controls.email.errors['email']) {
-              Email-ul nu este valid.
-            } @else {
-              Email-ul depășește limita permisă.
-            }
-          </p>
-        }
-
-        <label>
-          Parolă
-          <div class="password-input-wrapper">
-            <input [type]="showPassword() ? 'text' : 'password'" formControlName="password" />
-            <button type="button" class="toggle-password" (click)="togglePasswordVisibility()" tabindex="-1">
-              @if (showPassword()) {
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-              } @else {
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-              }
-            </button>
+      <form [formGroup]="loginForm" (ngSubmit)="submitLogin()">
+        <div class="field-group">
+          <div class="field">
+            <label class="field-label" for="login-email">Email address</label>
+            <input
+              id="login-email"
+              type="email"
+              class="input"
+              placeholder="name@example.com"
+              formControlName="email"
+              [class.border-red-500]="loginForm.controls.email.invalid && loginForm.controls.email.touched"
+            >
           </div>
-        </label>
-        @if (loginForm.controls.password.touched && loginForm.controls.password.errors) {
-          <p class="field-error">
-            @if (loginForm.controls.password.errors['required']) {
-              Parola este obligatorie.
-            } @else {
-              Parola depășește limita permisă.
-            }
-          </p>
-        }
 
-        <label class="remember-me">
-          <input type="checkbox" formControlName="rememberMe" />
-          Remember me
-        </label>
+          <div class="field">
+            <div class="field-header">
+              <label class="field-label" for="login-password">Password</label>
+              <a class="forgot-password" href="#">Forgot password?</a>
+            </div>
+            <div class="input-group">
+              <input
+                id="login-password"
+                [type]="showPassword() ? 'text' : 'password'"
+                class="input input-group-input"
+                placeholder="Password"
+                formControlName="password"
+              >
+              <div class="input-group-addon">
+                <button type="button" class="input-group-button" (click)="togglePasswordVisibility()" aria-label="Toggle password visibility">
+                  @if (showPassword()) {
+                    <!-- ViewOffSlashIcon (Hugeicons style simulation) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/>
+                      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/>
+                      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/>
+                      <line x1="2" x2="22" y1="2" y2="22"/>
+                    </svg>
+                  } @else {
+                    <!-- ViewIcon (Hugeicons style simulation) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
 
-        <button type="submit" [disabled]="isSubmitting()">
-          {{ isSubmitting() ? 'Se procesează...' : 'Login' }}
-        </button>
+          <button type="submit" class="btn btn-primary" [disabled]="isSubmitting()">
+             {{ isSubmitting() ? 'Signing in...' : 'Sign in' }}
+          </button>
+        </div>
       </form>
     } @else {
-      <form [formGroup]="registerForm" (ngSubmit)="submitRegister()" novalidate>
-        <label>
-          Nume afișat
-          <input type="text" formControlName="displayName" />
-        </label>
-        @if (registerForm.controls.displayName.touched && registerForm.controls.displayName.errors) {
-          <p class="field-error">
-            @if (registerForm.controls.displayName.errors['required']) {
-              Numele afișat este obligatoriu.
-            } @else {
-              Numele afișat este prea lung.
-            }
-          </p>
-        }
-
-        <label>
-          Username
-          <input type="text" formControlName="username" />
-        </label>
-        @if (registerForm.controls.username.touched && registerForm.controls.username.errors) {
-          <p class="field-error">
-            @if (registerForm.controls.username.errors['required']) {
-              Username-ul este obligatoriu.
-            } @else if (registerForm.controls.username.errors['pattern']) {
-              Username-ul acceptă doar litere mici, cifre și _.
-            } @else {
-              Username-ul este prea lung.
-            }
-          </p>
-        }
-
-        <label>
-          Email
-          <input type="email" formControlName="email" />
-        </label>
-        @if (registerForm.controls.email.touched && registerForm.controls.email.errors) {
-          <p class="field-error">
-            @if (registerForm.controls.email.errors['required']) {
-              Email-ul este obligatoriu.
-            } @else if (registerForm.controls.email.errors['email']) {
-              Email-ul nu este valid.
-            } @else {
-              Email-ul depășește limita permisă.
-            }
-          </p>
-        }
-
-        <label>
-          Parolă
-          <div class="password-input-wrapper">
-            <input [type]="showPassword() ? 'text' : 'password'" formControlName="password" />
-            <button type="button" class="toggle-password" (click)="togglePasswordVisibility()" tabindex="-1">
-              @if (showPassword()) {
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>
-              } @else {
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-              }
-            </button>
+      <!-- Register Form Ported to New Style -->
+      <form [formGroup]="registerForm" (ngSubmit)="submitRegister()">
+        <div class="field-group">
+          <div class="field">
+            <label class="field-label" for="reg-displayname">Display Name</label>
+            <input id="reg-displayname" type="text" class="input" placeholder="John Doe" formControlName="displayName">
           </div>
-        </label>
-        @if (registerForm.controls.password.touched && registerForm.controls.password.errors) {
-          <p class="field-error">
-            @if (registerForm.controls.password.errors['required']) {
-              Parola este obligatorie.
-            } @else if (registerForm.controls.password.errors['minlength']) {
-              Parola trebuie să aibă minim 8 caractere.
-            } @else if (registerForm.controls.password.errors['weakPassword']) {
-              Parola trebuie să conțină literă mare, literă mică și cifră.
-            } @else {
-              Parola depășește limita permisă.
-            }
-          </p>
-        }
 
-        <label>
-          Confirmă parola
-          <div class="password-input-wrapper">
-            <input [type]="showPassword() ? 'text' : 'password'" formControlName="confirmPassword" />
+          <div class="field">
+            <label class="field-label" for="reg-username">Username</label>
+            <input id="reg-username" type="text" class="input" placeholder="johndoe" formControlName="username">
           </div>
-        </label>
-        @if (registerForm.controls.confirmPassword.touched && registerForm.controls.confirmPassword.errors) {
-          <p class="field-error">
-            @if (registerForm.controls.confirmPassword.errors['required']) {
-              Confirmarea parolei este obligatorie.
-            } @else {
-              Parolele nu se potrivesc.
-            }
-          </p>
-        }
 
-        <button type="submit" [disabled]="isSubmitting()">
-          {{ isSubmitting() ? 'Se procesează...' : 'Register' }}
-        </button>
+          <div class="field">
+            <label class="field-label" for="reg-email">Email address</label>
+            <input id="reg-email" type="email" class="input" placeholder="name@example.com" formControlName="email">
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="reg-password">Password</label>
+             <div class="input-group">
+              <input
+                id="reg-password"
+                [type]="showPassword() ? 'text' : 'password'"
+                class="input input-group-input"
+                placeholder="Create a password"
+                formControlName="password"
+              >
+              <div class="input-group-addon">
+                <button type="button" class="input-group-button" (click)="togglePasswordVisibility()">
+                   @if (showPassword()) {
+                    <!-- ViewOffSlashIcon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/>
+                      <path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/>
+                      <path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/>
+                      <line x1="2" x2="22" y1="2" y2="22"/>
+                    </svg>
+                  } @else {
+                    <!-- ViewIcon -->
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/>
+                      <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="reg-confirm">Confirm Password</label>
+             <input
+                id="reg-confirm"
+                type="password"
+                class="input"
+                placeholder="Confirm your password"
+                formControlName="confirmPassword"
+              >
+          </div>
+
+          <button type="submit" class="btn btn-primary" [disabled]="isSubmitting()">
+             {{ isSubmitting() ? 'Creating account...' : 'Create account' }}
+          </button>
+        </div>
       </form>
     }
+
+    <div class="field-separator">
+      <span>Or continue with</span>
+    </div>
+
+    <button type="button" class="btn btn-outline">
+      <!-- GithubIcon -->
+      <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="currentColor" class="icon icon-mr" width="24" height="24">
+        <title>GitHub</title>
+        <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+      </svg>
+      Github
+    </button>
+  </div>
+
+  <div class="card-footer" style="flex-direction: column; gap: 1rem;">
+    <p class="terms-text">
+      By clicking continue, you agree to our <a href="#" class="terms-link">Terms of Service</a>
+    </p>
+
+    <p class="terms-text" style="color: #71717a;">
+      {{ mode() === 'login' ? "Don't have an account?" : "Already have an account?" }}
+      <button
+        type="button"
+        class="terms-link"
+        style="background: none; border: none; padding: 0; cursor: pointer; font-size: inherit; font-family: inherit;"
+        (click)="switchMode(mode() === 'login' ? 'register' : 'login')">
+        {{ mode() === 'login' ? 'Sign up' : 'Sign in' }}
+      </button>
+    </p>
   </div>
 </div>

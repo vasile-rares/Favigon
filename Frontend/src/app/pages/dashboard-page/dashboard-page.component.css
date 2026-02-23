@@ -1,0 +1,334 @@
+:host {
+  display: block;
+  height: 100vh;
+  width: 100vw;
+  background-color: #080808; /* Dark background matching canvas */
+  color: #e4e4e7; /* PrimeUI inspired text color */
+  overflow: hidden;
+  font-family: inherit; /* Should inherit from body/var(--font-sans) */
+}
+
+.dashboard-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* --- Top Bar (Consistent with Canvas) --- */
+.top-bar {
+  height: 48px;
+  background-color: #080808;
+  border-bottom: 1px solid #27272a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1rem;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.top-bar .top-bar-left,
+.top-bar .top-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.logo-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  cursor: pointer;
+}
+
+.logo-button svg {
+  transition: transform 0.2s ease;
+}
+
+.logo-button:hover svg {
+  transform: rotate(5deg);
+}
+
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #a1a1aa;
+}
+
+.breadcrumbs .breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: default;
+}
+
+.breadcrumbs .breadcrumb-item.active {
+  color: #e4e4e7;
+  font-weight: 500;
+}
+
+.breadcrumb-separator {
+  color: #52525b;
+}
+
+.org-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
+}
+
+.icon-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #a1a1aa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+  background-color: #27272a;
+  color: #e4e4e7;
+}
+
+.user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
+  cursor: pointer;
+  border: 1px solid #27272a;
+  transition: box-shadow 0.2s;
+}
+
+.user-avatar:hover {
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+}
+
+/* --- Main Content --- */
+.dashboard-content {
+  flex: 1;
+  padding: 2rem 3rem;
+  overflow-y: auto;
+}
+
+/* Scrollbar Styling */
+.dashboard-content::-webkit-scrollbar {
+  width: 6px;
+}
+.dashboard-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.dashboard-content::-webkit-scrollbar-thumb {
+  background: #3f3f46;
+  border-radius: 3px;
+}
+
+.content-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 2.5rem;
+  border-bottom: 1px solid #27272a;
+  padding-bottom: 1rem;
+}
+
+.content-header .header-texts h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: #f4f4f5;
+  margin: 0 0 0.5rem 0;
+  letter-spacing: -0.02em;
+}
+.content-header .header-texts p {
+  color: #a1a1aa;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.primary-btn {
+  background-color: #efefef;
+  color: #09090b;
+  border: none;
+  padding: 0.65rem 1.25rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.primary-btn:hover {
+  background-color: #ffffff;
+  transform: translateY(-1px);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.primary-btn:active {
+  transform: translateY(0);
+  background-color: #e4e4e7;
+}
+
+.primary-btn svg {
+  stroke-width: 2.5;
+}
+
+/* --- Project Grid & Cards --- */
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+.project-card {
+  background-color: #18181b; /* Subtle card bg */
+  border: 1px solid #27272a;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+  display: flex;
+  flex-direction: column;
+  height: 220px;
+  position: relative;
+}
+
+.project-card:hover {
+  border-color: #3f3f46;
+  transform: translateY(-2px);
+  box-shadow:
+    0 10px 15px -3px rgba(0, 0, 0, 0.5),
+    0 4px 6px -2px rgba(0, 0, 0, 0.3);
+}
+
+.project-card:hover .project-overlay {
+  opacity: 1;
+}
+
+.project-card:hover .card-preview .preview-placeholder svg {
+  stroke: #71717a;
+  transform: scale(1.05);
+}
+
+.card-preview {
+  flex: 1; /* Takes remaining space */
+  background-color: #09090b; /* Darker than card body */
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.card-preview .preview-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, #27272a 1px, transparent 1px);
+  background-size: 20px 20px; /* Dot pattern */
+}
+
+.card-preview .preview-placeholder svg {
+  transition: all 0.3s ease;
+}
+
+.project-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.project-overlay .open-btn {
+  background-color: #ffffff;
+  color: #000;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.project-overlay .open-btn:hover {
+  background-color: #f4f4f5;
+}
+
+.card-info {
+  padding: 1rem;
+  background-color: #18181b;
+  border-top: 1px solid #27272a;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-info .info-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.card-info .info-main h3 {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #f4f4f5;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.card-info .info-main .edited-date {
+  font-size: 0.75rem;
+  color: #71717a;
+}
+
+.card-info .options-btn {
+  background: transparent;
+  border: none;
+  color: #71717a;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.card-info .options-btn:hover {
+  background-color: #27272a;
+  color: #e4e4e7;
+}
