@@ -5,7 +5,7 @@
 .user-menu__trigger {
   border: 0;
   background: transparent;
-  color: #f4f4f5;
+  color: var(--color-zinc-100);
   display: flex;
   align-items: center;
   gap: 0.45rem;
@@ -14,16 +14,16 @@
   transition: color 0.2s ease;
 
   &:hover {
-    color: #ffffff;
+    color: var(--color-white);
   }
 }
 
 .user-menu__trigger-avatar {
   width: 30px;
   height: 30px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   overflow: hidden;
-  background: #27272a;
+  background: var(--color-zinc-800);
   flex-shrink: 0;
 
   img {
@@ -34,7 +34,7 @@
 }
 
 .user-menu__trigger-icon {
-  color: #a1a1aa;
+  color: var(--color-zinc-400);
   display: inline-flex;
 }
 
@@ -48,10 +48,10 @@
   right: 0;
   top: calc(100% + 0.5rem);
   width: 256px;
-  border-radius: 16px;
-  border: 1px solid #27272a;
-  background: #101114;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: var(--color-panel-bg);
+  box-shadow: var(--shadow-dropdown);
   overflow: hidden;
   z-index: 40;
 }
@@ -66,9 +66,9 @@
 .user-menu__identity-avatar {
   width: 44px;
   height: 44px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   overflow: hidden;
-  background: #27272a;
+  background: var(--color-zinc-800);
   flex-shrink: 0;
 
   img {
@@ -85,7 +85,7 @@
 }
 
 .user-menu__identity-name {
-  color: #fafafa;
+  color: var(--color-primary-text);
   font-size: 1rem;
   font-weight: 600;
   line-height: 1.2;
@@ -95,7 +95,7 @@
 }
 
 .user-menu__identity-email {
-  color: #a1a1aa;
+  color: var(--color-secondary-text);
   font-size: 0.75rem;
   line-height: 1.2;
   white-space: nowrap;
@@ -105,14 +105,15 @@
 
 .user-menu__divider {
   height: 1px;
-  background: #27272a;
+  background: var(--color-border);
 }
 
 .user-menu__item {
+  position: relative;
   width: 100%;
   border: 0;
   background: transparent;
-  color: #e4e4e7;
+  color: var(--color-zinc-200);
   display: flex;
   align-items: center;
   gap: 0.75rem;
@@ -120,34 +121,49 @@
   font-size: 1rem;
   text-align: left;
   cursor: pointer;
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
+  z-index: 1;
+  transition: color 0.2s ease;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: var(--radius-md);
+    background: transparent;
+    z-index: -1;
+    transition: background-color 0.2s ease;
+  }
 
   &:hover {
-    background: #17191f;
-    color: #fff;
+    color: var(--color-white);
+
+    &::before {
+      background: var(--color-item-hover-bg);
+    }
   }
 }
 
 .user-menu__item-icon {
-  color: #d4d4d8;
+  color: var(--color-zinc-300);
   display: inline-flex;
 }
 
 .user-menu__item--danger {
-  color: #f87171;
+  color: var(--color-danger);
 
   .user-menu__item-icon {
-    color: #f87171;
+    color: var(--color-danger);
   }
 
   &:hover {
-    background: rgba(248, 113, 113, 0.12);
-    color: #fb7185;
+    color: var(--color-danger);
+
+    &::before {
+      background: var(--color-danger-bg-subtle);
+    }
 
     .user-menu__item-icon {
-      color: #fb7185;
+      color: var(--color-danger);
     }
   }
 }

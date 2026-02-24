@@ -1,7 +1,7 @@
 .header-bar {
   height: 54px;
-  background-color: #080808;
-  border-bottom: 1px solid #27272a;
+  background-color: var(--color-bg-dark);
+  border-bottom: 1px solid var(--color-zinc-800);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -11,7 +11,8 @@
 }
 
 .header-bar--strong-divider {
-  border-bottom: 3px solid #111;
+  border-bottom: 3px solid #111; /* Keep or replace? #111 is very dark grey. Zinc 950 is #09090b. Let's use Zinc 900 or 950. */
+  border-bottom-color: var(--color-zinc-950);
 }
 
 .header-section {
@@ -28,7 +29,7 @@
 }
 
 .context-brand {
-  color: #f4f4f5;
+  color: var(--color-zinc-100);
   font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -43,16 +44,16 @@
   transition: background-color 0.2s;
 
   &:hover {
-    background-color: #27272a;
+    background-color: var(--color-zinc-800);
   }
 }
 
 .context-item--active {
-  color: #e4e4e7;
+  color: var(--color-zinc-200);
 }
 
 .context-separator {
-  color: #52525b;
+  color: var(--color-zinc-600);
   font-size: 0.875rem;
 }
 
@@ -61,7 +62,7 @@
   height: 26px;
   border-radius: 50%;
   overflow: hidden;
-  background-color: #27272a;
+  background-color: var(--color-zinc-800);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,8 +84,8 @@
 }
 
 .context-icon--file {
-  background-color: rgba(14, 165, 233, 0.1);
-  color: #38bdf8;
+  background-color: var(--color-sky-500-10);
+  color: var(--color-sky-400);
 }
 
 .context-text-group {
@@ -95,13 +96,13 @@
 }
 
 .context-title {
-  color: #e4e4e7;
+  color: var(--color-zinc-200);
   font-size: 0.875rem;
   font-weight: 500;
 }
 
 .context-subtitle {
-  color: #a1a1aa;
+  color: var(--color-zinc-400);
   font-size: 0.78rem;
 }
 
@@ -109,7 +110,7 @@
 .header-icon-btn {
   background: transparent;
   border: 1px solid transparent;
-  color: #a1a1aa;
+  color: var(--color-zinc-400);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -122,8 +123,8 @@
   transition: all 0.2s ease;
 
   &:hover {
-    background-color: #27272a;
-    color: #e4e4e7;
+    background-color: var(--color-zinc-800);
+    color: var(--color-zinc-200);
   }
 }
 

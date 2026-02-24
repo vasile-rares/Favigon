@@ -4,17 +4,17 @@
   width: 100%;
   align-items: center;
   justify-content: center;
-  background-color: #080808;
+  background-color: var(--color-bg-dark);
   font-family: inherit;
-  color: #e4e4e7;
+  color: var(--color-zinc-200);
 }
 
 .auth-box {
   width: 100%;
   max-width: 350px;
   border-radius: 1rem;
-  border: 1px solid #27272a;
-  background-color: #171717;
+  border: 1px solid var(--color-zinc-800);
+  background-color: var(--color-neutral-900);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   overflow: hidden;
 
@@ -29,13 +29,13 @@
       font-weight: 600;
       line-height: 1;
       letter-spacing: -0.025em;
-      color: #f4f4f5;
+      color: var(--color-zinc-100);
       margin: 0;
     }
 
     .subtitle-muted {
       font-size: 0.875rem;
-      color: #a1a1aa;
+      color: var(--color-zinc-400);
       margin: 0;
     }
   }
@@ -45,8 +45,8 @@
   }
 
   .auth-footer {
-    background-color: #1e1e1e;
-    border-top: 1px solid #27272a;
+    background-color: var(--color-zinc-900);
+    border-top: 1px solid var(--color-zinc-800);
     padding: 1rem 1.5rem;
     display: flex;
     flex-direction: column;
@@ -55,7 +55,7 @@
 
     .switch-account-text {
       font-size: 0.8rem;
-      color: #71717a;
+      color: var(--color-zinc-500);
       text-align: center;
       margin: 0;
     }
@@ -67,12 +67,12 @@
       cursor: pointer;
       font-size: inherit;
       font-family: inherit;
-      color: #e4e4e7;
+      color: var(--color-zinc-200);
       text-decoration: underline;
       text-underline-offset: 4px;
 
       &:hover {
-        color: #f4f4f5;
+        color: var(--color-zinc-100);
       }
     }
   }
@@ -91,7 +91,7 @@
 
   &.failed-validation {
     .input-label {
-      color: #ef4444 !important;
+      color: var(--color-red-500) !important;
     }
   }
 
@@ -102,13 +102,13 @@
 
     .forgot-link {
       font-size: 0.75rem;
-      color: #a1a1aa;
+      color: var(--color-zinc-400);
       text-decoration: none;
       text-underline-offset: 4px;
 
       &:hover {
         text-decoration: underline;
-        color: #f4f4f5;
+        color: var(--color-zinc-100);
       }
     }
   }
@@ -117,7 +117,7 @@
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1;
-    color: #e4e4e7;
+    color: var(--color-zinc-200);
     cursor: pointer;
   }
 }
@@ -129,8 +129,8 @@
   align-items: center;
 
   &:has(.text-input.ng-invalid.ng-touched) {
-    border-color: #ef4444 !important;
-    color: #ef4444;
+    border-color: var(--color-red-500) !important;
+    color: var(--color-red-500);
   }
 
   .padded-input {
@@ -156,15 +156,15 @@
       border-radius: 0.25rem;
       border: none;
       background: transparent;
-      color: #a1a1aa;
+      color: var(--color-zinc-400);
       cursor: pointer;
       transition:
         color 0.2s,
         background-color 0.2s;
 
       &:hover {
-        color: #f4f4f5;
-        background-color: #27272a;
+        color: var(--color-zinc-100);
+        background-color: var(--color-zinc-800);
       }
     }
   }
@@ -175,27 +175,29 @@
   height: 2.25rem;
   width: 100%;
   border-radius: 0.75rem;
-  border: 1px solid #424242;
-  background-color: #212121;
+  border: 1px solid #424242; /* Zinc 700ish? Zinc 700 is 3f3f46. 424242 is Grey 800. I'll use zinc-700 */
+  border-color: var(--color-zinc-700);
+  background-color: #212121; /* Grey 900. Zinc 900 is 18181b. I'll use Zinc 900 or Neutral 900? Let's use Zinc 800/900 mix. Zinc 800 is 27272a (lighter). I'll use Zinc 900. */
+  background-color: var(--color-zinc-900);
   padding: 0.25rem 0.75rem;
   font-size: 0.875rem;
-  color: #f4f4f5;
+  color: var(--color-zinc-100);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   transition: all 0.2s;
 
   &::placeholder {
-    color: #52525b;
+    color: var(--color-zinc-600);
   }
 
   &:focus-visible {
     outline: none;
-    border-color: #e4e4e7;
-    box-shadow: 0 0 0 1px #27272a;
+    border-color: var(--color-zinc-200);
+    box-shadow: 0 0 0 1px var(--color-zinc-800);
   }
 
   &.ng-invalid.ng-touched {
-    border-color: #ef4444 !important;
-    color: #ef4444;
+    border-color: var(--color-red-500) !important;
+    color: var(--color-red-500);
   }
 }
 
