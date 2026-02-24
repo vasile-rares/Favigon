@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   AbstractControl,
   FormBuilder,
@@ -10,6 +10,7 @@ import {
 } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
+import { environment } from '../../../environments/environment';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const EMAIL_MAX_LENGTH = 100;
@@ -41,6 +42,7 @@ export class AuthPage implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
   private static readonly REMEMBER_EMAIL_KEY = 'prismatic.rememberedEmail';
 
@@ -81,6 +83,7 @@ export class AuthPage implements OnInit {
 
   ngOnInit() {
     this.checkRememberedEmail();
+    void this.tryGithubCallbackLogin();
   }
 
   // --- Actions ---
@@ -166,6 +169,26 @@ export class AuthPage implements OnInit {
     }
   }
 
+  startGithubLogin() {
+    const clientId = environment.githubClientId?.trim();
+    if (!clientId) {
+      this.statusMessage.set({
+        type: 'error',
+        text: 'GitHub login is not configured in frontend environment.',
+      });
+      return;
+    }
+
+    const redirectUri = `${window.location.origin}/login`;
+    const githubAuthorizeUrl =
+      `https://github.com/login/oauth/authorize` +
+      `?client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&scope=${encodeURIComponent('read:user user:email')}`;
+
+    window.location.href = githubAuthorizeUrl;
+  }
+
   // --- Private Helpers ---
 
   /** Cross-field validator for password matching attached to the FormGroup */
@@ -210,6 +233,25 @@ export class AuthPage implements OnInit {
   private startLoading() {
     this.isSubmitting.set(true);
     this.statusMessage.set(null);
+  }
+
+  private async tryGithubCallbackLogin() {
+    const code = this.route.snapshot.queryParamMap.get('code');
+    if (!code) {
+      return;
+    }
+
+    this.startLoading();
+
+    try {
+      await firstValueFrom(this.authService.loginWithGithub({ code }));
+      await this.router.navigate(['/dashboard']);
+    } catch (error: any) {
+      this.handleError(error, 'Could not authenticate with GitHub.');
+      await this.router.navigate(['/login'], { replaceUrl: true });
+    } finally {
+      this.isSubmitting.set(false);
+    }
   }
 
   private handleError(error: any, defaultMsg: string) {

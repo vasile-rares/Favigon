@@ -10,6 +10,10 @@ export interface RegisterRequest {
   password: string;
 }
 
+export interface GithubAuthRequest {
+  code: string;
+}
+
 export interface AuthMessageResponse {
   message: string;
 }

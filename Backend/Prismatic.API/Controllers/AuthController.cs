@@ -37,6 +37,14 @@ public class AuthController : ControllerBase
     return Ok(new { message = "Login successful." });
   }
 
+  [HttpPost("github")]
+  public async Task<IActionResult> LoginWithGithub([FromBody] GithubAuthRequest request)
+  {
+    var response = await _authService.LoginWithGithubAsync(request);
+    SetTokenCookie(response.Token);
+    return Ok(new { message = "GitHub authentication successful." });
+  }
+
   [HttpPost("logout")]
   public IActionResult Logout()
   {
