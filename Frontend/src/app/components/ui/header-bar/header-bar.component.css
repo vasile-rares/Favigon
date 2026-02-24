@@ -1,136 +1,94 @@
 .header-bar {
   height: 54px;
-  background-color: var(--color-bg-dark);
-  border-bottom: 1px solid var(--color-zinc-800);
+  background-color: var(--color-bg-page);
+  border-bottom: 1px solid var(--color-border-dark);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 1.15rem;
+  padding: 0 1.5rem;
   box-sizing: border-box;
   flex-shrink: 0;
-}
-
-.header-bar--strong-divider {
-  border-bottom: 3px solid #111; /* Keep or replace? #111 is very dark grey. Zinc 950 is #09090b. Let's use Zinc 900 or 950. */
-  border-bottom-color: var(--color-zinc-950);
 }
 
 .header-section {
   display: flex;
   align-items: center;
-  gap: 1.125rem;
+  gap: 1rem;
 }
 
 .context-nav {
   display: flex;
   align-items: center;
-  gap: 0.85rem;
-  font-family: 'Inter', system-ui, sans-serif;
 }
 
 .context-brand {
-  color: var(--color-zinc-100);
-  font-size: 0.9rem;
+  color: var(--color-text-light);
+  font-size: 1rem;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.025em;
+  padding-right: 0.5rem;
 }
 
-.context-item {
+.breadcrumb-item {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
-  padding: 0.3rem 0.55rem;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
   border-radius: 6px;
-  transition: background-color 0.2s;
+  cursor: pointer;
+  color: var(--color-text-subtle);
+  transition: all 0.2s;
 
   &:hover {
-    background-color: var(--color-zinc-800);
+    color: var(--color-text-light);
+  }
+
+  &.active {
+    color: var(--color-text-light);
+    cursor: default;
   }
 }
 
-.context-item--active {
-  color: var(--color-zinc-200);
-}
-
-.context-separator {
-  color: var(--color-zinc-600);
-  font-size: 0.875rem;
-}
-
-.context-avatar {
-  width: 26px;
-  height: 26px;
+.breadcrumb-avatar {
+  width: 25px;
+  height: 25px;
   border-radius: 50%;
-  overflow: hidden;
-  background-color: var(--color-zinc-800);
+  object-fit: cover;
+  border: 1px solid var(--color-border-medium);
+}
+
+.breadcrumb-separator {
   display: flex;
   align-items: center;
-  justify-content: center;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
+  color: var(--color-text-subtle);
 }
 
-.context-icon {
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.context-icon--file {
-  background-color: var(--color-sky-500-10);
-  color: var(--color-sky-400);
-}
-
-.context-text-group {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  line-height: 1.1;
-}
-
-.context-title {
-  color: var(--color-zinc-200);
-  font-size: 0.875rem;
+.breadcrumb-text {
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
   font-weight: 500;
-}
-
-.context-subtitle {
-  color: var(--color-zinc-400);
-  font-size: 0.78rem;
+  white-space: nowrap;
 }
 
 .header-action-btn,
 .header-icon-btn {
   background: transparent;
   border: 1px solid transparent;
-  color: var(--color-zinc-400);
+  color: var(--color-text-medium);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.45rem 0.68rem;
-  border-radius: 6px;
+  padding: 0.4rem;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 500;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   transition: all 0.2s ease;
 
   &:hover {
-    background-color: var(--color-zinc-800);
-    color: var(--color-zinc-200);
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border-dark);
+    color: var(--color-text-light);
   }
-}
-
-.header-action-btn svg,
-.header-icon-btn svg,
-.context-icon svg {
-  width: 17px;
-  height: 17px;
 }

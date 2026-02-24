@@ -20,6 +20,7 @@ export class HeaderBarComponent implements OnInit {
 
   profilePictureUrl: string | null = null;
   displayName = 'Alex Johnson';
+  username = 'alexjohnson';
   email = 'alex@example.com';
 
   get avatarUrl(): string {
@@ -35,6 +36,7 @@ export class HeaderBarComponent implements OnInit {
     this.http
       .get<{
         displayName?: string | null;
+        username?: string | null;
         email?: string | null;
         profilePictureUrl?: string | null;
       }>(`${environment.apiBaseUrl}/users/me`, {
@@ -43,6 +45,7 @@ export class HeaderBarComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.displayName = response.displayName?.trim() || this.displayName;
+          this.username = response.username?.trim() || this.username;
           this.email = response.email?.trim() || this.email;
           this.profilePictureUrl = response.profilePictureUrl ?? null;
           HeaderBarComponent.cachedProfilePictureUrl = this.profilePictureUrl;

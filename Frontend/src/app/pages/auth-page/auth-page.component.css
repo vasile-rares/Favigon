@@ -4,17 +4,16 @@
   width: 100%;
   align-items: center;
   justify-content: center;
-  background-color: var(--color-bg-dark);
+  background-color: var(--color-bg-page);
   font-family: inherit;
-  color: var(--color-zinc-200);
 }
 
 .auth-box {
   width: 100%;
   max-width: 350px;
   border-radius: 1rem;
-  border: 1px solid var(--color-zinc-800);
-  background-color: var(--color-neutral-900);
+  border: 1px solid var(--color-border-dark);
+  background-color: var(--color-surface);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   overflow: hidden;
 
@@ -29,13 +28,13 @@
       font-weight: 600;
       line-height: 1;
       letter-spacing: -0.025em;
-      color: var(--color-zinc-100);
+      color: var(--color-text-light);
       margin: 0;
     }
 
     .subtitle-muted {
       font-size: 0.875rem;
-      color: var(--color-zinc-400);
+      color: var(--color-text-medium);
       margin: 0;
     }
   }
@@ -45,8 +44,8 @@
   }
 
   .auth-footer {
-    background-color: var(--color-zinc-900);
-    border-top: 1px solid var(--color-zinc-800);
+    background-color: var(--color-surface-elevated);
+    border-top: 1px solid var(--color-border-dark);
     padding: 1rem 1.5rem;
     display: flex;
     flex-direction: column;
@@ -55,7 +54,7 @@
 
     .switch-account-text {
       font-size: 0.8rem;
-      color: var(--color-zinc-500);
+      color: var(--color-text-subtle);
       text-align: center;
       margin: 0;
     }
@@ -67,12 +66,12 @@
       cursor: pointer;
       font-size: inherit;
       font-family: inherit;
-      color: var(--color-zinc-200);
+      color: var(--color-text-medium);
       text-decoration: underline;
       text-underline-offset: 4px;
 
       &:hover {
-        color: var(--color-zinc-100);
+        color: var(--color-text-light);
       }
     }
   }
@@ -91,7 +90,7 @@
 
   &.failed-validation {
     .input-label {
-      color: var(--color-red-500) !important;
+      color: var(--color-danger-light) !important;
     }
   }
 
@@ -102,13 +101,12 @@
 
     .forgot-link {
       font-size: 0.75rem;
-      color: var(--color-zinc-400);
+      color: var(--color-text-medium);
       text-decoration: none;
       text-underline-offset: 4px;
 
       &:hover {
         text-decoration: underline;
-        color: var(--color-zinc-100);
       }
     }
   }
@@ -117,8 +115,7 @@
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1;
-    color: var(--color-zinc-200);
-    cursor: pointer;
+    color: var(--color-text-light);
   }
 }
 
@@ -129,8 +126,8 @@
   align-items: center;
 
   &:has(.text-input.ng-invalid.ng-touched) {
-    border-color: var(--color-red-500) !important;
-    color: var(--color-red-500);
+    border-color: var(--color-danger-light) !important;
+    color: var(--color-danger-light);
   }
 
   .padded-input {
@@ -156,15 +153,14 @@
       border-radius: 0.25rem;
       border: none;
       background: transparent;
-      color: var(--color-zinc-400);
+      color: var(--color-text-medium);
       cursor: pointer;
       transition:
         color 0.2s,
         background-color 0.2s;
 
       &:hover {
-        color: var(--color-zinc-100);
-        background-color: var(--color-zinc-800);
+        color: var(--color-text-light);
       }
     }
   }
@@ -175,29 +171,27 @@
   height: 2.25rem;
   width: 100%;
   border-radius: 0.75rem;
-  border: 1px solid #424242; /* Zinc 700ish? Zinc 700 is 3f3f46. 424242 is Grey 800. I'll use zinc-700 */
-  border-color: var(--color-zinc-700);
-  background-color: #212121; /* Grey 900. Zinc 900 is 18181b. I'll use Zinc 900 or Neutral 900? Let's use Zinc 800/900 mix. Zinc 800 is 27272a (lighter). I'll use Zinc 900. */
-  background-color: var(--color-zinc-900);
+  border: 1px solid var(--color-border-medium);
+  background-color: var(--color-surface-elevated);
   padding: 0.25rem 0.75rem;
   font-size: 0.875rem;
-  color: var(--color-zinc-100);
+  color: var(--color-text-light);
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   transition: all 0.2s;
 
   &::placeholder {
-    color: var(--color-zinc-600);
+    color: var(--color-text-medium);
   }
 
   &:focus-visible {
     outline: none;
-    border-color: var(--color-zinc-200);
-    box-shadow: 0 0 0 1px var(--color-zinc-800);
+    border-color: var(--color-border-medium);
+    box-shadow: 0 0 0 4px var(--color-zinc-800);
   }
 
   &.ng-invalid.ng-touched {
-    border-color: var(--color-red-500) !important;
-    color: var(--color-red-500);
+    border-color: var(--color-danger-light) !important;
+    color: var(--color-danger-light);
   }
 }
 
@@ -215,7 +209,6 @@
   transition: all 0.2s;
   cursor: pointer;
   border: none;
-  gap: 0.5rem;
 
   .social-icon {
     margin-right: 0.5rem;
@@ -224,25 +217,24 @@
   }
 
   &.primary-action {
-    background-color: #f4f4f5;
-    color: #09090b;
+    background-color: var(--color-btn-primary);
+    color: var(--color-text-dark);
     width: 100%;
 
     &:hover {
-      background-color: #d4d4d8;
+      background-color: var(--color-btn-primary-hover);
     }
   }
 
   &.outline-action {
-    background-color: #212121;
-    border: 1px solid #424242;
-    color: #e4e4e7;
+    background-color: var(--color-btn-tertiary);
+    border: 1px solid var(--color-border-medium);
+    color: var(--color-text-light);
     width: 100%;
     margin-top: 0rem;
 
     &:hover {
-      background-color: #27272a;
-      color: #f4f4f5;
+      background-color: var(--color-btn-tertiary-hover);
     }
   }
 }
@@ -255,7 +247,7 @@
   margin: 1.25rem 0;
   font-size: 0.75rem;
   text-transform: uppercase;
-  color: #989898;
+  color: var(--color-text-medium);
 
   &::before {
     content: '';
@@ -264,13 +256,13 @@
     left: 0;
     right: 0;
     height: 1px;
-    background-color: #27272a;
+    background-color: var(--color-border-medium);
     z-index: 0;
   }
 
   span {
     padding: 0 0.5rem;
-    background-color: #171717;
+    background-color: var(--color-surface);
     z-index: 1;
   }
 }
@@ -279,13 +271,8 @@
   width: 100%;
   text-align: center;
   font-size: 0.75rem;
-  color: #a1a1aa;
+  color: var(--color-text-medium);
   margin: 0;
-
-  .legal-highlight {
-    color: #a1a1a1;
-    /* Removed underline and hover because user requested it to be plain text */
-  }
 }
 
 /* --- Icons --- */
@@ -297,12 +284,12 @@
 
 .validation-message {
   font-size: 0.8rem;
-  color: #ef4444;
+  color: var(--color-danger-light);
   margin-top: -0.25rem;
 }
 
 .failed-validation {
-  color: #ef4444 !important;
+  color: var(--color-danger-light) !important;
 }
 
 /* --- Password Complexity --- */
@@ -318,23 +305,23 @@
   align-items: center;
   gap: 0.5rem;
   font-size: 0.75rem;
-  color: #71717a;
+  color: var(--color-text-subtle);
 }
 
 .rule-bullet {
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background-color: #71717a;
+  background-color: var(--color-text-subtle);
 }
 
 /* --- Validations & Requirements --- */
 .error-text {
-  color: #ef4444;
+  color: var(--color-danger-light);
 }
 
 .field-error {
-  color: #ef4444;
+  color: var(--color-danger-light);
   font-size: 0.8rem;
   font-weight: 500;
   margin-top: 0.25rem;
@@ -351,7 +338,7 @@
     align-items: center;
     gap: 0.5rem;
     font-size: 0.8rem;
-    color: #ef4444;
+    color: var(--color-danger-light);
   }
 
   .requirement-bullet {
@@ -363,5 +350,5 @@
 }
 
 .success-message {
-  color: #22c55e;
+  color: var(--color-success-light);
 }

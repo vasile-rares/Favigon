@@ -2,99 +2,10 @@
   display: block;
   height: 100vh;
   width: 100vw;
-  background-color: var(--color-bg-dark);
-  color: var(--color-zinc-200);
+  background-color: var(--color-bg-page);
+  color: var(--color-text-light);
   overflow: hidden;
   font-family: inherit;
-}
-
-.dashboard-layout {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.logo-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  cursor: pointer;
-
-  svg {
-    transition: transform 0.2s ease;
-  }
-
-  &:hover svg {
-    transform: rotate(5deg);
-  }
-}
-
-.breadcrumbs {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  color: var(--color-zinc-400);
-
-  .breadcrumb-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: default;
-
-    &.active {
-      color: var(--color-zinc-200);
-      font-weight: 500;
-    }
-  }
-}
-
-.breadcrumb-separator {
-  color: var(--color-zinc-600);
-}
-
-.org-color {
-  width: 12px;
-  height: 12px;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(135deg, var(--color-pink-500) 0%, var(--color-violet-500) 100%);
-}
-
-.icon-btn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--color-zinc-400);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background-color: var(--color-zinc-800);
-    color: var(--color-zinc-200);
-  }
-}
-
-.user-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-emerald-500) 0%, var(--color-blue-500) 100%);
-  cursor: pointer;
-  border: 1px solid var(--color-zinc-800);
-  transition: box-shadow 0.2s;
-
-  &:hover {
-    box-shadow: 0 0 0 2px var(--color-blue-focus);
-  }
 }
 
 .dashboard-content {
@@ -109,7 +20,7 @@
     background: transparent;
   }
   &::-webkit-scrollbar-thumb {
-    background: var(--color-zinc-700);
+    background: var(--color-surface);
     border-radius: 3px;
   }
 }
@@ -119,19 +30,19 @@
   justify-content: space-between;
   align-items: flex-end;
   margin-bottom: 2.5rem;
-  border-bottom: 1px solid var(--color-zinc-800);
+  border-bottom: 1px solid var(--color-border-dark);
   padding-bottom: 1rem;
 
   .header-texts {
     h1 {
       font-size: 1.75rem;
       font-weight: 600;
-      color: var(--color-zinc-100);
+      color: var(--color-text-light);
       margin: 0 0 0.5rem 0;
       letter-spacing: -0.02em;
     }
     p {
-      color: var(--color-zinc-400);
+      color: var(--color-text-subtle);
       font-size: 0.95rem;
       margin: 0;
     }
@@ -139,8 +50,8 @@
 }
 
 .primary-btn {
-  background-color: var(--color-zinc-100);
-  color: var(--color-zinc-950);
+  background-color: var(--color-btn-primary);
+  color: var(--color-text-dark);
   border: none;
   padding: 0.65rem 1.25rem;
   border-radius: 6px;
@@ -154,16 +65,7 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 
   &:hover {
-    background-color: var(--color-white);
-    transform: translateY(-1px);
-    box-shadow:
-      0 4px 6px -1px rgba(0, 0, 0, 0.1),
-      0 2px 4px -1px rgba(0, 0, 0, 0.06);
-  }
-
-  &:active {
-    transform: translateY(0);
-    background-color: var(--color-zinc-200);
+    background-color: var(--color-btn-primary-hover);
   }
 
   svg {
@@ -174,12 +76,12 @@
 .projects-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.5rem;
+  gap: 1rem;
 }
 
 .project-card {
-  background-color: var(--color-card-bg);
-  border: 1px solid var(--color-zinc-800);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-dark);
   border-radius: 12px;
   overflow: hidden;
   cursor: pointer;
@@ -190,18 +92,12 @@
   position: relative;
 
   &:hover {
-    border-color: var(--color-zinc-700);
-    transform: translateY(-2px);
-    box-shadow:
-      0 10px 15px -3px rgba(0, 0, 0, 0.5),
-      0 4px 6px -2px rgba(0, 0, 0, 0.3);
-
     .project-overlay {
-      opacity: 1;
+      opacity: 0;
     }
 
     .card-preview .preview-placeholder svg {
-      stroke: var(--color-zinc-500);
+      stroke: var(--color-text-subtle);
       transform: scale(1.05);
     }
   }
@@ -209,7 +105,7 @@
 
 .card-preview {
   flex: 1;
-  background-color: var(--color-zinc-950);
+  background-color: var(--color-bg-page);
   position: relative;
   display: flex;
   align-items: center;
@@ -222,7 +118,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: radial-gradient(circle at center, var(--color-zinc-800) 1px, transparent 1px);
+    background: radial-gradient(circle at center, var(--color-text-dark) 1px, transparent 1px);
     background-size: 20px 20px;
 
     svg {
@@ -237,35 +133,19 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.4);
+  background: #00000066;
   backdrop-filter: blur(2px);
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
+  opacity: 1;
   transition: opacity 0.2s ease;
-
-  .open-btn {
-    background-color: var(--color-white);
-    color: var(--color-black);
-    border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-weight: 600;
-    font-size: 0.85rem;
-    cursor: pointer;
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-
-    &:hover {
-      background-color: var(--color-zinc-100);
-    }
-  }
 }
 
 .card-info {
   padding: 1rem;
-  background-color: var(--color-card-bg);
-  border-top: 1px solid var(--color-zinc-800);
+  background-color: var(--color-surface);
+  border-top: 1px solid var(--color-border-dark);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -280,7 +160,7 @@
 .card-info .info-main h3 {
   font-size: 0.95rem;
   font-weight: 500;
-  color: var(--color-zinc-100);
+  color: var(--color-text-light);
   margin: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -290,16 +170,16 @@
 
 .card-info .info-main .edited-date {
   font-size: 0.75rem;
-  color: var(--color-zinc-500);
+  color: var(--color-text-subtle);
 }
 
 .card-info .options-btn {
   background: transparent;
   border: none;
-  color: var(--color-zinc-500);
+  color: var(--color-text-subtle);
   width: 28px;
   height: 28px;
-  border-radius: 4px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -308,6 +188,7 @@
 }
 
 .card-info .options-btn:hover {
-  background-color: var(--color-zinc-800);
-  color: var(--color-zinc-200);
+  background-color: var(--color-btn-tertiary);
+  color: var(--color-text-light);
+  border: 1px solid var(--color-border-dark);
 }

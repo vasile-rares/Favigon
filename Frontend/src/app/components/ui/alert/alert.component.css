@@ -32,7 +32,7 @@
   color: var(--color-black); /* Was #0f172a (dark blue-grey), close to black */
 }
 :host-context(.dark) .bg-background {
-  background-color: #020817; /* Darker than black-soft (#080808) - almost black */
+  background-color: var(--color-zinc-950);
   color: var(--color-zinc-50);
 }
 
