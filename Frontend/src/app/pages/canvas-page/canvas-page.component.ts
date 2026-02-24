@@ -1,11 +1,12 @@
 import { Component, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CanvasElement, CanvasElementType } from '../../core/models/canvas.models';
+import { HeaderBarComponent } from '../../components/ui/header-bar/header-bar.component';
 
 @Component({
   selector: 'app-canvas-page',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, HeaderBarComponent],
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
 })

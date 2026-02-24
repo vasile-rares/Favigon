@@ -3,6 +3,7 @@ using Prismatic.Application.Interfaces;
 using Prismatic.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace Prismatic.API.Controllers;
 
@@ -23,6 +24,32 @@ public class UsersController : ControllerBase
   {
     var users = await _userService.GetAllAsync();
     return Ok(users);
+  }
+
+  [HttpGet("me")]
+  public async Task<IActionResult> GetMe()
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+    {
+      return Unauthorized();
+    }
+
+    var user = await _userService.GetByIdAsync(userId);
+    if (user == null)
+    {
+      return NotFound();
+    }
+
+    return Ok(new
+    {
+      user.Id,
+      user.DisplayName,
+      user.Username,
+      user.Email,
+      user.Role,
+      user.ProfilePictureUrl
+    });
   }
 
   [HttpGet("{id:int}")]

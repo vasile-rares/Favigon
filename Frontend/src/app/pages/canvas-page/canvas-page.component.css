@@ -8,25 +8,6 @@
   overflow: hidden;
 }
 
-/* Top Bar Styles */
-.top-bar {
-  height: 48px;
-  background-color: #080808;
-  border-bottom: 3px solid #111;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 1rem;
-  box-sizing: border-box;
-
-  .top-bar-left,
-  .top-bar-right {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-  }
-}
-
 .logo-button {
   display: flex;
   align-items: center;

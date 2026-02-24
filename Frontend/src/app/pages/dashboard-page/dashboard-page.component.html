@@ -1,37 +1,6 @@
 <div class="dashboard-layout">
   <!-- Top Navigation Bar (Consistent with Canvas) -->
-  <header class="top-bar">
-    <div class="top-bar-left">
-      <div class="logo-button">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="#ececec" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M2 17L12 22L22 17" stroke="#ececec" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M2 12L12 17L22 12" stroke="#ececec" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div class="breadcrumbs">
-        <div class="breadcrumb-item">
-          <span class="org-color"></span>
-          <span>Acme Corp</span>
-        </div>
-        <span class="breadcrumb-separator">/</span>
-        <div class="breadcrumb-item active">
-          <span>Dashboard</span>
-        </div>
-      </div>
-    </div>
-
-    <div class="top-bar-right">
-      <button class="icon-btn">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <span>Search</span>
-      </button>
-      <div class="user-avatar" (click)="logout()" title="Logout"></div>
-    </div>
-  </header>
+  <app-header-bar (logoutRequested)="logout()"></app-header-bar>
 
   <!-- Main Content Area -->
   <main class="dashboard-content">

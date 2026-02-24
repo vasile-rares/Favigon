@@ -1,0 +1,135 @@
+.header-bar {
+  height: 54px;
+  background-color: #080808;
+  border-bottom: 1px solid #27272a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 1.15rem;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.header-bar--strong-divider {
+  border-bottom: 3px solid #111;
+}
+
+.header-section {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+}
+
+.context-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.context-brand {
+  color: #f4f4f5;
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.context-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: #27272a;
+  }
+}
+
+.context-item--active {
+  color: #e4e4e7;
+}
+
+.context-separator {
+  color: #52525b;
+  font-size: 0.875rem;
+}
+
+.context-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: #27272a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.context-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.context-icon--file {
+  background-color: rgba(14, 165, 233, 0.1);
+  color: #38bdf8;
+}
+
+.context-text-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.1;
+}
+
+.context-title {
+  color: #e4e4e7;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.context-subtitle {
+  color: #a1a1aa;
+  font-size: 0.78rem;
+}
+
+.header-action-btn,
+.header-icon-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #a1a1aa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.68rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background-color: #27272a;
+    color: #e4e4e7;
+  }
+}
+
+.header-action-btn svg,
+.header-icon-btn svg,
+.context-icon svg {
+  width: 17px;
+  height: 17px;
+}

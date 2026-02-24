@@ -2,6 +2,7 @@ import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { HeaderBarComponent } from '../../components/ui/header-bar/header-bar.component';
 
 interface Project {
   id: string;
@@ -13,7 +14,7 @@ interface Project {
 @Component({
   selector: 'app-dashboard-page',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, HeaderBarComponent],
   templateUrl: './dashboard-page.component.html',
   styleUrl: './dashboard-page.component.css',
 })
