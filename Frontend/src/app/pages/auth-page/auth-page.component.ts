@@ -1,5 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
-import { HttpErrorResponse } from '@angular/common/http';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import {
   AbstractControl,
@@ -12,29 +11,22 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 
+const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const EMAIL_MAX_LENGTH = 100;
+
+/**
+ * Validates password complexity:
+ * - Minimum 8 characters
+ * - At least one lowercase letter
+ * - At least one uppercase letter
+ * - At least one digit
+ */
 function passwordStrengthValidator(): ValidatorFn {
-  const pattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-
   return (control: AbstractControl): ValidationErrors | null => {
-    const value = String(control.value ?? '');
-    if (!value) {
-      return null;
+    if (!control.value) {
+      return null; // Let 'required' validator handle empty case
     }
-
-    return pattern.test(value) ? null : { weakPassword: true };
-  };
-}
-
-function confirmPasswordValidator(passwordControlName: string): ValidatorFn {
-  return (control: AbstractControl): ValidationErrors | null => {
-    if (!control.parent) {
-      return null;
-    }
-
-    const password = control.parent.get(passwordControlName)?.value;
-    const confirmPassword = control.value;
-
-    return password === confirmPassword ? null : { passwordMismatch: true };
+    return PASSWORD_PATTERN.test(String(control.value)) ? null : { weakPassword: true };
   };
 }
 
@@ -45,66 +37,68 @@ function confirmPasswordValidator(passwordControlName: string): ValidatorFn {
   templateUrl: './auth-page.component.html',
   styleUrl: './auth-page.component.css',
 })
-export class AuthPage {
+export class AuthPage implements OnInit {
   private readonly authService = inject(AuthService);
-  private readonly formBuilder = inject(FormBuilder);
+  private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
 
+  private static readonly REMEMBER_EMAIL_KEY = 'prismatic.rememberedEmail';
+
+  // --- State Signals ---
   readonly mode = signal<'login' | 'register'>('login');
   readonly isSubmitting = signal(false);
-  readonly errorMessage = signal<string | null>(null);
-  readonly successMessage = signal<string | null>(null);
+  readonly statusMessage = signal<{ type: 'error' | 'success'; text: string } | null>(null);
   readonly showPassword = signal(false);
 
-  readonly loginForm = this.formBuilder.nonNullable.group({
+  // --- Forms ---
+  readonly loginForm = this.fb.nonNullable.group({
     email: ['', [Validators.required, Validators.email, Validators.maxLength(100)]],
     password: ['', [Validators.required, Validators.maxLength(100)]],
     rememberMe: [false],
   });
 
-  readonly registerForm = this.formBuilder.nonNullable.group({
-    displayName: ['', [Validators.required, Validators.maxLength(50)]],
-    username: [
-      '',
-      [Validators.required, Validators.maxLength(30), Validators.pattern(/^[a-z0-9_]+$/)],
-    ],
-    email: ['', [Validators.required, Validators.email, Validators.maxLength(100)]],
-    password: [
-      '',
-      [
-        Validators.required,
-        Validators.minLength(8),
-        Validators.maxLength(100),
-        passwordStrengthValidator(),
+  readonly registerForm = this.fb.nonNullable.group(
+    {
+      displayName: ['', [Validators.required, Validators.maxLength(50)]],
+      username: [
+        '',
+        [Validators.required, Validators.maxLength(30), Validators.pattern(/^[a-z0-9_]+$/)],
       ],
-    ],
-    confirmPassword: [
-      '',
-      [Validators.required, Validators.maxLength(100), confirmPasswordValidator('password')],
-    ],
-  });
+      email: ['', [Validators.required, Validators.email, Validators.maxLength(100)]],
+      password: [
+        '',
+        [
+          Validators.required,
+          Validators.minLength(8),
+          Validators.maxLength(100),
+          passwordStrengthValidator(),
+        ],
+      ],
+      confirmPassword: ['', [Validators.required, Validators.maxLength(100)]],
+    },
+    { validators: [this.passwordMatchValidator] },
+  );
 
-  private readonly rememberedEmailKey = 'prismatic.rememberedEmail';
-
-  constructor() {
-    const rememberedEmail = localStorage.getItem(this.rememberedEmailKey);
-    if (rememberedEmail) {
-      this.loginForm.patchValue({
-        email: rememberedEmail,
-        rememberMe: true,
-      });
-    }
-
-    this.registerForm.controls.password.valueChanges.subscribe(() => {
-      this.registerForm.controls.confirmPassword.updateValueAndValidity({ emitEvent: false });
-    });
+  ngOnInit() {
+    this.checkRememberedEmail();
   }
+
+  // --- Actions ---
 
   switchMode(nextMode: 'login' | 'register') {
     this.mode.set(nextMode);
-    this.errorMessage.set(null);
-    this.successMessage.set(null);
+
+    // Reset UI state
+    this.statusMessage.set(null);
     this.showPassword.set(false);
+
+    // Reset forms
+    this.loginForm.reset();
+    this.registerForm.reset();
+
+    if (nextMode === 'login') {
+      this.checkRememberedEmail();
+    }
   }
 
   togglePasswordVisibility() {
@@ -117,30 +111,22 @@ export class AuthPage {
       return;
     }
 
-    this.isSubmitting.set(true);
-    this.errorMessage.set(null);
-    this.successMessage.set(null);
-
-    const payload = this.loginForm.getRawValue();
+    this.startLoading();
+    const { email, password, rememberMe } = this.loginForm.getRawValue();
 
     try {
       const response = await firstValueFrom(
         this.authService.login({
-          email: payload.email.trim(),
-          password: payload.password,
+          email: email.trim(),
+          password,
         }),
       );
 
-      if (payload.rememberMe) {
-        localStorage.setItem(this.rememberedEmailKey, payload.email.trim());
-      } else {
-        localStorage.removeItem(this.rememberedEmailKey);
-      }
-
-      this.successMessage.set(response.message || 'Login successful.');
-      this.router.navigate(['/dashboard']);
+      this.handleRememberMe(email.trim(), rememberMe);
+      this.statusMessage.set({ type: 'success', text: response.message || 'Login successful.' });
+      await this.router.navigate(['/dashboard']);
     } catch (error: any) {
-      this.errorMessage.set(error.error?.message || error.error?.title || 'Could not log in.');
+      this.handleError(error, 'Could not log in.');
     } finally {
       this.isSubmitting.set(false);
     }
@@ -152,33 +138,82 @@ export class AuthPage {
       return;
     }
 
-    this.isSubmitting.set(true);
-    this.errorMessage.set(null);
-    this.successMessage.set(null);
-
-    const payload = this.registerForm.getRawValue();
+    this.startLoading();
+    const { displayName, username, email, password } = this.registerForm.getRawValue();
 
     try {
       const response = await firstValueFrom(
         this.authService.register({
-          displayName: payload.displayName.trim(),
-          username: payload.username.trim(),
-          email: payload.email.trim(),
-          password: payload.password,
+          displayName: displayName.trim(),
+          username: username.trim(),
+          email: email.trim(),
+          password,
         }),
       );
 
-      this.successMessage.set(response.message || 'Account created successfully.');
-      this.switchMode('login');
-      this.loginForm.patchValue({
-        email: payload.email.trim(),
+      this.statusMessage.set({
+        type: 'success',
+        text: response.message || 'Account created successfully.',
       });
+
+      // Auto-switch to login and pre-fill email
+      this.switchMode('login');
+      this.loginForm.patchValue({ email: email.trim() });
     } catch (error: any) {
-      this.errorMessage.set(
-        error.error?.message || error.error?.title || 'Could not create account.',
-      );
+      this.handleError(error, 'Could not create account.');
     } finally {
       this.isSubmitting.set(false);
     }
+  }
+
+  // --- Private Helpers ---
+
+  /** Cross-field validator for password matching attached to the FormGroup */
+  private passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
+    const password = group.get('password')?.value;
+    const confirmControl = group.get('confirmPassword');
+
+    if (!confirmControl) return null;
+
+    const confirmValue = confirmControl.value;
+
+    // Only set error if confirm field has content but doesn't match
+    if (confirmValue && password !== confirmValue) {
+      confirmControl.setErrors({ ...confirmControl.errors, passwordMismatch: true });
+      return { passwordMismatch: true };
+    }
+
+    // Remove error if they match now
+    if (confirmControl.hasError('passwordMismatch')) {
+      const { passwordMismatch, ...otherErrors } = confirmControl.errors || {};
+      confirmControl.setErrors(Object.keys(otherErrors).length ? otherErrors : null);
+    }
+
+    return null;
+  }
+
+  private checkRememberedEmail() {
+    const savedEmail = localStorage.getItem(AuthPage.REMEMBER_EMAIL_KEY);
+    if (savedEmail) {
+      this.loginForm.patchValue({ email: savedEmail, rememberMe: true });
+    }
+  }
+
+  private handleRememberMe(email: string, shouldRemember: boolean) {
+    if (shouldRemember) {
+      localStorage.setItem(AuthPage.REMEMBER_EMAIL_KEY, email);
+    } else {
+      localStorage.removeItem(AuthPage.REMEMBER_EMAIL_KEY);
+    }
+  }
+
+  private startLoading() {
+    this.isSubmitting.set(true);
+    this.statusMessage.set(null);
+  }
+
+  private handleError(error: any, defaultMsg: string) {
+    const msg = error.error?.message || error.error?.title || defaultMsg;
+    this.statusMessage.set({ type: 'error', text: msg });
   }
 }

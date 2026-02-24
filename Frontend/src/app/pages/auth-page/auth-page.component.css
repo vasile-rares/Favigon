@@ -9,7 +9,7 @@
   color: #e4e4e7;
 }
 
-.card {
+.auth-box {
   width: 100%;
   max-width: 350px;
   border-radius: 1rem;
@@ -18,13 +18,13 @@
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   overflow: hidden;
 
-  .card-header {
+  .auth-header {
     display: flex;
     flex-direction: column;
     gap: 0.375rem;
     padding: 1.5rem;
 
-    .card-title {
+    .title-large {
       font-size: 1.2rem;
       font-weight: 600;
       line-height: 1;
@@ -33,18 +33,18 @@
       margin: 0;
     }
 
-    .card-description {
+    .subtitle-muted {
       font-size: 0.875rem;
       color: #a1a1aa;
       margin: 0;
     }
   }
 
-  .card-content {
+  .auth-body {
     padding: 0 1.5rem 1.5rem 1.5rem;
   }
 
-  .card-footer {
+  .auth-footer {
     background-color: #1e1e1e;
     border-top: 1px solid #27272a;
     padding: 1rem 1.5rem;
@@ -53,14 +53,14 @@
     gap: 1rem;
     align-items: center;
 
-    .footer-text {
+    .switch-account-text {
       font-size: 0.8rem;
       color: #71717a;
       text-align: center;
       margin: 0;
     }
 
-    .footer-action-btn {
+    .text-link-button {
       background: none;
       border: none;
       padding: 0;
@@ -78,29 +78,29 @@
   }
 }
 
-.field-group {
+.form-stack {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
 }
 
-.field {
+.input-wrapper {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
 
-  &.error-text {
-    .field-label {
+  &.failed-validation {
+    .input-label {
       color: #ef4444 !important;
     }
   }
 
-  .field-header {
+  .label-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
 
-    .forgot-password {
+    .forgot-link {
       font-size: 0.75rem;
       color: #a1a1aa;
       text-decoration: none;
@@ -113,7 +113,7 @@
     }
   }
 
-  .field-label {
+  .input-label {
     font-size: 0.875rem;
     font-weight: 500;
     line-height: 1;
@@ -122,22 +122,22 @@
   }
 }
 
-.input-group {
+.password-input-container {
   position: relative;
   display: flex;
   width: 100%;
   align-items: center;
 
-  &:has(.input.ng-invalid.ng-touched) {
+  &:has(.text-input.ng-invalid.ng-touched) {
     border-color: #ef4444 !important;
     color: #ef4444;
   }
 
-  .input-group-input {
+  .padded-input {
     padding-right: 2.5rem;
   }
 
-  .input-group-addon {
+  .toggle-visibility-wrapper {
     position: absolute;
     right: 0;
     top: 0;
@@ -147,7 +147,7 @@
     justify-content: center;
     padding-right: 0.5rem;
 
-    .input-group-button {
+    .toggle-visibility-btn {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -170,7 +170,7 @@
   }
 }
 
-.input {
+.text-input {
   display: flex;
   height: 2.25rem;
   width: 100%;
@@ -199,7 +199,7 @@
   }
 }
 
-.btn {
+.action-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -215,13 +215,13 @@
   border: none;
   gap: 0.5rem;
 
-  .icon-mr {
+  .social-icon {
     margin-right: 0.5rem;
     height: 1.2rem;
     width: 1.2rem;
   }
 
-  &.btn-primary {
+  &.primary-action {
     background-color: #f4f4f5;
     color: #09090b;
     width: 100%;
@@ -231,7 +231,7 @@
     }
   }
 
-  &.btn-outline {
+  &.outline-action {
     background-color: #212121;
     border: 1px solid #424242;
     color: #e4e4e7;
@@ -245,7 +245,7 @@
   }
 }
 
-.field-separator {
+.divider {
   position: relative;
   display: flex;
   align-items: center;
@@ -273,29 +273,57 @@
   }
 }
 
-.terms-text {
+.legal-text {
   width: 100%;
   text-align: center;
   font-size: 0.75rem;
   color: #a1a1aa;
   margin: 0;
 
-  .terms-link {
+  .legal-highlight {
     color: #a1a1a1;
-    text-decoration: underline;
-    text-underline-offset: 4px;
-
-    &:hover {
-      color: #f4f4f5;
-    }
+    /* Removed underline and hover because user requested it to be plain text */
   }
 }
 
 /* --- Icons --- */
-.icon {
+.social-icon {
   width: 1rem;
   height: 1rem;
   stroke-width: 2;
+}
+
+.validation-message {
+  font-size: 0.8rem;
+  color: #ef4444;
+  margin-top: -0.25rem;
+}
+
+.failed-validation {
+  color: #ef4444 !important;
+}
+
+/* --- Password Complexity --- */
+.complex-password-rules {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: -0.25rem;
+}
+
+.rule-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #71717a;
+}
+
+.rule-bullet {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: #71717a;
 }
 
 /* --- Validations & Requirements --- */
@@ -330,4 +358,8 @@
     border-radius: 50%;
     background-color: currentColor;
   }
+}
+
+.success-message {
+  color: #22c55e;
 }
