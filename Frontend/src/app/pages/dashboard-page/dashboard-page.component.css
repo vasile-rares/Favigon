@@ -90,6 +90,8 @@
   flex-direction: column;
   height: 220px;
   position: relative;
+  text-decoration: none;
+  color: inherit;
 
   &:hover {
     .project-overlay {

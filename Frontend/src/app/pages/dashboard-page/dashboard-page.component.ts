@@ -1,7 +1,6 @@
 import { Component, signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
-import { AuthService } from '../../core/services/auth.service';
+import { Router, RouterLink } from '@angular/router';
 import { HeaderBarComponent } from '../../components/ui/header-bar/header-bar.component';
 
 interface Project {
@@ -14,13 +13,12 @@ interface Project {
 @Component({
   selector: 'app-dashboard-page',
   standalone: true,
-  imports: [CommonModule, HeaderBarComponent],
+  imports: [CommonModule, RouterLink, HeaderBarComponent],
   templateUrl: './dashboard-page.component.html',
   styleUrl: './dashboard-page.component.css',
 })
 export class DashboardPage {
   private readonly router = inject(Router);
-  private readonly authService = inject(AuthService);
 
   // Mock data for projects
   projects = signal<Project[]>([
@@ -34,15 +32,5 @@ export class DashboardPage {
     // In a real app, we would call a service to create the project in the backend first
     console.log('Creating new project:', newId);
     this.router.navigate(['/project', newId]);
-  }
-
-  openProject(projectId: string) {
-    console.log('Opening project:', projectId);
-    this.router.navigate(['/project', projectId]);
-  }
-
-  logout() {
-    this.authService.logout();
-    this.router.navigate(['/login']);
   }
 }

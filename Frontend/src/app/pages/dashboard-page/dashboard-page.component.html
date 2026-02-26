@@ -1,6 +1,6 @@
 <div class="dashboard-layout">
   <!-- Top Navigation Bar (Consistent with Canvas) -->
-  <app-header-bar (logoutRequested)="logout()"></app-header-bar>
+  <app-header-bar></app-header-bar>
 
   <!-- Main Content Area -->
   <main class="dashboard-content">
@@ -20,7 +20,7 @@
 
     <div class="projects-grid">
       @for (project of projects(); track project.id) {
-        <div class="project-card" (click)="openProject(project.id)">
+        <a class="project-card" [routerLink]="['/project', project.id]">
           <div class="card-preview">
             <div class="preview-placeholder">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1">
@@ -45,7 +45,7 @@
               </svg>
             </button>
           </div>
-        </div>
+        </a>
       }
     </div>
   </main>

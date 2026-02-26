@@ -1,6 +1,8 @@
-import { Component, EventEmitter, OnInit, Output, inject } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { environment } from '../../../../environments/environment';
+import { AuthService } from '../../../core/services/auth.service';
 import { UserMenuDropdownComponent } from '../user-menu-dropdown/user-menu-dropdown.component';
 
 @Component({
@@ -12,11 +14,10 @@ import { UserMenuDropdownComponent } from '../user-menu-dropdown/user-menu-dropd
 })
 export class HeaderBarComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  private readonly authService = inject(AuthService);
   private readonly fallbackAvatarUrl = 'https://github.com/shadcn.png';
   private static cachedProfilePictureUrl: string | null | undefined;
-
-  @Output() logoutRequested = new EventEmitter<void>();
-  @Output() settingsRequested = new EventEmitter<void>();
 
   profilePictureUrl: string | null = null;
   displayName = 'Alex Johnson';
@@ -59,10 +60,7 @@ export class HeaderBarComponent implements OnInit {
 
   onLogout() {
     HeaderBarComponent.cachedProfilePictureUrl = undefined;
-    this.logoutRequested.emit();
-  }
-
-  onSettings() {
-    this.settingsRequested.emit();
+    this.authService.logout().subscribe();
+    this.router.navigate(['/login']);
   }
 }

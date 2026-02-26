@@ -1,10 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, ElementRef, EventEmitter, HostListener, Input, Output } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { Component, ElementRef, HostListener, Input, Output, EventEmitter } from '@angular/core';
 
 @Component({
   selector: 'app-user-menu-dropdown',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   templateUrl: './user-menu-dropdown.component.html',
   styleUrl: './user-menu-dropdown.component.css',
 })
@@ -13,7 +14,6 @@ export class UserMenuDropdownComponent {
   @Input() email = 'alex@example.com';
   @Input() avatarUrl = 'https://github.com/shadcn.png';
 
-  @Output() settingsClicked = new EventEmitter<void>();
   @Output() logoutClicked = new EventEmitter<void>();
 
   isOpen = false;
@@ -22,11 +22,6 @@ export class UserMenuDropdownComponent {
 
   toggleMenu(): void {
     this.isOpen = !this.isOpen;
-  }
-
-  onSettings(): void {
-    this.isOpen = false;
-    this.settingsClicked.emit();
   }
 
   onLogout(): void {
