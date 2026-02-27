@@ -16,7 +16,7 @@ public static class ServiceCollectionExtensions
     services.AddScoped<IAuthService, AuthService>();
     services.AddScoped<IProjectService, ProjectService>();
 
-    services.AddSingleton<CodeGenerationPipeline>();
+    services.AddSingleton<ConverterPipeline>();
 
     return services;
   }

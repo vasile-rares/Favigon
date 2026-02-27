@@ -6,16 +6,11 @@ using Microsoft.AspNetCore.Mvc;
 namespace Prismatic.API.Controllers;
 
 [ApiController]
-[Route("api/codegen")]
-public class CodeGenController(CodeGenerationPipeline pipeline) : ControllerBase
+[Route("api/converter")]
+public class ConverterController(ConverterPipeline pipeline) : ControllerBase
 {
-    /// <summary>
-    /// Generates code from an IR node tree.
-    /// POST /api/codegen/generate
-    /// Body: { "framework": "html", "flavor": null, "ir": { ...IRNode... } }
-    /// </summary>
     [HttpPost("generate")]
-    public IActionResult Generate([FromBody] CodeGenRequest request)
+    public IActionResult Generate([FromBody] ConverterRequest request)
     {
         if (request.Ir is null)
             return BadRequest(new { error = "IR node is required." });
@@ -33,7 +28,7 @@ public class CodeGenController(CodeGenerationPipeline pipeline) : ControllerBase
         if (!result.IsSuccess)
             return BadRequest(new { error = result.ErrorMessage });
 
-        return Ok(new CodeGenResponse
+        return Ok(new ConverterResponse
         {
             Framework = request.Framework,
             Flavor = request.Flavor,
@@ -42,23 +37,18 @@ public class CodeGenController(CodeGenerationPipeline pipeline) : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Validates an IR node tree without generating code.
-    /// POST /api/codegen/validate
-    /// Body: { "ir": { ...IRNode... } }  — same shape as /generate
-    /// </summary>
     [HttpPost("validate")]
-    public IActionResult Validate([FromBody] CodeGenRequest request)
+    public IActionResult Validate([FromBody] ConverterRequest request)
     {
         if (request.Ir is null)
             return BadRequest(new { error = "IR node is required." });
 
         var result = pipeline.Validate(request.Ir);
 
-        return Ok(new CodeGenValidationResponse
+        return Ok(new ConverterValidationResponse
         {
             IsValid = result.IsValid,
-            Errors = result.Errors.Select(e => new CodeGenValidationError { Path = e.Path, Message = e.Message })
+            Errors = result.Errors.Select(e => new ConverterValidationError { Path = e.Path, Message = e.Message })
         });
     }
 }

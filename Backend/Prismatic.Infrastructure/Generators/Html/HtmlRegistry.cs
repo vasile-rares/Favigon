@@ -2,10 +2,6 @@ using Prismatic.Application.Registry;
 
 namespace Prismatic.Infrastructure.Generators.Html;
 
-/// <summary>
-/// Framework registry for plain HTML emission.
-/// To add a new component: implement <see cref="HtmlMapperBase"/> and call Register() here.
-/// </summary>
 public sealed class HtmlRegistry : FrameworkRegistry
 {
   public HtmlRegistry() : base("html", flavor: null)

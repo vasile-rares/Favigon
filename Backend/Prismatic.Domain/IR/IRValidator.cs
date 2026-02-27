@@ -2,9 +2,6 @@ using System.Text.RegularExpressions;
 
 namespace Prismatic.Domain.IR;
 
-/// <summary>
-/// Validates an IR tree and returns a structured result with all collected errors.
-/// </summary>
 public static class IRValidator
 {
     // ── Known abstract component types ───────────────────────────────────────
@@ -47,9 +44,6 @@ public static class IRValidator
 
     // ─────────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Validates the full IR tree. Collects all errors (does not stop at first).
-    /// </summary>
     public static IRValidationResult Validate(IRNode node)
     {
         var errors = new List<IRValidationError>();
@@ -221,9 +215,6 @@ public static class IRValidator
 
 // ── Result types ──────────────────────────────────────────────────────────────
 
-/// <summary>
-/// Result of IR validation. IsValid = true when there are no errors.
-/// </summary>
 public sealed record IRValidationResult(IReadOnlyList<IRValidationError> Errors)
 {
     public bool IsValid => Errors.Count == 0;
@@ -235,7 +226,4 @@ public sealed record IRValidationResult(IReadOnlyList<IRValidationError> Errors)
               string.Join("\n", Errors.Select(e => $"  [{e.Path}] {e.Message}"));
 }
 
-/// <summary>
-/// A single validation error with location path and description.
-/// </summary>
 public sealed record IRValidationError(string Path, string Message);

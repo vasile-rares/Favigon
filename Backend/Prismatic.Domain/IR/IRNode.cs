@@ -2,10 +2,6 @@ using System.Text.Json;
 
 namespace Prismatic.Domain.IR;
 
-/// <summary>
-/// Root IR node — single source of truth produced by the canvas.
-/// Framework-agnostic; consumed by the code generation pipeline.
-/// </summary>
 public class IRNode
 {
     public string Version { get; set; } = "1.0";
@@ -18,28 +14,17 @@ public class IRNode
     public List<IRNode> Children { get; set; } = [];
 }
 
-/// <summary>
-/// Layout descriptor: flex / grid / stack, with alignment and spacing.
-/// </summary>
 public class IRLayout
 {
-    /// <summary>flex | grid | stack</summary>
     public string Mode { get; set; } = "flex";
-
-    /// <summary>row | column</summary>
     public string? Direction { get; set; }
-
-    /// <summary>start | center | end | stretch | space-between | space-around</summary>
     public string? Alignment { get; set; }
-
-    /// <summary>start | center | end | stretch | space-between | space-around</summary>
     public string? Justify { get; set; }
 
     public double? Gap { get; set; }
     public IRSpacing? Padding { get; set; }
     public IRSpacing? Margin { get; set; }
 
-    /// <summary>nowrap | wrap | wrap-reverse</summary>
     public string? Wrap { get; set; }
 
     // Grid-specific
@@ -47,9 +32,6 @@ public class IRLayout
     public int? Rows { get; set; }
 }
 
-/// <summary>
-/// Four-sided spacing (padding or margin), all values in px.
-/// </summary>
 public class IRSpacing
 {
     public double? Top { get; set; }
@@ -58,9 +40,6 @@ public class IRSpacing
     public double? Left { get; set; }
 }
 
-/// <summary>
-/// Essential visual styles — framework-agnostic tokens.
-/// </summary>
 public class IRStyle
 {
     public string? Color { get; set; }
@@ -70,7 +49,6 @@ public class IRStyle
     public int? FontWeight { get; set; }
     public string? FontFamily { get; set; }
 
-    /// <summary>none | sm | md | lg | xl</summary>
     public string? Shadow { get; set; }
     public string? Border { get; set; }
     public double? Opacity { get; set; }
@@ -82,9 +60,6 @@ public class IRStyle
     public string? MaxHeight { get; set; }
 }
 
-/// <summary>
-/// Partial overrides applied at a specific responsive breakpoint (e.g. "md", "lg").
-/// </summary>
 public class IRResponsiveOverride
 {
     public IRLayout? Layout { get; set; }

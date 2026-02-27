@@ -4,24 +4,14 @@ using Prismatic.Application.Transformers;
 
 namespace Prismatic.Application.Pipeline;
 
-/// <summary>
-/// Orchestrates the full IR → code generation flow:
-/// validate → resolve registry → recursively emit the node tree.
-/// </summary>
-public sealed class CodeGenerationPipeline(ComponentRegistry registry)
+public sealed class ConverterPipeline(ComponentRegistry registry)
 {
-    /// <summary>
-    /// Generates code for the given IR tree targeting the specified framework and flavor.
-    /// </summary>
-    /// <param name="root">Root of the IR node tree.</param>
-    /// <param name="framework">Target framework: "html" | "react" | "angular".</param>
-    /// <param name="flavor">Optional flavor: "plain" | "tailwind" | "material".</param>
-    public CodeGenerationResult Generate(IRNode root, string framework, string? flavor = null)
+    public ConverterResult Generate(IRNode root, string framework, string? flavor = null)
     {
         // 1 — Validate IR
         var validation = IRValidator.Validate(root);
         if (!validation.IsValid)
-            return CodeGenerationResult.Invalid(validation);
+            return ConverterResult.Invalid(validation);
 
         // 2 — Resolve the framework registry
         IFrameworkRegistry frameworkRegistry;
@@ -31,7 +21,7 @@ public sealed class CodeGenerationPipeline(ComponentRegistry registry)
         }
         catch (InvalidOperationException ex)
         {
-            return CodeGenerationResult.Failure(ex.Message, validation);
+            return ConverterResult.Failure(ex.Message, validation);
         }
 
         // 3 — Emit the tree recursively
@@ -49,15 +39,14 @@ public sealed class CodeGenerationPipeline(ComponentRegistry registry)
 
             var html = EmitNode(root, ctx, frameworkRegistry);
             var css = styles.Build();
-            return CodeGenerationResult.Success(html, css, validation);
+            return ConverterResult.Success(html, css, validation);
         }
         catch (Exception ex)
         {
-            return CodeGenerationResult.Failure($"Emission error: {ex.Message}", validation);
+            return ConverterResult.Failure($"Emission error: {ex.Message}", validation);
         }
     }
 
-    /// <summary>Validates an IR tree without generating code.</summary>
     public IRValidationResult Validate(IRNode root) => IRValidator.Validate(root);
 
     // ── Internal ──────────────────────────────────────────────────────────────
@@ -72,4 +61,25 @@ public sealed class CodeGenerationPipeline(ComponentRegistry registry)
         var mapper = frameworkRegistry.Resolve(node.Type);
         return mapper.Emit(node, ctx);
     }
+}
+
+public sealed class ConverterResult
+{
+    public bool IsSuccess { get; private init; }
+    public string? Html { get; private init; }
+    public string? Css { get; private init; }
+    public string? ErrorMessage { get; private init; }
+    public IRValidationResult ValidationResult { get; private init; } = null!;
+
+    public static ConverterResult Success(string html, string css, IRValidationResult validation) =>
+        new() { IsSuccess = true, Html = html, Css = css, ValidationResult = validation };
+
+    public static ConverterResult Invalid(IRValidationResult validation) =>
+        new() { IsSuccess = false, ErrorMessage = validation.ToString(), ValidationResult = validation };
+
+    public static ConverterResult Failure(string message, IRValidationResult validation) =>
+        new() { IsSuccess = false, ErrorMessage = message, ValidationResult = validation };
+
+    public override string ToString() =>
+        IsSuccess ? $"OK (html: {Html?.Length ?? 0} chars, css: {Css?.Length ?? 0} chars)" : $"FAILED: {ErrorMessage}";
 }

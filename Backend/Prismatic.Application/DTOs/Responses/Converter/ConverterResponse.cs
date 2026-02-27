@@ -1,6 +1,6 @@
 namespace Prismatic.Application.DTOs.Responses;
 
-public class CodeGenResponse
+public class ConverterResponse
 {
   public string Framework { get; set; } = string.Empty;
   public string? Flavor { get; set; }
@@ -8,13 +8,13 @@ public class CodeGenResponse
   public string Css { get; set; } = string.Empty;
 }
 
-public class CodeGenValidationResponse
+public class ConverterValidationResponse
 {
   public bool IsValid { get; set; }
-  public IEnumerable<CodeGenValidationError> Errors { get; set; } = [];
+  public IEnumerable<ConverterValidationError> Errors { get; set; } = [];
 }
 
-public class CodeGenValidationError
+public class ConverterValidationError
 {
   public string Path { get; set; } = string.Empty;
   public string Message { get; set; } = string.Empty;

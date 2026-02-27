@@ -20,7 +20,7 @@ public static class ServiceCollectionExtensions
     services.AddScoped<IUserRepository, UserRepository>();
     services.AddScoped<IProjectRepository, ProjectRepository>();
 
-    // Code generation — singleton because registries are configured once at startup
+    // Converter — singleton because registries are configured once at startup
     services.AddSingleton<ComponentRegistry>(sp =>
     {
       var registry = new ComponentRegistry();

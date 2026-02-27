@@ -3,9 +3,6 @@ using Prismatic.Domain.IR;
 
 namespace Prismatic.Application.Transformers;
 
-/// <summary>
-/// Converts IR responsive overrides into CSS @media query blocks.
-/// </summary>
 public static class ResponsiveTransformer
 {
   private static readonly Dictionary<string, string> Breakpoints = new(StringComparer.OrdinalIgnoreCase)
@@ -18,7 +15,6 @@ public static class ResponsiveTransformer
     ["2xl"] = "1536px"
   };
 
-  /// <summary>Generates CSS @media blocks for all responsive overrides on a node.</summary>
   public static string ToCssMediaQueries(
       Dictionary<string, IRResponsiveOverride> responsive,
       string selector)
@@ -43,16 +39,6 @@ public static class ResponsiveTransformer
     }
 
     return sb.ToString();
-  }
-
-  /// <summary>Returns a per-breakpoint map of CSS property dictionaries for a node.</summary>
-  public static Dictionary<string, Dictionary<string, string>> ToBreakpointMap(
-      Dictionary<string, IRResponsiveOverride> responsive)
-  {
-    var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-    foreach (var (bp, @override) in responsive)
-      result[bp] = BuildOverrideProperties(@override);
-    return result;
   }
 
   private static Dictionary<string, string> BuildOverrideProperties(IRResponsiveOverride @override)

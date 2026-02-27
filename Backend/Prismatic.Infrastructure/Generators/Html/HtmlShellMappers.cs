@@ -26,10 +26,6 @@ public sealed class HtmlSidebarMapper : HtmlMapperBase
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
 
-/// <summary>
-/// Emits a native &lt;dialog&gt; element.
-/// The 'open' prop controls the open attribute.
-/// </summary>
 public sealed class HtmlModalMapper : HtmlMapperBase
 {
     public override string Type => "Modal";

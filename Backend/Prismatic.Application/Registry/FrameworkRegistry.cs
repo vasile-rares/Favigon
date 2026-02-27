@@ -1,10 +1,5 @@
 namespace Prismatic.Application.Registry;
 
-/// <summary>
-/// Base implementation of <see cref="IFrameworkRegistry"/>.
-/// Framework-specific registries (HtmlRegistry, ReactRegistry, etc.) subclass this
-/// and register their mappers in the constructor.
-/// </summary>
 public class FrameworkRegistry(string framework, string? flavor = null) : IFrameworkRegistry
 {
   private readonly Dictionary<string, IComponentMapper> _mappers = new(StringComparer.OrdinalIgnoreCase);

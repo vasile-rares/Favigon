@@ -6,7 +6,6 @@ namespace Prismatic.Infrastructure.Generators.Html;
 
 // ── Stack ─────────────────────────────────────────────────────────────────────
 
-/// <summary>Flex column container.</summary>
 public sealed class HtmlStackMapper : HtmlMapperBase
 {
     public override string Type => "Stack";
@@ -24,7 +23,6 @@ public sealed class HtmlStackMapper : HtmlMapperBase
 
 // ── Row ───────────────────────────────────────────────────────────────────────
 
-/// <summary>Flex row container.</summary>
 public sealed class HtmlRowMapper : HtmlMapperBase
 {
     public override string Type => "Row";
@@ -41,7 +39,6 @@ public sealed class HtmlRowMapper : HtmlMapperBase
 
 // ── Column ────────────────────────────────────────────────────────────────────
 
-/// <summary>Flex column container (alias for Stack with explicit semantics).</summary>
 public sealed class HtmlColumnMapper : HtmlMapperBase
 {
     public override string Type => "Column";
@@ -58,7 +55,6 @@ public sealed class HtmlColumnMapper : HtmlMapperBase
 
 // ── Grid ──────────────────────────────────────────────────────────────────────
 
-/// <summary>CSS Grid container.</summary>
 public sealed class HtmlGridMapper : HtmlMapperBase
 {
     public override string Type => "Grid";
@@ -75,7 +71,6 @@ public sealed class HtmlGridMapper : HtmlMapperBase
 
 // ── Container ─────────────────────────────────────────────────────────────────
 
-/// <summary>Generic block container with layout + style applied.</summary>
 public sealed class HtmlContainerMapper : HtmlMapperBase
 {
     public override string Type => "Container";
@@ -86,7 +81,6 @@ public sealed class HtmlContainerMapper : HtmlMapperBase
 
 // ── Divider ───────────────────────────────────────────────────────────────────
 
-/// <summary>Horizontal or vertical rule.</summary>
 public sealed class HtmlDividerMapper : HtmlMapperBase
 {
     public override string Type => "Divider";

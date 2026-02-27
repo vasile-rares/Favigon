@@ -33,10 +33,6 @@ public sealed class HtmlImageMapper : HtmlMapperBase
 
 // ── Icon ──────────────────────────────────────────────────────────────────────
 
-/// <summary>
-/// Renders a named icon as a &lt;span&gt; with aria-label.
-/// The icon name is used as text content — adapt to your icon font or SVG system.
-/// </summary>
 public sealed class HtmlIconMapper : HtmlMapperBase
 {
     public override string Type => "Icon";
@@ -96,11 +92,6 @@ public sealed class HtmlAvatarMapper : HtmlMapperBase
 
 // ── Table ─────────────────────────────────────────────────────────────────────
 
-/// <summary>
-/// Emits a &lt;table&gt; with thead/tbody structure.
-/// Columns are read from the 'columns' prop (comma-separated header labels).
-/// Row children are emitted inside tbody.
-/// </summary>
 public sealed class HtmlTableMapper : HtmlMapperBase
 {
     public override string Type => "Table";

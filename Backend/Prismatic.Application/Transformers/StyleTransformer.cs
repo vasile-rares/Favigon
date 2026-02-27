@@ -2,9 +2,6 @@ using Prismatic.Domain.IR;
 
 namespace Prismatic.Application.Transformers;
 
-/// <summary>
-/// Converts an <see cref="IRStyle"/> into CSS property declarations.
-/// </summary>
 public static class StyleTransformer
 {
   private static readonly Dictionary<string, string> ShadowMap = new(StringComparer.OrdinalIgnoreCase)
@@ -44,17 +41,6 @@ public static class StyleTransformer
     return css;
   }
 
-  public static string ToInlineStyle(IRStyle style) => CssUtils.BuildInlineStyle(ToCssProperties(style));
-  public static string ToCssBlock(IRStyle style) => CssUtils.BuildCssBlock(ToCssProperties(style));
-
-  /// <summary>Merges layout and style into a single inline-style string.</summary>
-  public static string MergeToInlineStyle(IRLayout? layout, IRStyle? style) =>
-      CssUtils.BuildInlineStyle(MergeToProperties(layout, style));
-
-  /// <summary>
-  /// Merges layout and style into a single CSS property dictionary.
-  /// Used by generators that deposit styles into a <see cref="StyleCollector"/>.
-  /// </summary>
   public static Dictionary<string, string> MergeToProperties(IRLayout? layout, IRStyle? style)
   {
     var merged = new Dictionary<string, string>(StringComparer.Ordinal);

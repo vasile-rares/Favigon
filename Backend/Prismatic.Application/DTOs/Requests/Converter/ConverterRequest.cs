@@ -3,7 +3,7 @@ using Prismatic.Domain.IR;
 
 namespace Prismatic.Application.DTOs.Requests;
 
-public class CodeGenRequest
+public class ConverterRequest
 {
   [Required]
   public string Framework { get; set; } = "html";

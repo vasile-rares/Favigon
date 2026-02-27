@@ -2,9 +2,6 @@ using Prismatic.Domain.IR;
 
 namespace Prismatic.Application.Transformers;
 
-/// <summary>
-/// Converts an <see cref="IRLayout"/> into CSS property declarations.
-/// </summary>
 public static class LayoutTransformer
 {
   public static Dictionary<string, string> ToCssProperties(IRLayout layout)
@@ -38,9 +35,6 @@ public static class LayoutTransformer
 
     return css;
   }
-
-  public static string ToInlineStyle(IRLayout layout) => CssUtils.BuildInlineStyle(ToCssProperties(layout));
-  public static string ToCssBlock(IRLayout layout) => CssUtils.BuildCssBlock(ToCssProperties(layout));
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 

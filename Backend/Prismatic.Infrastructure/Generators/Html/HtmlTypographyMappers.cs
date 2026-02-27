@@ -5,7 +5,6 @@ namespace Prismatic.Infrastructure.Generators.Html;
 
 // ── Text ──────────────────────────────────────────────────────────────────────
 
-/// <summary>Renders as &lt;p&gt; or &lt;span&gt; based on the 'inline' prop.</summary>
 public sealed class HtmlTextMapper : HtmlMapperBase
 {
     public override string Type => "Text";
@@ -22,7 +21,6 @@ public sealed class HtmlTextMapper : HtmlMapperBase
 
 // ── Heading ──────────────────────────────────────────────────────────────────
 
-/// <summary>Renders as &lt;h1&gt;–&lt;h6&gt; based on the 'level' prop (default h2).</summary>
 public sealed class HtmlHeadingMapper : HtmlMapperBase
 {
     public override string Type => "Heading";
@@ -39,7 +37,6 @@ public sealed class HtmlHeadingMapper : HtmlMapperBase
 
 // ── Link ──────────────────────────────────────────────────────────────────────
 
-/// <summary>Renders as &lt;a&gt; with href, target, and optional rel="noopener".</summary>
 public sealed class HtmlLinkMapper : HtmlMapperBase
 {
     public override string Type => "Link";
