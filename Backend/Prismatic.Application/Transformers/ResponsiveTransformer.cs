@@ -8,65 +8,65 @@ namespace Prismatic.Application.Transformers;
 /// </summary>
 public static class ResponsiveTransformer
 {
-    private static readonly Dictionary<string, string> Breakpoints = new(StringComparer.OrdinalIgnoreCase)
+  private static readonly Dictionary<string, string> Breakpoints = new(StringComparer.OrdinalIgnoreCase)
+  {
+    ["xs"] = "0px",
+    ["sm"] = "640px",
+    ["md"] = "768px",
+    ["lg"] = "1024px",
+    ["xl"] = "1280px",
+    ["2xl"] = "1536px"
+  };
+
+  /// <summary>Generates CSS @media blocks for all responsive overrides on a node.</summary>
+  public static string ToCssMediaQueries(
+      Dictionary<string, IRResponsiveOverride> responsive,
+      string selector)
+  {
+    if (responsive.Count == 0) return string.Empty;
+
+    var sb = new StringBuilder();
+
+    foreach (var breakpoint in Breakpoints.Keys)
     {
-        ["xs"]  = "0px",
-        ["sm"]  = "640px",
-        ["md"]  = "768px",
-        ["lg"]  = "1024px",
-        ["xl"]  = "1280px",
-        ["2xl"] = "1536px"
-    };
+      if (!responsive.TryGetValue(breakpoint, out var @override)) continue;
 
-    /// <summary>Generates CSS @media blocks for all responsive overrides on a node.</summary>
-    public static string ToCssMediaQueries(
-        Dictionary<string, IRResponsiveOverride> responsive,
-        string selector)
-    {
-        if (responsive.Count == 0) return string.Empty;
+      var props = BuildOverrideProperties(@override);
+      if (props.Count == 0) continue;
 
-        var sb = new StringBuilder();
-
-        foreach (var breakpoint in Breakpoints.Keys)
-        {
-            if (!responsive.TryGetValue(breakpoint, out var @override)) continue;
-
-            var props = BuildOverrideProperties(@override);
-            if (props.Count == 0) continue;
-
-            sb.Append($"@media (min-width: {Breakpoints[breakpoint]}) {{\n");
-            sb.Append($"  {selector} {{\n");
-            foreach (var (k, v) in props)
-                sb.Append($"    {k}: {v};\n");
-            sb.Append("  }\n");
-            sb.Append("}\n");
-        }
-
-        return sb.ToString();
+      sb.Append($"@media (min-width: {Breakpoints[breakpoint]}) {{\n");
+      sb.Append($"  {selector} {{\n");
+      foreach (var (k, v) in props)
+        sb.Append($"    {k}: {v};\n");
+      sb.Append("  }\n");
+      sb.Append("}\n");
     }
 
-    /// <summary>Returns a per-breakpoint map of CSS property dictionaries for a node.</summary>
-    public static Dictionary<string, Dictionary<string, string>> ToBreakpointMap(
-        Dictionary<string, IRResponsiveOverride> responsive)
-    {
-        var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (bp, @override) in responsive)
-            result[bp] = BuildOverrideProperties(@override);
-        return result;
-    }
+    return sb.ToString();
+  }
 
-    private static Dictionary<string, string> BuildOverrideProperties(IRResponsiveOverride @override)
-    {
-        var props = new Dictionary<string, string>(StringComparer.Ordinal);
+  /// <summary>Returns a per-breakpoint map of CSS property dictionaries for a node.</summary>
+  public static Dictionary<string, Dictionary<string, string>> ToBreakpointMap(
+      Dictionary<string, IRResponsiveOverride> responsive)
+  {
+    var result = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
+    foreach (var (bp, @override) in responsive)
+      result[bp] = BuildOverrideProperties(@override);
+    return result;
+  }
 
-        if (@override.Layout is not null)
-            foreach (var kv in LayoutTransformer.ToCssProperties(@override.Layout))
-                props[kv.Key] = kv.Value;
+  private static Dictionary<string, string> BuildOverrideProperties(IRResponsiveOverride @override)
+  {
+    var props = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        if (@override.Style is not null)
-            foreach (var kv in StyleTransformer.ToCssProperties(@override.Style))
-                props[kv.Key] = kv.Value;
+    if (@override.Layout is not null)
+      foreach (var kv in LayoutTransformer.ToCssProperties(@override.Layout))
+        props[kv.Key] = kv.Value;
 
-        return props;
-    }
+    if (@override.Style is not null)
+      foreach (var kv in StyleTransformer.ToCssProperties(@override.Style))
+        props[kv.Key] = kv.Value;
+
+    return props;
+  }
 }

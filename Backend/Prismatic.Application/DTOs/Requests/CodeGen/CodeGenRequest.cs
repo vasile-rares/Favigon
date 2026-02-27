@@ -5,11 +5,11 @@ namespace Prismatic.Application.DTOs.Requests;
 
 public class CodeGenRequest
 {
-    [Required]
-    public string Framework { get; set; } = "html";
+  [Required]
+  public string Framework { get; set; } = "html";
 
-    public string? Flavor { get; set; }
+  public string? Flavor { get; set; }
 
-    [Required]
-    public IRNode? Ir { get; set; }
+  [Required]
+  public IRNode? Ir { get; set; }
 }
