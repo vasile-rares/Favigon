@@ -56,3 +56,4 @@
 - Keep public contracts stable unless explicitly asked to evolve them.
 - Favor consistency with existing naming, folder structure, and coding style over new patterns.
 - Avoid excessive or redundant comments.
+

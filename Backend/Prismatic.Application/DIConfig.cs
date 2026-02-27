@@ -1,3 +1,5 @@
+using Prismatic.Application.Pipeline;
+using Prismatic.Application.Registry;
 using Prismatic.Application.Interfaces;
 using Prismatic.Application.Mappings;
 using Prismatic.Application.Services;
@@ -13,6 +15,9 @@ public static class ServiceCollectionExtensions
     services.AddScoped<IUserService, UserService>();
     services.AddScoped<IAuthService, AuthService>();
     services.AddScoped<IProjectService, ProjectService>();
+
+    services.AddSingleton<CodeGenerationPipeline>();
+
     return services;
   }
 }
