@@ -1,4 +1,3 @@
-using Prismatic.Application.Pipeline;
 using Prismatic.Application.Registry;
 using Prismatic.Application.Interfaces;
 using Prismatic.Application.Mappings;
@@ -15,8 +14,7 @@ public static class ServiceCollectionExtensions
     services.AddScoped<IUserService, UserService>();
     services.AddScoped<IAuthService, AuthService>();
     services.AddScoped<IProjectService, ProjectService>();
-
-    services.AddSingleton<ConverterPipeline>();
+    services.AddScoped<IConverterService, ConverterService>();
 
     return services;
   }

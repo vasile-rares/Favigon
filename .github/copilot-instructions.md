@@ -46,7 +46,7 @@
 
 ## Design & UI Guidelines
 
-- Follow the design philosophy and component styling of **PrimeUI** (https://primeui.com/), specifically the Dark Mode theme.
+<!-- - Follow the design philosophy and component styling of **PrimeUI** (https://primeui.com/), specifically the Dark Mode theme. -->
 - Ensure all new UI components match the "premium" look and feel established in the Project Dashboard and Canvas.
 - Use CSS nesting to organize styles hierarchically and improve readability.
 
