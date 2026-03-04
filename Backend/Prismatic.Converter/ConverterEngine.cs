@@ -36,7 +36,7 @@ public sealed class ConverterEngine : IConverterEngine
 
     var frameworkMappers = ResolveFrameworkMappers(framework);
 
-    var styles = new StyleCollector();
+    var styles = new StyleBuilder();
     var context = new EmitContext
     {
       Framework = framework,

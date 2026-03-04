@@ -3,7 +3,7 @@ using Prismatic.Converter.Models;
 
 namespace Prismatic.Converter.Transformers;
 
-public sealed class StyleCollector
+public sealed class StyleBuilder
 {
   private readonly List<(string NodeId, Dictionary<string, string> Props)> _baseRules = [];
   private readonly List<string> _mediaRules = [];
