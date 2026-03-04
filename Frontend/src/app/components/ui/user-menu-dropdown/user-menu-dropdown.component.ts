@@ -10,8 +10,8 @@ import { Component, ElementRef, HostListener, Input, Output, EventEmitter } from
   styleUrl: './user-menu-dropdown.component.css',
 })
 export class UserMenuDropdownComponent {
-  @Input() displayName = 'Alex Johnson';
-  @Input() email = 'alex@example.com';
+  @Input() displayName = '';
+  @Input() email = '';
   @Input() avatarUrl = 'https://github.com/shadcn.png';
 
   @Output() logoutClicked = new EventEmitter<void>();

@@ -117,5 +117,9 @@
         </div>
       </div>
     </main>
+
+    <app-canvas-design-sidepanel
+      [selectedElement]="selectedElement()"
+      (elementPatch)="onSelectedElementPatch($event)"></app-canvas-design-sidepanel>
   </div>
 </div>

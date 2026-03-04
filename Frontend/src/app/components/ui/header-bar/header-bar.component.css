@@ -37,6 +37,7 @@
   border-radius: 6px;
   cursor: pointer;
   color: var(--color-text-subtle);
+  text-decoration: none;
   transition: all 0.2s;
 
   &:hover {

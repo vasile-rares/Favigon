@@ -11,7 +11,7 @@
       <!-- User Part -->
       <div class="breadcrumb-item">
         <img [src]="avatarUrl" alt="User" class="breadcrumb-avatar" />
-        <span class="breadcrumb-text">@{{ username }}</span>
+        <span class="breadcrumb-text">@{{ username || 'user' }}</span>
       </div>
 
       <span class="breadcrumb-separator">
@@ -19,9 +19,9 @@
       </span>
 
       <!-- "Projects" Literal -->
-      <div class="breadcrumb-item">
+      <a class="breadcrumb-item" [routerLink]="['/dashboard']">
         <span class="breadcrumb-text">Projects</span>
-      </div>
+      </a>
 
       @if (isProjectContext && currentProjectName) {
         <span class="breadcrumb-separator">

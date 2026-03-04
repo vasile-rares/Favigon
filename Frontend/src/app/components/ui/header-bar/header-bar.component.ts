@@ -1,16 +1,23 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../../../core/services/auth.service';
 import { ProjectService } from '../../../core/services/project.service';
 import { UserMenuDropdownComponent } from '../user-menu-dropdown/user-menu-dropdown.component';
 import { filter } from 'rxjs';
 
+interface HeaderUserProfile {
+  displayName: string;
+  username: string;
+  email: string;
+  profilePictureUrl: string | null;
+}
+
 @Component({
   selector: 'app-header-bar',
   standalone: true,
-  imports: [UserMenuDropdownComponent],
+  imports: [UserMenuDropdownComponent, RouterLink],
   templateUrl: './header-bar.component.html',
   styleUrl: './header-bar.component.css',
 })
@@ -21,12 +28,12 @@ export class HeaderBarComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly projectService = inject(ProjectService);
   private readonly fallbackAvatarUrl = 'https://github.com/shadcn.png';
-  private static cachedProfilePictureUrl: string | null | undefined;
+  private static cachedProfile: HeaderUserProfile | null | undefined;
 
   profilePictureUrl: string | null = null;
-  displayName = 'Alex Johnson';
-  username = 'alexjohnson';
-  email = 'alex@example.com';
+  displayName = '';
+  username = '';
+  email = '';
   currentProjectName: string | null = null;
   isProjectContext = false;
 
@@ -40,8 +47,15 @@ export class HeaderBarComponent implements OnInit {
       .pipe(filter((event) => event instanceof NavigationEnd))
       .subscribe(() => this.syncRouteContext());
 
-    if (HeaderBarComponent.cachedProfilePictureUrl !== undefined) {
-      this.profilePictureUrl = HeaderBarComponent.cachedProfilePictureUrl;
+    if (HeaderBarComponent.cachedProfile !== undefined) {
+      const cachedProfile = HeaderBarComponent.cachedProfile;
+
+      if (cachedProfile === null) {
+        this.resetIdentity();
+      } else {
+        this.applyProfile(cachedProfile);
+      }
+
       return;
     }
 
@@ -56,17 +70,39 @@ export class HeaderBarComponent implements OnInit {
       })
       .subscribe({
         next: (response) => {
-          this.displayName = response.displayName?.trim() || this.displayName;
-          this.username = response.username?.trim() || this.username;
-          this.email = response.email?.trim() || this.email;
-          this.profilePictureUrl = response.profilePictureUrl ?? null;
-          HeaderBarComponent.cachedProfilePictureUrl = this.profilePictureUrl;
+          const username = response.username?.trim() || '';
+          const email = response.email?.trim() || '';
+          const displayName = response.displayName?.trim() || username || email;
+
+          const profile: HeaderUserProfile = {
+            displayName,
+            username,
+            email,
+            profilePictureUrl: response.profilePictureUrl ?? null,
+          };
+
+          this.applyProfile(profile);
+          HeaderBarComponent.cachedProfile = profile;
         },
         error: () => {
-          this.profilePictureUrl = null;
-          HeaderBarComponent.cachedProfilePictureUrl = null;
+          this.resetIdentity();
+          HeaderBarComponent.cachedProfile = null;
         },
       });
+  }
+
+  private applyProfile(profile: HeaderUserProfile): void {
+    this.displayName = profile.displayName;
+    this.username = profile.username;
+    this.email = profile.email;
+    this.profilePictureUrl = profile.profilePictureUrl;
+  }
+
+  private resetIdentity(): void {
+    this.displayName = '';
+    this.username = '';
+    this.email = '';
+    this.profilePictureUrl = null;
   }
 
   private syncRouteContext() {
@@ -106,7 +142,7 @@ export class HeaderBarComponent implements OnInit {
   }
 
   onLogout() {
-    HeaderBarComponent.cachedProfilePictureUrl = undefined;
+    HeaderBarComponent.cachedProfile = undefined;
     this.authService.logout().subscribe();
     this.router.navigate(['/login']);
   }

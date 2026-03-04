@@ -22,8 +22,8 @@
         <img [src]="avatarUrl" [alt]="displayName" />
       </span>
       <span class="user-menu__identity-text">
-        <span class="user-menu__identity-name">{{ displayName }}</span>
-        <span class="user-menu__identity-email">{{ email }}</span>
+        <span class="user-menu__identity-name">{{ displayName || 'Account' }}</span>
+        <span class="user-menu__identity-email" *ngIf="email">{{ email }}</span>
       </span>
     </div>
 

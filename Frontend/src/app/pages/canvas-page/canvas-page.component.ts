@@ -12,6 +12,7 @@ import { ActivatedRoute } from '@angular/router';
 import { CanvasElement, CanvasElementType } from '../../core/models/canvas.models';
 import { buildCanvasElementsFromIR, buildCanvasIR } from '../../core/mappers/canvas-ir.mapper';
 import { HeaderBarComponent } from '../../components/ui/header-bar/header-bar.component';
+import { CanvasDesignSidepanelComponent } from '../../components/ui/canvas-design-sidepanel/canvas-design-sidepanel.component';
 import { ConverterService } from '../../core/services/converter.service';
 import { IRNode } from '../../core/models/ir.models';
 import { ProjectService } from '../../core/services/project.service';
@@ -19,7 +20,7 @@ import { ProjectService } from '../../core/services/project.service';
 @Component({
   selector: 'app-canvas-page',
   standalone: true,
-  imports: [CommonModule, HeaderBarComponent],
+  imports: [CommonModule, HeaderBarComponent, CanvasDesignSidepanelComponent],
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
 })
@@ -31,6 +32,14 @@ export class ProjectPage implements OnDestroy {
   elements = signal<CanvasElement[]>([]);
   selectedElementId = signal<string | null>(null);
   currentTool = signal<CanvasElementType | 'select'>('select');
+  selectedElement = computed<CanvasElement | null>(() => {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) {
+      return null;
+    }
+
+    return this.elements().find((element) => element.id === selectedId) ?? null;
+  });
 
   selectedFramework = signal<'html' | 'react' | 'angular'>('html');
   validationResult = signal<boolean | null>(null);
@@ -194,6 +203,29 @@ export class ProjectPage implements OnDestroy {
     };
   }
 
+  onSelectedElementPatch(patch: Partial<CanvasElement>) {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) {
+      return;
+    }
+
+    this.elements.update((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedId) {
+          return element;
+        }
+
+        const nextElement: CanvasElement = {
+          ...element,
+          ...patch,
+        };
+
+        this.normalizeElement(nextElement, elements);
+        return nextElement;
+      }),
+    );
+  }
+
   @HostListener('window:pointermove', ['$event'])
   onPointerMove(event: MouseEvent) {
     if (this.isResizing()) {
@@ -224,8 +256,8 @@ export class ProjectPage implements OnDestroy {
 
             return {
               ...el,
-              x: nextX,
-              y: nextY,
+              x: this.roundToTwoDecimals(nextX),
+              y: this.roundToTwoDecimals(nextY),
             };
           }
           return el;
@@ -304,7 +336,9 @@ export class ProjectPage implements OnDestroy {
     this.projectService.getDesign(this.projectIdAsNumber).subscribe({
       next: (response) => {
         const parsedIr = this.safeParseIr(response.designJson);
-        this.elements.set(buildCanvasElementsFromIR(parsedIr));
+        this.elements.set(
+          buildCanvasElementsFromIR(parsedIr).map((element) => this.withRoundedPrecision(element)),
+        );
         this.lastSavedAt.set(response.updatedAt ?? null);
         this.isLoadingDesign.set(false);
         this.canPersistDesign = true;
@@ -402,7 +436,79 @@ export class ProjectPage implements OnDestroy {
   }
 
   private clamp(value: number, min: number, max: number): number {
-    return Math.min(Math.max(value, min), max);
+    return this.roundToTwoDecimals(Math.min(Math.max(value, min), max));
+  }
+
+  private roundToTwoDecimals(value: number): number {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
+  }
+
+  private withRoundedPrecision(element: CanvasElement): CanvasElement {
+    return {
+      ...element,
+      x: this.roundToTwoDecimals(element.x),
+      y: this.roundToTwoDecimals(element.y),
+      width: this.roundToTwoDecimals(element.width),
+      height: this.roundToTwoDecimals(element.height),
+      fontSize:
+        typeof element.fontSize === 'number'
+          ? this.roundToTwoDecimals(element.fontSize)
+          : undefined,
+    };
+  }
+
+  private normalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
+    const minSize = 24;
+
+    element.width = Math.max(minSize, element.width);
+    element.height = Math.max(minSize, element.height);
+
+    if (element.type === 'text') {
+      element.fontSize = Math.max(8, element.fontSize ?? 16);
+    }
+
+    if (element.type === 'circle') {
+      const circleSize = Math.max(minSize, Math.min(element.width, element.height));
+      element.width = circleSize;
+      element.height = circleSize;
+    }
+
+    const parent = element.parentId
+      ? elements.find((candidate) => candidate.id === element.parentId)
+      : null;
+
+    if (!parent || element.type === 'frame') {
+      element.x = this.roundToTwoDecimals(element.x);
+      element.y = this.roundToTwoDecimals(element.y);
+      element.width = this.roundToTwoDecimals(element.width);
+      element.height = this.roundToTwoDecimals(element.height);
+      if (typeof element.fontSize === 'number') {
+        element.fontSize = this.roundToTwoDecimals(element.fontSize);
+      }
+      return;
+    }
+
+    const maxWidth = Math.max(minSize, parent.x + parent.width - element.x);
+    const maxHeight = Math.max(minSize, parent.y + parent.height - element.y);
+
+    element.width = this.clamp(element.width, minSize, maxWidth);
+    element.height = this.clamp(element.height, minSize, maxHeight);
+
+    if (element.type === 'circle') {
+      const constrainedCircleSize = Math.max(minSize, Math.min(element.width, element.height));
+      element.width = constrainedCircleSize;
+      element.height = constrainedCircleSize;
+    }
+
+    element.x = this.clamp(element.x, parent.x, parent.x + parent.width - element.width);
+    element.y = this.clamp(element.y, parent.y, parent.y + parent.height - element.height);
+    element.x = this.roundToTwoDecimals(element.x);
+    element.y = this.roundToTwoDecimals(element.y);
+    element.width = this.roundToTwoDecimals(element.width);
+    element.height = this.roundToTwoDecimals(element.height);
+    if (typeof element.fontSize === 'number') {
+      element.fontSize = this.roundToTwoDecimals(element.fontSize);
+    }
   }
 
   private handleResizePointerMove(event: MouseEvent) {
@@ -425,7 +531,9 @@ export class ProjectPage implements OnDestroy {
           ? elements.find((candidate) => candidate.id === element.parentId)
           : null;
 
-        const maxWidth = parent ? parent.x + parent.width - start.elementX : Number.POSITIVE_INFINITY;
+        const maxWidth = parent
+          ? parent.x + parent.width - start.elementX
+          : Number.POSITIVE_INFINITY;
         const maxHeight = parent
           ? parent.y + parent.height - start.elementY
           : Number.POSITIVE_INFINITY;
