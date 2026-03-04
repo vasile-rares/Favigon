@@ -412,6 +412,14 @@ public sealed class HtmlContainerMapper : HtmlMapperBase
       Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
 }
 
+public sealed class HtmlFrameMapper : HtmlMapperBase
+{
+  public override string Type => "Frame";
+
+  protected override string EmitElement(IRNode node, EmitContext ctx) =>
+      Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
+}
+
 public sealed class HtmlDividerMapper : HtmlMapperBase
 {
   public override string Type => "Divider";

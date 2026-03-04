@@ -414,6 +414,14 @@ public sealed class AngularContainerMapper : AngularMapperBase
       Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
 }
 
+public sealed class AngularFrameMapper : AngularMapperBase
+{
+  public override string Type => "Frame";
+
+  protected override string EmitElement(IRNode node, EmitContext ctx) =>
+      Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
+}
+
 public sealed class AngularDividerMapper : AngularMapperBase
 {
   public override string Type => "Divider";

@@ -2,6 +2,42 @@
   <app-header-bar></app-header-bar>
 
   <div class="workspace">
+    <aside class="inspector">
+      <h3>IR Builder</h3>
+
+      <label class="field-label" for="framework">Framework</label>
+      <select
+        id="framework"
+        [value]="selectedFramework()"
+        (change)="setFramework($any($event.target).value)">
+        <option value="html">HTML</option>
+        <option value="react">React</option>
+        <option value="angular">Angular</option>
+      </select>
+
+      <div class="action-row">
+        <button type="button" (click)="validateIR()" [disabled]="isValidating() || isGenerating()">
+          {{ isValidating() ? 'Validating...' : 'Validate IR' }}
+        </button>
+        <button type="button" (click)="generateCode()" [disabled]="isGenerating() || isValidating()">
+          {{ isGenerating() ? 'Generating...' : 'Generate Code' }}
+        </button>
+      </div>
+
+      <p class="status ok" *ngIf="validationResult() === true">IR is valid.</p>
+      <p class="status error" *ngIf="validationResult() === false">IR is not valid.</p>
+      <p class="status error" *ngIf="apiError()">{{ apiError() }}</p>
+
+      <h4>IR Preview</h4>
+      <pre>{{ irPreview() | json }}</pre>
+
+      <h4 *ngIf="generatedHtml()">Generated HTML</h4>
+      <pre *ngIf="generatedHtml()">{{ generatedHtml() }}</pre>
+
+      <h4 *ngIf="generatedCss()">Generated CSS</h4>
+      <pre *ngIf="generatedCss()">{{ generatedCss() }}</pre>
+    </aside>
+
     <aside class="toolbar">
       <!-- <div class="toolbar-header">
         <h2>Prismatic</h2>
@@ -11,25 +47,25 @@
         <button
           [class.active]="currentTool() === 'select'"
           (click)="selectTool('select')"
-          title="Selectează (V)">
+          title="Select (V)">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>
         </button>
         <button
           [class.active]="currentTool() === 'frame'"
           (click)="selectTool('frame')"
-          title="Cadru (F)">
+          title="Frame (F)">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
         </button>
         <button
           [class.active]="currentTool() === 'rectangle'"
           (click)="selectTool('rectangle')"
-          title="Dreptunghi (R)">
+          title="Rectangle (R)">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
         </button>
         <button
           [class.active]="currentTool() === 'circle'"
           (click)="selectTool('circle')"
-          title="Cerc (O)">
+          title="Circle (O)">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
         </button>
         <button
@@ -37,6 +73,12 @@
           (click)="selectTool('text')"
           title="Text (T)">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>
+        </button>
+        <button
+          [class.active]="currentTool() === 'image'"
+          (click)="selectTool('image')"
+          title="Image (I)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
         </button>
       </div>
     </aside>
@@ -50,18 +92,29 @@
         [class.rectangle]="el.type === 'rectangle'"
         [class.circle]="el.type === 'circle'"
         [class.text]="el.type === 'text'"
+        [class.image]="el.type === 'image'"
         [style.left.px]="el.x"
         [style.top.px]="el.y"
         [style.width.px]="el.width"
         [style.height.px]="el.height"
-        [style.background-color]="el.type !== 'text' ? el.fill : 'transparent'"
+        [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
         (pointerdown)="onElementPointerDown($event, el.id)">
 
         <ng-container *ngIf="el.type === 'text'">
           <span [style.font-size.px]="el.fontSize">{{ el.text }}</span>
         </ng-container>
 
-        <div class="selection-outline" *ngIf="selectedElementId() === el.id"></div>
+        <ng-container *ngIf="el.type === 'image'">
+          <img [src]="el.imageUrl" alt="Canvas image" draggable="false" />
+        </ng-container>
+
+        <div class="selection-outline" *ngIf="selectedElementId() === el.id">
+          <button
+            type="button"
+            class="resize-handle resize-handle-se"
+            (pointerdown)="onResizeHandlePointerDown($event, el.id)"
+            aria-label="Resize element"></button>
+        </div>
       </div>
     </main>
   </div>

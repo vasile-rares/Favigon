@@ -1,10 +1,11 @@
-import { Component, signal, inject } from '@angular/core';
+import { Component, signal, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { HeaderBarComponent } from '../../components/ui/header-bar/header-bar.component';
+import { ProjectService } from '../../core/services/project.service';
 
 interface Project {
-  id: string;
+  id: number;
   name: string;
   lastEdited: Date;
   thumbnailUrl?: string;
@@ -17,20 +18,53 @@ interface Project {
   templateUrl: './dashboard-page.component.html',
   styleUrl: './dashboard-page.component.css',
 })
-export class DashboardPage {
+export class DashboardPage implements OnInit {
   private readonly router = inject(Router);
+  private readonly projectService = inject(ProjectService);
 
-  // Mock data for projects
-  projects = signal<Project[]>([
-    { id: '1', name: 'Design System', lastEdited: new Date() },
-    { id: '2', name: 'Mobile App Mockup', lastEdited: new Date(Date.now() - 86400000) },
-    { id: '3', name: 'Landing Page', lastEdited: new Date(Date.now() - 172800000) },
-  ]);
+  projects = signal<Project[]>([]);
+  isLoading = signal(true);
+  errorMessage = signal<string | null>(null);
+
+  ngOnInit() {
+    this.loadProjects();
+  }
+
+  private loadProjects() {
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
+
+    this.projectService.getProjects().subscribe({
+      next: (projects) => {
+        this.projects.set(
+          projects.map((project) => ({
+            id: project.projectId,
+            name: project.name,
+            lastEdited: new Date(project.updatedAt),
+          })),
+        );
+        this.isLoading.set(false);
+      },
+      error: (error: { error?: { message?: string } }) => {
+        this.errorMessage.set(error.error?.message ?? 'Failed to load projects.');
+        this.isLoading.set(false);
+      },
+    });
+  }
 
   createNewProject() {
-    const newId = crypto.randomUUID();
-    // In a real app, we would call a service to create the project in the backend first
-    console.log('Creating new project:', newId);
-    this.router.navigate(['/project', newId]);
+    this.projectService
+      .create({
+        name: 'Untitled Project',
+        isPublic: false,
+      })
+      .subscribe({
+        next: (project) => {
+          this.router.navigate(['/project', project.projectId]);
+        },
+        error: (error: { error?: { message?: string } }) => {
+          this.errorMessage.set(error.error?.message ?? 'Failed to create project.');
+        },
+      });
   }
 }

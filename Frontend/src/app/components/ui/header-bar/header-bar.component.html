@@ -23,14 +23,15 @@
         <span class="breadcrumb-text">Projects</span>
       </div>
 
-      <span class="breadcrumb-separator">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right"><path d="m9 18 6-6-6-6"/></svg>
-      </span>
+      @if (isProjectContext && currentProjectName) {
+        <span class="breadcrumb-separator">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right"><path d="m9 18 6-6-6-6"/></svg>
+        </span>
 
-      <!-- Project Name -->
-      <div class="breadcrumb-item active">
-        <span class="breadcrumb-text">My First Project</span>
-      </div>
+        <div class="breadcrumb-item active">
+          <span class="breadcrumb-text">{{ currentProjectName }}</span>
+        </div>
+      }
     </nav>
   </div>
 

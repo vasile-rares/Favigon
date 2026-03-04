@@ -7,11 +7,7 @@ public static class IrValidator
 {
   private static readonly HashSet<string> KnownTypes =
   [
-      "Button", "Input", "Textarea", "Select", "Checkbox", "Radio", "Toggle",
-        "Text", "Heading", "Link", "Image", "Icon",
-        "Card", "Stack", "Row", "Column", "Grid", "Container", "Divider",
-        "Navbar", "Sidebar", "Modal", "Drawer", "Tooltip", "Badge", "Avatar",
-        "Table", "List", "Form", "Tabs", "Accordion", "Breadcrumb", "Pagination"
+      "Frame", "Container", "Text", "Image"
   ];
 
   private static readonly HashSet<string> ValidLayoutModes = ["flex", "grid", "stack"];

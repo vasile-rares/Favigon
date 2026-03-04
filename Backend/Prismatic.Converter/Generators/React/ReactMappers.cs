@@ -413,6 +413,14 @@ public sealed class ReactContainerMapper : ReactMapperBase
       Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
 }
 
+public sealed class ReactFrameMapper : ReactMapperBase
+{
+  public override string Type => "Frame";
+
+  protected override string EmitElement(IRNode node, EmitContext ctx) =>
+      Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
+}
+
 public sealed class ReactDividerMapper : ReactMapperBase
 {
   public override string Type => "Divider";
