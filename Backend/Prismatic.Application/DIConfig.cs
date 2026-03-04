@@ -1,7 +1,7 @@
-using Prismatic.Application.Registry;
 using Prismatic.Application.Interfaces;
 using Prismatic.Application.Mappings;
 using Prismatic.Application.Services;
+using Prismatic.Converter;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Prismatic.Application;
@@ -15,6 +15,7 @@ public static class ServiceCollectionExtensions
     services.AddScoped<IAuthService, AuthService>();
     services.AddScoped<IProjectService, ProjectService>();
     services.AddScoped<IConverterService, ConverterService>();
+    services.AddPrismaticConverter();
 
     return services;
   }

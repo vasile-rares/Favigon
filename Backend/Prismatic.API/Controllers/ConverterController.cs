@@ -15,7 +15,7 @@ public class ConverterController(IConverterService converterService) : Controlle
         if (request.Ir is null)
             throw new ArgumentException("IR node is required.");
 
-        var result = converterService.Generate(request.Ir, request.Framework, request.Flavor);
+        var result = converterService.Generate(request.Ir, request.Framework);
 
         return Ok(result);
     }
@@ -26,12 +26,11 @@ public class ConverterController(IConverterService converterService) : Controlle
         if (request.Ir is null)
             throw new ArgumentException("IR node is required.");
 
-        var result = converterService.Validate(request.Ir);
+        var isValid = converterService.Validate(request.Ir);
 
         return Ok(new ConverterResponse
         {
-            IsSuccess = result.IsValid,
-            IsValid = result.IsValid
+            IsValid = isValid
         });
     }
 }

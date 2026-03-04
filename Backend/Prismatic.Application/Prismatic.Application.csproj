@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Prismatic.Domain\Prismatic.Domain.csproj" />
+    <ProjectReference Include="..\Prismatic.Converter\Prismatic.Converter.csproj" />
   </ItemGroup>
 
   <ItemGroup>
