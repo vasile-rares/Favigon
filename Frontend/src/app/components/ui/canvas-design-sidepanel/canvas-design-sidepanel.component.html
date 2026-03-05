@@ -1,7 +1,21 @@
 <aside class="design-sidepanel">
   <h3>Design</h3>
 
-  <div class="empty-state" *ngIf="!selectedElement">
+  <section class="panel-section" *ngIf="isFrameToolSelected()">
+    <p class="section-caption">Frame templates</p>
+    <div class="template-grid">
+      <button
+        type="button"
+        class="template-button"
+        *ngFor="let template of frameTemplates"
+        (click)="applyFrameTemplate(template)">
+        <span class="template-name">{{ template.name }}</span>
+        <span class="template-size">{{ template.sizeLabel }}</span>
+      </button>
+    </div>
+  </section>
+
+  <div class="empty-state" *ngIf="!selectedElement && !isFrameToolSelected()">
     <p>Select an element in the canvas to edit design properties.</p>
   </div>
 
@@ -60,11 +74,69 @@
     </section>
 
     <section class="panel-section" *ngIf="hasFill(element.type)">
-      <p class="section-caption">Appearance</p>
+      <p class="section-caption">Fill</p>
       <label class="field color-field">
         <span>Fill</span>
-        <input type="color" [value]="element.fill || '#e0e0e0'" (input)="onFillChange($event)" />
+        <input type="color" [value]="fillInputValue(element)" (input)="onFillChange($event)" />
       </label>
+    </section>
+
+    <section class="panel-section" *ngIf="hasStroke(element.type)">
+      <p class="section-caption">Stroke</p>
+      <div class="field-grid">
+        <label class="field color-field">
+          <span>Color</span>
+          <input
+            type="color"
+            [value]="strokeInputValue(element)"
+            (input)="onStrokeChange($event)" />
+        </label>
+
+        <label class="field">
+          <span>Width</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            [value]="toDisplayNumber(element.strokeWidth ?? 1)"
+            (input)="onNumberChange('strokeWidth', $event)" />
+        </label>
+      </div>
+
+      <label class="field">
+        <span>Position</span>
+        <select [value]="strokePositionValue(element)" (change)="onStrokePositionChange($event)">
+          <option *ngFor="let position of strokePositionOptions" [value]="position">
+            {{ position === 'inside' ? 'Inside' : 'Outside' }}
+          </option>
+        </select>
+      </label>
+    </section>
+
+    <section class="panel-section">
+      <p class="section-caption">Appearance</p>
+      <div class="field-grid">
+        <label class="field">
+          <span>Opacity</span>
+          <input
+            type="number"
+            min="0"
+            max="1"
+            step="0.01"
+            [value]="toDisplayNumber(element.opacity ?? 1)"
+            (input)="onNumberChange('opacity', $event)" />
+        </label>
+
+        <label class="field" *ngIf="supportsCornerRadius(element.type)">
+          <span>Corner Radius</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            [value]="toDisplayNumber(element.cornerRadius ?? (element.type === 'image' ? 6 : 0))"
+            (input)="onNumberChange('cornerRadius', $event)" />
+        </label>
+      </div>
     </section>
 
     <section class="panel-section" *ngIf="isText(element.type)">

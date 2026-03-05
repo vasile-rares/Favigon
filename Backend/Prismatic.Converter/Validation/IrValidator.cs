@@ -23,7 +23,7 @@ public static class IrValidator
 
   private static readonly Regex CssColor = new(
       @"^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})" +
-      @"|rgb\(.+\)|rgba\(.+\)|hsl\(.+\)|hsla\(.+\)|[a-zA-Z]+)$",
+      @"|rgb\(.+\)|rgba\(.+\)|hsl\(.+\)|hsla\(.+\)|var\(--[a-zA-Z0-9_-]+\)|[a-zA-Z]+)$",
       RegexOptions.Compiled);
 
   private static readonly Regex CssSize = new(
@@ -32,12 +32,17 @@ public static class IrValidator
 
   public static bool Validate(IRNode node)
   {
+    return GetValidationErrors(node).Count == 0;
+  }
+
+  public static IReadOnlyList<string> GetValidationErrors(IRNode node)
+  {
     var errors = new List<string>();
     var seenIds = new HashSet<string>();
 
     ValidateNode(node, path: "root", seenIds, errors);
 
-    return errors.Count == 0;
+    return errors;
   }
 
   private static void ValidateNode(

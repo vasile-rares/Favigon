@@ -9,9 +9,14 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
-import { CanvasElement, CanvasElementType } from '../../core/models/canvas.models';
+import {
+  CanvasElement,
+  CanvasElementType,
+  CanvasStrokePosition,
+} from '../../core/models/canvas.models';
 import { buildCanvasElementsFromIR, buildCanvasIR } from '../../core/mappers/canvas-ir.mapper';
 import { HeaderBarComponent } from '../../components/ui/header-bar/header-bar.component';
+import { CanvasLeftPanelComponent } from '../../components/ui/canvas-left-panel/canvas-left-panel.component';
 import { CanvasDesignSidepanelComponent } from '../../components/ui/canvas-design-sidepanel/canvas-design-sidepanel.component';
 import { ConverterService } from '../../core/services/converter.service';
 import { IRNode } from '../../core/models/ir.models';
@@ -20,7 +25,12 @@ import { ProjectService } from '../../core/services/project.service';
 @Component({
   selector: 'app-canvas-page',
   standalone: true,
-  imports: [CommonModule, HeaderBarComponent, CanvasDesignSidepanelComponent],
+  imports: [
+    CommonModule,
+    HeaderBarComponent,
+    CanvasLeftPanelComponent,
+    CanvasDesignSidepanelComponent,
+  ],
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
 })
@@ -32,6 +42,11 @@ export class ProjectPage implements OnDestroy {
   elements = signal<CanvasElement[]>([]);
   selectedElementId = signal<string | null>(null);
   currentTool = signal<CanvasElementType | 'select'>('select');
+  zoomLevel = signal(1);
+  viewportOffset = signal({ x: 0, y: 0 });
+  isPanning = signal(false);
+  isSpacePressed = signal(false);
+  frameTemplate = signal({ width: 390, height: 844 });
   selectedElement = computed<CanvasElement | null>(() => {
     const selectedId = this.selectedElementId();
     if (!selectedId) {
@@ -71,6 +86,15 @@ export class ProjectPage implements OnDestroy {
     elementId: '' as string,
   };
   private readonly imagePlaceholderUrl = 'https://placehold.co/300x200?text=Image';
+  private readonly defaultFrameFill = '#3f3f46';
+  private readonly defaultElementFill = '#e0e0e0';
+  private readonly minZoom = 0.25;
+  private readonly maxZoom = 3;
+  private readonly zoomStep = 0.1;
+  private readonly gridSize = 20;
+  private panStart = { x: 0, y: 0 };
+  private panMoved = false;
+  private suppressNextCanvasClick = false;
 
   constructor() {
     this.loadProjectDesign();
@@ -94,26 +118,59 @@ export class ProjectPage implements OnDestroy {
 
   selectTool(tool: CanvasElementType | 'select') {
     this.currentTool.set(tool);
-    if (tool !== 'select') {
+    if (tool === 'select') {
+      return;
+    }
+
+    const selected = this.selectedElement();
+    const shouldKeepSelection = tool !== 'frame' && selected?.type === 'frame';
+
+    if (!shouldKeepSelection) {
       this.selectedElementId.set(null);
     }
   }
 
+  onCanvasPointerDown(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (!this.shouldStartPanning(event, target)) {
+      return;
+    }
+
+    this.startPanning(event);
+  }
+
   onCanvasClick(event: MouseEvent) {
+    if (this.suppressNextCanvasClick) {
+      this.suppressNextCanvasClick = false;
+      return;
+    }
+
+    if (this.isSpacePressed()) {
+      return;
+    }
+
     this.apiError.set(null);
     const tool = this.currentTool();
     if (tool === 'select') {
       // If we clicked directly on the canvas (not an element), deselect
-      if ((event.target as HTMLElement).classList.contains('canvas-container')) {
+      const target = event.target as HTMLElement;
+      if (
+        target.classList.contains('canvas-container') ||
+        target.classList.contains('canvas-viewport')
+      ) {
         this.selectedElementId.set(null);
       }
       return;
     }
 
     // Create new element
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const pointer = this.getCanvasPoint(event);
+    if (!pointer) {
+      return;
+    }
+
+    const x = pointer.x;
+    const y = pointer.y;
 
     const selectedFrame = this.getSelectedFrame();
     if (tool !== 'frame') {
@@ -130,8 +187,22 @@ export class ProjectPage implements OnDestroy {
       }
     }
 
-    const defaultWidth = tool === 'text' ? 150 : tool === 'image' ? 180 : 100;
-    const defaultHeight = tool === 'text' ? 40 : tool === 'image' ? 120 : 100;
+    const defaultWidth =
+      tool === 'frame'
+        ? this.frameTemplate().width
+        : tool === 'text'
+          ? 150
+          : tool === 'image'
+            ? 180
+            : 100;
+    const defaultHeight =
+      tool === 'frame'
+        ? this.frameTemplate().height
+        : tool === 'text'
+          ? 40
+          : tool === 'image'
+            ? 120
+            : 100;
 
     const constrainedX =
       selectedFrame && tool !== 'frame'
@@ -142,14 +213,21 @@ export class ProjectPage implements OnDestroy {
         ? this.clamp(y, selectedFrame.y, selectedFrame.y + selectedFrame.height - defaultHeight)
         : y;
 
+    const name = this.getNextElementName(tool);
+
     const newElement: CanvasElement = {
       id: crypto.randomUUID(),
       type: tool,
+      name,
       x: constrainedX,
       y: constrainedY,
       width: defaultWidth,
       height: defaultHeight,
-      fill: tool === 'frame' ? '#ffffff' : '#e0e0e0',
+      fill: tool === 'frame' ? this.defaultFrameFill : this.defaultElementFill,
+      strokeWidth: tool === 'text' ? undefined : 1,
+      strokePosition: tool === 'text' ? undefined : 'inside',
+      opacity: 1,
+      cornerRadius: tool === 'image' ? 6 : 0,
       text: tool === 'text' ? 'New text' : undefined,
       fontSize: tool === 'text' ? 16 : undefined,
       imageUrl: tool === 'image' ? this.imagePlaceholderUrl : undefined,
@@ -162,6 +240,16 @@ export class ProjectPage implements OnDestroy {
   }
 
   onElementPointerDown(event: MouseEvent, id: string) {
+    const target = event.target as HTMLElement;
+    if (this.shouldStartPanning(event, target)) {
+      this.startPanning(event);
+      return;
+    }
+
+    if (this.currentTool() !== 'select') {
+      return;
+    }
+
     if (this.isResizing()) {
       return;
     }
@@ -172,10 +260,15 @@ export class ProjectPage implements OnDestroy {
 
     const el = this.elements().find((e) => e.id === id);
     if (el) {
+      const pointer = this.getCanvasPoint(event);
+      if (!pointer) {
+        return;
+      }
+
       this.isDragging.set(true);
       this.dragOffset = {
-        x: event.clientX - el.x,
-        y: event.clientY - el.y,
+        x: pointer.x - el.x,
+        y: pointer.y - el.y,
       };
     }
   }
@@ -189,12 +282,17 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
+    const pointer = this.getCanvasPoint(event);
+    if (!pointer) {
+      return;
+    }
+
     this.selectedElementId.set(id);
     this.isDragging.set(false);
     this.isResizing.set(true);
     this.resizeStart = {
-      x: event.clientX,
-      y: event.clientY,
+      x: pointer.x,
+      y: pointer.y,
       width: element.width,
       height: element.height,
       elementX: element.x,
@@ -228,6 +326,25 @@ export class ProjectPage implements OnDestroy {
 
   @HostListener('window:pointermove', ['$event'])
   onPointerMove(event: MouseEvent) {
+    if (this.isPanning()) {
+      const deltaX = event.clientX - this.panStart.x;
+      const deltaY = event.clientY - this.panStart.y;
+
+      if (deltaX !== 0 || deltaY !== 0) {
+        this.panMoved = true;
+        this.viewportOffset.update((offset) => ({
+          x: this.roundToTwoDecimals(offset.x + deltaX),
+          y: this.roundToTwoDecimals(offset.y + deltaY),
+        }));
+        this.panStart = {
+          x: event.clientX,
+          y: event.clientY,
+        };
+      }
+
+      return;
+    }
+
     if (this.isResizing()) {
       this.handleResizePointerMove(event);
       return;
@@ -237,43 +354,205 @@ export class ProjectPage implements OnDestroy {
 
     const selectedId = this.selectedElementId();
     if (selectedId) {
-      this.elements.update((els) =>
-        els.map((el) => {
-          if (el.id === selectedId) {
-            const nextX = event.clientX - this.dragOffset.x;
-            const nextY = event.clientY - this.dragOffset.y;
-            const parent = el.parentId
-              ? els.find((candidate) => candidate.id === el.parentId)
-              : null;
+      this.elements.update((elements) => {
+        const selectedElement = elements.find((element) => element.id === selectedId);
+        if (!selectedElement) {
+          return elements;
+        }
 
-            if (parent && el.type !== 'frame') {
-              return {
-                ...el,
-                x: this.clamp(nextX, parent.x, parent.x + parent.width - el.width),
-                y: this.clamp(nextY, parent.y, parent.y + parent.height - el.height),
-              };
+        const pointer = this.getCanvasPoint(event);
+        if (!pointer) {
+          return elements;
+        }
+
+        const nextX = pointer.x - this.dragOffset.x;
+        const nextY = pointer.y - this.dragOffset.y;
+
+        if (selectedElement.type === 'frame') {
+          const deltaX = this.roundToTwoDecimals(nextX - selectedElement.x);
+          const deltaY = this.roundToTwoDecimals(nextY - selectedElement.y);
+
+          if (deltaX === 0 && deltaY === 0) {
+            return elements;
+          }
+
+          const descendantIds = this.collectDescendantIds(elements, selectedElement.id);
+          return elements.map((element) => {
+            if (element.id !== selectedElement.id && !descendantIds.has(element.id)) {
+              return element;
             }
 
             return {
-              ...el,
-              x: this.roundToTwoDecimals(nextX),
-              y: this.roundToTwoDecimals(nextY),
+              ...element,
+              x: this.roundToTwoDecimals(element.x + deltaX),
+              y: this.roundToTwoDecimals(element.y + deltaY),
+            };
+          });
+        }
+
+        return elements.map((element) => {
+          if (element.id !== selectedId) {
+            return element;
+          }
+
+          const parent = element.parentId
+            ? elements.find((candidate) => candidate.id === element.parentId)
+            : null;
+
+          if (parent && element.type !== 'frame') {
+            return {
+              ...element,
+              x: this.clamp(nextX, parent.x, parent.x + parent.width - element.width),
+              y: this.clamp(nextY, parent.y, parent.y + parent.height - element.height),
             };
           }
-          return el;
-        }),
-      );
+
+          return {
+            ...element,
+            x: this.roundToTwoDecimals(nextX),
+            y: this.roundToTwoDecimals(nextY),
+          };
+        });
+      });
     }
   }
 
   @HostListener('window:pointerup')
   onPointerUp() {
+    if (this.isPanning() && this.panMoved) {
+      this.suppressNextCanvasClick = true;
+    }
+
+    this.isPanning.set(false);
     this.isDragging.set(false);
     this.isResizing.set(false);
   }
 
   setFramework(framework: 'html' | 'react' | 'angular') {
     this.selectedFramework.set(framework);
+  }
+
+  onLayerSelected(elementId: string) {
+    this.selectedElementId.set(elementId);
+    this.currentTool.set('select');
+  }
+
+  onLayerNameChanged(change: { id: string; name: string }) {
+    this.elements.update((elements) =>
+      elements.map((element) =>
+        element.id === change.id
+          ? {
+              ...element,
+              name: change.name,
+            }
+          : element,
+      ),
+    );
+  }
+
+  onFrameTemplateSelected(template: { width: number; height: number }) {
+    this.frameTemplate.set({
+      width: template.width,
+      height: template.height,
+    });
+  }
+
+  onCanvasWheel(event: WheelEvent) {
+    const canvas = event.currentTarget as HTMLElement | null;
+    if (!canvas) {
+      return;
+    }
+
+    event.preventDefault();
+    if (event.ctrlKey) {
+      const rect = canvas.getBoundingClientRect();
+      const delta = event.deltaY < 0 ? this.zoomStep : -this.zoomStep;
+      this.setZoom(this.zoomLevel() + delta, {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top,
+      });
+      return;
+    }
+
+    this.viewportOffset.update((offset) => ({
+      x: this.roundToTwoDecimals(offset.x - event.deltaX),
+      y: this.roundToTwoDecimals(offset.y - event.deltaY),
+    }));
+  }
+
+  zoomIn() {
+    this.setZoom(this.zoomLevel() + this.zoomStep);
+  }
+
+  zoomOut() {
+    this.setZoom(this.zoomLevel() - this.zoomStep);
+  }
+
+  resetZoom() {
+    this.zoomLevel.set(1);
+  }
+
+  zoomPercentage(): number {
+    return Math.round(this.zoomLevel() * 100);
+  }
+
+  canvasViewportTransform(): string {
+    const offset = this.viewportOffset();
+    return `translate(${offset.x}px, ${offset.y}px) scale(${this.zoomLevel()})`;
+  }
+
+  canvasBackgroundSize(): string {
+    const size = this.roundToTwoDecimals(this.gridSize * this.zoomLevel());
+    return `${size}px ${size}px`;
+  }
+
+  canvasBackgroundPosition(): string {
+    const offset = this.viewportOffset();
+    return `${offset.x}px ${offset.y}px`;
+  }
+
+  isPanReady(): boolean {
+    return this.currentTool() === 'select' || this.isSpacePressed();
+  }
+
+  getElementBorderStyle(element: CanvasElement): string {
+    if (!element.stroke || element.type === 'text') {
+      return 'none';
+    }
+
+    const strokeWidth = this.getStrokeWidth(element);
+    if (strokeWidth <= 0) {
+      return 'none';
+    }
+
+    const strokePosition = this.getStrokePosition(element);
+    if (strokePosition !== 'inside') {
+      return 'none';
+    }
+
+    return `${strokeWidth}px solid ${element.stroke}`;
+  }
+
+  getElementOutlineStyle(element: CanvasElement): string {
+    if (!element.stroke || element.type === 'text') {
+      return 'none';
+    }
+
+    const strokeWidth = this.getStrokeWidth(element);
+    if (strokeWidth <= 0) {
+      return 'none';
+    }
+
+    const strokePosition = this.getStrokePosition(element);
+    if (strokePosition !== 'outside') {
+      return 'none';
+    }
+
+    return `${strokeWidth}px solid ${element.stroke}`;
+  }
+
+  getElementOutlineOffset(element: CanvasElement): number {
+    return 0;
   }
 
   validateIR() {
@@ -291,8 +570,8 @@ export class ProjectPage implements OnDestroy {
           this.validationResult.set(response.isValid);
           this.isValidating.set(false);
         },
-        error: (error: { error?: { message?: string } }) => {
-          this.apiError.set(error.error?.message ?? 'IR validation failed.');
+        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+          this.apiError.set(this.extractErrorMessage(error, 'IR validation failed.'));
           this.isValidating.set(false);
         },
       });
@@ -316,8 +595,8 @@ export class ProjectPage implements OnDestroy {
           this.validationResult.set(response.isValid);
           this.isGenerating.set(false);
         },
-        error: (error: { error?: { message?: string } }) => {
-          this.apiError.set(error.error?.message ?? 'Code generation failed.');
+        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+          this.apiError.set(this.extractErrorMessage(error, 'Code generation failed.'));
           this.isGenerating.set(false);
         },
       });
@@ -343,9 +622,15 @@ export class ProjectPage implements OnDestroy {
         this.isLoadingDesign.set(false);
         this.canPersistDesign = true;
       },
-      error: (error: { error?: { message?: string } }) => {
-        this.apiError.set(error.error?.message ?? 'Failed to load project design.');
+      error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+        this.apiError.set(this.extractErrorMessage(error, 'Failed to load project design.'));
         this.isLoadingDesign.set(false);
+
+        // Keep autosave available after a load error so edits can still be persisted.
+        this.canPersistDesign = true;
+        if (this.elements().length > 0) {
+          this.scheduleDesignSave();
+        }
       },
     });
   }
@@ -377,8 +662,8 @@ export class ProjectPage implements OnDestroy {
         this.lastSavedAt.set(response.updatedAt ?? null);
         this.isSavingDesign.set(false);
       },
-      error: (error: { error?: { message?: string } }) => {
-        this.apiError.set(error.error?.message ?? 'Failed to save project design.');
+      error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+        this.apiError.set(this.extractErrorMessage(error, 'Failed to save project design.'));
         this.isSavingDesign.set(false);
       },
     });
@@ -396,8 +681,31 @@ export class ProjectPage implements OnDestroy {
     }
   }
 
+  private extractErrorMessage(
+    error: { error?: { message?: string; title?: string; detail?: string } },
+    fallback: string,
+  ): string {
+    return error.error?.message ?? error.error?.title ?? error.error?.detail ?? fallback;
+  }
+
   @HostListener('window:keydown', ['$event'])
   handleKeyDown(event: KeyboardEvent) {
+    if (event.defaultPrevented) {
+      return;
+    }
+
+    const isTypingContext = this.isTypingContext(event);
+
+    if (event.code === 'Space' && !isTypingContext) {
+      this.isSpacePressed.set(true);
+      event.preventDefault();
+      return;
+    }
+
+    if (isTypingContext) {
+      return;
+    }
+
     // Tool shortcuts
     if (event.key.toLowerCase() === 'v') this.selectTool('select');
     if (event.key.toLowerCase() === 'f') this.selectTool('frame');
@@ -414,6 +722,19 @@ export class ProjectPage implements OnDestroy {
         this.selectedElementId.set(null);
       }
     }
+  }
+
+  @HostListener('window:keyup', ['$event'])
+  handleKeyUp(event: KeyboardEvent) {
+    if (event.code === 'Space') {
+      this.isSpacePressed.set(false);
+    }
+  }
+
+  @HostListener('window:blur')
+  handleWindowBlur() {
+    this.isSpacePressed.set(false);
+    this.isPanning.set(false);
   }
 
   private getSelectedFrame(): CanvasElement | null {
@@ -450,6 +771,10 @@ export class ProjectPage implements OnDestroy {
       y: this.roundToTwoDecimals(element.y),
       width: this.roundToTwoDecimals(element.width),
       height: this.roundToTwoDecimals(element.height),
+      strokeWidth:
+        typeof element.strokeWidth === 'number'
+          ? this.roundToTwoDecimals(element.strokeWidth)
+          : undefined,
       fontSize:
         typeof element.fontSize === 'number'
           ? this.roundToTwoDecimals(element.fontSize)
@@ -471,6 +796,31 @@ export class ProjectPage implements OnDestroy {
       const circleSize = Math.max(minSize, Math.min(element.width, element.height));
       element.width = circleSize;
       element.height = circleSize;
+    }
+
+    const normalizedOpacity = Number.isFinite(element.opacity ?? Number.NaN)
+      ? (element.opacity as number)
+      : 1;
+    element.opacity = this.clamp(normalizedOpacity, 0, 1);
+
+    if (element.type !== 'circle' && element.type !== 'text') {
+      const normalizedCornerRadius = Number.isFinite(element.cornerRadius ?? Number.NaN)
+        ? (element.cornerRadius as number)
+        : element.type === 'image'
+          ? 6
+          : 0;
+      element.cornerRadius = Math.max(0, this.roundToTwoDecimals(normalizedCornerRadius));
+    }
+
+    if (element.type !== 'text') {
+      const normalizedStrokeWidth = Number.isFinite(element.strokeWidth ?? Number.NaN)
+        ? (element.strokeWidth as number)
+        : 1;
+      element.strokeWidth = Math.max(0, this.roundToTwoDecimals(normalizedStrokeWidth));
+      element.strokePosition = this.getStrokePosition(element);
+    } else {
+      element.strokeWidth = undefined;
+      element.strokePosition = undefined;
     }
 
     const parent = element.parentId
@@ -517,8 +867,13 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const deltaX = event.clientX - start.x;
-    const deltaY = event.clientY - start.y;
+    const pointer = this.getCanvasPoint(event);
+    if (!pointer) {
+      return;
+    }
+
+    const deltaX = pointer.x - start.x;
+    const deltaY = pointer.y - start.y;
     const minSize = 24;
 
     this.elements.update((elements) =>
@@ -556,19 +911,152 @@ export class ProjectPage implements OnDestroy {
     );
   }
 
-  private removeWithChildren(elements: CanvasElement[], rootId: string): CanvasElement[] {
-    const idsToRemove = new Set<string>([rootId]);
+  private setZoom(nextZoom: number, anchor?: { x: number; y: number }) {
+    const previousZoom = this.zoomLevel();
+    const clampedZoom = this.clamp(nextZoom, this.minZoom, this.maxZoom);
+
+    if (clampedZoom === previousZoom) {
+      return;
+    }
+
+    if (anchor) {
+      const offset = this.viewportOffset();
+      const worldX = (anchor.x - offset.x) / previousZoom;
+      const worldY = (anchor.y - offset.y) / previousZoom;
+
+      this.viewportOffset.set({
+        x: this.roundToTwoDecimals(anchor.x - worldX * clampedZoom),
+        y: this.roundToTwoDecimals(anchor.y - worldY * clampedZoom),
+      });
+    }
+
+    this.zoomLevel.set(clampedZoom);
+  }
+
+  private getCanvasPoint(event: MouseEvent): { x: number; y: number } | null {
+    const canvas = this.getCanvasElement();
+    if (!canvas) {
+      return null;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const offset = this.viewportOffset();
+
+    return {
+      x: this.roundToTwoDecimals((event.clientX - rect.left - offset.x) / this.zoomLevel()),
+      y: this.roundToTwoDecimals((event.clientY - rect.top - offset.y) / this.zoomLevel()),
+    };
+  }
+
+  private shouldStartPanning(event: MouseEvent, target: HTMLElement): boolean {
+    if (event.button === 1) {
+      return true;
+    }
+
+    if (event.button !== 0) {
+      return false;
+    }
+
+    if (this.isSpacePressed()) {
+      return true;
+    }
+
+    return this.currentTool() === 'select' && this.isCanvasBackgroundTarget(target);
+  }
+
+  private startPanning(event: MouseEvent): void {
+    this.isPanning.set(true);
+    this.isDragging.set(false);
+    this.isResizing.set(false);
+    this.panMoved = false;
+    this.panStart = {
+      x: event.clientX,
+      y: event.clientY,
+    };
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  private isCanvasBackgroundTarget(target: HTMLElement): boolean {
+    return (
+      target.classList.contains('canvas-container') || target.classList.contains('canvas-viewport')
+    );
+  }
+
+  private getCanvasElement(): HTMLElement | null {
+    return document.querySelector('.canvas-container') as HTMLElement | null;
+  }
+
+  private getNextElementName(type: CanvasElementType): string {
+    const index = this.elements().filter((element) => element.type === type).length + 1;
+    return `${this.toTypeLabel(type)} ${index}`;
+  }
+
+  private toTypeLabel(type: CanvasElementType): string {
+    return `${type.charAt(0).toUpperCase()}${type.slice(1)}`;
+  }
+
+  private isTypingTarget(target: EventTarget | null): boolean {
+    const element = target as HTMLElement | null;
+    if (!element) {
+      return false;
+    }
+
+    if (element.isContentEditable) {
+      return true;
+    }
+
+    const tagName = element.tagName;
+    return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT';
+  }
+
+  private isTypingContext(event: KeyboardEvent): boolean {
+    if (this.isTypingTarget(event.target)) {
+      return true;
+    }
+
+    return this.isTypingTarget(document.activeElement);
+  }
+
+  private getStrokeWidth(element: CanvasElement): number {
+    if (typeof element.strokeWidth === 'number' && Number.isFinite(element.strokeWidth)) {
+      return Math.max(0, element.strokeWidth);
+    }
+
+    return 1;
+  }
+
+  private getStrokePosition(element: CanvasElement): CanvasStrokePosition {
+    return element.strokePosition === 'outside' ? 'outside' : 'inside';
+  }
+
+  private collectDescendantIds(elements: CanvasElement[], rootId: string): Set<string> {
+    const descendants = new Set<string>();
     let added = true;
 
     while (added) {
       added = false;
       for (const element of elements) {
-        if (element.parentId && idsToRemove.has(element.parentId) && !idsToRemove.has(element.id)) {
-          idsToRemove.add(element.id);
+        if (!element.parentId) {
+          continue;
+        }
+
+        const isDirectChild = element.parentId === rootId;
+        const isNestedChild = descendants.has(element.parentId);
+
+        if ((isDirectChild || isNestedChild) && !descendants.has(element.id)) {
+          descendants.add(element.id);
           added = true;
         }
       }
     }
+
+    return descendants;
+  }
+
+  private removeWithChildren(elements: CanvasElement[], rootId: string): CanvasElement[] {
+    const idsToRemove = this.collectDescendantIds(elements, rootId);
+    idsToRemove.add(rootId);
 
     return elements.filter((element) => !idsToRemove.has(element.id));
   }

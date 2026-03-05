@@ -2,21 +2,34 @@ using AutoMapper;
 using Prismatic.Application.DTOs.Requests;
 using Prismatic.Application.DTOs.Responses;
 using Prismatic.Application.Interfaces;
+using Prismatic.Converter.Abstractions;
+using Prismatic.Converter.Models;
+using Prismatic.Converter.Validation;
 using Prismatic.Domain.Entities;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Prismatic.Application.Services;
 
 public class ProjectService : IProjectService
 {
+  private static readonly JsonSerializerOptions IrDeserializationOptions = new()
+  {
+    PropertyNameCaseInsensitive = true
+  };
+
   private readonly IProjectRepository _projectRepository;
   private readonly IMapper _mapper;
+  private readonly IConverterEngine _converterEngine;
 
   public ProjectService(
     IProjectRepository projectRepository,
-    IMapper mapper)
+    IMapper mapper,
+    IConverterEngine converterEngine)
   {
     _projectRepository = projectRepository;
     _mapper = mapper;
+    _converterEngine = converterEngine;
   }
 
   public async Task<IReadOnlyList<ProjectResponse>> GetAllAsync()
@@ -87,7 +100,7 @@ public class ProjectService : IProjectService
     var project = await _projectRepository.GetByIdAsync(projectId, userId);
     if (project == null) return null;
 
-    project.DesignJson = string.IsNullOrWhiteSpace(request.DesignJson) ? "{}" : request.DesignJson;
+    project.DesignJson = NormalizeAndValidateDesignJson(request.DesignJson);
     await _projectRepository.UpdateAsync(project);
 
     return new ProjectDesignResponse
@@ -96,5 +109,131 @@ public class ProjectService : IProjectService
       DesignJson = string.IsNullOrWhiteSpace(project.DesignJson) ? "{}" : project.DesignJson,
       UpdatedAt = project.UpdatedAt
     };
+  }
+
+  private string NormalizeAndValidateDesignJson(string? designJson)
+  {
+    if (string.IsNullOrWhiteSpace(designJson))
+    {
+      return "{}";
+    }
+
+    JsonNode? rootNode;
+    try
+    {
+      rootNode = JsonNode.Parse(designJson);
+    }
+    catch (JsonException ex)
+    {
+      throw new ArgumentException("Design JSON is not valid JSON.", ex);
+    }
+
+    if (rootNode is null)
+    {
+      return "{}";
+    }
+
+    if (rootNode is not JsonObject rootObject)
+    {
+      throw new ArgumentException("Design JSON root must be a JSON object.");
+    }
+
+    if (rootObject.Count == 0)
+    {
+      return "{}";
+    }
+
+    NormalizeNumbers(rootObject);
+
+    var normalizedDesignJson = rootObject.ToJsonString(new JsonSerializerOptions
+    {
+      WriteIndented = false
+    });
+
+    IRNode? irRoot;
+    try
+    {
+      irRoot = JsonSerializer.Deserialize<IRNode>(normalizedDesignJson, IrDeserializationOptions);
+    }
+    catch (JsonException ex)
+    {
+      throw new ArgumentException("Design JSON does not match the expected IR shape.", ex);
+    }
+
+    if (irRoot == null)
+    {
+      throw new ArgumentException("Design JSON does not contain a valid IR root node.");
+    }
+
+    var validationErrors = IrValidator.GetValidationErrors(irRoot);
+    if (validationErrors.Count > 0)
+    {
+      var details = string.Join(" ", validationErrors.Take(3));
+      throw new ArgumentException($"Design JSON failed IR validation. {details}");
+    }
+
+    return normalizedDesignJson;
+  }
+
+  private static void NormalizeNumbers(JsonNode node)
+  {
+    switch (node)
+    {
+      case JsonObject jsonObject:
+        {
+          foreach (var propertyName in jsonObject.Select(property => property.Key).ToList())
+          {
+            var childNode = jsonObject[propertyName];
+            if (childNode is null)
+            {
+              continue;
+            }
+
+            if (childNode is JsonValue jsonValue)
+            {
+              jsonObject[propertyName] = NormalizeJsonValue(jsonValue);
+              continue;
+            }
+
+            NormalizeNumbers(childNode);
+          }
+
+          break;
+        }
+      case JsonArray jsonArray:
+        {
+          for (var index = 0; index < jsonArray.Count; index++)
+          {
+            var childNode = jsonArray[index];
+            if (childNode is null)
+            {
+              continue;
+            }
+
+            if (childNode is JsonValue jsonValue)
+            {
+              jsonArray[index] = NormalizeJsonValue(jsonValue);
+              continue;
+            }
+
+            NormalizeNumbers(childNode);
+          }
+
+          break;
+        }
+    }
+  }
+
+  private static JsonNode NormalizeJsonValue(JsonValue value)
+  {
+    if (value.TryGetValue<JsonElement>(out var jsonElement)
+      && jsonElement.ValueKind == JsonValueKind.Number
+      && jsonElement.TryGetDecimal(out var number))
+    {
+      var rounded = Math.Round(number, 2, MidpointRounding.AwayFromZero);
+      return JsonValue.Create(rounded)!;
+    }
+
+    return value;
   }
 }

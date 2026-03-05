@@ -1,12 +1,25 @@
-import { CanvasElement } from '../models/canvas.models';
+import { CanvasElement, CanvasStrokePosition } from '../models/canvas.models';
 import { IRNode, IRStyle } from '../models/ir.models';
 
 const ROOT_ROLE = 'canvas-root';
 const ROOT_TYPE = 'Container';
-const MANAGED_PROP_KEYS = ['x', 'y', 'content', 'src'] as const;
+const MANAGED_PROP_KEYS = [
+  'x',
+  'y',
+  'content',
+  'src',
+  'strokePosition',
+  'strokeWidth',
+  'name',
+] as const;
 
 const DEFAULT_POSITION = 24;
 const DEFAULT_FILL = '#e0e0e0';
+const DEFAULT_FRAME_FILL = '#3f3f46';
+const DEFAULT_IMAGE_RADIUS = 6;
+const DEFAULT_OPACITY = 1;
+const DEFAULT_STROKE_WIDTH = 1;
+const DEFAULT_STROKE_POSITION: CanvasStrokePosition = 'inside';
 const CIRCLE_RADIUS = 9999;
 
 const DEFAULT_ELEMENT_SIZE = {
@@ -114,7 +127,6 @@ function mapCanvasElementToIR(element: CanvasElement): IRNode {
 
 function buildNodeStyle(element: CanvasElement): IRStyle {
   const style: IRStyle = {
-    ...(element.irMeta?.style ?? {}),
     width: `${element.width}px`,
     height: `${element.height}px`,
   };
@@ -123,8 +135,25 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     style.background = element.fill;
   }
 
+  if (element.stroke) {
+    const strokeWidth =
+      typeof element.strokeWidth === 'number'
+        ? Math.max(0, element.strokeWidth)
+        : DEFAULT_STROKE_WIDTH;
+
+    if (strokeWidth > 0) {
+      style.border = `${strokeWidth}px solid ${element.stroke}`;
+    }
+  }
+
+  if (typeof element.opacity === 'number') {
+    style.opacity = element.opacity;
+  }
+
   if (element.type === 'circle') {
     style.borderRadius = CIRCLE_RADIUS;
+  } else if (typeof element.cornerRadius === 'number') {
+    style.borderRadius = element.cornerRadius;
   }
 
   if (element.type === 'text' && element.fontSize) {
@@ -152,6 +181,16 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
 
   if (element.irMeta?.type && element.irMeta.type !== primitiveType) {
     props['sourceType'] = element.irMeta.type;
+  }
+
+  if (typeof element.name === 'string') {
+    props['name'] = element.name;
+  }
+
+  if (element.type !== 'text') {
+    props['strokeWidth'] =
+      typeof element.strokeWidth === 'number' ? element.strokeWidth : DEFAULT_STROKE_WIDTH;
+    props['strokePosition'] = element.strokePosition ?? DEFAULT_STROKE_POSITION;
   }
 
   return props;
@@ -182,11 +221,27 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
   return {
     id: node.id,
     type: mappedType,
+    name: readOptionalStringProp(node.props, 'name'),
     x: readNumericProp(node.props, 'x', DEFAULT_POSITION),
     y: readNumericProp(node.props, 'y', DEFAULT_POSITION),
     width: readSize(node.style, 'width', defaults.width),
     height: readSize(node.style, 'height', defaults.height),
-    fill: mappedType !== 'text' ? (node.style?.background ?? DEFAULT_FILL) : undefined,
+    fill:
+      mappedType !== 'text'
+        ? (node.style?.background ?? (mappedType === 'frame' ? DEFAULT_FRAME_FILL : DEFAULT_FILL))
+        : undefined,
+    stroke: readBorderColor(node.style?.border),
+    strokeWidth:
+      mappedType !== 'text'
+        ? readStrokeWidth(node.style?.border, node.props, DEFAULT_STROKE_WIDTH)
+        : undefined,
+    strokePosition:
+      mappedType !== 'text' ? readStrokePosition(node.props, DEFAULT_STROKE_POSITION) : undefined,
+    opacity: readNumber(node.style?.opacity, DEFAULT_OPACITY),
+    cornerRadius:
+      mappedType !== 'circle' && mappedType !== 'text'
+        ? readNumber(node.style?.borderRadius, mappedType === 'image' ? DEFAULT_IMAGE_RADIUS : 0)
+        : undefined,
     text: mappedType === 'text' ? readStringProp(node.props, 'content', 'New text') : undefined,
     fontSize: mappedType === 'text' ? readNumber(node.style?.fontSize, 16) : undefined,
     imageUrl: mappedType === 'image' ? readStringProp(node.props, 'src', '') : undefined,
@@ -270,6 +325,14 @@ function readStringProp(
   return typeof value === 'string' ? value : fallback;
 }
 
+function readOptionalStringProp(
+  props: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  const value = props?.[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
 function readNumber(value: unknown, fallback: number): number {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -283,4 +346,62 @@ function readNumber(value: unknown, fallback: number): number {
   }
 
   return fallback;
+}
+
+function readBorderColor(border: string | undefined): string | undefined {
+  if (!border) {
+    return undefined;
+  }
+
+  const tokens = border.trim().split(/\s+/);
+  if (tokens.length === 0) {
+    return undefined;
+  }
+
+  const lastToken = tokens[tokens.length - 1];
+  if (isColorToken(lastToken)) {
+    return lastToken;
+  }
+
+  if (isColorToken(border.trim())) {
+    return border.trim();
+  }
+
+  return undefined;
+}
+
+function readStrokeWidth(
+  border: string | undefined,
+  props: Record<string, unknown> | undefined,
+  fallback: number,
+): number {
+  const propStrokeWidth = readNumber(props?.['strokeWidth'], fallback);
+  if (!border) {
+    return propStrokeWidth;
+  }
+
+  const match = border.trim().match(/^(\d+(\.\d+)?)px/i);
+  if (!match) {
+    return propStrokeWidth;
+  }
+
+  const parsed = Number.parseFloat(match[1]);
+  return Number.isFinite(parsed) ? parsed : propStrokeWidth;
+}
+
+function readStrokePosition(
+  props: Record<string, unknown> | undefined,
+  fallback: CanvasStrokePosition,
+): CanvasStrokePosition {
+  const value = props?.['strokePosition'];
+  return value === 'outside' ? 'outside' : fallback;
+}
+
+function isColorToken(value: string): boolean {
+  return (
+    value.startsWith('#') ||
+    value.startsWith('rgb') ||
+    value.startsWith('hsl') ||
+    value.startsWith('var(')
+  );
 }
