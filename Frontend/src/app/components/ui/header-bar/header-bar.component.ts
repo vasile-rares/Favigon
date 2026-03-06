@@ -1,11 +1,20 @@
-import { Component, OnInit, inject } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  HostListener,
+  OnInit,
+  ViewChild,
+  inject,
+} from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { AuthService } from '../../../core/services/auth.service';
 import { ProjectService } from '../../../core/services/project.service';
 import { UserMenuDropdownComponent } from '../user-menu-dropdown/user-menu-dropdown.component';
-import { filter } from 'rxjs';
+import { filter, map, distinctUntilChanged } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 interface HeaderUserProfile {
   displayName: string;
@@ -23,6 +32,7 @@ interface HeaderUserProfile {
 })
 export class HeaderBarComponent implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly activatedRoute = inject(ActivatedRoute);
   private readonly authService = inject(AuthService);
@@ -36,26 +46,29 @@ export class HeaderBarComponent implements OnInit {
   email = '';
   currentProjectName: string | null = null;
   isProjectContext = false;
+  isUserMenuOpen = false;
+
+  @ViewChild('userMenuContainer')
+  userMenuContainer?: ElementRef<HTMLElement>;
 
   get avatarUrl(): string {
     return this.profilePictureUrl?.trim() || this.fallbackAvatarUrl;
   }
 
   ngOnInit(): void {
-    this.syncRouteContext();
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
-      .subscribe(() => this.syncRouteContext());
+      .pipe(
+        map(() => this.getProjectIdFromRoute()),
+        distinctUntilChanged(),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((projectId) => this.syncRouteContext(projectId));
 
-    if (HeaderBarComponent.cachedProfile !== undefined) {
-      const cachedProfile = HeaderBarComponent.cachedProfile;
+    this.syncRouteContext(this.getProjectIdFromRoute());
 
-      if (cachedProfile === null) {
-        this.resetIdentity();
-      } else {
-        this.applyProfile(cachedProfile);
-      }
-
+    if (HeaderBarComponent.cachedProfile) {
+      this.applyProfile(HeaderBarComponent.cachedProfile);
       return;
     }
 
@@ -65,9 +78,7 @@ export class HeaderBarComponent implements OnInit {
         username?: string | null;
         email?: string | null;
         profilePictureUrl?: string | null;
-      }>(`${environment.apiBaseUrl}/users/me`, {
-        withCredentials: true,
-      })
+      }>(`${environment.apiBaseUrl}/users/me`)
       .subscribe({
         next: (response) => {
           const username = response.username?.trim() || '';
@@ -86,7 +97,7 @@ export class HeaderBarComponent implements OnInit {
         },
         error: () => {
           this.resetIdentity();
-          HeaderBarComponent.cachedProfile = null;
+          HeaderBarComponent.cachedProfile = undefined;
         },
       });
   }
@@ -105,8 +116,7 @@ export class HeaderBarComponent implements OnInit {
     this.profilePictureUrl = null;
   }
 
-  private syncRouteContext() {
-    const projectId = this.getProjectIdFromRoute();
+  private syncRouteContext(projectId: number | null) {
     if (projectId === null) {
       this.isProjectContext = false;
       this.currentProjectName = null;
@@ -142,8 +152,36 @@ export class HeaderBarComponent implements OnInit {
   }
 
   onLogout() {
+    this.isUserMenuOpen = false;
     HeaderBarComponent.cachedProfile = undefined;
     this.authService.logout().subscribe();
     this.router.navigate(['/login']);
+  }
+
+  toggleUserMenu(): void {
+    this.isUserMenuOpen = !this.isUserMenuOpen;
+  }
+
+  closeUserMenu(): void {
+    this.isUserMenuOpen = false;
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (!this.isUserMenuOpen) {
+      return;
+    }
+
+    const target = event.target as Node | null;
+    const container = this.userMenuContainer?.nativeElement;
+
+    if (target && container && !container.contains(target)) {
+      this.closeUserMenu();
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    this.closeUserMenu();
   }
 }

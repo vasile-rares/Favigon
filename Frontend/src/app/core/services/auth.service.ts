@@ -15,28 +15,18 @@ export class AuthService {
   private readonly baseUrl = environment.apiBaseUrl;
 
   login(request: LoginRequest): Observable<AuthMessageResponse> {
-    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/auth/login`, request, {
-      withCredentials: true,
-    });
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/auth/login`, request);
   }
 
   register(request: RegisterRequest): Observable<AuthMessageResponse> {
-    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/auth/register`, request, {
-      withCredentials: true,
-    });
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/auth/register`, request);
   }
 
   loginWithGithub(request: GithubAuthRequest): Observable<AuthMessageResponse> {
-    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/auth/github`, request, {
-      withCredentials: true,
-    });
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/auth/github`, request);
   }
 
   logout(): Observable<AuthMessageResponse> {
-    return this.http.post<AuthMessageResponse>(
-      `${this.baseUrl}/auth/logout`,
-      {},
-      { withCredentials: true },
-    );
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/auth/logout`, {});
   }
 }

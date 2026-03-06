@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { CanvasElement, CanvasElementType } from '../../../core/models/canvas.models';
+import { formatCanvasElementTypeLabel } from '../../../core/utils/canvas-label.util';
 
 type SupportedFramework = 'html' | 'react' | 'angular';
 
@@ -100,7 +101,7 @@ export class CanvasLeftPanelComponent implements OnChanges {
         const nextTypeCount = (typeCounters.get(child.type) ?? 0) + 1;
         typeCounters.set(child.type, nextTypeCount);
 
-        const typeLabel = this.toTypeLabel(child.type);
+        const typeLabel = formatCanvasElementTypeLabel(child.type);
         const fallbackName = `${typeLabel} ${nextTypeCount}`;
 
         entries.push({
@@ -116,9 +117,5 @@ export class CanvasLeftPanelComponent implements OnChanges {
 
     walk(null, 0);
     return entries;
-  }
-
-  private toTypeLabel(type: CanvasElementType): string {
-    return `${type.charAt(0).toUpperCase()}${type.slice(1)}`;
   }
 }

@@ -5,6 +5,7 @@ import {
   CanvasElementType,
   CanvasStrokePosition,
 } from '../../../core/models/canvas.models';
+import { formatCanvasElementTypeLabel } from '../../../core/utils/canvas-label.util';
 
 type EditableNumericField =
   | 'x'
@@ -77,7 +78,7 @@ export class CanvasDesignSidepanelComponent {
       return '';
     }
 
-    return `${this.selectedElement.type.charAt(0).toUpperCase()}${this.selectedElement.type.slice(1)}`;
+    return formatCanvasElementTypeLabel(this.selectedElement.type);
   }
 
   hasFill(type: CanvasElementType): boolean {

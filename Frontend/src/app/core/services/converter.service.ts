@@ -10,14 +10,10 @@ export class ConverterService {
   private readonly baseUrl = environment.apiBaseUrl;
 
   validate(request: ConverterRequest): Observable<ConverterResponse> {
-    return this.http.post<ConverterResponse>(`${this.baseUrl}/converter/validate`, request, {
-      withCredentials: true,
-    });
+    return this.http.post<ConverterResponse>(`${this.baseUrl}/converter/validate`, request);
   }
 
   generate(request: ConverterRequest): Observable<ConverterResponse> {
-    return this.http.post<ConverterResponse>(`${this.baseUrl}/converter/generate`, request, {
-      withCredentials: true,
-    });
+    return this.http.post<ConverterResponse>(`${this.baseUrl}/converter/generate`, request);
   }
 }

@@ -14,13 +14,26 @@ import {
   CanvasElementType,
   CanvasStrokePosition,
 } from '../../core/models/canvas.models';
-import { buildCanvasElementsFromIR, buildCanvasIR } from '../../core/mappers/canvas-ir.mapper';
+import { buildCanvasIR } from '../../core/mappers/canvas-ir.mapper';
 import { HeaderBarComponent } from '../../components/ui/header-bar/header-bar.component';
 import { CanvasLeftPanelComponent } from '../../components/ui/canvas-left-panel/canvas-left-panel.component';
 import { CanvasDesignSidepanelComponent } from '../../components/ui/canvas-design-sidepanel/canvas-design-sidepanel.component';
-import { ConverterService } from '../../core/services/converter.service';
 import { IRNode } from '../../core/models/ir.models';
-import { ProjectService } from '../../core/services/project.service';
+import { extractApiErrorMessage } from '../../core/utils/api-error.util';
+import {
+  clamp,
+  collectDescendantIds,
+  getStrokePosition,
+  getStrokeWidth,
+  isPointInsideElement,
+  normalizeElementInPlace,
+  removeWithChildren,
+  roundToTwoDecimals,
+  withRoundedPrecision,
+} from '../../core/utils/canvas-interaction.util';
+import { formatCanvasElementTypeLabel } from '../../core/utils/canvas-label.util';
+import { CanvasGenerationService } from '../../core/services/canvas-generation.service';
+import { CanvasPersistenceService } from '../../core/services/canvas-persistence.service';
 
 @Component({
   selector: 'app-canvas-page',
@@ -36,8 +49,8 @@ import { ProjectService } from '../../core/services/project.service';
 })
 export class ProjectPage implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
-  private readonly converterService = inject(ConverterService);
-  private readonly projectService = inject(ProjectService);
+  private readonly canvasGenerationService = inject(CanvasGenerationService);
+  private readonly canvasPersistenceService = inject(CanvasPersistenceService);
 
   elements = signal<CanvasElement[]>([]);
   selectedElementId = signal<string | null>(null);
@@ -516,24 +529,21 @@ export class ProjectPage implements OnDestroy {
   }
 
   getElementBorderStyle(element: CanvasElement): string {
-    if (!element.stroke || element.type === 'text') {
-      return 'none';
-    }
-
-    const strokeWidth = this.getStrokeWidth(element);
-    if (strokeWidth <= 0) {
-      return 'none';
-    }
-
-    const strokePosition = this.getStrokePosition(element);
-    if (strokePosition !== 'inside') {
-      return 'none';
-    }
-
-    return `${strokeWidth}px solid ${element.stroke}`;
+    return this.getElementStrokeStyle(element, 'inside');
   }
 
   getElementOutlineStyle(element: CanvasElement): string {
+    return this.getElementStrokeStyle(element, 'outside');
+  }
+
+  getElementOutlineOffset(_element: CanvasElement): number {
+    return 0;
+  }
+
+  private getElementStrokeStyle(
+    element: CanvasElement,
+    targetPosition: CanvasStrokePosition,
+  ): string {
     if (!element.stroke || element.type === 'text') {
       return 'none';
     }
@@ -544,15 +554,11 @@ export class ProjectPage implements OnDestroy {
     }
 
     const strokePosition = this.getStrokePosition(element);
-    if (strokePosition !== 'outside') {
+    if (strokePosition !== targetPosition) {
       return 'none';
     }
 
     return `${strokeWidth}px solid ${element.stroke}`;
-  }
-
-  getElementOutlineOffset(element: CanvasElement): number {
-    return 0;
   }
 
   validateIR() {
@@ -560,21 +566,16 @@ export class ProjectPage implements OnDestroy {
     this.validationResult.set(null);
     this.isValidating.set(true);
 
-    this.converterService
-      .validate({
-        framework: this.selectedFramework(),
-        ir: this.irPreview(),
-      })
-      .subscribe({
-        next: (response) => {
-          this.validationResult.set(response.isValid);
-          this.isValidating.set(false);
-        },
-        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-          this.apiError.set(this.extractErrorMessage(error, 'IR validation failed.'));
-          this.isValidating.set(false);
-        },
-      });
+    this.canvasGenerationService.validate(this.selectedFramework(), this.irPreview()).subscribe({
+      next: (response) => {
+        this.validationResult.set(response.isValid);
+        this.isValidating.set(false);
+      },
+      error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+        this.apiError.set(extractApiErrorMessage(error, 'IR validation failed.'));
+        this.isValidating.set(false);
+      },
+    });
   }
 
   generateCode() {
@@ -583,23 +584,18 @@ export class ProjectPage implements OnDestroy {
     this.generatedCss.set('');
     this.isGenerating.set(true);
 
-    this.converterService
-      .generate({
-        framework: this.selectedFramework(),
-        ir: this.irPreview(),
-      })
-      .subscribe({
-        next: (response) => {
-          this.generatedHtml.set(response.html);
-          this.generatedCss.set(response.css);
-          this.validationResult.set(response.isValid);
-          this.isGenerating.set(false);
-        },
-        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-          this.apiError.set(this.extractErrorMessage(error, 'Code generation failed.'));
-          this.isGenerating.set(false);
-        },
-      });
+    this.canvasGenerationService.generate(this.selectedFramework(), this.irPreview()).subscribe({
+      next: (response) => {
+        this.generatedHtml.set(response.html);
+        this.generatedCss.set(response.css);
+        this.validationResult.set(response.isValid);
+        this.isGenerating.set(false);
+      },
+      error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+        this.apiError.set(extractApiErrorMessage(error, 'Code generation failed.'));
+        this.isGenerating.set(false);
+      },
+    });
   }
 
   private loadProjectDesign() {
@@ -612,18 +608,15 @@ export class ProjectPage implements OnDestroy {
     this.apiError.set(null);
     this.canPersistDesign = false;
 
-    this.projectService.getDesign(this.projectIdAsNumber).subscribe({
+    this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
       next: (response) => {
-        const parsedIr = this.safeParseIr(response.designJson);
-        this.elements.set(
-          buildCanvasElementsFromIR(parsedIr).map((element) => this.withRoundedPrecision(element)),
-        );
+        this.elements.set(response.elements);
         this.lastSavedAt.set(response.updatedAt ?? null);
         this.isLoadingDesign.set(false);
         this.canPersistDesign = true;
       },
       error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-        this.apiError.set(this.extractErrorMessage(error, 'Failed to load project design.'));
+        this.apiError.set(extractApiErrorMessage(error, 'Failed to load project design.'));
         this.isLoadingDesign.set(false);
 
         // Keep autosave available after a load error so edits can still be persisted.
@@ -654,38 +647,20 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const designJson = JSON.stringify(this.irPreview());
     this.isSavingDesign.set(true);
 
-    this.projectService.saveDesign(this.projectIdAsNumber, { designJson }).subscribe({
-      next: (response) => {
-        this.lastSavedAt.set(response.updatedAt ?? null);
-        this.isSavingDesign.set(false);
-      },
-      error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-        this.apiError.set(this.extractErrorMessage(error, 'Failed to save project design.'));
-        this.isSavingDesign.set(false);
-      },
-    });
-  }
-
-  private safeParseIr(rawJson: string): IRNode | null {
-    if (!rawJson?.trim()) {
-      return null;
-    }
-
-    try {
-      return JSON.parse(rawJson) as IRNode;
-    } catch {
-      return null;
-    }
-  }
-
-  private extractErrorMessage(
-    error: { error?: { message?: string; title?: string; detail?: string } },
-    fallback: string,
-  ): string {
-    return error.error?.message ?? error.error?.title ?? error.error?.detail ?? fallback;
+    this.canvasPersistenceService
+      .saveProjectDesign(this.projectIdAsNumber, this.irPreview())
+      .subscribe({
+        next: (response) => {
+          this.lastSavedAt.set(response.updatedAt ?? null);
+          this.isSavingDesign.set(false);
+        },
+        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+          this.apiError.set(extractApiErrorMessage(error, 'Failed to save project design.'));
+          this.isSavingDesign.set(false);
+        },
+      });
   }
 
   @HostListener('window:keydown', ['$event'])
@@ -748,117 +723,23 @@ export class ProjectPage implements OnDestroy {
   }
 
   private isPointInsideElement(x: number, y: number, element: CanvasElement): boolean {
-    return (
-      x >= element.x &&
-      x <= element.x + element.width &&
-      y >= element.y &&
-      y <= element.y + element.height
-    );
+    return isPointInsideElement(x, y, element);
   }
 
   private clamp(value: number, min: number, max: number): number {
-    return this.roundToTwoDecimals(Math.min(Math.max(value, min), max));
+    return clamp(value, min, max);
   }
 
   private roundToTwoDecimals(value: number): number {
-    return Math.round((value + Number.EPSILON) * 100) / 100;
+    return roundToTwoDecimals(value);
   }
 
   private withRoundedPrecision(element: CanvasElement): CanvasElement {
-    return {
-      ...element,
-      x: this.roundToTwoDecimals(element.x),
-      y: this.roundToTwoDecimals(element.y),
-      width: this.roundToTwoDecimals(element.width),
-      height: this.roundToTwoDecimals(element.height),
-      strokeWidth:
-        typeof element.strokeWidth === 'number'
-          ? this.roundToTwoDecimals(element.strokeWidth)
-          : undefined,
-      fontSize:
-        typeof element.fontSize === 'number'
-          ? this.roundToTwoDecimals(element.fontSize)
-          : undefined,
-    };
+    return withRoundedPrecision(element);
   }
 
   private normalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
-    const minSize = 24;
-
-    element.width = Math.max(minSize, element.width);
-    element.height = Math.max(minSize, element.height);
-
-    if (element.type === 'text') {
-      element.fontSize = Math.max(8, element.fontSize ?? 16);
-    }
-
-    if (element.type === 'circle') {
-      const circleSize = Math.max(minSize, Math.min(element.width, element.height));
-      element.width = circleSize;
-      element.height = circleSize;
-    }
-
-    const normalizedOpacity = Number.isFinite(element.opacity ?? Number.NaN)
-      ? (element.opacity as number)
-      : 1;
-    element.opacity = this.clamp(normalizedOpacity, 0, 1);
-
-    if (element.type !== 'circle' && element.type !== 'text') {
-      const normalizedCornerRadius = Number.isFinite(element.cornerRadius ?? Number.NaN)
-        ? (element.cornerRadius as number)
-        : element.type === 'image'
-          ? 6
-          : 0;
-      element.cornerRadius = Math.max(0, this.roundToTwoDecimals(normalizedCornerRadius));
-    }
-
-    if (element.type !== 'text') {
-      const normalizedStrokeWidth = Number.isFinite(element.strokeWidth ?? Number.NaN)
-        ? (element.strokeWidth as number)
-        : 1;
-      element.strokeWidth = Math.max(0, this.roundToTwoDecimals(normalizedStrokeWidth));
-      element.strokePosition = this.getStrokePosition(element);
-    } else {
-      element.strokeWidth = undefined;
-      element.strokePosition = undefined;
-    }
-
-    const parent = element.parentId
-      ? elements.find((candidate) => candidate.id === element.parentId)
-      : null;
-
-    if (!parent || element.type === 'frame') {
-      element.x = this.roundToTwoDecimals(element.x);
-      element.y = this.roundToTwoDecimals(element.y);
-      element.width = this.roundToTwoDecimals(element.width);
-      element.height = this.roundToTwoDecimals(element.height);
-      if (typeof element.fontSize === 'number') {
-        element.fontSize = this.roundToTwoDecimals(element.fontSize);
-      }
-      return;
-    }
-
-    const maxWidth = Math.max(minSize, parent.x + parent.width - element.x);
-    const maxHeight = Math.max(minSize, parent.y + parent.height - element.y);
-
-    element.width = this.clamp(element.width, minSize, maxWidth);
-    element.height = this.clamp(element.height, minSize, maxHeight);
-
-    if (element.type === 'circle') {
-      const constrainedCircleSize = Math.max(minSize, Math.min(element.width, element.height));
-      element.width = constrainedCircleSize;
-      element.height = constrainedCircleSize;
-    }
-
-    element.x = this.clamp(element.x, parent.x, parent.x + parent.width - element.width);
-    element.y = this.clamp(element.y, parent.y, parent.y + parent.height - element.height);
-    element.x = this.roundToTwoDecimals(element.x);
-    element.y = this.roundToTwoDecimals(element.y);
-    element.width = this.roundToTwoDecimals(element.width);
-    element.height = this.roundToTwoDecimals(element.height);
-    if (typeof element.fontSize === 'number') {
-      element.fontSize = this.roundToTwoDecimals(element.fontSize);
-    }
+    normalizeElementInPlace(element, elements);
   }
 
   private handleResizePointerMove(event: MouseEvent) {
@@ -989,11 +870,7 @@ export class ProjectPage implements OnDestroy {
 
   private getNextElementName(type: CanvasElementType): string {
     const index = this.elements().filter((element) => element.type === type).length + 1;
-    return `${this.toTypeLabel(type)} ${index}`;
-  }
-
-  private toTypeLabel(type: CanvasElementType): string {
-    return `${type.charAt(0).toUpperCase()}${type.slice(1)}`;
+    return `${formatCanvasElementTypeLabel(type)} ${index}`;
   }
 
   private isTypingTarget(target: EventTarget | null): boolean {
@@ -1019,45 +896,18 @@ export class ProjectPage implements OnDestroy {
   }
 
   private getStrokeWidth(element: CanvasElement): number {
-    if (typeof element.strokeWidth === 'number' && Number.isFinite(element.strokeWidth)) {
-      return Math.max(0, element.strokeWidth);
-    }
-
-    return 1;
+    return getStrokeWidth(element);
   }
 
   private getStrokePosition(element: CanvasElement): CanvasStrokePosition {
-    return element.strokePosition === 'outside' ? 'outside' : 'inside';
+    return getStrokePosition(element);
   }
 
   private collectDescendantIds(elements: CanvasElement[], rootId: string): Set<string> {
-    const descendants = new Set<string>();
-    let added = true;
-
-    while (added) {
-      added = false;
-      for (const element of elements) {
-        if (!element.parentId) {
-          continue;
-        }
-
-        const isDirectChild = element.parentId === rootId;
-        const isNestedChild = descendants.has(element.parentId);
-
-        if ((isDirectChild || isNestedChild) && !descendants.has(element.id)) {
-          descendants.add(element.id);
-          added = true;
-        }
-      }
-    }
-
-    return descendants;
+    return collectDescendantIds(elements, rootId);
   }
 
   private removeWithChildren(elements: CanvasElement[], rootId: string): CanvasElement[] {
-    const idsToRemove = this.collectDescendantIds(elements, rootId);
-    idsToRemove.add(rootId);
-
-    return elements.filter((element) => !idsToRemove.has(element.id));
+    return removeWithChildren(elements, rootId);
   }
 }

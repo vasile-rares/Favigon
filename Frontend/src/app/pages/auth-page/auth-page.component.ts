@@ -11,9 +11,10 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../core/services/auth.service';
 import { environment } from '../../../environments/environment';
+import { extractApiErrorMessage } from '../../core/utils/api-error.util';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-const EMAIL_MAX_LENGTH = 100;
+const CREDENTIAL_MAX_LENGTH = 100;
 
 /**
  * Validates password complexity:
@@ -54,8 +55,11 @@ export class AuthPage implements OnInit {
 
   // --- Forms ---
   readonly loginForm = this.fb.nonNullable.group({
-    email: ['', [Validators.required, Validators.email, Validators.maxLength(100)]],
-    password: ['', [Validators.required, Validators.maxLength(100)]],
+    email: [
+      '',
+      [Validators.required, Validators.email, Validators.maxLength(CREDENTIAL_MAX_LENGTH)],
+    ],
+    password: ['', [Validators.required, Validators.maxLength(CREDENTIAL_MAX_LENGTH)]],
     rememberMe: [false],
   });
 
@@ -66,17 +70,20 @@ export class AuthPage implements OnInit {
         '',
         [Validators.required, Validators.maxLength(30), Validators.pattern(/^[a-z0-9_]+$/)],
       ],
-      email: ['', [Validators.required, Validators.email, Validators.maxLength(100)]],
+      email: [
+        '',
+        [Validators.required, Validators.email, Validators.maxLength(CREDENTIAL_MAX_LENGTH)],
+      ],
       password: [
         '',
         [
           Validators.required,
           Validators.minLength(8),
-          Validators.maxLength(100),
+          Validators.maxLength(CREDENTIAL_MAX_LENGTH),
           passwordStrengthValidator(),
         ],
       ],
-      confirmPassword: ['', [Validators.required, Validators.maxLength(100)]],
+      confirmPassword: ['', [Validators.required, Validators.maxLength(CREDENTIAL_MAX_LENGTH)]],
     },
     { validators: [this.passwordMatchValidator] },
   );
@@ -184,7 +191,8 @@ export class AuthPage implements OnInit {
       `https://github.com/login/oauth/authorize` +
       `?client_id=${encodeURIComponent(clientId)}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-      `&scope=${encodeURIComponent('read:user user:email')}`;
+      `&scope=${encodeURIComponent('read:user user:email')}` +
+      `&prompt=select_account`;
 
     window.location.href = githubAuthorizeUrl;
   }
@@ -255,7 +263,6 @@ export class AuthPage implements OnInit {
   }
 
   private handleError(error: any, defaultMsg: string) {
-    const msg = error.error?.message || error.error?.title || defaultMsg;
-    this.statusMessage.set({ type: 'error', text: msg });
+    this.statusMessage.set({ type: 'error', text: extractApiErrorMessage(error, defaultMsg) });
   }
 }

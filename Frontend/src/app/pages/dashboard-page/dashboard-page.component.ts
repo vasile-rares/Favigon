@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { HeaderBarComponent } from '../../components/ui/header-bar/header-bar.component';
 import { ProjectService } from '../../core/services/project.service';
+import { extractApiErrorMessage } from '../../core/utils/api-error.util';
 
 interface Project {
   id: number;
@@ -45,8 +46,8 @@ export class DashboardPage implements OnInit {
         );
         this.isLoading.set(false);
       },
-      error: (error: { error?: { message?: string } }) => {
-        this.errorMessage.set(error.error?.message ?? 'Failed to load projects.');
+      error: (error: unknown) => {
+        this.errorMessage.set(extractApiErrorMessage(error, 'Failed to load projects.'));
         this.isLoading.set(false);
       },
     });
@@ -62,8 +63,8 @@ export class DashboardPage implements OnInit {
         next: (project) => {
           this.router.navigate(['/project', project.projectId]);
         },
-        error: (error: { error?: { message?: string } }) => {
-          this.errorMessage.set(error.error?.message ?? 'Failed to create project.');
+        error: (error: unknown) => {
+          this.errorMessage.set(extractApiErrorMessage(error, 'Failed to create project.'));
         },
       });
   }

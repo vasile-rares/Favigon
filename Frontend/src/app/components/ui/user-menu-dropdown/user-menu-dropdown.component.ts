@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { Component, ElementRef, HostListener, Input, Output, EventEmitter } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 @Component({
   selector: 'app-user-menu-dropdown',
@@ -13,36 +13,17 @@ export class UserMenuDropdownComponent {
   @Input() displayName = '';
   @Input() email = '';
   @Input() avatarUrl = 'https://github.com/shadcn.png';
+  @Input() isOpen = false;
 
   @Output() logoutClicked = new EventEmitter<void>();
-
-  isOpen = false;
-
-  constructor(private readonly elementRef: ElementRef<HTMLElement>) {}
-
-  toggleMenu(): void {
-    this.isOpen = !this.isOpen;
-  }
+  @Output() closeRequested = new EventEmitter<void>();
 
   onLogout(): void {
-    this.isOpen = false;
+    this.closeRequested.emit();
     this.logoutClicked.emit();
   }
 
-  @HostListener('document:click', ['$event'])
-  onDocumentClick(event: MouseEvent): void {
-    if (!this.isOpen) {
-      return;
-    }
-
-    const target = event.target as Node | null;
-    if (target && !this.elementRef.nativeElement.contains(target)) {
-      this.isOpen = false;
-    }
-  }
-
-  @HostListener('document:keydown.escape')
-  onEscape(): void {
-    this.isOpen = false;
+  closeMenu(): void {
+    this.closeRequested.emit();
   }
 }

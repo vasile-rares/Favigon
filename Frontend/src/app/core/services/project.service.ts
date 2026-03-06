@@ -15,27 +15,19 @@ export class ProjectService {
   private readonly baseUrl = environment.apiBaseUrl;
 
   getProjects(): Observable<ProjectResponse[]> {
-    return this.http.get<ProjectResponse[]>(`${this.baseUrl}/projects`, {
-      withCredentials: true,
-    });
+    return this.http.get<ProjectResponse[]>(`${this.baseUrl}/projects`);
   }
 
   getById(projectId: number): Observable<ProjectResponse> {
-    return this.http.get<ProjectResponse>(`${this.baseUrl}/projects/${projectId}`, {
-      withCredentials: true,
-    });
+    return this.http.get<ProjectResponse>(`${this.baseUrl}/projects/${projectId}`);
   }
 
   create(request: ProjectCreateRequest): Observable<ProjectResponse> {
-    return this.http.post<ProjectResponse>(`${this.baseUrl}/projects`, request, {
-      withCredentials: true,
-    });
+    return this.http.post<ProjectResponse>(`${this.baseUrl}/projects`, request);
   }
 
   getDesign(projectId: number): Observable<ProjectDesignResponse> {
-    return this.http.get<ProjectDesignResponse>(`${this.baseUrl}/projects/${projectId}/design`, {
-      withCredentials: true,
-    });
+    return this.http.get<ProjectDesignResponse>(`${this.baseUrl}/projects/${projectId}/design`);
   }
 
   saveDesign(
@@ -45,9 +37,6 @@ export class ProjectService {
     return this.http.put<ProjectDesignResponse>(
       `${this.baseUrl}/projects/${projectId}/design`,
       request,
-      {
-        withCredentials: true,
-      },
     );
   }
 }

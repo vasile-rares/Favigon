@@ -50,10 +50,31 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
     </button>
 
-    <app-user-menu-dropdown
-      [displayName]="displayName"
-      [email]="email"
-      [avatarUrl]="avatarUrl"
-      (logoutClicked)="onLogout()"></app-user-menu-dropdown>
+    <div class="header-user-menu" #userMenuContainer>
+      <button
+        type="button"
+        class="header-user-menu__trigger"
+        (click)="toggleUserMenu()"
+        [attr.aria-expanded]="isUserMenuOpen"
+        aria-haspopup="menu"
+        aria-label="Open user menu">
+        <span class="header-user-menu__avatar">
+          <img [src]="avatarUrl" [alt]="displayName" />
+        </span>
+        <span class="header-user-menu__icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </span>
+      </button>
+
+      <app-user-menu-dropdown
+        [displayName]="displayName"
+        [email]="email"
+        [avatarUrl]="avatarUrl"
+        [isOpen]="isUserMenuOpen"
+        (closeRequested)="closeUserMenu()"
+        (logoutClicked)="onLogout()"></app-user-menu-dropdown>
+    </div>
   </div>
 </header>
