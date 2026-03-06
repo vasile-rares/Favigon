@@ -13,8 +13,8 @@
   padding: 2rem 3rem;
   overflow-y: auto;
   transition:
-    filter 0.22s ease,
-    transform 0.22s ease;
+    filter 0.15s ease,
+    transform 0.15s ease;
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -35,8 +35,7 @@
 }
 
 .dashboard-content--blurred {
-  filter: blur(7px) saturate(0.82);
-  transform: scale(0.995);
+  filter: blur(5px);
   pointer-events: none;
   user-select: none;
 }
@@ -62,30 +61,6 @@
       font-size: 0.95rem;
       margin: 0;
     }
-  }
-}
-
-.primary-btn {
-  background-color: var(--color-btn-primary);
-  color: var(--color-text-dark);
-  border: none;
-  padding: 0.65rem 1.25rem;
-  border-radius: 6px;
-  font-weight: 600;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-
-  &:hover {
-    background-color: var(--color-btn-primary-hover);
-  }
-
-  svg {
-    stroke-width: 2.5;
   }
 }
 

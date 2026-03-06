@@ -1,13 +1,14 @@
 import { Component, signal, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
-import { HeaderBarComponent } from '../../shared/components/header-bar/header-bar.component';
-import { ProjectService } from '../../core/services/project.service';
-import { extractApiErrorMessage } from '../../core/utils/api-error.util';
+import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
+import { ProjectService } from '../../../core/services/project.service';
+import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
+import { ActionButtonComponent } from '../../../shared/components/button/action-button.component';
 import {
   NewProjectDialogComponent,
   NewProjectDialogSubmit,
-} from '../../features/dashboard/components/new-project-dialog/new-project-dialog.component';
+} from '../components/new-project-dialog/new-project-dialog.component';
 
 interface Project {
   id: number;
@@ -19,7 +20,13 @@ interface Project {
 @Component({
   selector: 'app-dashboard-page',
   standalone: true,
-  imports: [CommonModule, RouterLink, HeaderBarComponent, NewProjectDialogComponent],
+  imports: [
+    CommonModule,
+    RouterLink,
+    HeaderBarComponent,
+    NewProjectDialogComponent,
+    ActionButtonComponent,
+  ],
   templateUrl: './dashboard-page.component.html',
   styleUrl: './dashboard-page.component.css',
 })

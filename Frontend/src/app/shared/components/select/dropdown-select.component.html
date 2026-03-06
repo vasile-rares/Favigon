@@ -1,0 +1,64 @@
+<div class="dropdown-select" [class.dropdown-select--invalid]="isInvalid">
+  @if (label) {
+    <label class="dropdown-select__label" [attr.for]="id">
+      {{ label }}
+      @if (requiredMarker) {
+        <span class="dropdown-select__required">*</span>
+      }
+    </label>
+  }
+
+  <button
+    class="dropdown-select__trigger"
+    type="button"
+    [id]="id"
+    [disabled]="disabled"
+    [attr.aria-expanded]="isOpen"
+    [attr.aria-haspopup]="'listbox'"
+    (click)="toggleOpen()">
+    <span class="dropdown-select__trigger-text" [class.dropdown-select__trigger-text--placeholder]="!selectedLabel">
+      {{ selectedLabel || placeholder }}
+    </span>
+    <span class="dropdown-select__trigger-icon" [class.dropdown-select__trigger-icon--open]="isOpen" aria-hidden="true">
+      <svg class="dropdown-select__trigger-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="6 9 12 15 18 9"></polyline>
+      </svg>
+    </span>
+  </button>
+
+  @if (isOpen || isClosing) {
+    <div
+      class="dropdown-select__panel"
+      [class.dropdown-select__panel--open]="isOpen && !isClosing"
+      [class.dropdown-select__panel--closing]="isClosing"
+      role="listbox">
+      @if (enableSearch) {
+        <div class="dropdown-select__search-row">
+          <app-text-input
+            id="{{ id ? id + '-search' : 'dropdown-search' }}"
+            placeholder="Search..."
+            type="search"
+            autocomplete="off"
+            [ngModelOptions]="{ standalone: true }"
+            [(ngModel)]="searchQuery"></app-text-input>
+        </div>
+      }
+
+      <div class="dropdown-select__list">
+        @if (filteredOptions.length === 0) {
+          <div class="dropdown-select__empty">{{ emptyText }}</div>
+        } @else {
+          @for (option of filteredOptions; track option.label + '-' + option.value) {
+            <button
+              type="button"
+              class="dropdown-select__item"
+              [class.dropdown-select__item--selected]="option.value === selectedValue"
+              (click)="selectOption(option)">
+              {{ option.label }}
+            </button>
+          }
+        }
+      </div>
+    </div>
+  }
+</div>

@@ -1,0 +1,93 @@
+:host {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+}
+
+.project-dialog-layer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(2px);
+  padding: 1.25rem;
+}
+
+.project-dialog-card {
+  width: min(400px, 100%);
+  border-radius: 14px;
+  border: 1px solid #26272b;
+  background: var(--color-bg-page);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  overflow: visible;
+}
+
+.project-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1rem 0.25rem;
+
+  h2 {
+    margin: 0;
+    color: #f2f2f3;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 0.35rem 0 0;
+    color: #9a9ca2;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    max-width: 34ch;
+  }
+}
+
+.dialog-close-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #d5d6da;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+
+  &:hover {
+    border-color: #2f3136;
+    background: #121418;
+  }
+}
+
+.project-dialog-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+  padding: 0.75rem 1rem 1rem;
+}
+
+app-text-input {
+  display: block;
+}
+
+.project-dialog-footer {
+  margin: 0.35rem -1rem -1rem;
+  padding: 0.9rem 1rem;
+  border-top: 1px solid #1f2024;
+  background: var(--color-surface);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  border-bottom-left-radius: 14px;
+  border-bottom-right-radius: 14px;
+  overflow: hidden;
+}
+
+.dialog-close-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

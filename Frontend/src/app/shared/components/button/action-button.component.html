@@ -1,0 +1,11 @@
+<button
+  class="action-button"
+  [class.action-button--primary]="variant === 'primary'"
+  [class.action-button--outline]="variant === 'outline'"
+  [class.action-button--full-width]="fullWidth"
+  [type]="type"
+  [disabled]="disabled"
+  [attr.aria-label]="ariaLabel || null"
+  (click)="onClick($event)">
+  <ng-content></ng-content>
+</button>

@@ -1,0 +1,87 @@
+<div class="settings-layout">
+  <app-header-bar></app-header-bar>
+
+  <div class="settings-container">
+    <div class="settings-content-wrapper">
+
+      <!-- Custom Tabs Navigation -->
+      <div class="settings-tabs-list">
+        <button
+          class="tab-trigger"
+          [class.active]="activeTab === 'account'"
+          (click)="setActiveTab('account')">
+          Account
+        </button>
+        <button
+          class="tab-trigger"
+          [class.active]="activeTab === 'password'"
+          (click)="setActiveTab('password')">
+          Security
+        </button>
+      </div>
+
+      <!-- Tab Content Area -->
+      <div class="settings-tab-content">
+
+        <!-- Account Tab -->
+        <div *ngIf="activeTab === 'account'" class="settings-card fade-in">
+          <div class="card-header">
+            <h3 class="card-title">Account</h3>
+            <p class="card-description">Update your account information.</p>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <app-text-input
+                id="account-name"
+                label="Name"
+                type="text"
+                autocomplete="name"
+                [(ngModel)]="accountName"></app-text-input>
+            </div>
+            <div class="form-group">
+              <app-text-input
+                id="account-email"
+                label="Email"
+                type="email"
+                autocomplete="email"
+                [(ngModel)]="accountEmail"></app-text-input>
+            </div>
+          </div>
+          <div class="card-footer">
+            <app-action-button variant="primary" [fullWidth]="false">Save changes</app-action-button>
+          </div>
+        </div>
+
+        <!-- Password Tab -->
+        <div *ngIf="activeTab === 'password'" class="settings-card fade-in">
+          <div class="card-header">
+            <h3 class="card-title">Password and Authentication</h3>
+            <p class="card-description">Change your password here.</p>
+          </div>
+          <div class="card-body">
+            <div class="form-group">
+              <app-text-input
+                id="current-password"
+                label="Current password"
+                type="password"
+                autocomplete="current-password"
+                [(ngModel)]="currentPassword"></app-text-input>
+            </div>
+            <div class="form-group">
+              <app-text-input
+                id="new-password"
+                label="New password"
+                type="password"
+                autocomplete="new-password"
+                [(ngModel)]="newPassword"></app-text-input>
+            </div>
+          </div>
+          <div class="card-footer">
+            <app-action-button variant="primary" [fullWidth]="false">Update password</app-action-button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>

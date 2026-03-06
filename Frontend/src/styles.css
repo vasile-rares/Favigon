@@ -101,3 +101,13 @@ textarea {
 * {
   box-sizing: border-box;
 }
+
+::selection {
+  color: #000000;
+  background: #b3b3b3;
+}
+
+::-moz-selection {
+  color: #000000;
+  background: #b3b3b3;
+}
