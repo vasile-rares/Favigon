@@ -8,288 +8,19 @@
   overflow: hidden;
 }
 
-.logo-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  cursor: pointer;
-}
-
-/* Breadcrumb / Navigation Styles (ReUI Inspired) */
-.breadcrumb-list {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-family: 'Inter', system-ui, sans-serif;
-}
-
-.breadcrumb-item {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  cursor: pointer;
-  padding: 0.25rem 0.5rem;
-  border-radius: 6px;
-  transition: background-color 0.2s;
-
-  &:hover {
-    background-color: var(--color-zinc-800);
-  }
-}
-
-.breadcrumb-separator {
-  color: var(--color-zinc-600); /* Muted foreground */
-  font-size: 0.875rem;
-}
-
-/* Avatar Styling */
-.avatar-sm {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  overflow: hidden;
-  background-color: var(--color-zinc-800);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-}
-
-/* Icon Box for Document Type */
-.icon-box {
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.icon-box.sky-theme {
-  background-color: var(--color-sky-500-10); /* Sky-500/10 */
-  color: var(--color-sky-400); /* Sky-400 */
-}
-
-/* Text Stack (Name + Email/Detail) */
-.text-stack {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  line-height: 1.1;
-}
-
-.text-primary {
-  color: var(--color-zinc-200); /* Foreground */
-  font-size: 0.8125rem; /* ~13px */
-  font-weight: 500;
-}
-
-.text-secondary {
-  color: var(--color-zinc-400); /* Muted foreground */
-  font-size: 0.75rem; /* ~12px */
-}
-
-.icon-text-btn,
-.icon-btn {
-  background: transparent;
-  border: none;
-  color: var(--color-zinc-300);
-  /* color: #ccc was used */
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem 0.6rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: inherit;
-  font-size: 0.85rem;
-  transition: background-color 0.2s;
-
-  &:hover {
-    background-color: var(--color-zinc-700);
-    /* 3e3e3e is close to 700 */
-    color: var(--color-white);
-  }
-}
-
-.user-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  /* background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%); keeping inline gradient as unique */
-  background: linear-gradient(135deg, #a8ff78 0%, #78ffd6 100%);
-  cursor: pointer;
-  position: relative;
-}
-
-/* Workspace Layout */
 .workspace {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
   position: relative;
-  background-color: var(--color-bg-page); /* Very dark background */
-}
-
-.inspector {
-  width: 340px;
-  min-width: 340px;
-  border-right: 1px solid var(--color-border);
-  background-color: var(--color-zinc-900);
-  padding: 1rem;
+  flex: 1;
+  min-height: 0;
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  overflow: auto;
-  z-index: 10;
-
-  h3,
-  h4 {
-    margin: 0;
-    color: var(--color-zinc-100);
-    font-size: 0.95rem;
-    font-weight: 600;
-  }
-
-  select {
-    width: 100%;
-    background-color: var(--color-zinc-800);
-    border: 1px solid var(--color-border);
-    color: var(--color-zinc-200);
-    border-radius: 6px;
-    padding: 0.45rem 0.5rem;
-  }
-
-  pre {
-    margin: 0;
-    background-color: var(--color-zinc-800);
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
-    padding: 0.65rem;
-    font-size: 0.75rem;
-    color: var(--color-zinc-200);
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 220px;
-    overflow: auto;
-  }
-}
-
-.field-label {
-  color: var(--color-zinc-400);
-  font-size: 0.8rem;
-}
-
-.action-row {
-  display: flex;
-  gap: 0.5rem;
-
-  button {
-    flex: 1;
-    border: 1px solid var(--color-border);
-    background-color: var(--color-zinc-800);
-    color: var(--color-zinc-200);
-    border-radius: 6px;
-    padding: 0.45rem 0.6rem;
-    cursor: pointer;
-
-    &:hover:enabled {
-      background-color: var(--color-zinc-700);
-      color: var(--color-white);
-    }
-
-    &:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-  }
-}
-
-.status {
-  margin: 0;
-  font-size: 0.8rem;
-
-  &.ok {
-    color: var(--color-success-light);
-  }
-
-  &.error {
-    color: var(--color-danger-light);
-  }
-}
-
-/* Floating Toolbar */
-.toolbar {
-  position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: auto;
-  min-width: 240px;
-  background-color: var(--color-zinc-900);
-  /* 1a1a1a is Zinc 900 */
-  border: 2px solid var(--color-border);
-  /* 333 is close to Zinc 700 */
-  border-radius: 12px;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  z-index: 20;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-
-  .toolbar-header h2 {
-    display: none;
-  }
-}
-
-.tools {
-  display: flex;
-  flex-direction: row;
-  gap: 0.5rem;
-
-  button {
-    background: transparent;
-    border: 1px solid transparent;
-    color: var(--color-zinc-400);
-    /* #aaa */
-    width: 40px;
-    height: 40px;
-    border-radius: 8px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-
-    &:hover {
-      color: var(--color-white);
-      background-color: var(--color-zinc-700);
-      /* #333 */
-    }
-
-    &.active {
-      color: var(--color-brand-primary);
-      background-color: var(--color-brand-primary-10);
-      border: 1px solid var(--color-brand-primary-30);
-    }
-  }
+  overflow: hidden;
 }
 
 .canvas-container {
   flex: 1;
   position: relative;
-  background-color: var(--color-bg-page); /* #050505 vs #080808, using avg */
+  background-color: var(--color-bg-page);
   background-image: radial-gradient(var(--color-zinc-800) 1px, transparent 1px);
-  /* #222 */
   background-size: 20px 20px;
   cursor: crosshair;
   overflow: hidden;
@@ -309,6 +40,13 @@
   height: 100%;
   transform-origin: top left;
   will-change: transform;
+}
+
+.canvas-scene {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: top left;
 }
 
 .zoom-controls {
@@ -375,9 +113,10 @@
   &.text {
     color: var(--color-white);
     display: flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
+  }
+
+  &.editing {
+    z-index: 2;
   }
 
   &.image {
@@ -395,28 +134,86 @@
   }
 }
 
+.frame-title {
+  position: absolute;
+  left: 0;
+  color: var(--color-zinc-200);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.text-content,
+.text-inline-editor {
+  width: 100%;
+  height: 100%;
+  padding: 0.15rem 0.25rem;
+  overflow: hidden;
+}
+
+.text-content {
+  display: flex;
+
+  span {
+    width: 100%;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+}
+
+.text-inline-editor {
+  border: none;
+  outline: none;
+  resize: none;
+  background: rgba(24, 24, 27, 0.88);
+  color: inherit;
+  font: inherit;
+  white-space: pre-wrap;
+  caret-color: var(--color-white);
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--color-brand-primary-30);
+}
+
 .selection-outline {
   position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  border: 2px solid var(--color-brand-primary);
-  pointer-events: auto;
+  border-style: solid;
+  border-color: var(--color-brand-primary);
+  pointer-events: none;
+  z-index: 1;
 }
 
 .resize-handle {
   position: absolute;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--color-white);
-  background-color: var(--color-brand-primary);
-  border-radius: 2px;
+  box-sizing: border-box;
+  appearance: none;
+  border-style: solid;
+  border-color: var(--color-brand-primary);
+  background-color: var(--color-white);
+  border-radius: 0;
   padding: 0;
+  pointer-events: auto;
+}
+
+.resize-handle-nw {
+  left: var(--resize-handle-offset, -8px);
+  top: var(--resize-handle-offset, -8px);
   cursor: nwse-resize;
 }
 
+.resize-handle-ne {
+  right: var(--resize-handle-offset, -8px);
+  top: var(--resize-handle-offset, -8px);
+  cursor: nesw-resize;
+}
+
+.resize-handle-sw {
+  left: var(--resize-handle-offset, -8px);
+  bottom: var(--resize-handle-offset, -8px);
+  cursor: nesw-resize;
+}
+
 .resize-handle-se {
-  right: -8px;
-  bottom: -8px;
+  right: var(--resize-handle-offset, -8px);
+  bottom: var(--resize-handle-offset, -8px);
+  cursor: nwse-resize;
 }

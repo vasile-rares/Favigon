@@ -1,0 +1,309 @@
+<aside class="properties-panel">
+  <div class="properties-panel-header">
+    <h3>Properties</h3>
+    <div class="properties-tabs">
+      <button
+        type="button"
+        class="properties-tab"
+        [class.active]="isTabActive('design')"
+        (click)="selectTab('design')">
+        Design
+      </button>
+      <button
+        type="button"
+        class="properties-tab"
+        [class.active]="isTabActive('prototype')"
+        (click)="selectTab('prototype')">
+        Prototype
+      </button>
+    </div>
+  </div>
+
+  <ng-container *ngIf="isTabActive('design'); else prototypeTab">
+    <section class="properties-section" *ngIf="isFrameToolSelected()">
+      <p class="properties-section-title">Frame templates</p>
+      <p class="properties-section-hint">Select a preset to add a new frame and focus it in the canvas.</p>
+      <div class="frame-template-grid">
+        <button
+          type="button"
+          class="frame-template-button"
+          *ngFor="let template of frameTemplates"
+          (click)="applyFrameTemplate(template)">
+          <span class="frame-template-name">{{ template.name }}</span>
+          <span class="frame-template-size">{{ template.sizeLabel }}</span>
+        </button>
+      </div>
+    </section>
+
+    <div class="properties-empty-state" *ngIf="!selectedElement && !isFrameToolSelected()">
+      <p>Select an element in the canvas to edit design properties.</p>
+    </div>
+
+    <ng-container *ngIf="selectedElement as element">
+      <section class="properties-section">
+        <div class="properties-section-header">
+          <p class="properties-section-title">Position</p>
+          <span class="properties-element-type">{{ elementTypeLabel }}</span>
+        </div>
+
+      <div class="properties-grid properties-grid--single">
+        <label class="property-field property-field--inline">
+          <span class="property-label">X</span>
+          <input
+            type="number"
+            step="0.01"
+            [value]="toDisplayNumber(element.x)"
+            (input)="onNumberChange('x', $event)" />
+        </label>
+
+        <label class="property-field property-field--inline">
+          <span class="property-label">Y</span>
+          <input
+            type="number"
+            step="0.01"
+            [value]="toDisplayNumber(element.y)"
+            (input)="onNumberChange('y', $event)" />
+        </label>
+      </div>
+    </section>
+
+    <section class="properties-section">
+      <p class="properties-section-title">Layout</p>
+      <div class="properties-grid properties-grid--single">
+        <label class="property-field property-field--inline">
+          <span class="property-label">W</span>
+          <input
+            type="number"
+            min="24"
+            step="0.01"
+            [value]="toDisplayNumber(element.width)"
+            (input)="onNumberChange('width', $event)" />
+        </label>
+
+        <label class="property-field property-field--inline">
+          <span class="property-label">H</span>
+          <input
+            type="number"
+            min="24"
+            step="0.01"
+            [value]="toDisplayNumber(element.height)"
+            (input)="onNumberChange('height', $event)" />
+        </label>
+      </div>
+    </section>
+
+    <section class="properties-section">
+      <p class="properties-section-title">Appearance</p>
+      <div class="properties-grid">
+        <label class="property-field property-field--inline">
+          <span class="property-label">Opacity</span>
+          <input
+            type="number"
+            min="0"
+            max="1"
+            step="0.01"
+            [value]="toDisplayNumber(element.opacity ?? 1)"
+            (input)="onNumberChange('opacity', $event)" />
+        </label>
+
+        <label class="property-field property-field--inline" *ngIf="supportsCornerRadius(element.type)">
+          <span class="property-label">Corner radius</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            [value]="toDisplayNumber(element.cornerRadius ?? (element.type === 'image' ? 6 : 0))"
+            (input)="onNumberChange('cornerRadius', $event)" />
+        </label>
+      </div>
+    </section>
+
+    <section class="properties-section" *ngIf="hasFill(element.type)">
+      <p class="properties-section-title">Fill</p>
+      <label class="property-field property-field--inline property-field--color">
+        <span class="property-label">Color</span>
+        <div class="property-inline-group">
+          <input type="color" [value]="fillInputValue(element)" (input)="onFillChange($event)" />
+          <span class="property-inline-value">{{ fillInputValue(element) | uppercase }}</span>
+        </div>
+      </label>
+    </section>
+
+    <section class="properties-section" *ngIf="hasStroke(element.type)">
+      <p class="properties-section-title">Stroke</p>
+      <div class="properties-grid properties-grid--single">
+        <label class="property-field property-field--inline property-field--color">
+          <span class="property-label">Color</span>
+          <div class="property-inline-group">
+            <input
+              type="color"
+              [value]="strokeInputValue(element)"
+              (input)="onStrokeChange($event)" />
+            <span class="property-inline-value">{{ strokeInputValue(element) | uppercase }}</span>
+          </div>
+        </label>
+
+        <label class="property-field property-field--inline">
+          <span class="property-label">Position</span>
+          <select [value]="strokePositionValue(element)" (change)="onStrokePositionChange($event)">
+            <option *ngFor="let position of strokePositionOptions" [value]="position">
+              {{ position === 'inside' ? 'Inside' : 'Outside' }}
+            </option>
+          </select>
+        </label>
+
+        <label class="property-field property-field--inline">
+          <span class="property-label">Weight</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            [value]="toDisplayNumber(element.strokeWidth ?? 1)"
+            (input)="onNumberChange('strokeWidth', $event)" />
+        </label>
+      </div>
+    </section>
+
+    <section class="properties-section" *ngIf="isText(element.type)">
+      <p class="properties-section-title">Text</p>
+      <label class="property-field">
+        <span>Content</span>
+        <input
+          type="text"
+          [value]="element.text || ''"
+          (input)="onTextChange('text', $event)"
+          placeholder="Text content" />
+      </label>
+
+      <label class="property-field">
+        <span>Font size</span>
+        <input
+          type="number"
+          min="8"
+          step="0.01"
+          [value]="toDisplayNumber(element.fontSize || 16)"
+          (input)="onNumberChange('fontSize', $event)" />
+      </label>
+    </section>
+
+    <section class="properties-section" *ngIf="isText(element.type)">
+      <p class="properties-section-title">Typography</p>
+
+      <div class="properties-grid properties-grid--single">
+        <label class="property-field property-field--inline">
+          <span class="property-label">Font</span>
+          <select [value]="fontFamilyValue(element)" (change)="onTypographySelectChange('fontFamily', $event)">
+            <option *ngFor="let font of fontFamilyOptions" [value]="font">{{ font }}</option>
+          </select>
+        </label>
+
+        <label class="property-field property-field--inline">
+          <span class="property-label">Weight</span>
+          <select [value]="fontWeightValue(element)" (change)="onTypographySelectChange('fontWeight', $event)">
+            <option *ngFor="let weight of fontWeightOptions" [value]="weight">{{ weight }}</option>
+          </select>
+        </label>
+
+        <label class="property-field property-field--inline">
+          <span class="property-label">Style</span>
+          <select [value]="fontStyleValue(element)" (change)="onTypographySelectChange('fontStyle', $event)">
+            <option *ngFor="let style of fontStyleOptions" [value]="style">
+              {{ style === 'italic' ? 'Italic' : 'Regular' }}
+            </option>
+          </select>
+        </label>
+
+        <label class="property-field property-field--inline">
+          <span class="property-label">Horizontal</span>
+          <select [value]="textAlignValue(element)" (change)="onTypographySelectChange('textAlign', $event)">
+            <option *ngFor="let align of textAlignOptions" [value]="align">{{ align | titlecase }}</option>
+          </select>
+        </label>
+
+        <label class="property-field property-field--inline">
+          <span class="property-label">Vertical</span>
+          <select [value]="textVerticalAlignValue(element)" (change)="onTypographySelectChange('textVerticalAlign', $event)">
+            <option *ngFor="let align of textVerticalAlignOptions" [value]="align">
+              {{ align === 'middle' ? 'Middle' : (align | titlecase) }}
+            </option>
+          </select>
+        </label>
+
+        <label class="property-field property-field--inline">
+          <span class="property-label">Letter spacing</span>
+          <input
+            type="number"
+            step="0.01"
+            [value]="toDisplayNumber(element.letterSpacing ?? 0)"
+            (input)="onNumberChange('letterSpacing', $event)" />
+        </label>
+
+        <label class="property-field property-field--inline">
+          <span class="property-label">Line height</span>
+          <input
+            type="number"
+            min="0.8"
+            step="0.01"
+            [value]="toDisplayNumber(element.lineHeight ?? 1.2)"
+            (input)="onNumberChange('lineHeight', $event)" />
+        </label>
+      </div>
+    </section>
+
+      <section class="properties-section" *ngIf="isImage(element.type)">
+        <p class="properties-section-title">Image</p>
+        <label class="property-field">
+          <span>Source URL</span>
+          <input
+            type="text"
+            [value]="element.imageUrl || ''"
+            (input)="onTextChange('imageUrl', $event)"
+            placeholder="https://example.com/image.png" />
+        </label>
+      </section>
+    </ng-container>
+  </ng-container>
+
+  <ng-template #prototypeTab>
+    <section class="properties-section">
+      <p class="properties-section-title">IR Builder</p>
+
+      <label class="property-field">
+        <span>Framework</span>
+        <select [value]="selectedFramework" (change)="onFrameworkChange($event)">
+          <option value="html">HTML</option>
+          <option value="react">React</option>
+          <option value="angular">Angular</option>
+        </select>
+      </label>
+
+      <div class="prototype-actions">
+        <button type="button" (click)="validateRequested.emit()" [disabled]="isValidating || isGenerating">
+          {{ isValidating ? 'Validating...' : 'Validate IR' }}
+        </button>
+        <button type="button" (click)="generateRequested.emit()" [disabled]="isGenerating || isValidating">
+          {{ isGenerating ? 'Generating...' : 'Generate Code' }}
+        </button>
+      </div>
+
+      <p class="prototype-status prototype-status--ok" *ngIf="validationResult === true">IR is valid.</p>
+      <p class="prototype-status prototype-status--error" *ngIf="validationResult === false">IR is not valid.</p>
+      <p class="prototype-status prototype-status--error" *ngIf="apiError">{{ apiError }}</p>
+    </section>
+
+    <section class="properties-section">
+      <p class="properties-section-title">IR Preview</p>
+      <pre>{{ irPreview | json }}</pre>
+    </section>
+
+    <section class="properties-section" *ngIf="generatedHtml">
+      <p class="properties-section-title">Generated HTML</p>
+      <pre>{{ generatedHtml }}</pre>
+    </section>
+
+    <section class="properties-section" *ngIf="generatedCss">
+      <p class="properties-section-title">Generated CSS</p>
+      <pre>{{ generatedCss }}</pre>
+    </section>
+  </ng-template>
+</aside>

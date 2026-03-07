@@ -1,8 +1,14 @@
-import { CanvasElement, CanvasStrokePosition } from '../models/canvas.models';
+import {
+  CanvasElement,
+  CanvasPageModel,
+  CanvasProjectDocument,
+  CanvasStrokePosition,
+} from '../models/canvas.models';
 import { IRNode, IRStyle } from '../models/ir.models';
 
 const ROOT_ROLE = 'canvas-root';
 const ROOT_TYPE = 'Container';
+const CANVAS_DOCUMENT_PROP = 'prismaticCanvasDocument';
 const MANAGED_PROP_KEYS = [
   'x',
   'y',
@@ -11,6 +17,8 @@ const MANAGED_PROP_KEYS = [
   'strokePosition',
   'strokeWidth',
   'name',
+  'visible',
+  'textVerticalAlign',
 ] as const;
 
 const DEFAULT_POSITION = 24;
@@ -27,12 +35,100 @@ const DEFAULT_ELEMENT_SIZE = {
   generic: { width: 100, height: 100 },
 } as const;
 
-export function buildCanvasIR(elements: CanvasElement[], projectId: string): IRNode {
+export function buildCanvasIR(
+  elements: CanvasElement[],
+  projectId: string,
+  pageName?: string,
+): IRNode {
   const rootId = `canvas-${projectId}`;
   const nodesById = createNodeIndex(elements);
   const rootChildren = resolveRootChildren(elements, nodesById, rootId);
 
-  return createRootNode(projectId, rootId, rootChildren);
+  return createRootNode(projectId, rootId, rootChildren, pageName);
+}
+
+export function buildCanvasProjectDocument(
+  pages: CanvasPageModel[],
+  projectId: string,
+  activePageId: string | null,
+): CanvasProjectDocument {
+  const normalizedPages = pages.length > 0 ? pages : [createDefaultPageModel()];
+
+  return {
+    version: '2.0',
+    projectId,
+    activePageId: activePageId ?? normalizedPages[0]?.id ?? null,
+    pages: normalizedPages.map((page) => ({
+      id: page.id,
+      name: page.name,
+      elements: page.elements.map((element) => ({
+        ...element,
+        visible: element.visible !== false,
+      })),
+    })),
+  };
+}
+
+export function buildPersistedCanvasDesign(document: CanvasProjectDocument): IRNode {
+  const normalizedDocument = buildCanvasProjectDocument(
+    document.pages,
+    document.projectId,
+    document.activePageId,
+  );
+  const activePage =
+    normalizedDocument.pages.find((page) => page.id === normalizedDocument.activePageId) ??
+    normalizedDocument.pages[0];
+  const root = buildCanvasIR(activePage?.elements ?? [], document.projectId, activePage?.name);
+
+  root.props = {
+    ...root.props,
+    [CANVAS_DOCUMENT_PROP]: normalizedDocument,
+  };
+
+  return root;
+}
+
+export function buildCanvasProjectDocumentFromUnknown(
+  rawDesign: unknown,
+  projectId: string,
+): CanvasProjectDocument {
+  const persistedDocument = readPersistedCanvasProjectDocument(rawDesign, projectId);
+  if (persistedDocument) {
+    return persistedDocument;
+  }
+
+  if (isCanvasProjectDocument(rawDesign)) {
+    const rawPages = Array.isArray(rawDesign.pages) ? rawDesign.pages : [];
+    const pages = rawPages.length > 0 ? rawPages : [createDefaultPageModel()];
+    const fallbackActivePageId = pages[0]?.id ?? null;
+
+    return {
+      version: typeof rawDesign.version === 'string' ? rawDesign.version : '2.0',
+      projectId:
+        typeof rawDesign.projectId === 'string' && rawDesign.projectId.trim().length > 0
+          ? rawDesign.projectId
+          : projectId,
+      activePageId:
+        typeof rawDesign.activePageId === 'string' &&
+        pages.some((page) => page.id === rawDesign.activePageId)
+          ? rawDesign.activePageId
+          : fallbackActivePageId,
+      pages: pages.map((page, index) => normalizeCanvasPage(page, index + 1)),
+    };
+  }
+
+  const legacyElements = buildCanvasElementsFromIR(rawDesign as IRNode | null | undefined);
+  return buildCanvasProjectDocument(
+    [
+      {
+        id: crypto.randomUUID(),
+        name: 'Page 1',
+        elements: legacyElements,
+      },
+    ],
+    projectId,
+    null,
+  );
 }
 
 export function buildCanvasElementsFromIR(root: IRNode | null | undefined): CanvasElement[] {
@@ -89,7 +185,12 @@ function resolveRootChildren(
   return rootChildren;
 }
 
-function createRootNode(projectId: string, rootId: string, children: IRNode[]): IRNode {
+function createRootNode(
+  projectId: string,
+  rootId: string,
+  children: IRNode[],
+  pageName?: string,
+): IRNode {
   return {
     version: '1.0',
     id: rootId,
@@ -97,6 +198,7 @@ function createRootNode(projectId: string, rootId: string, children: IRNode[]): 
     props: {
       projectId,
       role: ROOT_ROLE,
+      ...(pageName ? { pageName } : {}),
     },
     layout: {
       mode: 'stack',
@@ -160,6 +262,32 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     style.fontSize = element.fontSize;
   }
 
+  if (element.type === 'text') {
+    if (element.fontFamily) {
+      style.fontFamily = element.fontFamily;
+    }
+
+    if (typeof element.fontWeight === 'number') {
+      style.fontWeight = element.fontWeight;
+    }
+
+    if (element.fontStyle) {
+      style.fontStyle = element.fontStyle;
+    }
+
+    if (element.textAlign) {
+      style.textAlign = element.textAlign;
+    }
+
+    if (typeof element.lineHeight === 'number') {
+      style.lineHeight = element.lineHeight;
+    }
+
+    if (typeof element.letterSpacing === 'number') {
+      style.letterSpacing = element.letterSpacing;
+    }
+  }
+
   return style;
 }
 
@@ -168,11 +296,13 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
     ...(element.irMeta?.props ?? {}),
     x: element.x,
     y: element.y,
+    visible: element.visible !== false,
     primitive: true,
   };
 
   if (element.type === 'text') {
     props['content'] = element.text ?? '';
+    props['textVerticalAlign'] = element.textVerticalAlign ?? 'middle';
   }
 
   if (element.type === 'image') {
@@ -226,6 +356,7 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     y: readNumericProp(node.props, 'y', DEFAULT_POSITION),
     width: readSize(node.style, 'width', defaults.width),
     height: readSize(node.style, 'height', defaults.height),
+    visible: readBooleanProp(node.props, 'visible', true),
     fill:
       mappedType !== 'text'
         ? (node.style?.background ?? (mappedType === 'frame' ? DEFAULT_FRAME_FILL : DEFAULT_FILL))
@@ -244,6 +375,19 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
         : undefined,
     text: mappedType === 'text' ? readStringProp(node.props, 'content', 'New text') : undefined,
     fontSize: mappedType === 'text' ? readNumber(node.style?.fontSize, 16) : undefined,
+    fontFamily:
+      mappedType === 'text'
+        ? (readOptionalStringStyle(node.style, 'fontFamily') ?? 'Inter')
+        : undefined,
+    fontWeight: mappedType === 'text' ? readNumber(node.style?.fontWeight, 400) : undefined,
+    fontStyle: mappedType === 'text' ? readFontStyle(node.style?.fontStyle, 'normal') : undefined,
+    textAlign: mappedType === 'text' ? readTextAlign(node.style?.textAlign, 'center') : undefined,
+    textVerticalAlign:
+      mappedType === 'text'
+        ? readTextVerticalAlign(node.props, 'textVerticalAlign', 'middle')
+        : undefined,
+    letterSpacing: mappedType === 'text' ? readNumber(node.style?.letterSpacing, 0) : undefined,
+    lineHeight: mappedType === 'text' ? readNumber(node.style?.lineHeight, 1.2) : undefined,
     imageUrl: mappedType === 'image' ? readStringProp(node.props, 'src', '') : undefined,
     irMeta: {
       type: node.type,
@@ -295,6 +439,100 @@ function removeManagedProps(props: Record<string, unknown> | undefined): Record<
   }
 
   return clone;
+}
+
+function isCanvasProjectDocument(rawDesign: unknown): rawDesign is Partial<CanvasProjectDocument> {
+  if (!rawDesign || typeof rawDesign !== 'object') {
+    return false;
+  }
+
+  return Array.isArray((rawDesign as { pages?: unknown }).pages);
+}
+
+function readPersistedCanvasProjectDocument(
+  rawDesign: unknown,
+  projectId: string,
+): CanvasProjectDocument | null {
+  if (!rawDesign || typeof rawDesign !== 'object') {
+    return null;
+  }
+
+  const rawRoot = rawDesign as Partial<IRNode>;
+  const props = rawRoot.props;
+  if (!props || typeof props !== 'object') {
+    return null;
+  }
+
+  const rawDocument = (props as Record<string, unknown>)[CANVAS_DOCUMENT_PROP];
+  if (!rawDocument || typeof rawDocument !== 'object') {
+    return null;
+  }
+
+  return buildCanvasProjectDocumentFromUnknown(rawDocument, projectId);
+}
+
+function normalizeCanvasPage(rawPage: unknown, pageIndex: number): CanvasPageModel {
+  const page = rawPage && typeof rawPage === 'object' ? (rawPage as Partial<CanvasPageModel>) : {};
+  const normalizedName =
+    typeof page.name === 'string' && page.name.trim().length > 0
+      ? page.name.trim()
+      : `Page ${pageIndex}`;
+
+  return {
+    id: typeof page.id === 'string' && page.id.trim().length > 0 ? page.id : crypto.randomUUID(),
+    name: normalizedName,
+    elements: Array.isArray(page.elements)
+      ? page.elements.map((element) => ({
+          ...element,
+          visible: element.visible !== false,
+        }))
+      : [],
+  };
+}
+
+function createDefaultPageModel(): CanvasPageModel {
+  return {
+    id: crypto.randomUUID(),
+    name: 'Page 1',
+    elements: [],
+  };
+}
+
+function readBooleanProp(
+  props: Record<string, unknown> | undefined,
+  key: string,
+  fallback: boolean,
+): boolean {
+  const value = props?.[key];
+  return typeof value === 'boolean' ? value : fallback;
+}
+
+function readOptionalStringStyle(
+  style: IRStyle | undefined,
+  key: keyof IRStyle,
+): string | undefined {
+  const value = style?.[key];
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
+}
+
+function readFontStyle(value: unknown, fallback: 'normal' | 'italic'): 'normal' | 'italic' {
+  return value === 'italic' ? 'italic' : fallback;
+}
+
+function readTextAlign(
+  value: unknown,
+  fallback: 'left' | 'center' | 'right',
+): 'left' | 'center' | 'right' {
+  return value === 'left' || value === 'center' || value === 'right' ? value : fallback;
+}
+
+function readTextVerticalAlign(
+  props: Record<string, unknown> | undefined,
+  key: string,
+  fallback: 'top' | 'middle' | 'bottom',
+): 'top' | 'middle' | 'bottom' {
+  const value = props?.[key];
+  return value === 'top' || value === 'middle' || value === 'bottom' ? value : fallback;
 }
 
 function readSize(style: IRStyle | undefined, key: 'width' | 'height', fallback: number): number {

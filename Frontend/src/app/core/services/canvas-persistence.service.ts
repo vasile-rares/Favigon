@@ -1,8 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { map, Observable } from 'rxjs';
-import { buildCanvasElementsFromIR } from '../mappers/canvas-ir.mapper';
-import { CanvasElement } from '../models/canvas.models';
-import { IRNode } from '../models/ir.models';
+import {
+  buildCanvasProjectDocumentFromUnknown,
+  buildPersistedCanvasDesign,
+} from '../mappers/canvas-ir.mapper';
+import { CanvasElement, CanvasPageModel, CanvasProjectDocument } from '../models/canvas.models';
 import { ProjectDesignResponse } from '../models/project.models';
 import { ProjectService } from './project.service';
 
@@ -10,36 +12,46 @@ import { ProjectService } from './project.service';
 export class CanvasPersistenceService {
   private readonly projectService = inject(ProjectService);
 
-  loadProjectDesign(
-    projectId: number,
-  ): Observable<{ elements: CanvasElement[]; updatedAt: string | null }> {
+  loadProjectDesign(projectId: number): Observable<{
+    pages: CanvasPageModel[];
+    activePageId: string | null;
+    updatedAt: string | null;
+  }> {
     return this.projectService.getDesign(projectId).pipe(
       map((response) => {
-        const parsedIr = this.parseIr(response.designJson);
-        const elements = buildCanvasElementsFromIR(parsedIr).map((element) =>
-          this.withRoundedPrecision(element),
+        const parsedDesign = this.parseDesign(response.designJson);
+        const projectDocument = buildCanvasProjectDocumentFromUnknown(
+          parsedDesign,
+          projectId.toString(),
         );
 
         return {
-          elements,
+          pages: projectDocument.pages.map((page) => ({
+            ...page,
+            elements: page.elements.map((element) => this.withRoundedPrecision(element)),
+          })),
+          activePageId: projectDocument.activePageId,
           updatedAt: response.updatedAt ?? null,
         };
       }),
     );
   }
 
-  saveProjectDesign(projectId: number, ir: IRNode): Observable<ProjectDesignResponse> {
-    const designJson = JSON.stringify(ir);
+  saveProjectDesign(
+    projectId: number,
+    document: CanvasProjectDocument,
+  ): Observable<ProjectDesignResponse> {
+    const designJson = JSON.stringify(buildPersistedCanvasDesign(document));
     return this.projectService.saveDesign(projectId, { designJson });
   }
 
-  private parseIr(rawJson: string): IRNode | null {
+  private parseDesign(rawJson: string): unknown {
     if (!rawJson?.trim()) {
       return null;
     }
 
     try {
-      return JSON.parse(rawJson) as IRNode;
+      return JSON.parse(rawJson) as unknown;
     } catch {
       return null;
     }

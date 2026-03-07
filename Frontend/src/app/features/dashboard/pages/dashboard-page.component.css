@@ -8,6 +8,13 @@
   font-family: inherit;
 }
 
+.dashboard-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 100vh;
+}
+
 .dashboard-content {
   flex: 1;
   padding: 2rem 3rem;
@@ -30,6 +37,8 @@
 
 .dashboard-main-shell {
   position: relative;
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
 }

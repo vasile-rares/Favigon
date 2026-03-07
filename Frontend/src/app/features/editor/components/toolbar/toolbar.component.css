@@ -1,0 +1,60 @@
+:host {
+  position: absolute;
+  left: 50%;
+  bottom: 15px;
+  z-index: 20;
+  transform: translateX(-50%);
+}
+
+.toolbar {
+  display: inline-flex;
+  padding: 0.3rem;
+  border: 1px solid var(--color-border-dark);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-transparent);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+}
+
+.toolbar__rail {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.toolbar__button {
+  width: 2.45rem;
+  height: 2.45rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: calc(var(--radius-lg) - 0.2rem);
+  background: transparent;
+  color: var(--color-text-light);
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.18s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  &:focus-visible {
+    outline: 1px solid var(--color-accent-light);
+    outline-offset: 2px;
+  }
+
+  &.is-active {
+    background: var(--color-accent);
+    border: 1px solid var(--color-accent-border);
+  }
+
+  svg {
+    width: 30px;
+    pointer-events: none;
+  }
+}

@@ -1,0 +1,90 @@
+<aside class="project-panel">
+  <h3>Project</h3>
+
+  <section class="project-pages">
+    <div class="project-section-header">
+      <h4>Pages</h4>
+      <button type="button" class="project-page-add" (click)="onPageCreate()">+ New Page</button>
+    </div>
+
+    <div class="project-pages-list">
+      <button
+        type="button"
+        class="project-page-item"
+        *ngFor="let page of pages; trackBy: trackByPageId"
+        [class.active]="page.id === currentPageId"
+        (click)="onPageSelect(page.id)">
+        {{ page.name }}
+      </button>
+    </div>
+  </section>
+
+  <section class="project-layers">
+    <h4>Layers</h4>
+    <p class="project-layers-empty" *ngIf="layerEntries.length === 0">No elements on canvas yet.</p>
+
+    <div class="project-layers-list" *ngIf="layerEntries.length > 0">
+      <div
+        class="project-layer-item"
+        *ngFor="let layer of layerEntries; trackBy: trackByLayerId"
+        [class.active]="selectedElementId === layer.id"
+        [class.hidden]="!layer.visible"
+        [class.is-dragging]="isLayerDragging(layer.id)"
+        [class.is-drop-before]="isLayerDropTarget(layer.id, 'before')"
+        [class.is-drop-after]="isLayerDropTarget(layer.id, 'after')"
+        [class.is-drop-inside]="isLayerDropTarget(layer.id, 'inside')"
+        draggable="true"
+        (dragstart)="onLayerDragStart(layer.id, $event)"
+        (dragover)="onLayerDragOver(layer, $event)"
+        (drop)="onLayerDrop(layer, $event)"
+        (dragend)="onLayerDragEnd()"
+        (click)="onLayerSelected(layer.id)">
+        <span class="project-layer-indent" [style.width.px]="layer.depth * 14"></span>
+        <span class="project-layer-grip" aria-hidden="true">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+            <circle cx="3" cy="2.5" r="1" />
+            <circle cx="3" cy="6" r="1" />
+            <circle cx="3" cy="9.5" r="1" />
+            <circle cx="9" cy="2.5" r="1" />
+            <circle cx="9" cy="6" r="1" />
+            <circle cx="9" cy="9.5" r="1" />
+          </svg>
+        </span>
+        <span class="project-layer-icon" [class.is-hidden]="!layer.visible" aria-hidden="true">
+          <svg *ngIf="isFrame(layer.type)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+          <svg *ngIf="isRectangle(layer.type)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+          <svg *ngIf="isCircle(layer.type)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+          <svg *ngIf="isText(layer.type)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>
+          <svg *ngIf="!isFrame(layer.type) && !isRectangle(layer.type) && !isCircle(layer.type) && !isText(layer.type)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+        </span>
+        <div class="project-layer-body">
+          <input
+            type="text"
+            class="project-layer-name"
+            [value]="layer.name"
+            (click)="$event.stopPropagation()"
+            (input)="onLayerNameInput(layer.id, $event)"
+            placeholder="Layer name" />
+          <span class="project-layer-meta">{{ layer.typeLabel }}</span>
+        </div>
+        <button
+          type="button"
+          class="project-layer-visibility"
+          [attr.aria-label]="layer.visible ? 'Hide element' : 'Show element'"
+          [title]="layer.visible ? 'Hide element' : 'Show element'"
+          (click)="onLayerVisibilityToggle(layer.id, $event)">
+          <svg *ngIf="layer.visible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          <svg *ngIf="!layer.visible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="m2 2 20 20"/>
+            <path d="M10.58 10.58a2 2 0 1 0 2.83 2.83"/>
+            <path d="M9.88 5.09A10.94 10.94 0 0 1 12 4.91c5.05 0 9.27 3.11 10.67 7.5a10.96 10.96 0 0 1-1.79 3.09"/>
+            <path d="M6.61 6.61A10.95 10.95 0 0 0 1.33 12.4a10.75 10.75 0 0 0 14.2 6.18"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </section>
+</aside>

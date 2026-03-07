@@ -1,0 +1,236 @@
+:host {
+  width: 300px;
+  min-width: 300px;
+  border-right: 1px solid var(--color-border);
+  background-color: var(--color-zinc-900);
+  z-index: 10;
+}
+
+.project-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  overflow: auto;
+
+  h3,
+  h4 {
+    margin: 0;
+    color: var(--color-zinc-100);
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+}
+
+.project-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.project-pages,
+.project-layers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-zinc-800);
+
+  h4 {
+    font-size: 0.86rem;
+  }
+}
+
+.project-page-add {
+  border: 1px solid var(--color-border);
+  background-color: var(--color-zinc-900);
+  color: var(--color-zinc-200);
+  border-radius: 6px;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.76rem;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-brand-primary-30);
+    background-color: var(--color-zinc-700);
+  }
+}
+
+.project-pages-list,
+.project-layers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.project-page-item {
+  border: 1px solid transparent;
+  background-color: var(--color-zinc-900);
+  color: var(--color-zinc-200);
+  border-radius: 6px;
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  font-size: 0.82rem;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--color-border);
+  }
+
+  &.active {
+    border-color: var(--color-brand-primary-30);
+    background-color: var(--color-brand-primary-10);
+    color: var(--color-zinc-100);
+  }
+}
+
+.project-layers-empty {
+  margin: 0;
+  color: var(--color-zinc-400);
+  font-size: 0.78rem;
+}
+
+.project-layer-item {
+  display: flex;
+  align-items: center;
+  padding: 0.4rem 0.7rem;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background-color: #09090b;
+  position: relative;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    opacity 0.18s ease;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+  }
+
+  &.active {
+    border-color: rgba(59, 130, 246, 0.36);
+    background-color: rgba(14, 19, 30, 0.96);
+  }
+
+  &.hidden {
+    opacity: 0.58;
+  }
+
+  &.is-dragging {
+    opacity: 0.45;
+  }
+
+  &.is-drop-before::before,
+  &.is-drop-after::after {
+    content: '';
+    position: absolute;
+    left: 0.8rem;
+    right: 0.8rem;
+    height: 2px;
+    border-radius: 999px;
+    background-color: var(--color-brand-primary);
+  }
+
+  &.is-drop-before::before {
+    top: -0.2rem;
+  }
+
+  &.is-drop-after::after {
+    bottom: -0.2rem;
+  }
+
+  &.is-drop-inside {
+    border-color: rgba(59, 130, 246, 0.36);
+    box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.9);
+  }
+
+  input {
+    min-width: 0;
+  }
+}
+
+.project-layer-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-zinc-600);
+  cursor: grab;
+  margin-right: 0.25rem;
+
+  svg {
+    width: 9px;
+    display: block;
+  }
+}
+
+.project-layer-icon {
+  width: 1.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-zinc-300);
+}
+
+.project-layer-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+}
+
+.project-layer-name {
+  min-width: 0;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--color-zinc-100);
+  padding: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.2;
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  &::placeholder {
+    color: var(--color-zinc-500);
+  }
+}
+
+.project-layer-meta {
+  color: var(--color-zinc-400);
+  font-size: 0.5rem;
+  line-height: 1.25;
+}
+
+.project-layer-visibility {
+  padding: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--color-text-light);
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease;
+
+  &:hover {
+    background-color: var(--color-btn-tertiary-hover);
+  }
+}
+
+.project-layer-indent {
+  display: inline-block;
+  height: 1px;
+}

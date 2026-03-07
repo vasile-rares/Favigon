@@ -1,39 +1,80 @@
 import {
   Component,
-  signal,
   HostListener,
-  inject,
+  OnDestroy,
   computed,
   effect,
-  OnDestroy,
+  inject,
+  signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import {
   CanvasElement,
   CanvasElementType,
+  CanvasPageModel,
+  CanvasProjectDocument,
   CanvasStrokePosition,
 } from '../../../core/models/canvas.models';
-import { buildCanvasIR } from '../../../core/mappers/canvas-ir.mapper';
+import { buildCanvasIR, buildCanvasProjectDocument } from '../../../core/mappers/canvas-ir.mapper';
 import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
-import { CanvasLeftPanelComponent } from '../components/canvas-left-panel/canvas-left-panel.component';
-import { CanvasDesignSidepanelComponent } from '../components/canvas-design-sidepanel/canvas-design-sidepanel.component';
+import { ToolbarComponent } from '../components/toolbar/toolbar.component';
+import { ProjectPanelComponent } from '../components/project-panel/project-panel.component';
+import { PropertiesPanelComponent } from '../components/properties-panel/properties-panel.component';
 import { IRNode } from '../../../core/models/ir.models';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
 import {
   clamp,
-  collectDescendantIds,
   getStrokePosition,
   getStrokeWidth,
   isPointInsideElement,
   normalizeElementInPlace,
   removeWithChildren,
   roundToTwoDecimals,
-  withRoundedPrecision,
 } from '../../../core/utils/canvas-interaction.util';
 import { formatCanvasElementTypeLabel } from '../../../core/utils/canvas-label.util';
 import { CanvasGenerationService } from '../../../core/services/canvas-generation.service';
 import { CanvasPersistenceService } from '../../../core/services/canvas-persistence.service';
+
+type SupportedFramework = 'html' | 'react' | 'angular';
+type ResizeHandlePosition = 'nw' | 'ne' | 'sw' | 'se';
+
+interface FrameTemplateSelection {
+  name: string;
+  sizeLabel: string;
+  width: number;
+  height: number;
+}
+
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface Bounds extends Point {
+  width: number;
+  height: number;
+}
+
+interface ResizeState {
+  pointerX: number;
+  pointerY: number;
+  width: number;
+  height: number;
+  absoluteX: number;
+  absoluteY: number;
+  centerX: number;
+  centerY: number;
+  aspectRatio: number;
+  elementId: string;
+  handle: ResizeHandlePosition;
+}
+
+interface HistorySnapshot {
+  pages: CanvasPageModel[];
+  currentPageId: string | null;
+  selectedElementId: string | null;
+}
 
 @Component({
   selector: 'app-canvas-page',
@@ -41,8 +82,9 @@ import { CanvasPersistenceService } from '../../../core/services/canvas-persiste
   imports: [
     CommonModule,
     HeaderBarComponent,
-    CanvasLeftPanelComponent,
-    CanvasDesignSidepanelComponent,
+    ToolbarComponent,
+    ProjectPanelComponent,
+    PropertiesPanelComponent,
   ],
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
@@ -52,15 +94,29 @@ export class ProjectPage implements OnDestroy {
   private readonly canvasGenerationService = inject(CanvasGenerationService);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
 
-  elements = signal<CanvasElement[]>([]);
-  selectedElementId = signal<string | null>(null);
-  currentTool = signal<CanvasElementType | 'select'>('select');
-  zoomLevel = signal(1);
-  viewportOffset = signal({ x: 0, y: 0 });
-  isPanning = signal(false);
-  isSpacePressed = signal(false);
-  frameTemplate = signal({ width: 390, height: 844 });
-  selectedElement = computed<CanvasElement | null>(() => {
+  readonly pages = signal<CanvasPageModel[]>([this.createPage('Page 1')]);
+  readonly currentPageId = signal<string | null>(this.pages()[0]?.id ?? null);
+  readonly selectedElementId = signal<string | null>(null);
+  readonly editingTextElementId = signal<string | null>(null);
+  readonly currentTool = signal<CanvasElementType | 'select'>('select');
+  readonly zoomLevel = signal(1);
+  readonly viewportOffset = signal({ x: 0, y: 0 });
+  readonly isPanning = signal(false);
+  readonly isSpacePressed = signal(false);
+  readonly frameTemplate = signal({ width: 390, height: 844 });
+
+  readonly currentPage = computed<CanvasPageModel | null>(() => {
+    const activePageId = this.currentPageId();
+    if (!activePageId) {
+      return this.pages()[0] ?? null;
+    }
+
+    return this.pages().find((page) => page.id === activePageId) ?? this.pages()[0] ?? null;
+  });
+
+  readonly elements = computed<CanvasElement[]>(() => this.currentPage()?.elements ?? []);
+
+  readonly selectedElement = computed<CanvasElement | null>(() => {
     const selectedId = this.selectedElementId();
     if (!selectedId) {
       return null;
@@ -69,51 +125,76 @@ export class ProjectPage implements OnDestroy {
     return this.elements().find((element) => element.id === selectedId) ?? null;
   });
 
-  selectedFramework = signal<'html' | 'react' | 'angular'>('html');
-  validationResult = signal<boolean | null>(null);
-  apiError = signal<string | null>(null);
-  isValidating = signal(false);
-  isGenerating = signal(false);
-  generatedHtml = signal('');
-  generatedCss = signal('');
-  isLoadingDesign = signal(false);
-  isSavingDesign = signal(false);
-  lastSavedAt = signal<string | null>(null);
+  readonly visibleElements = computed<CanvasElement[]>(() =>
+    this.elements().filter((element) => this.isElementEffectivelyVisible(element.id)),
+  );
 
-  projectId = this.route.snapshot.paramMap.get('id') ?? 'new-project';
-  irPreview = computed(() => buildCanvasIR(this.elements(), this.projectId));
+  readonly selectedFramework = signal<SupportedFramework>('html');
+  readonly validationResult = signal<boolean | null>(null);
+  readonly apiError = signal<string | null>(null);
+  readonly isValidating = signal(false);
+  readonly isGenerating = signal(false);
+  readonly generatedHtml = signal('');
+  readonly generatedCss = signal('');
+  readonly isLoadingDesign = signal(false);
+  readonly isSavingDesign = signal(false);
+  readonly lastSavedAt = signal<string | null>(null);
+
+  readonly projectId = this.route.snapshot.paramMap.get('id') ?? 'new-project';
+  readonly irPreview = computed<IRNode>(() => {
+    const currentPage = this.currentPage();
+    return buildCanvasIR(this.visibleElements(), this.projectId, currentPage?.name);
+  });
+
+  readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
+  readonly resizeHandlePositions: ResizeHandlePosition[] = ['nw', 'ne', 'sw', 'se'];
+
   private readonly projectIdAsNumber = Number.parseInt(this.projectId, 10);
-  private canPersistDesign = false;
-  private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
-  isDragging = signal(false);
-  isResizing = signal(false);
-  dragOffset = { x: 0, y: 0 };
-  resizeStart = {
-    x: 0,
-    y: 0,
-    width: 0,
-    height: 0,
-    elementX: 0,
-    elementY: 0,
-    elementId: '' as string,
-  };
   private readonly imagePlaceholderUrl = 'https://placehold.co/300x200?text=Image';
-  private readonly defaultFrameFill = '#3f3f46';
+  private readonly defaultFrameFill = '#ffffff';
   private readonly defaultElementFill = '#e0e0e0';
   private readonly minZoom = 0.25;
   private readonly maxZoom = 3;
   private readonly zoomStep = 0.1;
   private readonly gridSize = 20;
+  private readonly minElementSize = 24;
+  private readonly frameInsertGap = 48;
+  private readonly maxHistorySteps = 10;
+
+  private canPersistDesign = false;
+  private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private panStart = { x: 0, y: 0 };
   private panMoved = false;
   private suppressNextCanvasClick = false;
+  private dragOffset = { x: 0, y: 0 };
+  private isDragging = false;
+  private isResizing = false;
+  private isApplyingHistory = false;
+  private undoStack: HistorySnapshot[] = [];
+  private redoStack: HistorySnapshot[] = [];
+  private pendingGestureHistorySnapshot: HistorySnapshot | null = null;
+  private pendingTextEditHistorySnapshot: HistorySnapshot | null = null;
+  private resizeStart: ResizeState = {
+    pointerX: 0,
+    pointerY: 0,
+    width: 0,
+    height: 0,
+    absoluteX: 0,
+    absoluteY: 0,
+    centerX: 0,
+    centerY: 0,
+    aspectRatio: 1,
+    elementId: '',
+    handle: 'se',
+  };
 
   constructor() {
     this.loadProjectDesign();
 
     effect(() => {
-      this.elements();
+      this.pages();
+      this.currentPageId();
+
       if (!this.canPersistDesign) {
         return;
       }
@@ -129,7 +210,7 @@ export class ProjectPage implements OnDestroy {
     }
   }
 
-  selectTool(tool: CanvasElementType | 'select') {
+  selectTool(tool: CanvasElementType | 'select'): void {
     this.currentTool.set(tool);
     if (tool === 'select') {
       return;
@@ -143,7 +224,26 @@ export class ProjectPage implements OnDestroy {
     }
   }
 
-  onCanvasPointerDown(event: MouseEvent) {
+  addPage(): void {
+    this.runWithHistory(() => {
+      const page = this.createPage(this.getNextPageName());
+      this.pages.update((pages) => [...pages, page]);
+      this.currentPageId.set(page.id);
+      this.selectedElementId.set(null);
+    });
+  }
+
+  selectPage(pageId: string): void {
+    if (pageId === this.currentPageId()) {
+      return;
+    }
+
+    this.currentPageId.set(pageId);
+    this.selectedElementId.set(null);
+    this.currentTool.set('select');
+  }
+
+  onCanvasPointerDown(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     if (!this.shouldStartPanning(event, target)) {
       return;
@@ -152,7 +252,7 @@ export class ProjectPage implements OnDestroy {
     this.startPanning(event);
   }
 
-  onCanvasClick(event: MouseEvent) {
+  onCanvasClick(event: MouseEvent): void {
     if (this.suppressNextCanvasClick) {
       this.suppressNextCanvasClick = false;
       return;
@@ -165,7 +265,6 @@ export class ProjectPage implements OnDestroy {
     this.apiError.set(null);
     const tool = this.currentTool();
     if (tool === 'select') {
-      // If we clicked directly on the canvas (not an element), deselect
       const target = event.target as HTMLElement;
       if (
         target.classList.contains('canvas-container') ||
@@ -173,124 +272,47 @@ export class ProjectPage implements OnDestroy {
       ) {
         this.selectedElementId.set(null);
       }
+
       return;
     }
 
-    // Create new element
     const pointer = this.getCanvasPoint(event);
     if (!pointer) {
       return;
     }
 
-    const x = pointer.x;
-    const y = pointer.y;
-
-    const selectedFrame = this.getSelectedFrame();
-    if (tool !== 'frame') {
-      if (!selectedFrame) {
-        this.apiError.set(
-          'Select a frame first. Shapes, text, and images must be placed inside a frame.',
-        );
-        return;
-      }
-
-      if (!this.isPointInsideElement(x, y, selectedFrame)) {
-        this.apiError.set('Click inside the selected frame to place the element.');
-        return;
-      }
+    const newElement = this.createElementAtPoint(tool, pointer);
+    if (!newElement) {
+      return;
     }
 
-    const defaultWidth =
-      tool === 'frame'
-        ? this.frameTemplate().width
-        : tool === 'text'
-          ? 150
-          : tool === 'image'
-            ? 180
-            : 100;
-    const defaultHeight =
-      tool === 'frame'
-        ? this.frameTemplate().height
-        : tool === 'text'
-          ? 40
-          : tool === 'image'
-            ? 120
-            : 100;
-
-    const constrainedX =
-      selectedFrame && tool !== 'frame'
-        ? this.clamp(x, selectedFrame.x, selectedFrame.x + selectedFrame.width - defaultWidth)
-        : x;
-    const constrainedY =
-      selectedFrame && tool !== 'frame'
-        ? this.clamp(y, selectedFrame.y, selectedFrame.y + selectedFrame.height - defaultHeight)
-        : y;
-
-    const name = this.getNextElementName(tool);
-
-    const newElement: CanvasElement = {
-      id: crypto.randomUUID(),
-      type: tool,
-      name,
-      x: constrainedX,
-      y: constrainedY,
-      width: defaultWidth,
-      height: defaultHeight,
-      fill: tool === 'frame' ? this.defaultFrameFill : this.defaultElementFill,
-      strokeWidth: tool === 'text' ? undefined : 1,
-      strokePosition: tool === 'text' ? undefined : 'inside',
-      opacity: 1,
-      cornerRadius: tool === 'image' ? 6 : 0,
-      text: tool === 'text' ? 'New text' : undefined,
-      fontSize: tool === 'text' ? 16 : undefined,
-      imageUrl: tool === 'image' ? this.imagePlaceholderUrl : undefined,
-      parentId: tool === 'frame' ? null : selectedFrame?.id,
-    };
-
-    this.elements.update((els) => [...els, newElement]);
-    this.selectedElementId.set(newElement.id);
-    this.currentTool.set('select'); // Revert to select tool after creation
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) => [...elements, newElement]);
+      this.selectedElementId.set(newElement.id);
+      this.currentTool.set('select');
+    });
   }
 
-  onElementPointerDown(event: MouseEvent, id: string) {
+  onElementPointerDown(event: MouseEvent, id: string): void {
     const target = event.target as HTMLElement;
     if (this.shouldStartPanning(event, target)) {
       this.startPanning(event);
       return;
     }
 
-    if (this.currentTool() !== 'select') {
-      return;
-    }
-
-    if (this.isResizing()) {
+    if (this.isResizing || this.editingTextElementId() === id) {
       return;
     }
 
     event.stopPropagation();
     this.selectedElementId.set(id);
-    this.currentTool.set('select');
 
-    const el = this.elements().find((e) => e.id === id);
-    if (el) {
-      const pointer = this.getCanvasPoint(event);
-      if (!pointer) {
-        return;
-      }
-
-      this.isDragging.set(true);
-      this.dragOffset = {
-        x: pointer.x - el.x,
-        y: pointer.y - el.y,
-      };
+    if (this.currentTool() !== 'select') {
+      this.currentTool.set('select');
+      return;
     }
-  }
 
-  onResizeHandlePointerDown(event: MouseEvent, id: string) {
-    event.stopPropagation();
-    event.preventDefault();
-
-    const element = this.elements().find((candidate) => candidate.id === id);
+    const element = this.findElementById(id);
     if (!element) {
       return;
     }
@@ -300,45 +322,205 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    this.selectedElementId.set(id);
-    this.isDragging.set(false);
-    this.isResizing.set(true);
-    this.resizeStart = {
-      x: pointer.x,
-      y: pointer.y,
-      width: element.width,
-      height: element.height,
-      elementX: element.x,
-      elementY: element.y,
-      elementId: id,
+    const bounds = this.getAbsoluteBounds(element);
+    this.beginGestureHistory();
+    this.isDragging = true;
+    this.dragOffset = {
+      x: pointer.x - bounds.x,
+      y: pointer.y - bounds.y,
     };
   }
 
-  onSelectedElementPatch(patch: Partial<CanvasElement>) {
+  onElementDoubleClick(event: MouseEvent, id: string): void {
+    event.stopPropagation();
+
+    const element = this.findElementById(id);
+    if (element?.type !== 'text') {
+      return;
+    }
+
+    this.selectedElementId.set(id);
+    this.editingTextElementId.set(id);
+    this.focusInlineTextEditor(id);
+  }
+
+  onTextEditorPointerDown(event: MouseEvent): void {
+    event.stopPropagation();
+  }
+
+  onTextEditorInput(id: string, event: Event): void {
+    this.beginTextEditHistory();
+    const value = (event.target as HTMLTextAreaElement).value;
+    this.updateCurrentPageElements((elements) =>
+      elements.map((element) =>
+        element.id === id
+          ? {
+              ...element,
+              text: value,
+            }
+          : element,
+      ),
+    );
+  }
+
+  onTextEditorBlur(id: string): void {
+    this.commitTextEditHistory();
+    if (this.editingTextElementId() === id) {
+      this.editingTextElementId.set(null);
+    }
+  }
+
+  onTextEditorKeyDown(event: KeyboardEvent, id: string): void {
+    event.stopPropagation();
+
+    if (event.key !== 'Escape') {
+      return;
+    }
+
+    event.preventDefault();
+    this.commitTextEditHistory();
+    this.editingTextElementId.set(null);
+    if (this.selectedElementId() !== id) {
+      this.selectedElementId.set(id);
+    }
+    (event.target as HTMLTextAreaElement | null)?.blur();
+  }
+
+  onResizeHandlePointerDown(event: MouseEvent, id: string, handle: ResizeHandlePosition): void {
+    event.stopPropagation();
+    event.preventDefault();
+
+    const element = this.findElementById(id);
+    if (!element) {
+      return;
+    }
+
+    const pointer = this.getCanvasPoint(event);
+    if (!pointer) {
+      return;
+    }
+
+    const bounds = this.getAbsoluteBounds(element);
+
+    this.selectedElementId.set(id);
+    this.beginGestureHistory();
+    this.isDragging = false;
+    this.isResizing = true;
+    this.resizeStart = {
+      pointerX: pointer.x,
+      pointerY: pointer.y,
+      width: element.width,
+      height: element.height,
+      absoluteX: bounds.x,
+      absoluteY: bounds.y,
+      centerX: bounds.x + element.width / 2,
+      centerY: bounds.y + element.height / 2,
+      aspectRatio: element.width / Math.max(element.height, 1),
+      elementId: id,
+      handle,
+    };
+  }
+
+  onSelectedElementPatch(patch: Partial<CanvasElement>): void {
     const selectedId = this.selectedElementId();
     if (!selectedId) {
       return;
     }
 
-    this.elements.update((elements) =>
-      elements.map((element) => {
-        if (element.id !== selectedId) {
-          return element;
-        }
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) =>
+        elements.map((element) => {
+          if (element.id !== selectedId) {
+            return element;
+          }
 
-        const nextElement: CanvasElement = {
-          ...element,
-          ...patch,
-        };
+          const nextElement: CanvasElement = {
+            ...element,
+            ...patch,
+          };
 
-        this.normalizeElement(nextElement, elements);
-        return nextElement;
-      }),
+          this.normalizeElement(nextElement, elements);
+          return nextElement;
+        }),
+      );
+    });
+  }
+
+  onLayerSelected(elementId: string): void {
+    this.selectedElementId.set(elementId);
+    this.currentTool.set('select');
+  }
+
+  onLayerNameChanged(change: { id: string; name: string }): void {
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) =>
+        elements.map((element) =>
+          element.id === change.id
+            ? {
+                ...element,
+                name: change.name,
+              }
+            : element,
+        ),
+      );
+    });
+  }
+
+  onLayerVisibilityToggled(elementId: string): void {
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) =>
+        elements.map((element) =>
+          element.id === elementId
+            ? {
+                ...element,
+                visible: element.visible === false,
+              }
+            : element,
+        ),
+      );
+    });
+  }
+
+  onLayerMoved(change: {
+    draggedId: string;
+    targetId: string;
+    position: 'before' | 'after' | 'inside';
+  }): void {
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) =>
+        this.reorderLayerElements(elements, change.draggedId, change.targetId, change.position),
+      );
+    });
+  }
+
+  onFrameTemplateSelected(template: FrameTemplateSelection): void {
+    this.frameTemplate.set({
+      width: template.width,
+      height: template.height,
+    });
+
+    const centerPoint = this.getViewportCenterCanvasPoint();
+    const frame = this.createFrameAtCenter(
+      centerPoint,
+      template.width,
+      template.height,
+      template.name,
     );
+
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) => [...elements, frame]);
+      this.selectedElementId.set(frame.id);
+      this.currentTool.set('select');
+    });
+    this.focusElement(frame);
+  }
+
+  setFramework(framework: SupportedFramework): void {
+    this.selectedFramework.set(framework);
   }
 
   @HostListener('window:pointermove', ['$event'])
-  onPointerMove(event: MouseEvent) {
+  onPointerMove(event: MouseEvent): void {
     if (this.isPanning()) {
       const deltaX = event.clientX - this.panStart.x;
       const deltaY = event.clientY - this.panStart.y;
@@ -349,128 +531,85 @@ export class ProjectPage implements OnDestroy {
           x: this.roundToTwoDecimals(offset.x + deltaX),
           y: this.roundToTwoDecimals(offset.y + deltaY),
         }));
-        this.panStart = {
-          x: event.clientX,
-          y: event.clientY,
-        };
+        this.panStart = { x: event.clientX, y: event.clientY };
       }
 
       return;
     }
 
-    if (this.isResizing()) {
+    if (this.isResizing) {
       this.handleResizePointerMove(event);
       return;
     }
 
-    if (!this.isDragging()) return;
+    if (!this.isDragging) {
+      return;
+    }
 
     const selectedId = this.selectedElementId();
-    if (selectedId) {
-      this.elements.update((elements) => {
-        const selectedElement = elements.find((element) => element.id === selectedId);
-        if (!selectedElement) {
-          return elements;
+    if (!selectedId) {
+      return;
+    }
+
+    const pointer = this.getCanvasPoint(event);
+    if (!pointer) {
+      return;
+    }
+
+    this.updateCurrentPageElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== selectedId) {
+          return element;
         }
 
-        const pointer = this.getCanvasPoint(event);
-        if (!pointer) {
-          return elements;
-        }
+        const absoluteX = pointer.x - this.dragOffset.x;
+        const absoluteY = pointer.y - this.dragOffset.y;
 
-        const nextX = pointer.x - this.dragOffset.x;
-        const nextY = pointer.y - this.dragOffset.y;
-
-        if (selectedElement.type === 'frame') {
-          const deltaX = this.roundToTwoDecimals(nextX - selectedElement.x);
-          const deltaY = this.roundToTwoDecimals(nextY - selectedElement.y);
-
-          if (deltaX === 0 && deltaY === 0) {
-            return elements;
-          }
-
-          const descendantIds = this.collectDescendantIds(elements, selectedElement.id);
-          return elements.map((element) => {
-            if (element.id !== selectedElement.id && !descendantIds.has(element.id)) {
-              return element;
-            }
-
-            return {
-              ...element,
-              x: this.roundToTwoDecimals(element.x + deltaX),
-              y: this.roundToTwoDecimals(element.y + deltaY),
-            };
-          });
-        }
-
-        return elements.map((element) => {
-          if (element.id !== selectedId) {
-            return element;
-          }
-
-          const parent = element.parentId
-            ? elements.find((candidate) => candidate.id === element.parentId)
-            : null;
-
-          if (parent && element.type !== 'frame') {
-            return {
-              ...element,
-              x: this.clamp(nextX, parent.x, parent.x + parent.width - element.width),
-              y: this.clamp(nextY, parent.y, parent.y + parent.height - element.height),
-            };
-          }
-
+        if (element.type === 'frame') {
           return {
             ...element,
-            x: this.roundToTwoDecimals(nextX),
-            y: this.roundToTwoDecimals(nextY),
+            x: this.roundToTwoDecimals(absoluteX),
+            y: this.roundToTwoDecimals(absoluteY),
           };
-        });
-      });
-    }
+        }
+
+        const parent = this.findElementById(element.parentId ?? null, elements);
+        if (!parent) {
+          return {
+            ...element,
+            x: this.roundToTwoDecimals(absoluteX),
+            y: this.roundToTwoDecimals(absoluteY),
+          };
+        }
+
+        const parentBounds = this.getAbsoluteBounds(parent, elements);
+        return {
+          ...element,
+          x: this.clamp(absoluteX - parentBounds.x, 0, parent.width - element.width),
+          y: this.clamp(absoluteY - parentBounds.y, 0, parent.height - element.height),
+        };
+      }),
+    );
   }
 
   @HostListener('window:pointerup')
-  onPointerUp() {
+  onPointerUp(): void {
+    const shouldCommitGestureHistory = this.isDragging || this.isResizing;
+
     if (this.isPanning() && this.panMoved) {
       this.suppressNextCanvasClick = true;
     }
 
     this.isPanning.set(false);
-    this.isDragging.set(false);
-    this.isResizing.set(false);
+    this.isDragging = false;
+    this.isResizing = false;
+
+    if (shouldCommitGestureHistory) {
+      this.commitGestureHistory();
+    }
   }
 
-  setFramework(framework: 'html' | 'react' | 'angular') {
-    this.selectedFramework.set(framework);
-  }
-
-  onLayerSelected(elementId: string) {
-    this.selectedElementId.set(elementId);
-    this.currentTool.set('select');
-  }
-
-  onLayerNameChanged(change: { id: string; name: string }) {
-    this.elements.update((elements) =>
-      elements.map((element) =>
-        element.id === change.id
-          ? {
-              ...element,
-              name: change.name,
-            }
-          : element,
-      ),
-    );
-  }
-
-  onFrameTemplateSelected(template: { width: number; height: number }) {
-    this.frameTemplate.set({
-      width: template.width,
-      height: template.height,
-    });
-  }
-
-  onCanvasWheel(event: WheelEvent) {
+  onCanvasWheel(event: WheelEvent): void {
     const canvas = event.currentTarget as HTMLElement | null;
     if (!canvas) {
       return;
@@ -493,15 +632,15 @@ export class ProjectPage implements OnDestroy {
     }));
   }
 
-  zoomIn() {
+  zoomIn(): void {
     this.setZoom(this.zoomLevel() + this.zoomStep);
   }
 
-  zoomOut() {
+  zoomOut(): void {
     this.setZoom(this.zoomLevel() - this.zoomStep);
   }
 
-  resetZoom() {
+  resetZoom(): void {
     this.zoomLevel.set(1);
   }
 
@@ -511,7 +650,11 @@ export class ProjectPage implements OnDestroy {
 
   canvasViewportTransform(): string {
     const offset = this.viewportOffset();
-    return `translate(${offset.x}px, ${offset.y}px) scale(${this.zoomLevel()})`;
+    return `translate(${offset.x}px, ${offset.y}px)`;
+  }
+
+  canvasSceneZoom(): number {
+    return this.zoomLevel();
   }
 
   canvasBackgroundSize(): string {
@@ -540,28 +683,146 @@ export class ProjectPage implements OnDestroy {
     return 0;
   }
 
-  private getElementStrokeStyle(
-    element: CanvasElement,
-    targetPosition: CanvasStrokePosition,
-  ): string {
-    if (!element.stroke || element.type === 'text') {
-      return 'none';
-    }
-
-    const strokeWidth = this.getStrokeWidth(element);
-    if (strokeWidth <= 0) {
-      return 'none';
-    }
-
-    const strokePosition = this.getStrokePosition(element);
-    if (strokePosition !== targetPosition) {
-      return 'none';
-    }
-
-    return `${strokeWidth}px solid ${element.stroke}`;
+  getRenderedX(element: CanvasElement): number {
+    return this.getAbsoluteBounds(element).x;
   }
 
-  validateIR() {
+  getRenderedY(element: CanvasElement): number {
+    return this.getAbsoluteBounds(element).y;
+  }
+
+  getFrameTitle(element: CanvasElement): string {
+    return element.name?.trim() || 'Frame';
+  }
+
+  getFrameTitleFontSize(): number {
+    return this.getScreenInvariantSize(12.5);
+  }
+
+  getFrameTitleOffset(): number {
+    return this.getScreenInvariantSize(-24);
+  }
+
+  getSelectionOutlineInset(): number {
+    return this.getScreenInvariantSize(-2);
+  }
+
+  getSelectionOutlineBorderWidth(): number {
+    return this.getScreenInvariantSize(2);
+  }
+
+  getResizeHandleSize(): number {
+    return this.getScreenInvariantSize(12);
+  }
+
+  getResizeHandleBorderWidth(): number {
+    return this.getScreenInvariantSize(2);
+  }
+
+  getResizeHandleOffset(): number {
+    return this.getScreenInvariantSize(-8);
+  }
+
+  isTextEditing(elementId: string): boolean {
+    return this.editingTextElementId() === elementId;
+  }
+
+  getElementClipPath(element: CanvasElement): string {
+    const parent = this.findElementById(element.parentId ?? null);
+    if (!parent) {
+      return 'none';
+    }
+
+    const bounds = this.getAbsoluteBounds(element);
+    const parentBounds = this.getAbsoluteBounds(parent);
+    const topInset = Math.max(0, parentBounds.y - bounds.y);
+    const rightInset = Math.max(0, bounds.x + bounds.width - (parentBounds.x + parentBounds.width));
+    const bottomInset = Math.max(
+      0,
+      bounds.y + bounds.height - (parentBounds.y + parentBounds.height),
+    );
+    const leftInset = Math.max(0, parentBounds.x - bounds.x);
+
+    if (topInset === 0 && rightInset === 0 && bottomInset === 0 && leftInset === 0) {
+      return 'none';
+    }
+
+    return `inset(${topInset}px ${rightInset}px ${bottomInset}px ${leftInset}px)`;
+  }
+
+  isElementClippedOut(element: CanvasElement): boolean {
+    const parent = this.findElementById(element.parentId ?? null);
+    if (!parent) {
+      return false;
+    }
+
+    const bounds = this.getAbsoluteBounds(element);
+    const parentBounds = this.getAbsoluteBounds(parent);
+    const intersectionWidth =
+      Math.min(bounds.x + bounds.width, parentBounds.x + parentBounds.width) -
+      Math.max(bounds.x, parentBounds.x);
+    const intersectionHeight =
+      Math.min(bounds.y + bounds.height, parentBounds.y + parentBounds.height) -
+      Math.max(bounds.y, parentBounds.y);
+
+    return intersectionWidth <= 0 || intersectionHeight <= 0;
+  }
+
+  getTextFontFamily(element: CanvasElement): string {
+    return element.fontFamily ?? 'Inter';
+  }
+
+  getTextFontWeight(element: CanvasElement): number {
+    return element.fontWeight ?? 400;
+  }
+
+  getTextFontStyle(element: CanvasElement): string {
+    return element.fontStyle ?? 'normal';
+  }
+
+  getTextLineHeight(element: CanvasElement): number {
+    return element.lineHeight ?? 1.2;
+  }
+
+  getTextLetterSpacing(element: CanvasElement): string {
+    return `${element.letterSpacing ?? 0}px`;
+  }
+
+  getTextJustifyContent(element: CanvasElement): string {
+    switch (element.textAlign) {
+      case 'left':
+        return 'flex-start';
+      case 'right':
+        return 'flex-end';
+      default:
+        return 'center';
+    }
+  }
+
+  getTextAlignItems(element: CanvasElement): string {
+    switch (element.textVerticalAlign) {
+      case 'top':
+        return 'flex-start';
+      case 'bottom':
+        return 'flex-end';
+      default:
+        return 'center';
+    }
+  }
+
+  getTextAlignValue(element: CanvasElement): string {
+    return element.textAlign ?? 'center';
+  }
+
+  trackByElementId(_: number, element: CanvasElement): string {
+    return element.id;
+  }
+
+  resizeHandleClass(handle: ResizeHandlePosition): string {
+    return `resize-handle-${handle}`;
+  }
+
+  validateIR(): void {
     this.apiError.set(null);
     this.validationResult.set(null);
     this.isValidating.set(true);
@@ -578,7 +839,7 @@ export class ProjectPage implements OnDestroy {
     });
   }
 
-  generateCode() {
+  generateCode(): void {
     this.apiError.set(null);
     this.generatedHtml.set('');
     this.generatedCss.set('');
@@ -598,7 +859,82 @@ export class ProjectPage implements OnDestroy {
     });
   }
 
-  private loadProjectDesign() {
+  @HostListener('window:keydown', ['$event'])
+  handleKeyDown(event: KeyboardEvent): void {
+    if (event.defaultPrevented) {
+      return;
+    }
+
+    const isTypingContext = this.isTypingContext(event);
+
+    if (!isTypingContext && (event.ctrlKey || event.metaKey)) {
+      const key = event.key.toLowerCase();
+      if (key === 'z' && !event.shiftKey) {
+        event.preventDefault();
+        this.undo();
+        return;
+      }
+
+      if (key === 'y' || (key === 'z' && event.shiftKey)) {
+        event.preventDefault();
+        this.redo();
+        return;
+      }
+    }
+
+    if (this.editingTextElementId()) {
+      return;
+    }
+
+    if (event.code === 'Space' && !isTypingContext) {
+      this.isSpacePressed.set(true);
+      event.preventDefault();
+      return;
+    }
+
+    if (isTypingContext) {
+      return;
+    }
+
+    if (event.key.toLowerCase() === 'v') this.selectTool('select');
+    if (event.key.toLowerCase() === 'f') this.selectTool('frame');
+    if (event.key.toLowerCase() === 'r') this.selectTool('rectangle');
+    if (event.key.toLowerCase() === 'o') this.selectTool('circle');
+    if (event.key.toLowerCase() === 't') this.selectTool('text');
+    if (event.key.toLowerCase() === 'i') this.selectTool('image');
+
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      const selectedId = this.selectedElementId();
+      if (!selectedId) {
+        return;
+      }
+
+      this.runWithHistory(() => {
+        this.updateCurrentPageElements((elements) => this.removeWithChildren(elements, selectedId));
+        this.selectedElementId.set(null);
+      });
+    }
+  }
+
+  @HostListener('window:keyup', ['$event'])
+  handleKeyUp(event: KeyboardEvent): void {
+    if (event.code === 'Space') {
+      this.isSpacePressed.set(false);
+    }
+  }
+
+  @HostListener('window:blur')
+  handleWindowBlur(): void {
+    this.isSpacePressed.set(false);
+    this.isPanning.set(false);
+    this.isDragging = false;
+    this.isResizing = false;
+    this.commitGestureHistory();
+    this.commitTextEditHistory();
+    this.editingTextElementId.set(null);
+  }
+
+  private loadProjectDesign(): void {
     if (!Number.isInteger(this.projectIdAsNumber)) {
       this.apiError.set('Invalid project id.');
       return;
@@ -610,25 +946,29 @@ export class ProjectPage implements OnDestroy {
 
     this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
       next: (response) => {
-        this.elements.set(response.elements);
+        const pages = response.pages.length > 0 ? response.pages : [this.createPage('Page 1')];
+        const activePageId =
+          response.activePageId && pages.some((page) => page.id === response.activePageId)
+            ? response.activePageId
+            : (pages[0]?.id ?? null);
+
+        this.pages.set(pages);
+        this.currentPageId.set(activePageId);
+        this.selectedElementId.set(null);
         this.lastSavedAt.set(response.updatedAt ?? null);
+        this.resetHistory();
         this.isLoadingDesign.set(false);
         this.canPersistDesign = true;
       },
       error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
         this.apiError.set(extractApiErrorMessage(error, 'Failed to load project design.'));
         this.isLoadingDesign.set(false);
-
-        // Keep autosave available after a load error so edits can still be persisted.
         this.canPersistDesign = true;
-        if (this.elements().length > 0) {
-          this.scheduleDesignSave();
-        }
       },
     });
   }
 
-  private scheduleDesignSave() {
+  private scheduleDesignSave(): void {
     if (!Number.isInteger(this.projectIdAsNumber)) {
       return;
     }
@@ -642,107 +982,143 @@ export class ProjectPage implements OnDestroy {
     }, 500);
   }
 
-  private persistDesign() {
+  private persistDesign(): void {
     if (!Number.isInteger(this.projectIdAsNumber)) {
       return;
     }
 
+    const document = this.buildProjectDocument();
     this.isSavingDesign.set(true);
 
-    this.canvasPersistenceService
-      .saveProjectDesign(this.projectIdAsNumber, this.irPreview())
-      .subscribe({
-        next: (response) => {
-          this.lastSavedAt.set(response.updatedAt ?? null);
-          this.isSavingDesign.set(false);
-        },
-        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-          this.apiError.set(extractApiErrorMessage(error, 'Failed to save project design.'));
-          this.isSavingDesign.set(false);
-        },
-      });
+    this.canvasPersistenceService.saveProjectDesign(this.projectIdAsNumber, document).subscribe({
+      next: (response) => {
+        this.lastSavedAt.set(response.updatedAt ?? null);
+        this.isSavingDesign.set(false);
+      },
+      error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+        this.apiError.set(extractApiErrorMessage(error, 'Failed to save project design.'));
+        this.isSavingDesign.set(false);
+      },
+    });
   }
 
-  @HostListener('window:keydown', ['$event'])
-  handleKeyDown(event: KeyboardEvent) {
-    if (event.defaultPrevented) {
-      return;
-    }
-
-    const isTypingContext = this.isTypingContext(event);
-
-    if (event.code === 'Space' && !isTypingContext) {
-      this.isSpacePressed.set(true);
-      event.preventDefault();
-      return;
-    }
-
-    if (isTypingContext) {
-      return;
-    }
-
-    // Tool shortcuts
-    if (event.key.toLowerCase() === 'v') this.selectTool('select');
-    if (event.key.toLowerCase() === 'f') this.selectTool('frame');
-    if (event.key.toLowerCase() === 'r') this.selectTool('rectangle');
-    if (event.key.toLowerCase() === 'o') this.selectTool('circle');
-    if (event.key.toLowerCase() === 't') this.selectTool('text');
-    if (event.key.toLowerCase() === 'i') this.selectTool('image');
-
-    // Delete selected element
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      const selectedId = this.selectedElementId();
-      if (selectedId) {
-        this.elements.update((els) => this.removeWithChildren(els, selectedId));
-        this.selectedElementId.set(null);
-      }
-    }
+  private buildProjectDocument(): CanvasProjectDocument {
+    return buildCanvasProjectDocument(this.pages(), this.projectId, this.currentPageId());
   }
 
-  @HostListener('window:keyup', ['$event'])
-  handleKeyUp(event: KeyboardEvent) {
-    if (event.code === 'Space') {
-      this.isSpacePressed.set(false);
-    }
-  }
-
-  @HostListener('window:blur')
-  handleWindowBlur() {
-    this.isSpacePressed.set(false);
-    this.isPanning.set(false);
-  }
-
-  private getSelectedFrame(): CanvasElement | null {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) {
+  private createElementAtPoint(tool: CanvasElementType, pointer: Point): CanvasElement | null {
+    const selectedFrame = this.getSelectedFrame();
+    if (tool !== 'frame' && !selectedFrame) {
+      this.apiError.set(
+        'Select a frame first. Shapes, text, and images must be placed inside a frame.',
+      );
       return null;
     }
 
-    const selected = this.elements().find((element) => element.id === selectedId);
-    return selected?.type === 'frame' ? selected : null;
+    const defaultWidth =
+      tool === 'frame'
+        ? this.frameTemplate().width
+        : tool === 'text'
+          ? 150
+          : tool === 'image'
+            ? 180
+            : 100;
+    const defaultHeight =
+      tool === 'frame'
+        ? this.frameTemplate().height
+        : tool === 'text'
+          ? 40
+          : tool === 'image'
+            ? 120
+            : 100;
+
+    let x = this.roundToTwoDecimals(pointer.x - defaultWidth / 2);
+    let y = this.roundToTwoDecimals(pointer.y - defaultHeight / 2);
+    let parentId: string | null = null;
+
+    if (tool === 'frame') {
+      const nextFramePosition = this.getNextFramePosition(defaultWidth, defaultHeight);
+      if (nextFramePosition) {
+        x = nextFramePosition.x;
+        y = nextFramePosition.y;
+      }
+    }
+
+    if (tool !== 'frame' && selectedFrame) {
+      const frameBounds = this.getAbsoluteBounds(selectedFrame);
+      if (!this.isPointInsideRenderedElement(pointer.x, pointer.y, selectedFrame)) {
+        this.apiError.set('Click inside the selected frame to place the element.');
+        return null;
+      }
+
+      x = this.clamp(
+        pointer.x - frameBounds.x - defaultWidth / 2,
+        0,
+        selectedFrame.width - defaultWidth,
+      );
+      y = this.clamp(
+        pointer.y - frameBounds.y - defaultHeight / 2,
+        0,
+        selectedFrame.height - defaultHeight,
+      );
+      parentId = selectedFrame.id;
+    }
+
+    return {
+      id: crypto.randomUUID(),
+      type: tool,
+      name: this.getNextElementName(tool),
+      x,
+      y,
+      width: defaultWidth,
+      height: defaultHeight,
+      visible: true,
+      fill: tool === 'frame' ? this.defaultFrameFill : this.defaultElementFill,
+      strokeWidth: tool === 'text' ? undefined : 1,
+      strokePosition: tool === 'text' ? undefined : 'inside',
+      opacity: 1,
+      cornerRadius: tool === 'image' ? 6 : 0,
+      text: tool === 'text' ? 'New text' : undefined,
+      fontSize: tool === 'text' ? 16 : undefined,
+      fontFamily: tool === 'text' ? 'Inter' : undefined,
+      fontWeight: tool === 'text' ? 400 : undefined,
+      fontStyle: tool === 'text' ? 'normal' : undefined,
+      textAlign: tool === 'text' ? 'center' : undefined,
+      textVerticalAlign: tool === 'text' ? 'middle' : undefined,
+      letterSpacing: tool === 'text' ? 0 : undefined,
+      lineHeight: tool === 'text' ? 1.2 : undefined,
+      imageUrl: tool === 'image' ? this.imagePlaceholderUrl : undefined,
+      parentId,
+    };
   }
 
-  private isPointInsideElement(x: number, y: number, element: CanvasElement): boolean {
-    return isPointInsideElement(x, y, element);
+  private createFrameAtCenter(
+    center: Point,
+    width: number,
+    height: number,
+    name: string,
+  ): CanvasElement {
+    const nextFramePosition = this.getNextFramePosition(width, height);
+
+    return {
+      id: crypto.randomUUID(),
+      type: 'frame',
+      name: this.getNextFrameName(name),
+      x: nextFramePosition?.x ?? this.roundToTwoDecimals(center.x - width / 2),
+      y: nextFramePosition?.y ?? this.roundToTwoDecimals(center.y - height / 2),
+      width,
+      height,
+      visible: true,
+      fill: this.defaultFrameFill,
+      strokeWidth: 1,
+      strokePosition: 'inside',
+      opacity: 1,
+      cornerRadius: 0,
+      parentId: null,
+    };
   }
 
-  private clamp(value: number, min: number, max: number): number {
-    return clamp(value, min, max);
-  }
-
-  private roundToTwoDecimals(value: number): number {
-    return roundToTwoDecimals(value);
-  }
-
-  private withRoundedPrecision(element: CanvasElement): CanvasElement {
-    return withRoundedPrecision(element);
-  }
-
-  private normalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
-    normalizeElementInPlace(element, elements);
-  }
-
-  private handleResizePointerMove(event: MouseEvent) {
+  private handleResizePointerMove(event: MouseEvent): void {
     const start = this.resizeStart;
     if (!start.elementId) {
       return;
@@ -753,46 +1129,227 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const deltaX = pointer.x - start.x;
-    const deltaY = pointer.y - start.y;
-    const minSize = 24;
-
-    this.elements.update((elements) =>
+    this.updateCurrentPageElements((elements) =>
       elements.map((element) => {
         if (element.id !== start.elementId) {
           return element;
         }
 
-        const parent = element.parentId
-          ? elements.find((candidate) => candidate.id === element.parentId)
-          : null;
+        const parent = this.findElementById(element.parentId ?? null, elements);
+        const parentBounds = parent ? this.getAbsoluteBounds(parent, elements) : null;
+        const bounds = this.calculateResizedBounds(
+          element,
+          parentBounds,
+          pointer,
+          event.shiftKey,
+          event.altKey,
+        );
 
-        const maxWidth = parent
-          ? parent.x + parent.width - start.elementX
-          : Number.POSITIVE_INFINITY;
-        const maxHeight = parent
-          ? parent.y + parent.height - start.elementY
-          : Number.POSITIVE_INFINITY;
-
-        let nextWidth = this.clamp(start.width + deltaX, minSize, maxWidth);
-        let nextHeight = this.clamp(start.height + deltaY, minSize, maxHeight);
-
-        if (element.type === 'circle') {
-          const sizeLimit = Math.min(nextWidth, nextHeight);
-          nextWidth = sizeLimit;
-          nextHeight = sizeLimit;
-        }
-
-        return {
+        const nextElement: CanvasElement = {
           ...element,
-          width: nextWidth,
-          height: nextHeight,
+          x: parentBounds ? bounds.x - parentBounds.x : bounds.x,
+          y: parentBounds ? bounds.y - parentBounds.y : bounds.y,
+          width: bounds.width,
+          height: bounds.height,
         };
+
+        this.normalizeElement(nextElement, elements);
+        return nextElement;
       }),
     );
   }
 
-  private setZoom(nextZoom: number, anchor?: { x: number; y: number }) {
+  private calculateResizedBounds(
+    element: CanvasElement,
+    parentBounds: Bounds | null,
+    pointer: Point,
+    preserveAspectRatio: boolean,
+    scaleFromCenter: boolean,
+  ): Bounds {
+    const start = this.resizeStart;
+    const deltaX = pointer.x - start.pointerX;
+    const deltaY = pointer.y - start.pointerY;
+    const xDirection = start.handle.includes('w') ? -1 : 1;
+    const yDirection = start.handle.includes('n') ? -1 : 1;
+    const shouldPreserveAspectRatio = preserveAspectRatio || element.type === 'circle';
+    const aspectRatio = shouldPreserveAspectRatio
+      ? start.aspectRatio || 1
+      : start.width / Math.max(start.height, 1);
+
+    let left = start.absoluteX;
+    let top = start.absoluteY;
+    let right = start.absoluteX + start.width;
+    let bottom = start.absoluteY + start.height;
+
+    const minLeft = parentBounds ? parentBounds.x : Number.NEGATIVE_INFINITY;
+    const minTop = parentBounds ? parentBounds.y : Number.NEGATIVE_INFINITY;
+    const maxRight = parentBounds ? parentBounds.x + parentBounds.width : Number.POSITIVE_INFINITY;
+    const maxBottom = parentBounds
+      ? parentBounds.y + parentBounds.height
+      : Number.POSITIVE_INFINITY;
+
+    if (scaleFromCenter) {
+      const candidateHalfWidth = start.width / 2 + xDirection * deltaX;
+      const candidateHalfHeight = start.height / 2 + yDirection * deltaY;
+      const maxHalfWidth = Math.max(
+        this.minElementSize / 2,
+        Math.min(start.centerX - minLeft, maxRight - start.centerX),
+      );
+      const maxHalfHeight = Math.max(
+        this.minElementSize / 2,
+        Math.min(start.centerY - minTop, maxBottom - start.centerY),
+      );
+
+      if (shouldPreserveAspectRatio) {
+        const scaleX = candidateHalfWidth / Math.max(start.width / 2, 1);
+        const scaleY = candidateHalfHeight / Math.max(start.height / 2, 1);
+        const dominantScale = Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY;
+        const minScale = Math.max(
+          this.minElementSize / Math.max(start.width, 1),
+          this.minElementSize / Math.max(start.height, 1),
+        );
+        const maxScale = Math.min(
+          (maxHalfWidth * 2) / Math.max(start.width, 1),
+          (maxHalfHeight * 2) / Math.max(start.height, 1),
+        );
+        const scale = this.clamp(dominantScale, minScale, Math.max(minScale, maxScale));
+        const width = this.roundToTwoDecimals(start.width * scale);
+        const height = this.roundToTwoDecimals(width / aspectRatio);
+
+        return {
+          x: this.roundToTwoDecimals(start.centerX - width / 2),
+          y: this.roundToTwoDecimals(start.centerY - height / 2),
+          width,
+          height,
+        };
+      }
+
+      const halfWidth = this.clamp(candidateHalfWidth, this.minElementSize / 2, maxHalfWidth);
+      const halfHeight = this.clamp(candidateHalfHeight, this.minElementSize / 2, maxHalfHeight);
+
+      return {
+        x: this.roundToTwoDecimals(start.centerX - halfWidth),
+        y: this.roundToTwoDecimals(start.centerY - halfHeight),
+        width: this.roundToTwoDecimals(halfWidth * 2),
+        height: this.roundToTwoDecimals(halfHeight * 2),
+      };
+    }
+
+    if (shouldPreserveAspectRatio) {
+      const candidateWidth = start.handle.includes('w')
+        ? start.width - deltaX
+        : start.width + deltaX;
+      const candidateHeight = start.handle.includes('n')
+        ? start.height - deltaY
+        : start.height + deltaY;
+      const scaleX = candidateWidth / Math.max(start.width, 1);
+      const scaleY = candidateHeight / Math.max(start.height, 1);
+      const dominantScale = Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY;
+      const minScale = Math.max(
+        this.minElementSize / Math.max(start.width, 1),
+        this.minElementSize / Math.max(start.height, 1),
+      );
+      const maxScale = Math.min(
+        (start.handle.includes('w') ? right - minLeft : maxRight - left) / Math.max(start.width, 1),
+        (start.handle.includes('n') ? bottom - minTop : maxBottom - top) /
+          Math.max(start.height, 1),
+      );
+      const scale = this.clamp(dominantScale, minScale, Math.max(minScale, maxScale));
+      const width = this.roundToTwoDecimals(start.width * scale);
+      const height = this.roundToTwoDecimals(width / aspectRatio);
+
+      if (start.handle.includes('w')) {
+        left = right - width;
+      } else {
+        right = left + width;
+      }
+
+      if (start.handle.includes('n')) {
+        top = bottom - height;
+      } else {
+        bottom = top + height;
+      }
+
+      return {
+        x: this.roundToTwoDecimals(left),
+        y: this.roundToTwoDecimals(top),
+        width: this.roundToTwoDecimals(right - left),
+        height: this.roundToTwoDecimals(bottom - top),
+      };
+    }
+
+    if (start.handle.includes('w')) {
+      left = this.clamp(start.absoluteX + deltaX, minLeft, right - this.minElementSize);
+    }
+
+    if (start.handle.includes('e')) {
+      right = this.clamp(
+        start.absoluteX + start.width + deltaX,
+        left + this.minElementSize,
+        maxRight,
+      );
+    }
+
+    if (start.handle.includes('n')) {
+      top = this.clamp(start.absoluteY + deltaY, minTop, bottom - this.minElementSize);
+    }
+
+    if (start.handle.includes('s')) {
+      bottom = this.clamp(
+        start.absoluteY + start.height + deltaY,
+        top + this.minElementSize,
+        maxBottom,
+      );
+    }
+
+    let width = this.roundToTwoDecimals(right - left);
+    let height = this.roundToTwoDecimals(bottom - top);
+
+    return {
+      x: this.roundToTwoDecimals(left),
+      y: this.roundToTwoDecimals(top),
+      width: this.roundToTwoDecimals(right - left),
+      height: this.roundToTwoDecimals(bottom - top),
+    };
+  }
+
+  private focusElement(element: CanvasElement): void {
+    const canvas = this.getCanvasElement();
+    if (!canvas) {
+      return;
+    }
+
+    const padding = 64;
+    const bounds = this.getAbsoluteBounds(element);
+    const horizontalZoom =
+      (canvas.clientWidth - padding) / Math.max(bounds.width, this.minElementSize);
+    const verticalZoom =
+      (canvas.clientHeight - padding) / Math.max(bounds.height, this.minElementSize);
+    const zoom = this.clamp(Math.min(horizontalZoom, verticalZoom), this.minZoom, this.maxZoom);
+
+    this.zoomLevel.set(zoom);
+    this.viewportOffset.set({
+      x: this.roundToTwoDecimals((canvas.clientWidth - bounds.width * zoom) / 2 - bounds.x * zoom),
+      y: this.roundToTwoDecimals(
+        (canvas.clientHeight - bounds.height * zoom) / 2 - bounds.y * zoom,
+      ),
+    });
+  }
+
+  private getViewportCenterCanvasPoint(): Point {
+    const canvas = this.getCanvasElement();
+    if (!canvas) {
+      return { x: 320, y: 240 };
+    }
+
+    const offset = this.viewportOffset();
+    return {
+      x: this.roundToTwoDecimals((canvas.clientWidth / 2 - offset.x) / this.zoomLevel()),
+      y: this.roundToTwoDecimals((canvas.clientHeight / 2 - offset.y) / this.zoomLevel()),
+    };
+  }
+
+  private setZoom(nextZoom: number, anchor?: Point): void {
     const previousZoom = this.zoomLevel();
     const clampedZoom = this.clamp(nextZoom, this.minZoom, this.maxZoom);
 
@@ -814,7 +1371,11 @@ export class ProjectPage implements OnDestroy {
     this.zoomLevel.set(clampedZoom);
   }
 
-  private getCanvasPoint(event: MouseEvent): { x: number; y: number } | null {
+  private getScreenInvariantSize(size: number): number {
+    return this.roundToTwoDecimals(size / this.zoomLevel());
+  }
+
+  private getCanvasPoint(event: MouseEvent): Point | null {
     const canvas = this.getCanvasElement();
     if (!canvas) {
       return null;
@@ -847,13 +1408,10 @@ export class ProjectPage implements OnDestroy {
 
   private startPanning(event: MouseEvent): void {
     this.isPanning.set(true);
-    this.isDragging.set(false);
-    this.isResizing.set(false);
+    this.isDragging = false;
+    this.isResizing = false;
     this.panMoved = false;
-    this.panStart = {
-      x: event.clientX,
-      y: event.clientY,
-    };
+    this.panStart = { x: event.clientX, y: event.clientY };
     event.preventDefault();
     event.stopPropagation();
   }
@@ -868,9 +1426,253 @@ export class ProjectPage implements OnDestroy {
     return document.querySelector('.canvas-container') as HTMLElement | null;
   }
 
+  private focusInlineTextEditor(elementId: string): void {
+    setTimeout(() => {
+      const editor = document.querySelector(
+        `[data-text-editor-id="${elementId}"]`,
+      ) as HTMLTextAreaElement | null;
+
+      if (!editor) {
+        return;
+      }
+
+      editor.focus();
+      const textLength = editor.value.length;
+      editor.setSelectionRange(textLength, textLength);
+    }, 0);
+  }
+
+  private getSelectedFrame(): CanvasElement | null {
+    const selected = this.selectedElement();
+    return selected?.type === 'frame' ? selected : null;
+  }
+
+  private isPointInsideRenderedElement(x: number, y: number, element: CanvasElement): boolean {
+    const bounds = this.getAbsoluteBounds(element);
+    return (
+      x >= bounds.x &&
+      x <= bounds.x + bounds.width &&
+      y >= bounds.y &&
+      y <= bounds.y + bounds.height
+    );
+  }
+
+  private getAbsoluteBounds(element: CanvasElement, elements = this.elements()): Bounds {
+    const parent = this.findElementById(element.parentId ?? null, elements);
+    if (!parent || element.type === 'frame') {
+      return {
+        x: this.roundToTwoDecimals(element.x),
+        y: this.roundToTwoDecimals(element.y),
+        width: this.roundToTwoDecimals(element.width),
+        height: this.roundToTwoDecimals(element.height),
+      };
+    }
+
+    const parentBounds = this.getAbsoluteBounds(parent, elements);
+    return {
+      x: this.roundToTwoDecimals(parentBounds.x + element.x),
+      y: this.roundToTwoDecimals(parentBounds.y + element.y),
+      width: this.roundToTwoDecimals(element.width),
+      height: this.roundToTwoDecimals(element.height),
+    };
+  }
+
+  private findElementById(id: string | null, elements = this.elements()): CanvasElement | null {
+    if (!id) {
+      return null;
+    }
+
+    return elements.find((element) => element.id === id) ?? null;
+  }
+
+  private isElementEffectivelyVisible(elementId: string): boolean {
+    const elements = this.elements();
+    let current = this.findElementById(elementId, elements);
+
+    while (current) {
+      if (current.visible === false) {
+        return false;
+      }
+
+      current = this.findElementById(current.parentId ?? null, elements);
+    }
+
+    return true;
+  }
+
+  private reorderLayerElements(
+    elements: CanvasElement[],
+    draggedId: string,
+    targetId: string,
+    position: 'before' | 'after' | 'inside',
+  ): CanvasElement[] {
+    if (draggedId === targetId) {
+      return elements;
+    }
+
+    const dragged = elements.find((element) => element.id === draggedId);
+    const target = elements.find((element) => element.id === targetId);
+    if (!dragged || !target) {
+      return elements;
+    }
+
+    if (position === 'inside' && (target.type !== 'frame' || dragged.type === 'frame')) {
+      return elements;
+    }
+
+    const draggedSubtreeIds = new Set(this.collectSubtreeIds(elements, draggedId));
+    const targetSubtreeIds = this.collectSubtreeIds(elements, targetId);
+    if (targetSubtreeIds.includes(draggedId)) {
+      return elements;
+    }
+
+    const draggedSubtree = elements.filter((element) => draggedSubtreeIds.has(element.id));
+    const remaining = elements.filter((element) => !draggedSubtreeIds.has(element.id));
+    const draggedRoot = draggedSubtree[0];
+    if (!draggedRoot) {
+      return elements;
+    }
+
+    const draggedBounds = this.getAbsoluteBounds(dragged, elements);
+    const targetIndex = remaining.findIndex((element) => element.id === targetId);
+    if (targetIndex === -1) {
+      return elements;
+    }
+
+    let nextParentId = dragged.parentId ?? null;
+    let insertIndex = targetIndex;
+
+    if (position === 'inside') {
+      nextParentId = target.id;
+      insertIndex = targetIndex + targetSubtreeIds.length;
+    } else {
+      nextParentId = target.parentId ?? null;
+      insertIndex = position === 'after' ? targetIndex + targetSubtreeIds.length : targetIndex;
+    }
+
+    const nextParent = nextParentId
+      ? (remaining.find((element) => element.id === nextParentId) ?? null)
+      : null;
+
+    draggedRoot.parentId = nextParentId;
+    if (nextParent) {
+      const parentBounds = this.getAbsoluteBounds(nextParent, remaining);
+      draggedRoot.x = this.clamp(
+        draggedBounds.x - parentBounds.x,
+        0,
+        nextParent.width - draggedRoot.width,
+      );
+      draggedRoot.y = this.clamp(
+        draggedBounds.y - parentBounds.y,
+        0,
+        nextParent.height - draggedRoot.height,
+      );
+    } else {
+      draggedRoot.x = this.roundToTwoDecimals(draggedBounds.x);
+      draggedRoot.y = this.roundToTwoDecimals(draggedBounds.y);
+    }
+
+    return [...remaining.slice(0, insertIndex), ...draggedSubtree, ...remaining.slice(insertIndex)];
+  }
+
+  private collectSubtreeIds(elements: CanvasElement[], rootId: string): string[] {
+    const collected: string[] = [];
+    const visit = (currentId: string) => {
+      collected.push(currentId);
+      const children = elements.filter((element) => (element.parentId ?? null) === currentId);
+      for (const child of children) {
+        visit(child.id);
+      }
+    };
+
+    visit(rootId);
+    return collected;
+  }
+
+  private getNextFramePosition(width: number, height: number): Point | null {
+    const rootFrames = this.elements().filter(
+      (element) => element.type === 'frame' && !element.parentId,
+    );
+
+    if (rootFrames.length === 0) {
+      return null;
+    }
+
+    const rightMostFrame = rootFrames.reduce((currentRightMost, candidate) => {
+      const currentBounds = this.getAbsoluteBounds(currentRightMost);
+      const candidateBounds = this.getAbsoluteBounds(candidate);
+      const currentRight = currentBounds.x + currentBounds.width;
+      const candidateRight = candidateBounds.x + candidateBounds.width;
+
+      return candidateRight > currentRight ? candidate : currentRightMost;
+    }, rootFrames[0]);
+
+    const bounds = this.getAbsoluteBounds(rightMostFrame);
+    return {
+      x: this.roundToTwoDecimals(bounds.x + bounds.width + this.frameInsertGap),
+      y: this.roundToTwoDecimals(bounds.y),
+    };
+  }
+
+  private updateCurrentPageElements(updater: (elements: CanvasElement[]) => CanvasElement[]): void {
+    const currentPageId = this.currentPageId();
+    if (!currentPageId) {
+      return;
+    }
+
+    this.pages.update((pages) =>
+      pages.map((page) =>
+        page.id === currentPageId
+          ? {
+              ...page,
+              elements: updater(page.elements),
+            }
+          : page,
+      ),
+    );
+  }
+
+  private getElementStrokeStyle(
+    element: CanvasElement,
+    targetPosition: CanvasStrokePosition,
+  ): string {
+    if (!element.stroke || element.type === 'text') {
+      return 'none';
+    }
+
+    const strokeWidth = this.getStrokeWidth(element);
+    if (strokeWidth <= 0) {
+      return 'none';
+    }
+
+    const strokePosition = this.getStrokePosition(element);
+    if (strokePosition !== targetPosition) {
+      return 'none';
+    }
+
+    return `${strokeWidth}px solid ${element.stroke}`;
+  }
+
+  private createPage(name: string): CanvasPageModel {
+    return {
+      id: crypto.randomUUID(),
+      name,
+      elements: [],
+    };
+  }
+
+  private getNextPageName(): string {
+    return `Page ${this.pages().length + 1}`;
+  }
+
   private getNextElementName(type: CanvasElementType): string {
     const index = this.elements().filter((element) => element.type === type).length + 1;
     return `${formatCanvasElementTypeLabel(type)} ${index}`;
+  }
+
+  private getNextFrameName(templateName: string): string {
+    const frameIndex = this.elements().filter((element) => element.type === 'frame').length + 1;
+    return `${templateName} ${frameIndex}`;
   }
 
   private isTypingTarget(target: EventTarget | null): boolean {
@@ -887,6 +1689,128 @@ export class ProjectPage implements OnDestroy {
     return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT';
   }
 
+  private runWithHistory(action: () => void): void {
+    if (this.isApplyingHistory) {
+      action();
+      return;
+    }
+
+    const snapshot = this.createHistorySnapshot();
+    action();
+    this.pushUndoSnapshotIfChanged(snapshot);
+  }
+
+  private beginGestureHistory(): void {
+    if (this.isApplyingHistory || this.pendingGestureHistorySnapshot) {
+      return;
+    }
+
+    this.pendingGestureHistorySnapshot = this.createHistorySnapshot();
+  }
+
+  private commitGestureHistory(): void {
+    if (!this.pendingGestureHistorySnapshot) {
+      return;
+    }
+
+    const snapshot = this.pendingGestureHistorySnapshot;
+    this.pendingGestureHistorySnapshot = null;
+    this.pushUndoSnapshotIfChanged(snapshot);
+  }
+
+  private beginTextEditHistory(): void {
+    if (this.isApplyingHistory || this.pendingTextEditHistorySnapshot) {
+      return;
+    }
+
+    this.pendingTextEditHistorySnapshot = this.createHistorySnapshot();
+  }
+
+  private commitTextEditHistory(): void {
+    if (!this.pendingTextEditHistorySnapshot) {
+      return;
+    }
+
+    const snapshot = this.pendingTextEditHistorySnapshot;
+    this.pendingTextEditHistorySnapshot = null;
+    this.pushUndoSnapshotIfChanged(snapshot);
+  }
+
+  private undo(): void {
+    this.commitGestureHistory();
+    this.commitTextEditHistory();
+
+    const snapshot = this.undoStack.pop();
+    if (!snapshot) {
+      return;
+    }
+
+    this.redoStack.push(this.createHistorySnapshot());
+    this.applyHistorySnapshot(snapshot);
+  }
+
+  private redo(): void {
+    this.commitGestureHistory();
+    this.commitTextEditHistory();
+
+    const snapshot = this.redoStack.pop();
+    if (!snapshot) {
+      return;
+    }
+
+    this.undoStack.push(this.createHistorySnapshot());
+    if (this.undoStack.length > this.maxHistorySteps) {
+      this.undoStack = this.undoStack.slice(-this.maxHistorySteps);
+    }
+
+    this.applyHistorySnapshot(snapshot);
+  }
+
+  private createHistorySnapshot(): HistorySnapshot {
+    return {
+      pages: structuredClone(this.pages()),
+      currentPageId: this.currentPageId(),
+      selectedElementId: this.selectedElementId(),
+    };
+  }
+
+  private applyHistorySnapshot(snapshot: HistorySnapshot): void {
+    this.isApplyingHistory = true;
+    this.pages.set(structuredClone(snapshot.pages));
+    this.currentPageId.set(snapshot.currentPageId);
+    this.selectedElementId.set(snapshot.selectedElementId);
+    this.currentTool.set('select');
+    this.editingTextElementId.set(null);
+    this.isApplyingHistory = false;
+  }
+
+  private pushUndoSnapshotIfChanged(snapshot: HistorySnapshot): void {
+    if (
+      this.isApplyingHistory ||
+      this.areHistorySnapshotsEqual(snapshot, this.createHistorySnapshot())
+    ) {
+      return;
+    }
+
+    this.undoStack.push(snapshot);
+    if (this.undoStack.length > this.maxHistorySteps) {
+      this.undoStack = this.undoStack.slice(-this.maxHistorySteps);
+    }
+
+    this.redoStack = [];
+  }
+
+  private areHistorySnapshotsEqual(left: HistorySnapshot, right: HistorySnapshot): boolean {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  private resetHistory(): void {
+    this.undoStack = [];
+    this.redoStack = [];
+    this.pendingGestureHistorySnapshot = null;
+    this.pendingTextEditHistorySnapshot = null;
+  }
+
   private isTypingContext(event: KeyboardEvent): boolean {
     if (this.isTypingTarget(event.target)) {
       return true;
@@ -895,16 +1819,28 @@ export class ProjectPage implements OnDestroy {
     return this.isTypingTarget(document.activeElement);
   }
 
+  private clamp(value: number, min: number, max: number): number {
+    if (max < min) {
+      return this.roundToTwoDecimals(min);
+    }
+
+    return clamp(value, min, max);
+  }
+
+  private roundToTwoDecimals(value: number): number {
+    return roundToTwoDecimals(value);
+  }
+
+  private normalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
+    normalizeElementInPlace(element, elements);
+  }
+
   private getStrokeWidth(element: CanvasElement): number {
     return getStrokeWidth(element);
   }
 
   private getStrokePosition(element: CanvasElement): CanvasStrokePosition {
     return getStrokePosition(element);
-  }
-
-  private collectDescendantIds(elements: CanvasElement[], rootId: string): Set<string> {
-    return collectDescendantIds(elements, rootId);
   }
 
   private removeWithChildren(elements: CanvasElement[], rootId: string): CanvasElement[] {

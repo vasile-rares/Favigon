@@ -3,9 +3,16 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import {
   CanvasElement,
   CanvasElementType,
+  CanvasFontStyle,
   CanvasStrokePosition,
+  CanvasTextAlign,
+  CanvasTextVerticalAlign,
 } from '../../../../core/models/canvas.models';
+import { IRNode } from '../../../../core/models/ir.models';
 import { formatCanvasElementTypeLabel } from '../../../../core/utils/canvas-label.util';
+
+type SupportedFramework = 'html' | 'react' | 'angular';
+type PropertiesTab = 'design' | 'prototype';
 
 type EditableNumericField =
   | 'x'
@@ -13,9 +20,18 @@ type EditableNumericField =
   | 'width'
   | 'height'
   | 'fontSize'
+  | 'letterSpacing'
+  | 'lineHeight'
   | 'strokeWidth'
   | 'opacity'
   | 'cornerRadius';
+
+type EditableTypographyField =
+  | 'fontFamily'
+  | 'fontWeight'
+  | 'fontStyle'
+  | 'textAlign'
+  | 'textVerticalAlign';
 
 interface FrameTemplate {
   name: string;
@@ -25,20 +41,45 @@ interface FrameTemplate {
 }
 
 @Component({
-  selector: 'app-canvas-design-sidepanel',
+  selector: 'app-properties-panel',
   standalone: true,
   imports: [CommonModule],
-  templateUrl: './canvas-design-sidepanel.component.html',
-  styleUrl: './canvas-design-sidepanel.component.css',
+  templateUrl: './properties-panel.component.html',
+  styleUrl: './properties-panel.component.css',
 })
-export class CanvasDesignSidepanelComponent {
+export class PropertiesPanelComponent {
   @Input() selectedElement: CanvasElement | null = null;
   @Input() currentTool: CanvasElementType | 'select' = 'select';
+  @Input() selectedFramework: SupportedFramework = 'html';
+  @Input() validationResult: boolean | null = null;
+  @Input() apiError: string | null = null;
+  @Input() isValidating = false;
+  @Input() isGenerating = false;
+  @Input() generatedHtml = '';
+  @Input() generatedCss = '';
+  @Input() irPreview: IRNode | null = null;
 
   @Output() elementPatch = new EventEmitter<Partial<CanvasElement>>();
-  @Output() frameTemplateSelected = new EventEmitter<Pick<FrameTemplate, 'width' | 'height'>>();
+  @Output() frameTemplateSelected = new EventEmitter<FrameTemplate>();
+  @Output() frameworkChanged = new EventEmitter<SupportedFramework>();
+  @Output() validateRequested = new EventEmitter<void>();
+  @Output() generateRequested = new EventEmitter<void>();
+
+  activeTab: PropertiesTab = 'design';
 
   readonly strokePositionOptions: CanvasStrokePosition[] = ['inside', 'outside'];
+  readonly fontFamilyOptions = [
+    'Inter',
+    'Poppins',
+    'Montserrat',
+    'Space Grotesk',
+    'Georgia',
+    'Arial',
+  ];
+  readonly fontWeightOptions = [300, 400, 500, 600, 700];
+  readonly fontStyleOptions: CanvasFontStyle[] = ['normal', 'italic'];
+  readonly textAlignOptions: CanvasTextAlign[] = ['left', 'center', 'right'];
+  readonly textVerticalAlignOptions: CanvasTextVerticalAlign[] = ['top', 'middle', 'bottom'];
 
   readonly frameTemplates: FrameTemplate[] = [
     {
@@ -64,6 +105,19 @@ export class CanvasDesignSidepanelComponent {
   private readonly defaultFillColor = '#e0e0e0';
   private readonly defaultFrameFillColor = '#3f3f46';
   private readonly defaultStrokeColor = '#52525b';
+
+  selectTab(tab: PropertiesTab): void {
+    this.activeTab = tab;
+  }
+
+  isTabActive(tab: PropertiesTab): boolean {
+    return this.activeTab === tab;
+  }
+
+  onFrameworkChange(event: Event): void {
+    const framework = (event.target as HTMLSelectElement).value as SupportedFramework;
+    this.frameworkChanged.emit(framework);
+  }
 
   toDisplayNumber(value: number | undefined): string {
     if (!Number.isFinite(value ?? Number.NaN)) {
@@ -135,6 +189,17 @@ export class CanvasDesignSidepanelComponent {
     this.emitPatch({ strokePosition });
   }
 
+  onTypographySelectChange(field: EditableTypographyField, event: Event): void {
+    const value = (event.target as HTMLSelectElement).value;
+
+    if (field === 'fontWeight') {
+      this.emitPatch({ fontWeight: Number(value) });
+      return;
+    }
+
+    this.emitPatch({ [field]: value } as Partial<CanvasElement>);
+  }
+
   strokePositionValue(element: CanvasElement): CanvasStrokePosition {
     return element.strokePosition ?? 'inside';
   }
@@ -149,22 +214,32 @@ export class CanvasDesignSidepanelComponent {
   }
 
   applyFrameTemplate(template: FrameTemplate): void {
-    this.frameTemplateSelected.emit({
-      width: template.width,
-      height: template.height,
-    });
-
-    if (this.selectedElement?.type === 'frame') {
-      this.emitPatch({
-        width: template.width,
-        height: template.height,
-      });
-    }
+    this.frameTemplateSelected.emit(template);
   }
 
   onTextChange(field: 'text' | 'imageUrl', event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.emitPatch({ [field]: value } as Partial<CanvasElement>);
+  }
+
+  fontFamilyValue(element: CanvasElement): string {
+    return element.fontFamily ?? 'Inter';
+  }
+
+  fontWeightValue(element: CanvasElement): number {
+    return element.fontWeight ?? 400;
+  }
+
+  fontStyleValue(element: CanvasElement): CanvasFontStyle {
+    return element.fontStyle ?? 'normal';
+  }
+
+  textAlignValue(element: CanvasElement): CanvasTextAlign {
+    return element.textAlign ?? 'center';
+  }
+
+  textVerticalAlignValue(element: CanvasElement): CanvasTextVerticalAlign {
+    return element.textVerticalAlign ?? 'middle';
   }
 
   private emitPatch(patch: Partial<CanvasElement>): void {

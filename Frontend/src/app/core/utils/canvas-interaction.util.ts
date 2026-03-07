@@ -30,6 +30,12 @@ export function withRoundedPrecision(element: CanvasElement): CanvasElement {
       typeof element.strokeWidth === 'number' ? roundToTwoDecimals(element.strokeWidth) : undefined,
     fontSize:
       typeof element.fontSize === 'number' ? roundToTwoDecimals(element.fontSize) : undefined,
+    letterSpacing:
+      typeof element.letterSpacing === 'number'
+        ? roundToTwoDecimals(element.letterSpacing)
+        : undefined,
+    lineHeight:
+      typeof element.lineHeight === 'number' ? roundToTwoDecimals(element.lineHeight) : undefined,
   };
 }
 
@@ -39,6 +45,19 @@ export function normalizeElementInPlace(element: CanvasElement, elements: Canvas
 
   if (element.type === 'text') {
     element.fontSize = Math.max(8, element.fontSize ?? 16);
+    element.fontFamily = element.fontFamily?.trim() || 'Inter';
+    element.fontWeight = [300, 400, 500, 600, 700].includes(element.fontWeight ?? 400)
+      ? (element.fontWeight ?? 400)
+      : 400;
+    element.fontStyle = element.fontStyle === 'italic' ? 'italic' : 'normal';
+    element.textAlign =
+      element.textAlign === 'left' || element.textAlign === 'right' ? element.textAlign : 'center';
+    element.textVerticalAlign =
+      element.textVerticalAlign === 'top' || element.textVerticalAlign === 'bottom'
+        ? element.textVerticalAlign
+        : 'middle';
+    element.letterSpacing = roundToTwoDecimals(element.letterSpacing ?? 0);
+    element.lineHeight = Math.max(0.8, roundToTwoDecimals(element.lineHeight ?? 1.2));
   }
 
   if (element.type === 'circle') {
@@ -87,8 +106,8 @@ export function normalizeElementInPlace(element: CanvasElement, elements: Canvas
     return;
   }
 
-  const maxWidth = Math.max(MIN_SIZE, parent.x + parent.width - element.x);
-  const maxHeight = Math.max(MIN_SIZE, parent.y + parent.height - element.y);
+  const maxWidth = Math.max(MIN_SIZE, parent.width - element.x);
+  const maxHeight = Math.max(MIN_SIZE, parent.height - element.y);
 
   element.width = clamp(element.width, MIN_SIZE, maxWidth);
   element.height = clamp(element.height, MIN_SIZE, maxHeight);
@@ -99,8 +118,8 @@ export function normalizeElementInPlace(element: CanvasElement, elements: Canvas
     element.height = constrainedCircleSize;
   }
 
-  element.x = clamp(element.x, parent.x, parent.x + parent.width - element.width);
-  element.y = clamp(element.y, parent.y, parent.y + parent.height - element.height);
+  element.x = clamp(element.x, 0, parent.width - element.width);
+  element.y = clamp(element.y, 0, parent.height - element.height);
   element.x = roundToTwoDecimals(element.x);
   element.y = roundToTwoDecimals(element.y);
   element.width = roundToTwoDecimals(element.width);

@@ -2,67 +2,21 @@
   <app-header-bar></app-header-bar>
 
   <div class="workspace">
-    <app-canvas-left-panel
-      [selectedFramework]="selectedFramework()"
-      [validationResult]="validationResult()"
-      [apiError]="apiError()"
-      [isValidating]="isValidating()"
-      [isGenerating]="isGenerating()"
-      [generatedHtml]="generatedHtml()"
-      [generatedCss]="generatedCss()"
-      [irPreview]="irPreview()"
+    <app-project-panel
+      [pages]="pages()"
+      [currentPageId]="currentPageId()"
       [elements]="elements()"
       [selectedElementId]="selectedElementId()"
-      (frameworkChanged)="setFramework($event)"
-      (validateRequested)="validateIR()"
-      (generateRequested)="generateCode()"
+      (pageSelected)="selectPage($event)"
+      (pageCreateRequested)="addPage()"
       (layerSelected)="onLayerSelected($event)"
-      (layerNameChanged)="onLayerNameChanged($event)"></app-canvas-left-panel>
+      (layerNameChanged)="onLayerNameChanged($event)"
+      (layerMoved)="onLayerMoved($event)"
+      (layerVisibilityToggled)="onLayerVisibilityToggled($event)"></app-project-panel>
 
-    <aside class="toolbar">
-      <!-- <div class="toolbar-header">
-        <h2>Prismatic</h2>
-      </div> -->
-      <!-- Removed header since we have top bar now -->
-      <div class="tools">
-        <button
-          [class.active]="currentTool() === 'select'"
-          (click)="selectTool('select')"
-          title="Select (V)">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>
-        </button>
-        <button
-          [class.active]="currentTool() === 'frame'"
-          (click)="selectTool('frame')"
-          title="Frame (F)">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-        </button>
-        <button
-          [class.active]="currentTool() === 'rectangle'"
-          (click)="selectTool('rectangle')"
-          title="Rectangle (R)">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
-        </button>
-        <button
-          [class.active]="currentTool() === 'circle'"
-          (click)="selectTool('circle')"
-          title="Circle (O)">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
-        </button>
-        <button
-          [class.active]="currentTool() === 'text'"
-          (click)="selectTool('text')"
-          title="Text (T)">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>
-        </button>
-        <button
-          [class.active]="currentTool() === 'image'"
-          (click)="selectTool('image')"
-          title="Image (I)">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
-        </button>
-      </div>
-    </aside>
+    <app-toolbar
+      [activeTool]="currentTool()"
+      (toolSelected)="selectTool($event)"></app-toolbar>
 
     <main
       class="canvas-container"
@@ -82,50 +36,120 @@
       </div>
 
       <div class="canvas-viewport" [style.transform]="canvasViewportTransform()">
-        <div
-          *ngFor="let el of elements()"
-          class="canvas-element"
-          [class.selected]="selectedElementId() === el.id"
-          [class.frame]="el.type === 'frame'"
-          [class.rectangle]="el.type === 'rectangle'"
-          [class.circle]="el.type === 'circle'"
-          [class.text]="el.type === 'text'"
-          [class.image]="el.type === 'image'"
-          [style.left.px]="el.x"
-          [style.top.px]="el.y"
-          [style.width.px]="el.width"
-          [style.height.px]="el.height"
-          [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
-          [style.border]="getElementBorderStyle(el)"
-          [style.outline]="getElementOutlineStyle(el)"
-          [style.outline-offset.px]="getElementOutlineOffset(el)"
-          [style.opacity]="el.opacity ?? 1"
-          [style.border-radius.px]="el.type === 'circle' ? null : (el.cornerRadius ?? (el.type === 'image' ? 6 : 0))"
-          (pointerdown)="onElementPointerDown($event, el.id)">
+        <div class="canvas-scene" [style.zoom]="canvasSceneZoom()">
+          <div
+            *ngFor="let el of visibleElements(); trackBy: trackByElementId"
+            class="canvas-element"
+            [class.selected]="selectedElementId() === el.id"
+            [class.editing]="isTextEditing(el.id)"
+            [class.frame]="el.type === 'frame'"
+            [class.rectangle]="el.type === 'rectangle'"
+            [class.circle]="el.type === 'circle'"
+            [class.text]="el.type === 'text'"
+            [class.image]="el.type === 'image'"
+            [style.left.px]="getRenderedX(el)"
+            [style.top.px]="getRenderedY(el)"
+            [style.width.px]="el.width"
+            [style.height.px]="el.height"
+            [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
+            [style.border]="getElementBorderStyle(el)"
+            [style.outline]="getElementOutlineStyle(el)"
+            [style.outline-offset.px]="getElementOutlineOffset(el)"
+            [style.opacity]="el.opacity ?? 1"
+            [style.clip-path]="getElementClipPath(el)"
+            [style.visibility]="isElementClippedOut(el) ? 'hidden' : 'visible'"
+            [style.border-radius.px]="el.type === 'circle' ? null : (el.cornerRadius ?? (el.type === 'image' ? 6 : 0))"
+            (pointerdown)="onElementPointerDown($event, el.id)"
+            (dblclick)="onElementDoubleClick($event, el.id)">
 
-          <ng-container *ngIf="el.type === 'text'">
-            <span [style.font-size.px]="el.fontSize">{{ el.text }}</span>
-          </ng-container>
+            <div
+              class="frame-title"
+              *ngIf="el.type === 'frame'"
+              [style.top.px]="getFrameTitleOffset()"
+              [style.font-size.px]="getFrameTitleFontSize()">
+              {{ getFrameTitle(el) }}
+            </div>
 
-          <ng-container *ngIf="el.type === 'image'">
-            <img [src]="el.imageUrl" alt="Canvas image" draggable="false" />
-          </ng-container>
+            <ng-container *ngIf="el.type === 'text'">
+              <ng-container *ngIf="!isTextEditing(el.id); else textEditor">
+                <div
+                  class="text-content"
+                  [style.font-size.px]="el.fontSize"
+                  [style.font-family]="getTextFontFamily(el)"
+                  [style.font-weight]="getTextFontWeight(el)"
+                  [style.font-style]="getTextFontStyle(el)"
+                  [style.line-height]="getTextLineHeight(el)"
+                  [style.letter-spacing]="getTextLetterSpacing(el)"
+                  [style.justify-content]="getTextJustifyContent(el)"
+                  [style.align-items]="getTextAlignItems(el)"
+                  [style.text-align]="getTextAlignValue(el)">
+                  <span>{{ el.text }}</span>
+                </div>
+              </ng-container>
 
-          <div class="selection-outline" *ngIf="selectedElementId() === el.id">
-            <button
-              type="button"
-              class="resize-handle resize-handle-se"
-              (pointerdown)="onResizeHandlePointerDown($event, el.id)"
-              aria-label="Resize element"></button>
+              <ng-template #textEditor>
+                <textarea
+                  class="text-inline-editor"
+                  [attr.data-text-editor-id]="el.id"
+                  [value]="el.text || ''"
+                  [style.font-size.px]="el.fontSize"
+                  [style.font-family]="getTextFontFamily(el)"
+                  [style.font-weight]="getTextFontWeight(el)"
+                  [style.font-style]="getTextFontStyle(el)"
+                  [style.line-height]="getTextLineHeight(el)"
+                  [style.letter-spacing]="getTextLetterSpacing(el)"
+                  [style.text-align]="getTextAlignValue(el)"
+                  (pointerdown)="onTextEditorPointerDown($event)"
+                  (input)="onTextEditorInput(el.id, $event)"
+                  (blur)="onTextEditorBlur(el.id)"
+                  (keydown)="onTextEditorKeyDown($event, el.id)"></textarea>
+              </ng-template>
+            </ng-container>
+
+            <ng-container *ngIf="el.type === 'image'">
+              <img [src]="el.imageUrl" alt="Canvas image" draggable="false" />
+            </ng-container>
+
+            <div
+              class="selection-outline"
+              *ngIf="selectedElementId() === el.id"
+              [style.top.px]="getSelectionOutlineInset()"
+              [style.left.px]="getSelectionOutlineInset()"
+              [style.right.px]="getSelectionOutlineInset()"
+              [style.bottom.px]="getSelectionOutlineInset()"
+              [style.border-width.px]="getSelectionOutlineBorderWidth()">
+              <button
+                *ngFor="let handle of resizeHandlePositions"
+                type="button"
+                class="resize-handle"
+                [ngClass]="resizeHandleClass(handle)"
+                [style.width.px]="getResizeHandleSize()"
+                [style.height.px]="getResizeHandleSize()"
+                [style.border-width.px]="getResizeHandleBorderWidth()"
+                [style.--resize-handle-offset]="getResizeHandleOffset() + 'px'"
+                (pointerdown)="onResizeHandlePointerDown($event, el.id, handle)"
+                aria-label="Resize element"></button>
+            </div>
           </div>
         </div>
       </div>
     </main>
 
-    <app-canvas-design-sidepanel
+    <app-properties-panel
       [selectedElement]="selectedElement()"
       [currentTool]="currentTool()"
+      [selectedFramework]="selectedFramework()"
+      [validationResult]="validationResult()"
+      [apiError]="apiError()"
+      [isValidating]="isValidating()"
+      [isGenerating]="isGenerating()"
+      [generatedHtml]="generatedHtml()"
+      [generatedCss]="generatedCss()"
+      [irPreview]="irPreview()"
+      (frameworkChanged)="setFramework($event)"
+      (validateRequested)="validateIR()"
+      (generateRequested)="generateCode()"
       (frameTemplateSelected)="onFrameTemplateSelected($event)"
-      (elementPatch)="onSelectedElementPatch($event)"></app-canvas-design-sidepanel>
+      (elementPatch)="onSelectedElementPatch($event)"></app-properties-panel>
   </div>
 </div>

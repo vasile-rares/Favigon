@@ -21,6 +21,7 @@
 
   --color-surface: #171717;
   --color-surface-elevated: #1e1e1e;
+  --color-surface-transparent: rgba(23, 23, 23, 0.8);
 
   --color-border-light: #f4f4f5;
   --color-border-medium: #424242;
@@ -49,20 +50,14 @@
   --color-danger-light: #f87171;
   --color-danger-dark: #f8717126;
 
+  --color-accent: rgba(13, 154, 255, 0.2);
+  --color-accent-border: rgba(13, 154, 255, 0.5);
+
   /* Border Radius */
   --radius-sm: 0.25rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.75rem;
   --radius-full: 100%;
-
-  /* Gradients & Accents */
-  --color-pink-500: #ec4899;
-  --color-violet-500: #8b5cf6;
-  --color-emerald-500: #10b981;
-  --color-green-500: #22c55e;
-  --color-green-500-50: rgba(34, 197, 94, 0.5);
-  --color-red-500: #ef4444;
-  --color-red-500-50: rgba(239, 68, 68, 0.5);
 
   /* Blue / Sky / Brand */
   --color-blue-500: #3b82f6;

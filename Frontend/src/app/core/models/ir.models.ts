@@ -36,6 +36,10 @@ export interface IRStyle {
   fontSize?: number;
   fontWeight?: number;
   fontFamily?: string;
+  fontStyle?: string;
+  textAlign?: string;
+  lineHeight?: number;
+  letterSpacing?: number;
   shadow?: string;
   border?: string;
   opacity?: number;
