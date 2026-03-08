@@ -34,6 +34,7 @@ export class ProjectPanelComponent implements OnChanges {
 
   @Output() pageSelected = new EventEmitter<string>();
   @Output() pageCreateRequested = new EventEmitter<void>();
+  @Output() pageDeleteRequested = new EventEmitter<string>();
   @Output() layerSelected = new EventEmitter<string>();
   @Output() layerNameChanged = new EventEmitter<{ id: string; name: string }>();
   @Output() layerVisibilityToggled = new EventEmitter<string>();
@@ -64,6 +65,16 @@ export class ProjectPanelComponent implements OnChanges {
 
   onPageCreate(): void {
     this.pageCreateRequested.emit();
+  }
+
+  onPageDelete(pageId: string, event: MouseEvent): void {
+    event.stopPropagation();
+
+    if (this.pages.length <= 1) {
+      return;
+    }
+
+    this.pageDeleteRequested.emit(pageId);
   }
 
   onLayerSelected(id: string): void {
@@ -184,6 +195,10 @@ export class ProjectPanelComponent implements OnChanges {
 
   trackByPageId(_: number, page: CanvasPageModel): string {
     return page.id;
+  }
+
+  canDeletePage(): boolean {
+    return this.pages.length > 1;
   }
 
   private buildLayerEntries(elements: CanvasElement[]): LayerEntry[] {

@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
       options.UseNpgsql(configuration.GetConnectionString("PrismaticDb")));
 
     services.AddScoped<IUserRepository, UserRepository>();
+    services.AddScoped<IAccountProviderRepository, AccountProviderRepository>();
     services.AddScoped<IProjectRepository, ProjectRepository>();
 
     return services;

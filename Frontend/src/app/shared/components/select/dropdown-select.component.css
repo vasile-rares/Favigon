@@ -98,11 +98,11 @@
 }
 
 .dropdown-select__panel--open {
-  animation: dropdown-select-enter 0.05s ease-out forwards;
+  animation: dropdown-select-enter 0.12s ease-out forwards;
 }
 
 .dropdown-select__panel--closing {
-  animation: dropdown-select-exit 0.05s ease-in forwards;
+  animation: dropdown-select-exit 0.12s ease-in forwards;
 }
 
 .dropdown-select__search-row {

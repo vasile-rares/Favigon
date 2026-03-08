@@ -31,4 +31,6 @@ public class User
     public DateTime CreatedAt { get; set; }
 
     public ICollection<Project> Projects { get; set; } = new List<Project>();
+
+    public ICollection<AccountProvider> AccountProviders { get; set; } = new List<AccountProvider>();
 }

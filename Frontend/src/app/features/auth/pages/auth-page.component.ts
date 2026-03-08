@@ -91,7 +91,7 @@ export class AuthPage implements OnInit {
 
   ngOnInit() {
     this.checkRememberedEmail();
-    void this.tryGithubCallbackLogin();
+    void this.tryOAuthCallbackLogin();
   }
 
   // --- Actions ---
@@ -188,9 +188,33 @@ export class AuthPage implements OnInit {
       `?client_id=${encodeURIComponent(clientId)}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&scope=${encodeURIComponent('read:user user:email')}` +
+      `&state=${encodeURIComponent('github')}` +
       `&prompt=select_account`;
 
     window.location.href = githubAuthorizeUrl;
+  }
+
+  startGoogleLogin() {
+    const clientId = environment.googleClientId?.trim();
+    if (!clientId) {
+      this.statusMessage.set({
+        type: 'error',
+        text: 'Google login is not configured in frontend environment.',
+      });
+      return;
+    }
+
+    const redirectUri = `${window.location.origin}/login`;
+    const googleAuthorizeUrl =
+      `https://accounts.google.com/o/oauth2/v2/auth` +
+      `?client_id=${encodeURIComponent(clientId)}` +
+      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
+      `&response_type=${encodeURIComponent('code')}` +
+      `&scope=${encodeURIComponent('openid email profile')}` +
+      `&prompt=${encodeURIComponent('select_account')}` +
+      `&state=${encodeURIComponent('google')}`;
+
+    window.location.href = googleAuthorizeUrl;
   }
 
   // --- Private Helpers ---
@@ -239,19 +263,31 @@ export class AuthPage implements OnInit {
     this.statusMessage.set(null);
   }
 
-  private async tryGithubCallbackLogin() {
+  private async tryOAuthCallbackLogin() {
     const code = this.route.snapshot.queryParamMap.get('code');
     if (!code) {
       return;
     }
 
+    const state = this.route.snapshot.queryParamMap.get('state')?.trim().toLowerCase();
+
     this.startLoading();
 
     try {
-      await firstValueFrom(this.authService.loginWithGithub({ code }));
+      if (state == 'google') {
+        await firstValueFrom(this.authService.loginWithGoogle({ code }));
+      } else {
+        await firstValueFrom(this.authService.loginWithGithub({ code }));
+      }
+
       await this.router.navigate(['/dashboard']);
     } catch (error: any) {
-      this.handleError(error, 'Could not authenticate with GitHub.');
+      this.handleError(
+        error,
+        state === 'google'
+          ? 'Could not authenticate with Google.'
+          : 'Could not authenticate with GitHub.',
+      );
       await this.router.navigate(['/login'], { replaceUrl: true });
     } finally {
       this.isSubmitting.set(false);

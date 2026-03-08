@@ -1,17 +1,16 @@
-using Prismatic.Application.DTOs.Requests;
-using Prismatic.Application.DTOs.Responses;
-using Prismatic.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using Prismatic.Application.DTOs.Requests;
+using Prismatic.Application.Interfaces;
 
 namespace Prismatic.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-public class AuthController : ControllerBase
+[Route("api/account")]
+public class AccountController : ControllerBase
 {
   private readonly IAuthService _authService;
 
-  public AuthController(IAuthService authService)
+  public AccountController(IAuthService authService)
   {
     _authService = authService;
   }
@@ -37,12 +36,20 @@ public class AuthController : ControllerBase
     return Ok(new { message = "Login successful." });
   }
 
-  [HttpPost("github")]
+  [HttpPost("oauth2/github")]
   public async Task<IActionResult> LoginWithGithub([FromBody] GithubAuthRequest request)
   {
     var response = await _authService.LoginWithGithubAsync(request);
     SetTokenCookie(response.Token);
     return Ok(new { message = "GitHub authentication successful." });
+  }
+
+  [HttpPost("oauth2/google")]
+  public async Task<IActionResult> LoginWithGoogle([FromBody] GoogleAuthRequest request)
+  {
+    var response = await _authService.LoginWithGoogleAsync(request);
+    SetTokenCookie(response.Token);
+    return Ok(new { message = "Google authentication successful." });
   }
 
   [HttpPost("logout")]

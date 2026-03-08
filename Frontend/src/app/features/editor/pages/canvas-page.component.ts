@@ -76,6 +76,13 @@ interface HistorySnapshot {
   selectedElementId: string | null;
 }
 
+interface CanvasClipboardSnapshot {
+  rootId: string;
+  sourcePageId: string | null;
+  pasteCount: number;
+  elements: CanvasElement[];
+}
+
 @Component({
   selector: 'app-canvas-page',
   standalone: true,
@@ -160,6 +167,7 @@ export class ProjectPage implements OnDestroy {
   private readonly minElementSize = 24;
   private readonly frameInsertGap = 48;
   private readonly maxHistorySteps = 10;
+  private readonly clipboardPasteOffset = 24;
 
   private canPersistDesign = false;
   private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -174,6 +182,7 @@ export class ProjectPage implements OnDestroy {
   private redoStack: HistorySnapshot[] = [];
   private pendingGestureHistorySnapshot: HistorySnapshot | null = null;
   private pendingTextEditHistorySnapshot: HistorySnapshot | null = null;
+  private clipboardSnapshot: CanvasClipboardSnapshot | null = null;
   private resizeStart: ResizeState = {
     pointerX: 0,
     pointerY: 0,
@@ -243,6 +252,43 @@ export class ProjectPage implements OnDestroy {
     this.currentTool.set('select');
   }
 
+  deletePage(pageId: string): void {
+    const pages = this.pages();
+    if (pages.length <= 1) {
+      this.apiError.set('A project must contain at least one page.');
+      return;
+    }
+
+    const page = pages.find((entry) => entry.id === pageId);
+    if (!page) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(`Delete page "${page.name}"?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    this.apiError.set(null);
+
+    this.runWithHistory(() => {
+      const currentPages = this.pages();
+      const pageIndex = currentPages.findIndex((entry) => entry.id === pageId);
+      const nextPages = currentPages.filter((entry) => entry.id !== pageId);
+      const fallbackPage =
+        nextPages[Math.min(pageIndex, nextPages.length - 1)] ?? nextPages[0] ?? null;
+
+      this.pages.set(nextPages);
+      if (this.currentPageId() === pageId) {
+        this.currentPageId.set(fallbackPage?.id ?? null);
+      }
+
+      this.selectedElementId.set(null);
+      this.editingTextElementId.set(null);
+      this.currentTool.set('select');
+    });
+  }
+
   onCanvasPointerDown(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     if (!this.shouldStartPanning(event, target)) {
@@ -308,6 +354,16 @@ export class ProjectPage implements OnDestroy {
     this.selectedElementId.set(id);
 
     if (this.currentTool() !== 'select') {
+      const selectedFrame = this.getSelectedFrame();
+      const clickedElement = this.findElementById(id);
+      if (
+        selectedFrame &&
+        clickedElement?.id === selectedFrame.id &&
+        clickedElement.type === 'frame'
+      ) {
+        return;
+      }
+
       this.currentTool.set('select');
       return;
     }
@@ -869,6 +925,18 @@ export class ProjectPage implements OnDestroy {
 
     if (!isTypingContext && (event.ctrlKey || event.metaKey)) {
       const key = event.key.toLowerCase();
+      if (key === 'c') {
+        event.preventDefault();
+        this.copySelectedElement();
+        return;
+      }
+
+      if (key === 'v') {
+        event.preventDefault();
+        this.pasteClipboard();
+        return;
+      }
+
       if (key === 'z' && !event.shiftKey) {
         event.preventDefault();
         this.undo();
@@ -1115,6 +1183,75 @@ export class ProjectPage implements OnDestroy {
       opacity: 1,
       cornerRadius: 0,
       parentId: null,
+    };
+  }
+
+  private copySelectedElement(): void {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) {
+      return;
+    }
+
+    const subtreeIds = new Set(this.collectSubtreeIds(this.elements(), selectedId));
+    const copiedElements = this.elements()
+      .filter((element) => subtreeIds.has(element.id))
+      .map((element) => structuredClone(element));
+
+    if (copiedElements.length === 0) {
+      return;
+    }
+
+    this.clipboardSnapshot = {
+      rootId: selectedId,
+      sourcePageId: this.currentPageId(),
+      pasteCount: 0,
+      elements: copiedElements,
+    };
+    this.apiError.set(null);
+  }
+
+  private pasteClipboard(): void {
+    const clipboard = this.clipboardSnapshot;
+    if (!clipboard) {
+      return;
+    }
+
+    const currentPage = this.currentPage();
+    if (!currentPage) {
+      return;
+    }
+
+    const rootElement = clipboard.elements.find((element) => element.id === clipboard.rootId);
+    if (!rootElement) {
+      return;
+    }
+
+    const targetParentId = this.resolvePasteParentId(rootElement, currentPage.elements);
+    if (rootElement.type !== 'frame' && !targetParentId) {
+      this.apiError.set('Select a destination frame before pasting this element.');
+      return;
+    }
+
+    const pastedElements = this.createPastedElements(
+      clipboard,
+      currentPage.elements,
+      targetParentId,
+    );
+    if (pastedElements.length === 0) {
+      return;
+    }
+
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) => [...elements, ...pastedElements]);
+      this.selectedElementId.set(pastedElements[0]?.id ?? null);
+      this.editingTextElementId.set(null);
+      this.currentTool.set('select');
+    });
+
+    this.apiError.set(null);
+    this.clipboardSnapshot = {
+      ...clipboard,
+      pasteCount: clipboard.pasteCount + 1,
     };
   }
 
@@ -1630,6 +1767,66 @@ export class ProjectPage implements OnDestroy {
           : page,
       ),
     );
+  }
+
+  private resolvePasteParentId(
+    rootElement: CanvasElement,
+    currentElements: CanvasElement[],
+  ): string | null {
+    if (rootElement.type === 'frame') {
+      return null;
+    }
+
+    const originalParentId = rootElement.parentId ?? null;
+    if (
+      originalParentId &&
+      currentElements.some((element) => element.id === originalParentId && element.type === 'frame')
+    ) {
+      return originalParentId;
+    }
+
+    const selectedFrame = this.getSelectedFrame();
+    return selectedFrame?.id ?? null;
+  }
+
+  private createPastedElements(
+    clipboard: CanvasClipboardSnapshot,
+    currentElements: CanvasElement[],
+    targetParentId: string | null,
+  ): CanvasElement[] {
+    const rootElement = clipboard.elements.find((element) => element.id === clipboard.rootId);
+    if (!rootElement) {
+      return [];
+    }
+
+    const idMap = new Map(clipboard.elements.map((element) => [element.id, crypto.randomUUID()]));
+    const targetParent = targetParentId
+      ? (currentElements.find((element) => element.id === targetParentId) ?? null)
+      : null;
+    const offset = this.clipboardPasteOffset * (clipboard.pasteCount + 1);
+    const pastedElements = clipboard.elements.map((element) => {
+      const clonedElement = structuredClone(element);
+      clonedElement.id = idMap.get(element.id) ?? crypto.randomUUID();
+
+      if (element.id === clipboard.rootId) {
+        clonedElement.parentId = targetParentId;
+
+        if (targetParent) {
+          clonedElement.x = this.clamp(element.x + offset, 0, targetParent.width - element.width);
+          clonedElement.y = this.clamp(element.y + offset, 0, targetParent.height - element.height);
+        } else {
+          clonedElement.x = this.roundToTwoDecimals(element.x + offset);
+          clonedElement.y = this.roundToTwoDecimals(element.y + offset);
+        }
+
+        return clonedElement;
+      }
+
+      clonedElement.parentId = element.parentId ? (idMap.get(element.parentId) ?? null) : null;
+      return clonedElement;
+    });
+
+    return pastedElements;
   }
 
   private getElementStrokeStyle(

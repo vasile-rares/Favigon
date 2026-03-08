@@ -8,7 +8,7 @@ public static class UserSeeder
 {
   public static async Task SeedAsync(PrismaticDbContext context)
   {
-    await context.Database.EnsureCreatedAsync();
+    await context.Database.MigrateAsync();
 
     if (!await context.Users.AnyAsync())
     {

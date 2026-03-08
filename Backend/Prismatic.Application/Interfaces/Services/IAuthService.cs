@@ -8,4 +8,5 @@ public interface IAuthService
   Task<AuthResponse> RegisterAsync(RegisterRequest request);
   Task<AuthResponse?> LoginAsync(LoginRequest request);
   Task<AuthResponse> LoginWithGithubAsync(GithubAuthRequest request);
+  Task<AuthResponse> LoginWithGoogleAsync(GoogleAuthRequest request);
 }

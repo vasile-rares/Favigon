@@ -9,6 +9,7 @@
       [selectedElementId]="selectedElementId()"
       (pageSelected)="selectPage($event)"
       (pageCreateRequested)="addPage()"
+      (pageDeleteRequested)="deletePage($event)"
       (layerSelected)="onLayerSelected($event)"
       (layerNameChanged)="onLayerNameChanged($event)"
       (layerMoved)="onLayerMoved($event)"

@@ -72,10 +72,9 @@
   background-color: var(--color-zinc-900);
   color: var(--color-zinc-200);
   border-radius: 6px;
-  padding: 0.55rem 0.65rem;
-  text-align: left;
-  font-size: 0.82rem;
-  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 0.2rem;
 
   &:hover {
     border-color: var(--color-border);
@@ -85,6 +84,43 @@
     border-color: var(--color-brand-primary-30);
     background-color: var(--color-brand-primary-10);
     color: var(--color-zinc-100);
+  }
+}
+
+.project-page-select {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: inherit;
+  padding: 0.35rem 0.45rem;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.project-page-delete,
+.project-layer-visibility {
+  border: none;
+  background-color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.project-page-delete {
+  width: 28px;
+  height: 28px;
+  color: var(--color-zinc-500);
+  border-radius: 5px;
+
+  &:hover:not(:disabled) {
+    color: #fca5a5;
+    background-color: rgba(239, 68, 68, 0.08);
+  }
+
+  &:disabled {
+    opacity: 0.45;
   }
 }
 
@@ -213,17 +249,9 @@
 
 .project-layer-visibility {
   padding: 0.25rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  border: none;
   border-radius: var(--radius-md);
-  background-color: transparent;
   color: var(--color-text-light);
-  cursor: pointer;
-  transition:
-    background-color 0.18s ease;
 
   &:hover {
     background-color: var(--color-btn-tertiary-hover);

@@ -5,6 +5,7 @@ import { environment } from '../../../environments/environment';
 import {
   AuthMessageResponse,
   GithubAuthRequest,
+  GoogleAuthRequest,
   LoginRequest,
   RegisterRequest,
 } from '../models/auth.models';
@@ -15,18 +16,22 @@ export class AuthService {
   private readonly baseUrl = environment.apiBaseUrl;
 
   login(request: LoginRequest): Observable<AuthMessageResponse> {
-    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/auth/login`, request);
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/login`, request);
   }
 
   register(request: RegisterRequest): Observable<AuthMessageResponse> {
-    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/auth/register`, request);
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/register`, request);
   }
 
   loginWithGithub(request: GithubAuthRequest): Observable<AuthMessageResponse> {
-    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/auth/github`, request);
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/oauth2/github`, request);
+  }
+
+  loginWithGoogle(request: GoogleAuthRequest): Observable<AuthMessageResponse> {
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/oauth2/google`, request);
   }
 
   logout(): Observable<AuthMessageResponse> {
-    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/auth/logout`, {});
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/logout`, {});
   }
 }

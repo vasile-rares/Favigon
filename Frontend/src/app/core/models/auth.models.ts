@@ -14,6 +14,10 @@ export interface GithubAuthRequest {
   code: string;
 }
 
+export interface GoogleAuthRequest {
+  code: string;
+}
+
 export interface AuthMessageResponse {
   message: string;
 }

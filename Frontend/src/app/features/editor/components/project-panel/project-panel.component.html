@@ -8,14 +8,27 @@
     </div>
 
     <div class="project-pages-list">
-      <button
-        type="button"
+      <div
         class="project-page-item"
         *ngFor="let page of pages; trackBy: trackByPageId"
-        [class.active]="page.id === currentPageId"
-        (click)="onPageSelect(page.id)">
-        {{ page.name }}
-      </button>
+        [class.active]="page.id === currentPageId">
+        <button type="button" class="project-page-select" (click)="onPageSelect(page.id)">
+          {{ page.name }}
+        </button>
+        <button
+          type="button"
+          class="project-page-delete"
+          [disabled]="!canDeletePage()"
+          [attr.aria-label]="'Delete ' + page.name"
+          [title]="canDeletePage() ? 'Delete page' : 'At least one page is required'"
+          (click)="onPageDelete(page.id, $event)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 6h18"></path>
+            <path d="M8 6V4h8v2"></path>
+            <path d="M19 6l-1 14H6L5 6"></path>
+          </svg>
+        </button>
+      </div>
     </div>
   </section>
 

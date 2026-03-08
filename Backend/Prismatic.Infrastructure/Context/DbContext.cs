@@ -12,6 +12,7 @@ public class PrismaticDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     // DbSets
     public DbSet<User> Users { get; set; }
+    public DbSet<AccountProvider> AccountProviders { get; set; }
     public DbSet<Project> Projects { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -23,6 +24,9 @@ public class PrismaticDbContext : Microsoft.EntityFrameworkCore.DbContext
             .IsUnique();
 
         modelBuilder.Entity<User>()
+            .ToTable("users");
+
+        modelBuilder.Entity<User>()
             .Property(u => u.CreatedAt)
             .HasDefaultValueSql("NOW()")
             .ValueGeneratedOnAdd();
@@ -32,6 +36,43 @@ public class PrismaticDbContext : Microsoft.EntityFrameworkCore.DbContext
             .WithOne(p => p.User)
             .HasForeignKey(p => p.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<User>()
+            .HasMany(u => u.AccountProviders)
+            .WithOne(accountProvider => accountProvider.User)
+            .HasForeignKey(accountProvider => accountProvider.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<AccountProvider>()
+            .ToTable("account_providers");
+
+        modelBuilder.Entity<AccountProvider>()
+            .HasIndex(accountProvider => new { accountProvider.Provider, accountProvider.ProviderUserId })
+            .IsUnique();
+
+        modelBuilder.Entity<AccountProvider>()
+            .HasIndex(accountProvider => new { accountProvider.UserId, accountProvider.Provider })
+            .IsUnique();
+
+        modelBuilder.Entity<AccountProvider>()
+            .Property(accountProvider => accountProvider.Provider)
+            .HasMaxLength(50);
+
+        modelBuilder.Entity<AccountProvider>()
+            .Property(accountProvider => accountProvider.ProviderUserId)
+            .HasMaxLength(255);
+
+        modelBuilder.Entity<AccountProvider>()
+            .Property(accountProvider => accountProvider.ProviderEmail)
+            .HasMaxLength(100);
+
+        modelBuilder.Entity<AccountProvider>()
+            .Property(accountProvider => accountProvider.CreatedAt)
+            .HasDefaultValueSql("NOW()")
+            .ValueGeneratedOnAdd();
+
+        modelBuilder.Entity<Project>()
+            .ToTable("projects");
 
         modelBuilder.Entity<Project>()
             .Property(p => p.CreatedAt)

@@ -1,6 +1,6 @@
 import { Component, signal, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
 import { ProjectService } from '../../../core/services/project.service';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
@@ -9,23 +9,20 @@ import {
   NewProjectDialogComponent,
   NewProjectDialogSubmit,
 } from '../components/new-project-dialog/new-project-dialog.component';
-
-interface Project {
-  id: number;
-  name: string;
-  lastEdited: Date;
-  thumbnailUrl?: string;
-}
+import {
+  ProjectCardComponent,
+  ProjectCardViewModel,
+} from '../components/project-card/project-card.component';
 
 @Component({
   selector: 'app-dashboard-page',
   standalone: true,
   imports: [
     CommonModule,
-    RouterLink,
     HeaderBarComponent,
     NewProjectDialogComponent,
     ActionButtonComponent,
+    ProjectCardComponent,
   ],
   templateUrl: './dashboard-page.component.html',
   styleUrl: './dashboard-page.component.css',
@@ -34,11 +31,12 @@ export class DashboardPage implements OnInit {
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
 
-  projects = signal<Project[]>([]);
+  projects = signal<ProjectCardViewModel[]>([]);
   isLoading = signal(true);
   errorMessage = signal<string | null>(null);
   isCreateDialogOpen = signal(false);
   isCreatingProject = signal(false);
+  deletingProjectIds = signal<number[]>([]);
 
   ngOnInit() {
     this.loadProjects();
@@ -64,6 +62,10 @@ export class DashboardPage implements OnInit {
         this.isLoading.set(false);
       },
     });
+  }
+
+  isDeletingProject(projectId: number): boolean {
+    return this.deletingProjectIds().includes(projectId);
   }
 
   openCreateProjectDialog() {
@@ -103,5 +105,34 @@ export class DashboardPage implements OnInit {
           this.isCreatingProject.set(false);
         },
       });
+  }
+
+  deleteProject(project: ProjectCardViewModel): void {
+    if (this.isDeletingProject(project.id)) {
+      return;
+    }
+
+    const shouldDelete = window.confirm(`Delete project "${project.name}"?`);
+    if (!shouldDelete) {
+      return;
+    }
+
+    this.errorMessage.set(null);
+    this.deletingProjectIds.update((projectIds) => [...projectIds, project.id]);
+
+    this.projectService.delete(project.id).subscribe({
+      next: () => {
+        this.projects.update((projects) => projects.filter((entry) => entry.id !== project.id));
+        this.deletingProjectIds.update((projectIds) =>
+          projectIds.filter((projectId) => projectId !== project.id),
+        );
+      },
+      error: (error: unknown) => {
+        this.errorMessage.set(extractApiErrorMessage(error, 'Failed to delete project.'));
+        this.deletingProjectIds.update((projectIds) =>
+          projectIds.filter((projectId) => projectId !== project.id),
+        );
+      },
+    });
   }
 }
