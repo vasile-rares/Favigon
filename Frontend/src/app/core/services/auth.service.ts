@@ -44,4 +44,8 @@ export class AuthService {
   logout(): Observable<AuthMessageResponse> {
     return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/logout`, {});
   }
+
+  refresh(): Observable<AuthMessageResponse> {
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/refresh`, {});
+  }
 }

@@ -72,9 +72,11 @@ public class AuthService : IAuthService
     await _userRepository.AddAsync(user);
 
     var (token, expiresAt) = GenerateJwtToken(user);
+    var (refreshToken, _) = GenerateRefreshToken(user);
     var response = _mapper.Map<AuthResponse>(user);
     response.Token = token;
     response.ExpiresAt = expiresAt;
+    response.RefreshToken = refreshToken;
     return response;
   }
 
@@ -94,9 +96,11 @@ public class AuthService : IAuthService
     }
 
     var (token, expiresAt) = GenerateJwtToken(user);
+    var (refreshToken, _) = GenerateRefreshToken(user);
     var response = _mapper.Map<AuthResponse>(user);
     response.Token = token;
     response.ExpiresAt = expiresAt;
+    response.RefreshToken = refreshToken;
     return response;
   }
 
@@ -120,9 +124,11 @@ public class AuthService : IAuthService
       githubProfile.ProfilePictureUrl);
 
     var (token, expiresAt) = GenerateJwtToken(user);
+    var (refreshToken, _) = GenerateRefreshToken(user);
     var response = _mapper.Map<AuthResponse>(user);
     response.Token = token;
     response.ExpiresAt = expiresAt;
+    response.RefreshToken = refreshToken;
     return response;
   }
 
@@ -145,9 +151,11 @@ public class AuthService : IAuthService
       googleProfile.ProfilePictureUrl);
 
     var (token, expiresAt) = GenerateJwtToken(user);
+    var (refreshToken, _) = GenerateRefreshToken(user);
     var response = _mapper.Map<AuthResponse>(user);
     response.Token = token;
     response.ExpiresAt = expiresAt;
+    response.RefreshToken = refreshToken;
     return response;
   }
 
@@ -284,6 +292,54 @@ public class AuthService : IAuthService
     return user;
   }
 
+  public async Task<AuthResponse> RefreshAsync(string refreshToken)
+  {
+    var key = _configuration["JwtSettings:Key"] ?? "";
+    var issuer = _configuration["JwtSettings:Issuer"];
+    var audience = _configuration["JwtSettings:Audience"];
+    var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+
+    ClaimsPrincipal principal;
+    try
+    {
+      principal = new JwtSecurityTokenHandler().ValidateToken(refreshToken, new TokenValidationParameters
+      {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateIssuerSigningKey = true,
+        ValidateLifetime = true,
+        ValidIssuer = issuer,
+        ValidAudience = audience,
+        IssuerSigningKey = signingKey,
+        ClockSkew = TimeSpan.FromMinutes(1)
+      }, out _);
+    }
+    catch
+    {
+      throw new ArgumentException("Invalid or expired refresh token.");
+    }
+
+    var tokenType = principal.FindFirstValue("token_type");
+    if (tokenType != "refresh")
+      throw new ArgumentException("Invalid token type.");
+
+    var userIdStr = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdStr, out var userId))
+      throw new ArgumentException("Invalid token.");
+
+    var user = await _userRepository.GetByIdAsync(userId)
+      ?? throw new ArgumentException("User not found.");
+
+    var (newToken, expiresAt) = GenerateJwtToken(user);
+    var (newRefreshToken, _) = GenerateRefreshToken(user);
+
+    var response = _mapper.Map<AuthResponse>(user);
+    response.Token = newToken;
+    response.ExpiresAt = expiresAt;
+    response.RefreshToken = newRefreshToken;
+    return response;
+  }
+
   private (string Token, DateTime ExpiresAt) GenerateJwtToken(User user)
   {
     var key = _configuration["JwtSettings:Key"] ?? "";
@@ -299,6 +355,34 @@ public class AuthService : IAuthService
       new Claim(ClaimTypes.Name, user.DisplayName),
       new Claim(ClaimTypes.Role, user.Role),
       new Claim("username", user.Username),
+      new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+    };
+
+    var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
+    var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+
+    var token = new JwtSecurityToken(
+        issuer: issuer,
+        audience: audience,
+        claims: claims,
+        expires: expiresAt,
+        signingCredentials: credentials);
+
+    return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+  }
+
+  private (string Token, DateTime ExpiresAt) GenerateRefreshToken(User user)
+  {
+    var key = _configuration["JwtSettings:Key"] ?? "";
+    var issuer = _configuration["JwtSettings:Issuer"];
+    var audience = _configuration["JwtSettings:Audience"];
+    var expirationDays = _configuration.GetValue<int>("JwtSettings:RefreshTokenDays", 30);
+    var expiresAt = DateTime.UtcNow.AddDays(expirationDays);
+
+    var claims = new[]
+    {
+      new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+      new Claim("token_type", "refresh"),
       new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
     };
 

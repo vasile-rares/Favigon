@@ -35,7 +35,7 @@
             "console": "integratedTerminal",
             "serverReadyAction": {
                 "action": "openExternally",
-                "pattern": "Local:\\s+(http://\\S+)",
+                "pattern": "Local:\\s+(https://\\S+)",
                 "uriFormat": "%s"
             }
         }

@@ -6,6 +6,8 @@ import {
   HostListener,
   Input,
   OnChanges,
+  OnDestroy,
+  OnInit,
   Output,
   SimpleChanges,
 } from '@angular/core';
@@ -29,7 +31,7 @@ export interface ContextMenuItem {
   templateUrl: './context-menu.component.html',
   styleUrl: './context-menu.component.css',
 })
-export class ContextMenuComponent implements OnChanges {
+export class ContextMenuComponent implements OnChanges, OnInit, OnDestroy {
   @Input() x = 0;
   @Input() y = 0;
   @Input() items: ContextMenuItem[] = [];
@@ -40,7 +42,21 @@ export class ContextMenuComponent implements OnChanges {
   adjustedY = 0;
   openSubmenuId: string | null = null;
 
+  private readonly onDocumentPointerDownCapture = (event: PointerEvent): void => {
+    if (!this.el.nativeElement.contains(event.target as Node)) {
+      this.closed.emit();
+    }
+  };
+
   constructor(private readonly el: ElementRef<HTMLElement>) {}
+
+  ngOnInit(): void {
+    document.addEventListener('pointerdown', this.onDocumentPointerDownCapture, true);
+  }
+
+  ngOnDestroy(): void {
+    document.removeEventListener('pointerdown', this.onDocumentPointerDownCapture, true);
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['x'] || changes['y']) {
@@ -77,13 +93,6 @@ export class ContextMenuComponent implements OnChanges {
     item.action?.();
     this.openSubmenuId = null;
     this.closed.emit();
-  }
-
-  @HostListener('document:pointerdown', ['$event'])
-  onDocumentPointerDown(event: PointerEvent): void {
-    if (!this.el.nativeElement.contains(event.target as Node)) {
-      this.closed.emit();
-    }
   }
 
   @HostListener('document:keydown.escape')

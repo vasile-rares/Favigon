@@ -660,20 +660,16 @@ export class ProjectPage implements OnDestroy {
         disabled: !hasEl,
         action: () => this.ctxSendToBack(),
       },
-      ...(otherPages.length > 0
-        ? [
-            {
-              id: 'move-to-page',
-              label: 'Move to Page',
-              disabled: !hasEl,
-              children: otherPages.map((p) => ({
-                id: `move-page-${p.id}`,
-                label: p.name,
-                action: () => this.ctxMoveToPage(p.id),
-              })),
-            },
-          ]
-        : []),
+      {
+        id: 'move-to-page',
+        label: 'Move to Page',
+        disabled: !hasEl || otherPages.length === 0,
+        children: otherPages.map((p) => ({
+          id: `move-page-${p.id}`,
+          label: p.name,
+          action: () => this.ctxMoveToPage(p.id),
+        })),
+      },
 
       // Transform group
       {

@@ -21,6 +21,8 @@
 
   --color-surface: #171717;
   --color-surface-elevated: #1e1e1e;
+
+  --color-border-dark-transparent: rgba(39, 39, 42, 0.5);
   --color-surface-transparent: rgba(23, 23, 23, 0.8);
 
   --color-border-light: #f4f4f5;

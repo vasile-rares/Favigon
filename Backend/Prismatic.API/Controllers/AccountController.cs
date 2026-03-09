@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Prismatic.Application.DTOs.Requests;
 using Prismatic.Application.Interfaces;
 
@@ -6,20 +7,24 @@ namespace Prismatic.API.Controllers;
 
 [ApiController]
 [Route("api/account")]
+[EnableRateLimiting("auth")]
 public class AccountController : ControllerBase
 {
   private readonly IAuthService _authService;
+  private readonly IWebHostEnvironment _environment;
 
-  public AccountController(IAuthService authService)
+  public AccountController(IAuthService authService, IWebHostEnvironment environment)
   {
     _authService = authService;
+    _environment = environment;
   }
 
   [HttpPost("register")]
   public async Task<IActionResult> Register([FromBody] RegisterRequest request)
   {
     var response = await _authService.RegisterAsync(request);
-    SetTokenCookie(response.Token);
+    SetAccessTokenCookie(response.Token);
+    SetRefreshTokenCookie(response.RefreshToken);
     return Ok(new { message = "User registered successfully." });
   }
 
@@ -28,11 +33,10 @@ public class AccountController : ControllerBase
   {
     var response = await _authService.LoginAsync(request);
     if (response == null)
-    {
       return Unauthorized(new { message = "Invalid email or password." });
-    }
 
-    SetTokenCookie(response.Token);
+    SetAccessTokenCookie(response.Token);
+    SetRefreshTokenCookie(response.RefreshToken);
     return Ok(new { message = "Login successful." });
   }
 
@@ -40,7 +44,8 @@ public class AccountController : ControllerBase
   public async Task<IActionResult> LoginWithGithub([FromBody] GithubAuthRequest request)
   {
     var response = await _authService.LoginWithGithubAsync(request);
-    SetTokenCookie(response.Token);
+    SetAccessTokenCookie(response.Token);
+    SetRefreshTokenCookie(response.RefreshToken);
     return Ok(new { message = "GitHub authentication successful." });
   }
 
@@ -48,7 +53,8 @@ public class AccountController : ControllerBase
   public async Task<IActionResult> LoginWithGoogle([FromBody] GoogleAuthRequest request)
   {
     var response = await _authService.LoginWithGoogleAsync(request);
-    SetTokenCookie(response.Token);
+    SetAccessTokenCookie(response.Token);
+    SetRefreshTokenCookie(response.RefreshToken);
     return Ok(new { message = "Google authentication successful." });
   }
 
@@ -69,23 +75,71 @@ public class AccountController : ControllerBase
     return Ok(new { message = "Password reset successful. You can now sign in with your new password." });
   }
 
+  [HttpPost("refresh")]
+  [DisableRateLimiting]
+  public async Task<IActionResult> Refresh()
+  {
+    if (!Request.Cookies.TryGetValue("refresh_token", out var refreshToken))
+      return Unauthorized(new { message = "Refresh token not found." });
+
+    try
+    {
+      var response = await _authService.RefreshAsync(refreshToken);
+      SetAccessTokenCookie(response.Token);
+      SetRefreshTokenCookie(response.RefreshToken);
+      return Ok(new { message = "Token refreshed." });
+    }
+    catch
+    {
+      DeleteRefreshTokenCookie();
+      Response.Cookies.Delete("jwt");
+      return Unauthorized(new { message = "Refresh token is invalid or has expired. Please log in again." });
+    }
+  }
+
   [HttpPost("logout")]
+  [DisableRateLimiting]
   public IActionResult Logout()
   {
     Response.Cookies.Delete("jwt");
+    DeleteRefreshTokenCookie();
     return Ok(new { message = "Logged out successfully" });
   }
 
-  private void SetTokenCookie(string token)
+  private bool IsSecure => !_environment.IsDevelopment();
+
+  private void SetAccessTokenCookie(string token)
   {
-    var cookieOptions = new CookieOptions
+    Response.Cookies.Append("jwt", token, new CookieOptions
     {
       HttpOnly = true,
-      Secure = false,
+      Secure = IsSecure,
       SameSite = SameSiteMode.Strict,
       Expires = DateTime.UtcNow.AddDays(7)
-    };
+    });
+  }
 
-    Response.Cookies.Append("jwt", token, cookieOptions);
+  private void SetRefreshTokenCookie(string refreshToken)
+  {
+    Response.Cookies.Append("refresh_token", refreshToken, new CookieOptions
+    {
+      HttpOnly = true,
+      Secure = IsSecure,
+      SameSite = SameSiteMode.Strict,
+      Path = "/api/account/refresh",
+      Expires = DateTime.UtcNow.AddDays(30)
+    });
+  }
+
+  private void DeleteRefreshTokenCookie()
+  {
+    Response.Cookies.Append("refresh_token", "", new CookieOptions
+    {
+      HttpOnly = true,
+      Secure = IsSecure,
+      SameSite = SameSiteMode.Strict,
+      Path = "/api/account/refresh",
+      Expires = DateTime.UtcNow.AddDays(-1)
+    });
   }
 }

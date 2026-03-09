@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Prismatic.API.Middlewares;
 using Prismatic.Application;
 using Prismatic.Infrastructure;
@@ -24,6 +25,20 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("auth", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
+    options.RejectionStatusCode = 429;
+});
 
 var jwtKey = builder.Configuration["JwtSettings:Key"] ?? "";
 var jwtIssuer = builder.Configuration["JwtSettings:Issuer"];
@@ -59,6 +74,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+
+builder.Services.AddHsts(options =>
+{
+    options.MaxAge = TimeSpan.FromDays(365);
+    options.IncludeSubDomains = true;
+    options.Preload = true;
+});
 
 // Swagger
 builder.Services.AddOpenApi();
@@ -102,6 +124,7 @@ builder.Services.AddSwaggerGen(options =>
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlerMiddleware>();
+app.UseMiddleware<SecurityHeadersMiddleware>();
 
 await app.Services.SeedInfrastructureAsync();
 
@@ -110,12 +133,17 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
-else
+
+app.UseHttpsRedirection();
+
+if (!app.Environment.IsDevelopment())
 {
-    app.UseHttpsRedirection();
+    app.UseHsts();
 }
 
 app.UseCors("AllowAll");
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

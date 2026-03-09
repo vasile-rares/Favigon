@@ -9,12 +9,13 @@ import { provideAnimations } from '@angular/platform-browser/animations';
 
 import { routes } from './app.routes';
 import { apiCredentialsInterceptor } from './core/interceptors/api-credentials.interceptor';
+import { authRefreshInterceptor } from './core/interceptors/auth-refresh.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
-    provideHttpClient(withInterceptors([apiCredentialsInterceptor])),
+    provideHttpClient(withInterceptors([apiCredentialsInterceptor, authRefreshInterceptor])),
     provideRouter(routes),
     provideAnimations(),
   ],
