@@ -34,6 +34,11 @@ public class UserRepository : IUserRepository
     return _context.Users.FirstOrDefaultAsync(u => u.Email == email);
   }
 
+  public Task<User?> GetByPasswordResetTokenHashAsync(string tokenHash)
+  {
+    return _context.Users.FirstOrDefaultAsync(u => u.PasswordResetTokenHash == tokenHash);
+  }
+
   public async Task<User> AddAsync(User user)
   {
     _context.Users.Add(user);

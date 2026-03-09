@@ -1,14 +1,17 @@
 import { Component, signal, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
 import { ProjectService } from '../../../core/services/project.service';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
 import { ActionButtonComponent } from '../../../shared/components/button/action-button.component';
+import { DIALOG_BOX_IMPORTS } from '../../../shared/components/dialog-box/dialog-box.component';
+import { TextInputComponent } from '../../../shared/components/input/text-input.component';
 import {
-  NewProjectDialogComponent,
-  NewProjectDialogSubmit,
-} from '../components/new-project-dialog/new-project-dialog.component';
+  DropdownSelectComponent,
+  DropdownSelectOption,
+} from '../../../shared/components/select/dropdown-select.component';
 import {
   ProjectCardComponent,
   ProjectCardViewModel,
@@ -19,9 +22,12 @@ import {
   standalone: true,
   imports: [
     CommonModule,
+    ReactiveFormsModule,
     HeaderBarComponent,
-    NewProjectDialogComponent,
+    ...DIALOG_BOX_IMPORTS,
     ActionButtonComponent,
+    TextInputComponent,
+    DropdownSelectComponent,
     ProjectCardComponent,
   ],
   templateUrl: './dashboard-page.component.html',
@@ -30,6 +36,7 @@ import {
 export class DashboardPage implements OnInit {
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
+  private readonly fb = new FormBuilder();
 
   projects = signal<ProjectCardViewModel[]>([]);
   isLoading = signal(true);
@@ -37,6 +44,16 @@ export class DashboardPage implements OnInit {
   isCreateDialogOpen = signal(false);
   isCreatingProject = signal(false);
   deletingProjectIds = signal<number[]>([]);
+
+  readonly createProjectFormId = 'dashboard-create-project-form';
+  readonly createProjectForm = this.fb.nonNullable.group({
+    name: ['Untitled Project', [Validators.required, Validators.maxLength(120)]],
+    isPublic: [false],
+  });
+  readonly visibilityOptions: DropdownSelectOption[] = [
+    { label: 'Private', value: false },
+    { label: 'Public', value: true },
+  ];
 
   ngOnInit() {
     this.loadProjects();
@@ -70,6 +87,7 @@ export class DashboardPage implements OnInit {
 
   openCreateProjectDialog() {
     this.errorMessage.set(null);
+    this.resetCreateProjectForm();
     this.isCreateDialogOpen.set(true);
   }
 
@@ -81,17 +99,24 @@ export class DashboardPage implements OnInit {
     this.isCreateDialogOpen.set(false);
   }
 
-  submitCreateProject(payload: NewProjectDialogSubmit) {
+  submitCreateProject() {
     if (this.isCreatingProject()) {
       return;
     }
+
+    if (this.createProjectForm.invalid) {
+      this.createProjectForm.markAllAsTouched();
+      return;
+    }
+
+    const payload = this.createProjectForm.getRawValue();
 
     this.errorMessage.set(null);
     this.isCreatingProject.set(true);
 
     this.projectService
       .create({
-        name: payload.name,
+        name: payload.name.trim(),
         isPublic: payload.isPublic,
       })
       .subscribe({
@@ -105,6 +130,13 @@ export class DashboardPage implements OnInit {
           this.isCreatingProject.set(false);
         },
       });
+  }
+
+  private resetCreateProjectForm(): void {
+    this.createProjectForm.reset({
+      name: 'Untitled Project',
+      isPublic: false,
+    });
   }
 
   deleteProject(project: ProjectCardViewModel): void {

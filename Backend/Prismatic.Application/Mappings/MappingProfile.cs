@@ -27,6 +27,11 @@ public class MappingProfile : Profile
     CreateMap<User, UserResponse>()
       .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.Id));
 
+    CreateMap<User, AuthResponse>()
+      .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.Id))
+      .ForMember(dest => dest.Token, opt => opt.Ignore())
+      .ForMember(dest => dest.ExpiresAt, opt => opt.Ignore());
+
     CreateMap<UserCreateRequest, User>()
       .ForMember(dest => dest.Id, opt => opt.Ignore())
       .ForMember(dest => dest.PasswordHash, opt => opt.Ignore())

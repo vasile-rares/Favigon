@@ -38,10 +38,61 @@
     </main>
 
     @if (isCreateDialogOpen()) {
-      <app-new-project-dialog
-        [isSubmitting]="isCreatingProject()"
-        (cancelled)="closeCreateProjectDialog()"
-        (submitted)="submitCreateProject($event)"></app-new-project-dialog>
+      <app-dialog-box
+        #createDialog
+        ariaLabelledBy="project-dialog-title"
+        [isBusy]="isCreatingProject()"
+        (closed)="closeCreateProjectDialog()">
+        <div dialogTitle>
+          <h2 id="project-dialog-title">Create project</h2>
+        </div>
+
+        <div dialogDescription>
+          <p>Set up your project details. You can adjust settings later from project options.</p>
+        </div>
+
+        <form
+          class="project-dialog-form"
+          [id]="createProjectFormId"
+          [formGroup]="createProjectForm"
+          (ngSubmit)="submitCreateProject()">
+          <app-text-input
+            id="project-name"
+            label="Name"
+            placeholder="Project name"
+            formControlName="name"
+            [requiredMarker]="true"
+            [maxLength]="120"
+            [errorText]="'Name is required.'"></app-text-input>
+
+          <app-dropdown-select
+            id="project-visibility"
+            label="Visibility"
+            placeholder="Select visibility"
+            [enableSearch]="false"
+            [options]="visibilityOptions"
+            formControlName="isPublic"></app-dropdown-select>
+        </form>
+
+        <div dialogFooter class="project-dialog-footer">
+          <app-action-button
+            type="button"
+            variant="outline"
+            [fullWidth]="false"
+            [disabled]="isCreatingProject() || createDialog.isClosing"
+            (clicked)="createDialog.requestClose()">
+            Cancel
+          </app-action-button>
+          <app-action-button
+            type="submit"
+            variant="primary"
+            [form]="createProjectFormId"
+            [fullWidth]="false"
+            [disabled]="isCreatingProject() || createDialog.isClosing || createProjectForm.invalid">
+            {{ isCreatingProject() ? 'Creating...' : 'Create project' }}
+          </app-action-button>
+        </div>
+      </app-dialog-box>
     }
   </div>
 </div>

@@ -29,7 +29,6 @@
 ## Data and Persistence Conventions
 
 - Treat PostgreSQL as the primary persistence target and keep provider-specific mappings compatible with existing schema patterns.
-- Prefer extending existing repositories/services rather than introducing parallel data-access paths.
 - Respect automatic timestamp handling and existing mapping profiles when adding entities/DTOs.
 
 ## Developer Workflows
@@ -44,9 +43,18 @@
 - Preserve credentialed frontend requests for authenticated API flows unless auth strategy is intentionally changed.
 - When introducing new backend capabilities, ensure frontend service contracts are updated in the same change.
 
+## Code Quality
+
+- Keep all new code clean, readable, and maintainable.
+- Avoid duplicating logic that already exists in the repository.
+- Do not introduce parallel implementations that perform nearly the same task.
+- Prefer reusing or slightly refactoring existing utilities, services, or mappers instead of creating new ones.
+- Avoid redundant code and unnecessary complexity.
+- Follow the existing architecture, naming conventions, and project structure.
+
 ## Design & UI Guidelines
 
-- Follow the design philosophy and component styling of **PrimeUI** (https://primeui.com/), specifically the Dark Mode theme.
+<!-- - Follow the design philosophy and component styling of **PrimeUI** (https://primeui.com/), specifically the Dark Mode theme. -->
 - Ensure all new UI components match the "premium" look and feel established in the Project Dashboard and Canvas.
 - Use CSS nesting to organize styles hierarchically and improve readability.
 
@@ -56,3 +64,4 @@
 - Keep public contracts stable unless explicitly asked to evolve them.
 - Favor consistency with existing naming, folder structure, and coding style over new patterns.
 - Avoid excessive or redundant comments.
+

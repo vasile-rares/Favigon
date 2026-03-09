@@ -4,6 +4,7 @@
   [class.action-button--outline]="variant === 'outline'"
   [class.action-button--full-width]="fullWidth"
   [type]="type"
+  [attr.form]="form || null"
   [disabled]="disabled"
   [attr.aria-label]="ariaLabel || null"
   (click)="onClick($event)">

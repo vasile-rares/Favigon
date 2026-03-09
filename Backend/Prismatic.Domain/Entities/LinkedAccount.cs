@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Prismatic.Domain.Entities;
 
-public class AccountProvider
+public class LinkedAccount
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.Identity)]

@@ -9,4 +9,6 @@ public interface IAuthService
   Task<AuthResponse?> LoginAsync(LoginRequest request);
   Task<AuthResponse> LoginWithGithubAsync(GithubAuthRequest request);
   Task<AuthResponse> LoginWithGoogleAsync(GoogleAuthRequest request);
+  Task SendPasswordResetAsync(ForgotPasswordRequest request);
+  Task ResetPasswordAsync(ResetPasswordRequest request);
 }

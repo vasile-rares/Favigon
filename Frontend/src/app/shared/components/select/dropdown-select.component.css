@@ -21,7 +21,7 @@
 
 .dropdown-select__trigger {
   width: 100%;
-  height: 2.25rem;
+  height: 2.1rem;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-medium);
   background-color: var(--color-surface-elevated);

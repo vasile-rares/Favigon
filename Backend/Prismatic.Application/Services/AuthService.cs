@@ -1,13 +1,13 @@
 using System.IdentityModel.Tokens.Jwt;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
+using System.Net;
 using System.Security.Claims;
 using System.Text;
-using System.Text.Json.Serialization;
 using Prismatic.Application.DTOs.Requests;
+using Prismatic.Application.Helpers;
 using Prismatic.Application.DTOs.Responses;
 using Prismatic.Application.Interfaces;
 using Prismatic.Domain.Entities;
+using AutoMapper;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
@@ -16,16 +16,28 @@ namespace Prismatic.Application.Services;
 public class AuthService : IAuthService
 {
   private readonly IUserRepository _userRepository;
-  private readonly IAccountProviderRepository _accountProviderRepository;
+  private readonly ILinkedAccountRepository _linkedAccountRepository;
+  private readonly IGithubOAuthClient _githubOAuthClient;
+  private readonly IGoogleOAuthClient _googleOAuthClient;
+  private readonly IEmailSender _emailSender;
+  private readonly IMapper _mapper;
   private readonly IConfiguration _configuration;
 
   public AuthService(
       IUserRepository userRepository,
-      IAccountProviderRepository accountProviderRepository,
+      ILinkedAccountRepository linkedAccountRepository,
+      IGithubOAuthClient githubOAuthClient,
+      IGoogleOAuthClient googleOAuthClient,
+      IEmailSender emailSender,
+      IMapper mapper,
       IConfiguration configuration)
   {
     _userRepository = userRepository;
-    _accountProviderRepository = accountProviderRepository;
+    _linkedAccountRepository = linkedAccountRepository;
+    _githubOAuthClient = githubOAuthClient;
+    _googleOAuthClient = googleOAuthClient;
+    _emailSender = emailSender;
+    _mapper = mapper;
     _configuration = configuration;
   }
 
@@ -60,18 +72,10 @@ public class AuthService : IAuthService
     await _userRepository.AddAsync(user);
 
     var (token, expiresAt) = GenerateJwtToken(user);
-
-    return new AuthResponse
-    {
-      UserId = user.Id,
-      DisplayName = user.DisplayName,
-      Username = user.Username,
-      Email = user.Email,
-      ProfilePictureUrl = user.ProfilePictureUrl,
-      Role = user.Role,
-      Token = token,
-      ExpiresAt = expiresAt
-    };
+    var response = _mapper.Map<AuthResponse>(user);
+    response.Token = token;
+    response.ExpiresAt = expiresAt;
+    return response;
   }
 
   public async Task<AuthResponse?> LoginAsync(LoginRequest request)
@@ -90,8 +94,10 @@ public class AuthService : IAuthService
     }
 
     var (token, expiresAt) = GenerateJwtToken(user);
-
-    return CreateAuthResponse(user, token, expiresAt);
+    var response = _mapper.Map<AuthResponse>(user);
+    response.Token = token;
+    response.ExpiresAt = expiresAt;
+    return response;
   }
 
   public async Task<AuthResponse> LoginWithGithubAsync(GithubAuthRequest request)
@@ -102,66 +108,22 @@ public class AuthService : IAuthService
       throw new ArgumentException("GitHub authorization code is required.");
     }
 
-    var clientId = _configuration["GithubOAuth:ClientId"];
-    var clientSecret = _configuration["GithubOAuth:ClientSecret"];
+    var githubProfile = await _githubOAuthClient.GetUserProfileAsync(code);
+    var normalizedEmail = githubProfile.Email.Trim().ToLowerInvariant();
 
-    if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(clientSecret))
-    {
-      throw new InvalidOperationException("GitHub OAuth is not configured on the server.");
-    }
-
-    using var httpClient = new HttpClient();
-    httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Prismatic", "1.0"));
-    httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-    var tokenResponse = await httpClient.PostAsync(
-      "https://github.com/login/oauth/access_token",
-      new FormUrlEncodedContent(new Dictionary<string, string>
-      {
-        ["client_id"] = clientId,
-        ["client_secret"] = clientSecret,
-        ["code"] = code
-      }));
-
-    if (!tokenResponse.IsSuccessStatusCode)
-    {
-      throw new InvalidOperationException("Could not authenticate with GitHub.");
-    }
-
-    var githubToken = await tokenResponse.Content.ReadFromJsonAsync<GithubAccessTokenResponse>();
-    if (string.IsNullOrWhiteSpace(githubToken?.AccessToken))
-    {
-      throw new InvalidOperationException("GitHub token response is invalid.");
-    }
-
-    using var userRequest = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/user");
-    userRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", githubToken.AccessToken);
-
-    var githubUserResponse = await httpClient.SendAsync(userRequest);
-    if (!githubUserResponse.IsSuccessStatusCode)
-    {
-      throw new InvalidOperationException("Could not load GitHub user profile.");
-    }
-
-    var githubUser = await githubUserResponse.Content.ReadFromJsonAsync<GithubUserResponse>();
-    if (githubUser is null)
-    {
-      throw new InvalidOperationException("GitHub user response is invalid.");
-    }
-
-    var email = await ResolveGithubEmailAsync(httpClient, githubToken.AccessToken, githubUser);
-    var normalizedEmail = email.Trim().ToLowerInvariant();
-
-    var user = await ResolveOrCreateExternalUserAsync(
+    var user = await FindOrCreateOAuthUserAsync(
       "github",
-      githubUser.Id.ToString(),
+      githubProfile.ProviderUserId,
       normalizedEmail,
-      BuildUsernameCandidate(githubUser.Login, normalizedEmail, "github_user"),
-      githubUser.Name,
-      githubUser.AvatarUrl);
+      AuthUsernameHelper.BuildUsernameCandidate(githubProfile.Username, normalizedEmail, "github_user"),
+      githubProfile.DisplayName,
+      githubProfile.ProfilePictureUrl);
 
     var (token, expiresAt) = GenerateJwtToken(user);
-    return CreateAuthResponse(user, token, expiresAt);
+    var response = _mapper.Map<AuthResponse>(user);
+    response.Token = token;
+    response.ExpiresAt = expiresAt;
+    return response;
   }
 
   public async Task<AuthResponse> LoginWithGoogleAsync(GoogleAuthRequest request)
@@ -172,103 +134,87 @@ public class AuthService : IAuthService
       throw new ArgumentException("Google authorization code is required.");
     }
 
-    var clientId = _configuration["GoogleOAuth:ClientId"];
-    var clientSecret = _configuration["GoogleOAuth:ClientSecret"];
-    var redirectUri = _configuration["GoogleOAuth:RedirectUri"];
-
-    if (string.IsNullOrWhiteSpace(clientId) ||
-        string.IsNullOrWhiteSpace(clientSecret) ||
-        string.IsNullOrWhiteSpace(redirectUri))
-    {
-      throw new InvalidOperationException("Google OAuth is not configured on the server.");
-    }
-
-    using var httpClient = new HttpClient();
-
-    var tokenResponse = await httpClient.PostAsync(
-      "https://oauth2.googleapis.com/token",
-      new FormUrlEncodedContent(new Dictionary<string, string>
-      {
-        ["client_id"] = clientId,
-        ["client_secret"] = clientSecret,
-        ["code"] = code,
-        ["grant_type"] = "authorization_code",
-        ["redirect_uri"] = redirectUri
-      }));
-
-    if (!tokenResponse.IsSuccessStatusCode)
-    {
-      throw new InvalidOperationException("Could not authenticate with Google.");
-    }
-
-    var googleToken = await tokenResponse.Content.ReadFromJsonAsync<GoogleAccessTokenResponse>();
-    if (string.IsNullOrWhiteSpace(googleToken?.AccessToken))
-    {
-      throw new InvalidOperationException("Google token response is invalid.");
-    }
-
-    using var userRequest = new HttpRequestMessage(
-      HttpMethod.Get,
-      "https://openidconnect.googleapis.com/v1/userinfo");
-    userRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", googleToken.AccessToken);
-
-    var googleUserResponse = await httpClient.SendAsync(userRequest);
-    if (!googleUserResponse.IsSuccessStatusCode)
-    {
-      throw new InvalidOperationException("Could not load Google user profile.");
-    }
-
-    var googleUser = await googleUserResponse.Content.ReadFromJsonAsync<GoogleUserResponse>();
-    if (googleUser is null || string.IsNullOrWhiteSpace(googleUser.Email) || string.IsNullOrWhiteSpace(googleUser.Subject))
-    {
-      throw new InvalidOperationException("Google user response is invalid.");
-    }
-
-    if (!googleUser.EmailVerified)
-    {
-      throw new InvalidOperationException("Google account email is not verified.");
-    }
-
-    var normalizedEmail = googleUser.Email.Trim().ToLowerInvariant();
-    var user = await ResolveOrCreateExternalUserAsync(
+    var googleProfile = await _googleOAuthClient.GetUserProfileAsync(code);
+    var normalizedEmail = googleProfile.Email.Trim().ToLowerInvariant();
+    var user = await FindOrCreateOAuthUserAsync(
       "google",
-      googleUser.Subject,
+      googleProfile.ProviderUserId,
       normalizedEmail,
-      BuildUsernameCandidate(googleUser.Name, normalizedEmail, "google_user"),
-      googleUser.Name,
-      googleUser.Picture);
+      AuthUsernameHelper.BuildUsernameCandidate(googleProfile.DisplayName, normalizedEmail, "google_user"),
+      googleProfile.DisplayName,
+      googleProfile.ProfilePictureUrl);
 
     var (token, expiresAt) = GenerateJwtToken(user);
-    return CreateAuthResponse(user, token, expiresAt);
+    var response = _mapper.Map<AuthResponse>(user);
+    response.Token = token;
+    response.ExpiresAt = expiresAt;
+    return response;
   }
 
-  private async Task<string> ResolveGithubEmailAsync(HttpClient httpClient, string accessToken, GithubUserResponse githubUser)
+  public async Task SendPasswordResetAsync(ForgotPasswordRequest request)
   {
-    if (!string.IsNullOrWhiteSpace(githubUser.Email))
+    var normalizedEmail = request.Email.Trim().ToLowerInvariant();
+    var user = await _userRepository.GetByEmailAsync(normalizedEmail);
+    if (user is null)
     {
-      return githubUser.Email;
+      return;
     }
 
-    using var emailsRequest = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/user/emails");
-    emailsRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+    var tokenLifetimeMinutes = _configuration.GetValue<int?>("PasswordReset:TokenMinutes") ?? 30;
+    var rawToken = PasswordResetTokenHelper.GenerateRawToken();
+    var tokenHash = PasswordResetTokenHelper.HashToken(rawToken);
+    var expiresAt = DateTime.UtcNow.AddMinutes(tokenLifetimeMinutes);
 
-    var emailsResponse = await httpClient.SendAsync(emailsRequest);
-    if (!emailsResponse.IsSuccessStatusCode)
-    {
-      throw new InvalidOperationException("Could not load GitHub account emails.");
-    }
+    user.PasswordResetTokenHash = tokenHash;
+    user.PasswordResetExpiresAt = expiresAt;
+    await _userRepository.UpdateAsync(user);
 
-    var emails = await emailsResponse.Content.ReadFromJsonAsync<List<GithubEmailResponse>>() ?? [];
-    var preferredEmail = emails.FirstOrDefault(e => e.Verified && e.Primary)?.Email
-      ?? emails.FirstOrDefault(e => e.Verified)?.Email;
+    var resetUrl = PasswordResetTokenHelper.BuildResetUrl(_configuration, rawToken);
+    var encodedUrl = WebUtility.HtmlEncode(resetUrl);
+    var htmlBody = string.Join(
+      string.Empty,
+      "<p>Hello,</p>",
+      "<p>We received a request to reset your Prismatic password.</p>",
+      $"<p><a href=\"{encodedUrl}\">Reset your password</a></p>",
+      "<p>If you did not request this, you can ignore this email.</p>",
+      $"<p>This link expires in {tokenLifetimeMinutes} minutes.</p>");
+    var textBody =
+      "We received a request to reset your Prismatic password." + Environment.NewLine +
+      $"Reset your password here: {resetUrl}" + Environment.NewLine +
+      "If you did not request this, you can ignore this email.";
 
-    if (string.IsNullOrWhiteSpace(preferredEmail))
-    {
-      throw new InvalidOperationException("GitHub account does not have a verified email.");
-    }
-
-    return preferredEmail;
+    await _emailSender.SendEmailAsync(
+      user.Email,
+      "Reset your Prismatic password",
+      htmlBody,
+      textBody);
   }
+
+  public async Task ResetPasswordAsync(ResetPasswordRequest request)
+  {
+    var token = request.Token?.Trim() ?? string.Empty;
+    if (string.IsNullOrWhiteSpace(token))
+    {
+      throw new InvalidOperationException("Password reset link is invalid or has expired.");
+    }
+
+    var tokenHash = PasswordResetTokenHelper.HashToken(token);
+    var user = await _userRepository.GetByPasswordResetTokenHashAsync(tokenHash);
+    if (user is null || user.PasswordResetExpiresAt <= DateTime.UtcNow)
+    {
+      throw new InvalidOperationException("Password reset link is invalid or has expired.");
+    }
+
+    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+    user.PasswordResetTokenHash = null;
+    user.PasswordResetExpiresAt = null;
+    await _userRepository.UpdateAsync(user);
+  }
+
+
+
+
+
 
   private async Task<string> GenerateUniqueUsernameAsync(string candidate)
   {
@@ -284,7 +230,7 @@ public class AuthService : IAuthService
     return candidate;
   }
 
-  private async Task<User> ResolveOrCreateExternalUserAsync(
+  private async Task<User> FindOrCreateOAuthUserAsync(
     string provider,
     string providerUserId,
     string normalizedEmail,
@@ -292,7 +238,7 @@ public class AuthService : IAuthService
     string? displayNameCandidate,
     string? profilePictureUrl)
   {
-    var existingProvider = await _accountProviderRepository.GetByProviderAsync(provider, providerUserId);
+    var existingProvider = await _linkedAccountRepository.GetByProviderAsync(provider, providerUserId);
     if (existingProvider?.User is not null)
     {
       var linkedUser = existingProvider.User;
@@ -300,7 +246,7 @@ public class AuthService : IAuthService
       if (!string.Equals(existingProvider.ProviderEmail, normalizedEmail, StringComparison.OrdinalIgnoreCase))
       {
         existingProvider.ProviderEmail = normalizedEmail;
-        await _accountProviderRepository.UpdateAsync(existingProvider);
+        await _linkedAccountRepository.UpdateAsync(existingProvider);
       }
 
       return linkedUser;
@@ -327,121 +273,15 @@ public class AuthService : IAuthService
       await _userRepository.AddAsync(user);
     }
 
-    var providerRecord = await _accountProviderRepository.GetByUserIdAndProviderAsync(user.Id, provider);
-    if (providerRecord is null)
-    {
-      await _accountProviderRepository.AddAsync(new AccountProvider
-      {
-        UserId = user.Id,
-        Provider = provider,
-        ProviderUserId = providerUserId,
-        ProviderEmail = normalizedEmail,
-      });
-    }
-    else if (!string.Equals(providerRecord.ProviderUserId, providerUserId, StringComparison.Ordinal) ||
-             !string.Equals(providerRecord.ProviderEmail, normalizedEmail, StringComparison.OrdinalIgnoreCase))
-    {
-      providerRecord.ProviderUserId = providerUserId;
-      providerRecord.ProviderEmail = normalizedEmail;
-      await _accountProviderRepository.UpdateAsync(providerRecord);
-    }
-
-    return user;
-  }
-
-  private static string BuildUsernameCandidate(string? rawCandidate, string email, string fallbackPrefix)
-  {
-    var raw = string.IsNullOrWhiteSpace(rawCandidate)
-      ? email.Split('@')[0]
-      : rawCandidate;
-
-    var cleaned = new string(raw
-      .Trim()
-      .ToLowerInvariant()
-      .Select(ch => char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_')
-      .ToArray());
-
-    if (string.IsNullOrWhiteSpace(cleaned))
-    {
-      cleaned = fallbackPrefix;
-    }
-
-    return cleaned.Length <= 30 ? cleaned : cleaned[..30];
-  }
-
-  private static AuthResponse CreateAuthResponse(User user, string token, DateTime expiresAt)
-  {
-    return new AuthResponse
+    await _linkedAccountRepository.AddAsync(new LinkedAccount
     {
       UserId = user.Id,
-      DisplayName = user.DisplayName,
-      Username = user.Username,
-      Email = user.Email,
-      ProfilePictureUrl = user.ProfilePictureUrl,
-      Role = user.Role,
-      Token = token,
-      ExpiresAt = expiresAt
-    };
-  }
+      Provider = provider,
+      ProviderUserId = providerUserId,
+      ProviderEmail = normalizedEmail,
+    });
 
-  private sealed class GithubAccessTokenResponse
-  {
-    [JsonPropertyName("access_token")]
-    public string? AccessToken { get; set; }
-  }
-
-  private sealed class GithubUserResponse
-  {
-    [JsonPropertyName("id")]
-    public long Id { get; set; }
-
-    [JsonPropertyName("login")]
-    public string? Login { get; set; }
-
-    [JsonPropertyName("name")]
-    public string? Name { get; set; }
-
-    [JsonPropertyName("email")]
-    public string? Email { get; set; }
-
-    [JsonPropertyName("avatar_url")]
-    public string? AvatarUrl { get; set; }
-  }
-
-  private sealed class GithubEmailResponse
-  {
-    [JsonPropertyName("email")]
-    public string Email { get; set; } = string.Empty;
-
-    [JsonPropertyName("primary")]
-    public bool Primary { get; set; }
-
-    [JsonPropertyName("verified")]
-    public bool Verified { get; set; }
-  }
-
-  private sealed class GoogleAccessTokenResponse
-  {
-    [JsonPropertyName("access_token")]
-    public string? AccessToken { get; set; }
-  }
-
-  private sealed class GoogleUserResponse
-  {
-    [JsonPropertyName("sub")]
-    public string? Subject { get; set; }
-
-    [JsonPropertyName("email")]
-    public string? Email { get; set; }
-
-    [JsonPropertyName("email_verified")]
-    public bool EmailVerified { get; set; }
-
-    [JsonPropertyName("name")]
-    public string? Name { get; set; }
-
-    [JsonPropertyName("picture")]
-    public string? Picture { get; set; }
+    return user;
   }
 
   private (string Token, DateTime ExpiresAt) GenerateJwtToken(User user)

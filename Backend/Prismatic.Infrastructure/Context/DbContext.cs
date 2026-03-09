@@ -12,7 +12,7 @@ public class PrismaticDbContext : Microsoft.EntityFrameworkCore.DbContext
 
     // DbSets
     public DbSet<User> Users { get; set; }
-    public DbSet<AccountProvider> AccountProviders { get; set; }
+    public DbSet<LinkedAccount> LinkedAccounts { get; set; }
     public DbSet<Project> Projects { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -38,36 +38,50 @@ public class PrismaticDbContext : Microsoft.EntityFrameworkCore.DbContext
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<User>()
-            .HasMany(u => u.AccountProviders)
-            .WithOne(accountProvider => accountProvider.User)
-            .HasForeignKey(accountProvider => accountProvider.UserId)
+            .HasMany(u => u.LinkedAccounts)
+            .WithOne(la => la.User)
+            .HasForeignKey(la => la.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        modelBuilder.Entity<AccountProvider>()
-            .ToTable("account_providers");
+        modelBuilder.Entity<User>()
+            .Property(u => u.PasswordResetTokenHash)
+            .HasColumnName("password_reset_token_hash")
+            .HasMaxLength(64);
 
-        modelBuilder.Entity<AccountProvider>()
-            .HasIndex(accountProvider => new { accountProvider.Provider, accountProvider.ProviderUserId })
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.PasswordResetTokenHash)
+            .IsUnique()
+            .HasFilter("password_reset_token_hash IS NOT NULL");
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.PasswordResetExpiresAt)
+            .HasColumnName("password_reset_expires_at");
+
+        modelBuilder.Entity<LinkedAccount>()
+            .ToTable("linked_accounts");
+
+        modelBuilder.Entity<LinkedAccount>()
+            .HasIndex(la => new { la.Provider, la.ProviderUserId })
             .IsUnique();
 
-        modelBuilder.Entity<AccountProvider>()
-            .HasIndex(accountProvider => new { accountProvider.UserId, accountProvider.Provider })
+        modelBuilder.Entity<LinkedAccount>()
+            .HasIndex(la => new { la.UserId, la.Provider })
             .IsUnique();
 
-        modelBuilder.Entity<AccountProvider>()
-            .Property(accountProvider => accountProvider.Provider)
+        modelBuilder.Entity<LinkedAccount>()
+            .Property(la => la.Provider)
             .HasMaxLength(50);
 
-        modelBuilder.Entity<AccountProvider>()
-            .Property(accountProvider => accountProvider.ProviderUserId)
+        modelBuilder.Entity<LinkedAccount>()
+            .Property(la => la.ProviderUserId)
             .HasMaxLength(255);
 
-        modelBuilder.Entity<AccountProvider>()
-            .Property(accountProvider => accountProvider.ProviderEmail)
+        modelBuilder.Entity<LinkedAccount>()
+            .Property(la => la.ProviderEmail)
             .HasMaxLength(100);
 
-        modelBuilder.Entity<AccountProvider>()
-            .Property(accountProvider => accountProvider.CreatedAt)
+        modelBuilder.Entity<LinkedAccount>()
+            .Property(la => la.CreatedAt)
             .HasDefaultValueSql("NOW()")
             .ValueGeneratedOnAdd();
 

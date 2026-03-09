@@ -61,7 +61,7 @@ namespace Prismatic.Infrastructure.Migrations
                     b.HasIndex("UserId", "Provider")
                         .IsUnique();
 
-                    b.ToTable("account_providers", (string)null);
+                    b.ToTable("linked_accounts", (string)null);
                 });
 
             modelBuilder.Entity("Prismatic.Domain.Entities.Project", b =>
@@ -134,6 +134,15 @@ namespace Prismatic.Infrastructure.Migrations
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
+                    b.Property<DateTime?>("PasswordResetExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("password_reset_expires_at");
+
+                    b.Property<string>("PasswordResetTokenHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("password_reset_token_hash");
+
                     b.Property<string>("ProfilePictureUrl")
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
@@ -152,6 +161,10 @@ namespace Prismatic.Infrastructure.Migrations
 
                     b.HasIndex("Email")
                         .IsUnique();
+
+                    b.HasIndex("PasswordResetTokenHash")
+                        .IsUnique()
+                        .HasFilter("password_reset_token_hash IS NOT NULL");
 
                     b.ToTable("users", (string)null);
                 });

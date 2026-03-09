@@ -28,9 +28,14 @@ public class User
     [MaxLength(20)]
     public string Role { get; set; } = "User";
 
+    [MaxLength(64)]
+    public string? PasswordResetTokenHash { get; set; }
+
+    public DateTime? PasswordResetExpiresAt { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public ICollection<Project> Projects { get; set; } = new List<Project>();
 
-    public ICollection<AccountProvider> AccountProviders { get; set; } = new List<AccountProvider>();
+    public ICollection<LinkedAccount> LinkedAccounts { get; set; } = new List<LinkedAccount>();
 }

@@ -32,7 +32,9 @@
                   <span class="failed-validation">*</span>
                 }
               </label>
-              <a class="forgot-link" href="#">Forgot password?</a>
+              <button type="button" class="forgot-link" (click)="openForgotPasswordDialog()">
+                Forgot password?
+              </button>
             </div>
             <app-text-input
               id="login-password"
@@ -199,4 +201,83 @@
       </button>
     </p>
   </div>
+
+  @if (isForgotPasswordDialogOpen()) {
+    <app-dialog-box
+      #forgotPasswordDialog
+      ariaLabelledBy="forgot-password-dialog-title"
+      [isBusy]="isForgotPasswordSubmitting()"
+      width="420px"
+      (closed)="closeForgotPasswordDialog()">
+      <div dialogTitle>
+        <h2 id="forgot-password-dialog-title">Forgot password</h2>
+      </div>
+
+      <div dialogDescription>
+        <p>
+          @if (forgotPasswordEmailSent()) {
+            Check your inbox for the password reset link.
+          } @else {
+            Enter your email address and we will send you a password reset link.
+          }
+        </p>
+      </div>
+
+      @if (!forgotPasswordEmailSent()) {
+        <form
+          class="forgot-password-form"
+          id="forgot-password-form"
+          [formGroup]="forgotPasswordForm"
+          (ngSubmit)="submitForgotPassword()">
+          <app-text-input
+            id="forgot-password-email"
+            label="Email address"
+            type="email"
+            placeholder="name@example.com"
+            autocomplete="off"
+            formControlName="email"
+            [requiredMarker]="forgotPasswordForm.controls.email.invalid && forgotPasswordForm.controls.email.dirty"
+            [maxLength]="100"
+            [errorText]="'Please enter a valid email address.'"></app-text-input>
+
+          @if (forgotPasswordStatusMessage()?.type === 'error') {
+            <div class="validation-message">{{ forgotPasswordStatusMessage()!.text }}</div>
+          }
+        </form>
+      } @else {
+        <div class="forgot-password-success">
+          <p>{{ forgotPasswordStatusMessage()?.text }}</p>
+        </div>
+      }
+
+      <div dialogFooter class="forgot-password-footer">
+        @if (forgotPasswordEmailSent()) {
+          <app-action-button
+            type="button"
+            variant="primary"
+            [fullWidth]="false"
+            (clicked)="forgotPasswordDialog.requestClose()">
+            Close
+          </app-action-button>
+        } @else {
+          <app-action-button
+            type="button"
+            variant="outline"
+            [fullWidth]="false"
+            [disabled]="isForgotPasswordSubmitting() || forgotPasswordDialog.isClosing"
+            (clicked)="forgotPasswordDialog.requestClose()">
+            Cancel
+          </app-action-button>
+          <app-action-button
+            type="submit"
+            variant="primary"
+            form="forgot-password-form"
+            [fullWidth]="false"
+            [disabled]="isForgotPasswordSubmitting() || forgotPasswordDialog.isClosing || forgotPasswordForm.invalid">
+            {{ isForgotPasswordSubmitting() ? 'Sending...' : 'Send email' }}
+          </app-action-button>
+        }
+      </div>
+    </app-dialog-box>
+  }
 </div>

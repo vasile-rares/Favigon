@@ -52,6 +52,23 @@ public class AccountController : ControllerBase
     return Ok(new { message = "Google authentication successful." });
   }
 
+  [HttpPost("forgot-password")]
+  public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+  {
+    await _authService.SendPasswordResetAsync(request);
+    return Ok(new
+    {
+      message = "If an account exists for this email, a password reset email has been sent. Please check your inbox."
+    });
+  }
+
+  [HttpPost("reset-password")]
+  public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+  {
+    await _authService.ResetPasswordAsync(request);
+    return Ok(new { message = "Password reset successful. You can now sign in with your new password." });
+  }
+
   [HttpPost("logout")]
   public IActionResult Logout()
   {

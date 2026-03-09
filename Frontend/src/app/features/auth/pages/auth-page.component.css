@@ -104,6 +104,11 @@
     justify-content: space-between;
 
     .forgot-link {
+      padding: 0;
+      border: none;
+      background: transparent;
+      font-family: inherit;
+      cursor: pointer;
       font-size: 0.75rem;
       color: var(--color-text-medium);
       text-decoration: none;
@@ -200,4 +205,25 @@
 
 .success-message {
   color: var(--color-success-light);
+}
+
+.forgot-password-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.forgot-password-success {
+  p {
+    margin: 0;
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--color-text-medium);
+  }
+}
+
+.forgot-password-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
 }

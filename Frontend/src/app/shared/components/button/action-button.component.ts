@@ -11,6 +11,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 export class ActionButtonComponent {
   @Input() variant: 'primary' | 'outline' = 'primary';
   @Input() type: 'button' | 'submit' | 'reset' = 'button';
+  @Input() form?: string;
   @Input() disabled = false;
   @Input() fullWidth = true;
   @Input() ariaLabel?: string;

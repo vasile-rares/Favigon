@@ -14,6 +14,7 @@ import { environment } from '../../../../environments/environment';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
 import { TextInputComponent } from '../../../shared/components/input/text-input.component';
 import { ActionButtonComponent } from '../../../shared/components/button/action-button.component';
+import { DIALOG_BOX_IMPORTS } from '../../../shared/components/dialog-box/dialog-box.component';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const CREDENTIAL_MAX_LENGTH = 100;
@@ -37,7 +38,7 @@ function passwordStrengthValidator(): ValidatorFn {
 @Component({
   selector: 'app-auth-page',
   standalone: true,
-  imports: [ReactiveFormsModule, TextInputComponent, ActionButtonComponent],
+  imports: [ReactiveFormsModule, ...DIALOG_BOX_IMPORTS, TextInputComponent, ActionButtonComponent],
   templateUrl: './auth-page.component.html',
   styleUrl: './auth-page.component.css',
 })
@@ -52,6 +53,12 @@ export class AuthPage implements OnInit {
   // --- State Signals ---
   readonly mode = signal<'login' | 'register'>('login');
   readonly isSubmitting = signal(false);
+  readonly isForgotPasswordSubmitting = signal(false);
+  readonly isForgotPasswordDialogOpen = signal(false);
+  readonly forgotPasswordEmailSent = signal(false);
+  readonly forgotPasswordStatusMessage = signal<{ type: 'error' | 'success'; text: string } | null>(
+    null,
+  );
   readonly statusMessage = signal<{ type: 'error' | 'success'; text: string } | null>(null);
 
   // --- Forms ---
@@ -62,6 +69,13 @@ export class AuthPage implements OnInit {
     ],
     password: ['', [Validators.required, Validators.maxLength(CREDENTIAL_MAX_LENGTH)]],
     rememberMe: [false],
+  });
+
+  readonly forgotPasswordForm = this.fb.nonNullable.group({
+    email: [
+      '',
+      [Validators.required, Validators.email, Validators.maxLength(CREDENTIAL_MAX_LENGTH)],
+    ],
   });
 
   readonly registerForm = this.fb.nonNullable.group(
@@ -104,10 +118,62 @@ export class AuthPage implements OnInit {
 
     // Reset forms
     this.loginForm.reset();
+    this.forgotPasswordForm.reset();
     this.registerForm.reset();
 
     if (nextMode === 'login') {
       this.checkRememberedEmail();
+    }
+  }
+
+  openForgotPasswordDialog() {
+    this.forgotPasswordStatusMessage.set(null);
+    this.forgotPasswordEmailSent.set(false);
+    this.forgotPasswordForm.reset({
+      email: this.loginForm.controls.email.value?.trim() ?? '',
+    });
+    this.isForgotPasswordDialogOpen.set(true);
+  }
+
+  closeForgotPasswordDialog() {
+    if (this.isForgotPasswordSubmitting()) {
+      return;
+    }
+
+    this.isForgotPasswordDialogOpen.set(false);
+  }
+
+  async submitForgotPassword() {
+    if (this.forgotPasswordForm.invalid) {
+      this.forgotPasswordForm.markAllAsTouched();
+      return;
+    }
+
+    this.isForgotPasswordSubmitting.set(true);
+    this.forgotPasswordStatusMessage.set(null);
+
+    try {
+      const { email } = this.forgotPasswordForm.getRawValue();
+      const response = await firstValueFrom(
+        this.authService.forgotPassword({
+          email: email.trim(),
+        }),
+      );
+
+      this.forgotPasswordEmailSent.set(true);
+      this.forgotPasswordStatusMessage.set({
+        type: 'success',
+        text:
+          response.message ||
+          'If an account exists for this email, a password reset email has been sent. Please check your inbox.',
+      });
+    } catch (error: unknown) {
+      this.forgotPasswordStatusMessage.set({
+        type: 'error',
+        text: extractApiErrorMessage(error, 'Could not send password reset email.'),
+      });
+    } finally {
+      this.isForgotPasswordSubmitting.set(false);
     }
   }
 
