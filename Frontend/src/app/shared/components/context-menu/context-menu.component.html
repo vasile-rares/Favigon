@@ -1,0 +1,58 @@
+<div
+  class="context-menu__panel"
+  role="menu"
+  [style.left.px]="adjustedX"
+  [style.top.px]="adjustedY"
+  (click)="$event.stopPropagation()">
+
+  @for (item of items; track item.id) {
+    @if (item.separator) {
+      <div class="context-menu__separator"></div>
+    }
+
+    @if (item.children?.length) {
+      <!-- Submenu item -->
+      <div
+        class="context-menu__item context-menu__item--submenu"
+        role="menuitem"
+        [class.context-menu__item--disabled]="item.disabled"
+        (mouseenter)="openSubmenuId = item.disabled ? null : item.id"
+        (mouseleave)="openSubmenuId = null">
+        <span class="context-menu__item-label">{{ item.label }}</span>
+        <span class="context-menu__item-arrow">›</span>
+
+        @if (openSubmenuId === item.id) {
+          <div class="context-menu__submenu" role="menu">
+            @for (child of item.children; track child.id) {
+              <button
+                type="button"
+                class="context-menu__item"
+                role="menuitem"
+                [disabled]="child.disabled"
+                (click)="onSubmenuItemClick(child)">
+                <span class="context-menu__item-label">{{ child.label }}</span>
+                @if (child.shortcut) {
+                  <span class="context-menu__item-shortcut">{{ child.shortcut }}</span>
+                }
+              </button>
+            }
+          </div>
+        }
+      </div>
+    } @else {
+      <!-- Regular item -->
+      <button
+        type="button"
+        class="context-menu__item"
+        role="menuitem"
+        [class.context-menu__item--danger]="item.variant === 'danger'"
+        [disabled]="item.disabled"
+        (click)="onItemClick(item)">
+        <span class="context-menu__item-label">{{ item.label }}</span>
+        @if (item.shortcut) {
+          <span class="context-menu__item-shortcut">{{ item.shortcut }}</span>
+        }
+      </button>
+    }
+  }
+</div>

@@ -205,24 +205,11 @@
   @if (isForgotPasswordDialogOpen()) {
     <app-dialog-box
       #forgotPasswordDialog
-      ariaLabelledBy="forgot-password-dialog-title"
+      title="Forgot password"
+      [description]="forgotPasswordEmailSent() ? 'Check your inbox for the password reset link.' : 'Enter your email address and we will send you a password reset link.'"
       [isBusy]="isForgotPasswordSubmitting()"
       width="420px"
       (closed)="closeForgotPasswordDialog()">
-      <div dialogTitle>
-        <h2 id="forgot-password-dialog-title">Forgot password</h2>
-      </div>
-
-      <div dialogDescription>
-        <p>
-          @if (forgotPasswordEmailSent()) {
-            Check your inbox for the password reset link.
-          } @else {
-            Enter your email address and we will send you a password reset link.
-          }
-        </p>
-      </div>
-
       @if (!forgotPasswordEmailSent()) {
         <form
           class="forgot-password-form"
@@ -250,34 +237,36 @@
         </div>
       }
 
-      <div dialogFooter class="forgot-password-footer">
-        @if (forgotPasswordEmailSent()) {
-          <app-action-button
-            type="button"
-            variant="primary"
-            [fullWidth]="false"
-            (clicked)="forgotPasswordDialog.requestClose()">
-            Close
-          </app-action-button>
-        } @else {
-          <app-action-button
-            type="button"
-            variant="outline"
-            [fullWidth]="false"
-            [disabled]="isForgotPasswordSubmitting() || forgotPasswordDialog.isClosing"
-            (clicked)="forgotPasswordDialog.requestClose()">
-            Cancel
-          </app-action-button>
-          <app-action-button
-            type="submit"
-            variant="primary"
-            form="forgot-password-form"
-            [fullWidth]="false"
-            [disabled]="isForgotPasswordSubmitting() || forgotPasswordDialog.isClosing || forgotPasswordForm.invalid">
-            {{ isForgotPasswordSubmitting() ? 'Sending...' : 'Send email' }}
-          </app-action-button>
-        }
-      </div>
+      <ng-template #dialogFooter>
+        <div class="forgot-password-footer">
+          @if (forgotPasswordEmailSent()) {
+            <app-action-button
+              type="button"
+              variant="primary"
+              [fullWidth]="false"
+              (clicked)="forgotPasswordDialog.requestClose()">
+              Close
+            </app-action-button>
+          } @else {
+            <app-action-button
+              type="button"
+              variant="outline"
+              [fullWidth]="false"
+              [disabled]="isForgotPasswordSubmitting() || forgotPasswordDialog.isClosing"
+              (clicked)="forgotPasswordDialog.requestClose()">
+              Cancel
+            </app-action-button>
+            <app-action-button
+              type="submit"
+              variant="primary"
+              form="forgot-password-form"
+              [fullWidth]="false"
+              [disabled]="isForgotPasswordSubmitting() || forgotPasswordDialog.isClosing || forgotPasswordForm.invalid">
+              {{ isForgotPasswordSubmitting() ? 'Sending...' : 'Send email' }}
+            </app-action-button>
+          }
+        </div>
+      </ng-template>
     </app-dialog-box>
   }
 </div>

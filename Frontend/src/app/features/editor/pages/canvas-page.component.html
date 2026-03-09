@@ -13,7 +13,8 @@
       (layerSelected)="onLayerSelected($event)"
       (layerNameChanged)="onLayerNameChanged($event)"
       (layerMoved)="onLayerMoved($event)"
-      (layerVisibilityToggled)="onLayerVisibilityToggled($event)"></app-project-panel>
+      (layerVisibilityToggled)="onLayerVisibilityToggled($event)"
+      (layerContextMenuRequested)="onLayerContextMenuRequested($event)"></app-project-panel>
 
     <app-toolbar
       [activeTool]="currentTool()"
@@ -27,7 +28,8 @@
       [style.background-position]="canvasBackgroundPosition()"
       (pointerdown)="onCanvasPointerDown($event)"
       (click)="onCanvasClick($event)"
-      (wheel)="onCanvasWheel($event)">
+      (wheel)="onCanvasWheel($event)"
+      (contextmenu)="onCanvasContextMenu($event)">
       <div class="zoom-controls" (click)="$event.stopPropagation()">
         <button type="button" (click)="zoomOut()" title="Zoom out">-</button>
         <button type="button" class="zoom-percentage" (click)="resetZoom()" title="Reset zoom">
@@ -61,7 +63,8 @@
             [style.visibility]="isElementClippedOut(el) ? 'hidden' : 'visible'"
             [style.border-radius.px]="el.type === 'circle' ? null : (el.cornerRadius ?? (el.type === 'image' ? 6 : 0))"
             (pointerdown)="onElementPointerDown($event, el.id)"
-            (dblclick)="onElementDoubleClick($event, el.id)">
+            (dblclick)="onElementDoubleClick($event, el.id)"
+            (contextmenu)="onElementContextMenu($event, el.id)">
 
             <div
               class="frame-title"
@@ -154,3 +157,11 @@
       (elementPatch)="onSelectedElementPatch($event)"></app-properties-panel>
   </div>
 </div>
+
+@if (isContextMenuOpen()) {
+  <app-context-menu
+    [x]="contextMenuX()"
+    [y]="contextMenuY()"
+    [items]="contextMenuItems()"
+    (closed)="closeContextMenu()"></app-context-menu>
+}

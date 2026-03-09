@@ -43,6 +43,7 @@ export class ProjectPanelComponent implements OnChanges {
     targetId: string;
     position: LayerDropPosition;
   }>();
+  @Output() layerContextMenuRequested = new EventEmitter<{ id: string; x: number; y: number }>();
 
   private cachedLayerEntries: LayerEntry[] = [];
   private draggedLayerId: string | null = null;
@@ -89,6 +90,12 @@ export class ProjectPanelComponent implements OnChanges {
   onLayerVisibilityToggle(id: string, event: MouseEvent): void {
     event.stopPropagation();
     this.layerVisibilityToggled.emit(id);
+  }
+
+  onLayerContextMenu(id: string, event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.layerContextMenuRequested.emit({ id, x: event.clientX, y: event.clientY });
   }
 
   onLayerDragStart(id: string, event: DragEvent): void {

@@ -35,6 +35,10 @@ import {
 import { formatCanvasElementTypeLabel } from '../../../core/utils/canvas-label.util';
 import { CanvasGenerationService } from '../../../core/services/canvas-generation.service';
 import { CanvasPersistenceService } from '../../../core/services/canvas-persistence.service';
+import {
+  ContextMenuComponent,
+  ContextMenuItem,
+} from '../../../shared/components/context-menu/context-menu.component';
 
 type SupportedFramework = 'html' | 'react' | 'angular';
 type ResizeHandlePosition = 'nw' | 'ne' | 'sw' | 'se';
@@ -92,6 +96,7 @@ interface CanvasClipboardSnapshot {
     ToolbarComponent,
     ProjectPanelComponent,
     PropertiesPanelComponent,
+    ContextMenuComponent,
   ],
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
@@ -146,6 +151,11 @@ export class ProjectPage implements OnDestroy {
   readonly isLoadingDesign = signal(false);
   readonly isSavingDesign = signal(false);
   readonly lastSavedAt = signal<string | null>(null);
+
+  readonly isContextMenuOpen = signal(false);
+  readonly contextMenuX = signal(0);
+  readonly contextMenuY = signal(0);
+  readonly contextMenuItems = signal<ContextMenuItem[]>([]);
 
   readonly projectId = this.route.snapshot.paramMap.get('id') ?? 'new-project';
   readonly irPreview = computed<IRNode>(() => {
@@ -573,6 +583,258 @@ export class ProjectPage implements OnDestroy {
 
   setFramework(framework: SupportedFramework): void {
     this.selectedFramework.set(framework);
+  }
+
+  onCanvasContextMenu(event: MouseEvent): void {
+    event.preventDefault();
+    this.openContextMenu(event.clientX, event.clientY);
+  }
+
+  onElementContextMenu(event: MouseEvent, id: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.selectedElementId.set(id);
+    this.openContextMenu(event.clientX, event.clientY);
+  }
+
+  onLayerContextMenuRequested(event: { id: string; x: number; y: number }): void {
+    this.selectedElementId.set(event.id);
+    this.openContextMenu(event.x, event.y);
+  }
+
+  closeContextMenu(): void {
+    this.isContextMenuOpen.set(false);
+    this.contextMenuItems.set([]);
+  }
+
+  private openContextMenu(x: number, y: number): void {
+    this.contextMenuItems.set(this.buildContextMenuItems());
+    this.contextMenuX.set(x);
+    this.contextMenuY.set(y);
+    this.isContextMenuOpen.set(true);
+  }
+
+  private buildContextMenuItems(): ContextMenuItem[] {
+    const el = this.selectedElement();
+    const hasEl = !!el;
+    const isVisible = el?.visible !== false;
+    const otherPages = this.pages().filter((p) => p.id !== this.currentPageId());
+
+    return [
+      // Clipboard group
+      {
+        id: 'copy',
+        label: 'Copy',
+        shortcut: 'Ctrl+C',
+        disabled: !hasEl,
+        action: () => this.ctxCopy(),
+      },
+      {
+        id: 'paste',
+        label: 'Paste',
+        shortcut: 'Ctrl+V',
+        action: () => this.ctxPaste(),
+      },
+      {
+        id: 'delete',
+        label: 'Delete',
+        shortcut: 'Del',
+        variant: 'danger' as const,
+        disabled: !hasEl,
+        action: () => this.ctxDelete(),
+      },
+
+      // Order group
+      {
+        id: 'bring-front',
+        label: 'Bring to Front',
+        shortcut: 'Ctrl+]',
+        disabled: !hasEl,
+        separator: true,
+        action: () => this.ctxBringToFront(),
+      },
+      {
+        id: 'send-back',
+        label: 'Send to Back',
+        shortcut: 'Ctrl+[',
+        disabled: !hasEl,
+        action: () => this.ctxSendToBack(),
+      },
+      ...(otherPages.length > 0
+        ? [
+            {
+              id: 'move-to-page',
+              label: 'Move to Page',
+              disabled: !hasEl,
+              children: otherPages.map((p) => ({
+                id: `move-page-${p.id}`,
+                label: p.name,
+                action: () => this.ctxMoveToPage(p.id),
+              })),
+            },
+          ]
+        : []),
+
+      // Transform group
+      {
+        id: 'flip-h',
+        label: 'Flip Horizontal',
+        disabled: !hasEl,
+        separator: true,
+        action: () => this.ctxFlipHorizontal(),
+      },
+      {
+        id: 'flip-v',
+        label: 'Flip Vertical',
+        disabled: !hasEl,
+        action: () => this.ctxFlipVertical(),
+      },
+
+      // Element group
+      {
+        id: 'rename',
+        label: 'Rename',
+        shortcut: 'F2',
+        disabled: !hasEl,
+        separator: true,
+        action: () => this.ctxRename(),
+      },
+      {
+        id: 'visibility',
+        label: isVisible ? 'Hide' : 'Show',
+        shortcut: 'Ctrl+Shift+H',
+        disabled: !hasEl,
+        action: () => this.ctxToggleVisibility(),
+      },
+    ];
+  }
+
+  private ctxCopy(): void {
+    this.copySelectedElement();
+  }
+
+  private ctxPaste(): void {
+    this.pasteClipboard();
+  }
+
+  private ctxDelete(): void {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) return;
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) => this.removeWithChildren(elements, selectedId));
+      this.selectedElementId.set(null);
+    });
+  }
+
+  private ctxBringToFront(): void {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) return;
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) => {
+        const index = elements.findIndex((el) => el.id === selectedId);
+        if (index === -1) return elements;
+        const next = [...elements];
+        const [moved] = next.splice(index, 1);
+        next.push(moved);
+        return next;
+      });
+    });
+  }
+
+  private ctxSendToBack(): void {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) return;
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) => {
+        const el = elements.find((e) => e.id === selectedId);
+        if (!el) return elements;
+
+        const withoutEl = elements.filter((e) => e.id !== selectedId);
+        const parentId = el.parentId ?? null;
+
+        // Elements inside a frame: move to the start of their siblings
+        if (parentId !== null || el.type === 'frame') {
+          const firstSiblingIdx = withoutEl.findIndex((e) => (e.parentId ?? null) === parentId);
+          const insertAt = firstSiblingIdx === -1 ? 0 : firstSiblingIdx;
+          const result = [...withoutEl];
+          result.splice(insertAt, 0, el);
+          return result;
+        }
+
+        // Top-level non-frame: place just after the last top-level frame
+        // so it stays above frames but is at the back of non-frame elements
+        let lastFrameIdx = -1;
+        for (let i = 0; i < withoutEl.length; i++) {
+          if (withoutEl[i].type === 'frame' && !withoutEl[i].parentId) {
+            lastFrameIdx = i;
+          }
+        }
+
+        const insertAt = lastFrameIdx + 1;
+        const result = [...withoutEl];
+        result.splice(insertAt, 0, el);
+        return result;
+      });
+    });
+  }
+
+  private ctxMoveToPage(targetPageId: string): void {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) return;
+    const subtreeIds = new Set(this.collectSubtreeIds(this.elements(), selectedId));
+    const elementsToMove = this.elements().filter((el) => subtreeIds.has(el.id));
+    if (elementsToMove.length === 0) return;
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) => elements.filter((el) => !subtreeIds.has(el.id)));
+      this.pages.update((pages) =>
+        pages.map((page) =>
+          page.id === targetPageId
+            ? { ...page, elements: [...page.elements, ...elementsToMove] }
+            : page,
+        ),
+      );
+      this.selectedElementId.set(null);
+    });
+  }
+
+  private ctxFlipHorizontal(): void {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) return;
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) =>
+        elements.map((el) => {
+          if (el.id !== selectedId) return el;
+          const currentScale = (el as CanvasElement & { scaleX?: number }).scaleX ?? 1;
+          return { ...el, scaleX: currentScale === -1 ? 1 : -1 } as CanvasElement;
+        }),
+      );
+    });
+  }
+
+  private ctxFlipVertical(): void {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) return;
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) =>
+        elements.map((el) => {
+          if (el.id !== selectedId) return el;
+          const currentScale = (el as CanvasElement & { scaleY?: number }).scaleY ?? 1;
+          return { ...el, scaleY: currentScale === -1 ? 1 : -1 } as CanvasElement;
+        }),
+      );
+    });
+  }
+
+  private ctxRename(): void {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) return;
+    window.dispatchEvent(new CustomEvent('canvas:rename-request', { detail: { id: selectedId } }));
+  }
+
+  private ctxToggleVisibility(): void {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) return;
+    this.onLayerVisibilityToggled(selectedId);
   }
 
   @HostListener('window:pointermove', ['$event'])

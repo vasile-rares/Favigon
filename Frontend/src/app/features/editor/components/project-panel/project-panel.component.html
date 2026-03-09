@@ -51,7 +51,8 @@
         (dragover)="onLayerDragOver(layer, $event)"
         (drop)="onLayerDrop(layer, $event)"
         (dragend)="onLayerDragEnd()"
-        (click)="onLayerSelected(layer.id)">
+        (click)="onLayerSelected(layer.id)"
+        (contextmenu)="onLayerContextMenu(layer.id, $event)">
         <span class="project-layer-indent" [style.width.px]="layer.depth * 14"></span>
         <span class="project-layer-grip" aria-hidden="true">
           <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">

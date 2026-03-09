@@ -9,17 +9,14 @@
     class="dialog-box__card"
     role="dialog"
     aria-modal="true"
-    [attr.aria-labelledby]="ariaLabelledBy || null"
-    [attr.aria-label]="ariaLabel || null"
+    [attr.aria-label]="ariaLabel || title || null"
     (pointerdown)="onDialogPointerDown()"
     (click)="$event.stopPropagation()">
     @if (hasHeader || showCloseButton) {
       <header class="dialog-box__header" [class.dialog-box__header--compact]="!hasHeader">
         <div class="dialog-box__header-main">
-          @if (hasHeader) {
-            <div class="dialog-box__title">
-              <ng-content select="[dialogTitle]"></ng-content>
-            </div>
+          @if (title) {
+            <div class="dialog-box__title">{{ title }}</div>
           }
 
           @if (showCloseButton) {
@@ -37,21 +34,60 @@
           }
         </div>
 
-        @if (hasHeader) {
-          <div class="dialog-box__description">
-            <ng-content select="[dialogDescription]"></ng-content>
-          </div>
+        @if (description) {
+          <div class="dialog-box__description">{{ description }}</div>
         }
       </header>
     }
 
     <div class="dialog-box__content">
-      <ng-content select=":not([dialogTitle]):not([dialogDescription]):not([dialogFooter])"></ng-content>
+      @if (fields.length > 0) {
+        <div class="dialog-box__fields">
+          @for (field of fields; track field.key) {
+            <div class="dialog-box__field">
+              <label class="dialog-box__field-label" [for]="field.key">{{ field.label }}</label>
+              <input
+                class="dialog-box__field-input"
+                [id]="field.key"
+                [type]="field.type ?? 'text'"
+                [placeholder]="field.placeholder ?? ''"
+                [(ngModel)]="fieldValues[field.key]"
+                [disabled]="isBusy" />
+            </div>
+          }
+        </div>
+      }
+      <ng-content></ng-content>
     </div>
 
     @if (hasFooter) {
       <footer class="dialog-box__footer">
-        <ng-content select="[dialogFooter]"></ng-content>
+        @if (footerTemplate) {
+          <ng-container *ngTemplateOutlet="footerTemplate"></ng-container>
+        } @else {
+          <div class="dialog-box__footer-actions">
+            @if (secondaryAction) {
+              <app-action-button
+                type="button"
+                variant="outline"
+                [fullWidth]="false"
+                [disabled]="isBusy || isClosing || !!secondaryAction.disabled"
+                (clicked)="onSecondaryClick()">
+                {{ secondaryAction.label }}
+              </app-action-button>
+            }
+            @if (primaryAction) {
+              <app-action-button
+                type="button"
+                variant="primary"
+                [fullWidth]="false"
+                [disabled]="isBusy || isClosing || !!primaryAction.disabled"
+                (clicked)="onPrimaryClick()">
+                {{ primaryAction.label }}
+              </app-action-button>
+            }
+          </div>
+        }
       </footer>
     }
   </section>

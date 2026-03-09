@@ -1,68 +1,90 @@
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import {
   Component,
   ContentChild,
-  Directive,
   EventEmitter,
   Input,
   OnDestroy,
+  OnInit,
   Output,
+  TemplateRef,
 } from '@angular/core';
+import { ActionButtonComponent } from '../button/action-button.component';
+
+export interface DialogBoxField {
+  key: string;
+  label: string;
+  type?: 'text' | 'password' | 'email' | 'number';
+  placeholder?: string;
+  initialValue?: string;
+}
+
+export interface DialogBoxAction {
+  label: string;
+  variant?: 'primary' | 'outline';
+  disabled?: boolean;
+}
 
 const CLOSE_ANIMATION_DURATION_MS = 120;
-
-@Directive({
-  selector: '[dialogTitle]',
-  standalone: true,
-})
-export class DialogBoxTitleDirective {}
-
-@Directive({
-  selector: '[dialogDescription]',
-  standalone: true,
-})
-export class DialogBoxDescriptionDirective {}
-
-@Directive({
-  selector: '[dialogFooter]',
-  standalone: true,
-})
-export class DialogBoxFooterDirective {}
 
 @Component({
   selector: 'app-dialog-box',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule, ActionButtonComponent],
   templateUrl: './dialog-box.component.html',
   styleUrl: './dialog-box.component.css',
 })
-export class DialogBoxComponent implements OnDestroy {
+export class DialogBoxComponent implements OnInit, OnDestroy {
+  @Input() title = '';
+  @Input() description?: string;
+  @Input() fields: DialogBoxField[] = [];
+  @Input() primaryAction?: DialogBoxAction;
+  @Input() secondaryAction?: DialogBoxAction;
+
   @Input() blurBackdrop = true;
   @Input() closeOnBackdropClick = true;
   @Input() showCloseButton = true;
   @Input() width = '400px';
-  @Input() ariaLabelledBy?: string;
   @Input() ariaLabel?: string;
   @Input() isBusy = false;
 
   @Output() closed = new EventEmitter<void>();
+  @Output() primaryClicked = new EventEmitter<Record<string, string>>();
+  @Output() secondaryClicked = new EventEmitter<void>();
 
-  @ContentChild(DialogBoxTitleDirective) private titleSlot?: DialogBoxTitleDirective;
-  @ContentChild(DialogBoxDescriptionDirective)
-  private descriptionSlot?: DialogBoxDescriptionDirective;
-  @ContentChild(DialogBoxFooterDirective) private footerSlot?: DialogBoxFooterDirective;
+  @ContentChild('dialogFooter') footerTemplate?: TemplateRef<void>;
+
+  fieldValues: Record<string, string> = {};
 
   private shouldCloseFromBackdropClick = false;
   private closeTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   isClosing = false;
 
+  ngOnInit(): void {
+    this.fieldValues = {};
+    for (const field of this.fields) {
+      this.fieldValues[field.key] = field.initialValue ?? '';
+    }
+  }
+
   get hasHeader(): boolean {
-    return !!this.titleSlot || !!this.descriptionSlot;
+    return !!this.title || !!this.description;
   }
 
   get hasFooter(): boolean {
-    return !!this.footerSlot;
+    return !!this.footerTemplate || !!this.primaryAction || !!this.secondaryAction;
+  }
+
+  onPrimaryClick(): void {
+    if (this.isBusy || this.isClosing) return;
+    this.primaryClicked.emit({ ...this.fieldValues });
+  }
+
+  onSecondaryClick(): void {
+    if (this.isBusy || this.isClosing) return;
+    this.secondaryClicked.emit();
   }
 
   requestClose(): void {
@@ -114,9 +136,4 @@ export class DialogBoxComponent implements OnDestroy {
   }
 }
 
-export const DIALOG_BOX_IMPORTS = [
-  DialogBoxComponent,
-  DialogBoxTitleDirective,
-  DialogBoxDescriptionDirective,
-  DialogBoxFooterDirective,
-] as const;
+export const DIALOG_BOX_IMPORTS = [DialogBoxComponent] as const;

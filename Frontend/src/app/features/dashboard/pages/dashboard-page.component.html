@@ -40,17 +40,10 @@
     @if (isCreateDialogOpen()) {
       <app-dialog-box
         #createDialog
-        ariaLabelledBy="project-dialog-title"
+        title="Create project"
+        description="Set up your project details. You can adjust settings later from project options."
         [isBusy]="isCreatingProject()"
         (closed)="closeCreateProjectDialog()">
-        <div dialogTitle>
-          <h2 id="project-dialog-title">Create project</h2>
-        </div>
-
-        <div dialogDescription>
-          <p>Set up your project details. You can adjust settings later from project options.</p>
-        </div>
-
         <form
           class="project-dialog-form"
           [id]="createProjectFormId"
@@ -74,24 +67,26 @@
             formControlName="isPublic"></app-dropdown-select>
         </form>
 
-        <div dialogFooter class="project-dialog-footer">
-          <app-action-button
-            type="button"
-            variant="outline"
-            [fullWidth]="false"
-            [disabled]="isCreatingProject() || createDialog.isClosing"
-            (clicked)="createDialog.requestClose()">
-            Cancel
-          </app-action-button>
-          <app-action-button
-            type="submit"
-            variant="primary"
-            [form]="createProjectFormId"
-            [fullWidth]="false"
-            [disabled]="isCreatingProject() || createDialog.isClosing || createProjectForm.invalid">
-            {{ isCreatingProject() ? 'Creating...' : 'Create project' }}
-          </app-action-button>
-        </div>
+        <ng-template #dialogFooter>
+          <div class="project-dialog-footer">
+            <app-action-button
+              type="button"
+              variant="outline"
+              [fullWidth]="false"
+              [disabled]="isCreatingProject() || createDialog.isClosing"
+              (clicked)="createDialog.requestClose()">
+              Cancel
+            </app-action-button>
+            <app-action-button
+              type="submit"
+              variant="primary"
+              [form]="createProjectFormId"
+              [fullWidth]="false"
+              [disabled]="isCreatingProject() || createDialog.isClosing || createProjectForm.invalid">
+              {{ isCreatingProject() ? 'Creating...' : 'Create project' }}
+            </app-action-button>
+          </div>
+        </ng-template>
       </app-dialog-box>
     }
   </div>
