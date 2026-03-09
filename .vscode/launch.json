@@ -38,6 +38,23 @@
                 "pattern": "Local:\\s+(https://\\S+)",
                 "uriFormat": "%s"
             }
+        },
+        {
+            "name": "Debug Tests",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "dotnet",
+            "args": [
+                "test",
+                "${workspaceFolder}/Backend/Prismatic.Tests/Prismatic.Tests.csproj",
+                "-c",
+                "Release",
+                "--verbosity",
+                "normal"
+            ],
+            "cwd": "${workspaceFolder}/Backend/Prismatic.Tests",
+            "console": "integratedTerminal",
+            "stopAtEntry": false
         }
     ],
     "compounds": [

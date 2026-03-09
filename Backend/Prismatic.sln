@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Prismatic.API", "Prismatic.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Prismatic.Converter", "Prismatic.Converter\Prismatic.Converter.csproj", "{D02FC313-DD6C-40D6-9E19-B37D4E4270ED}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Prismatic.Tests", "Prismatic.Tests\Prismatic.Tests.csproj", "{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,18 @@ Global
 		{D02FC313-DD6C-40D6-9E19-B37D4E4270ED}.Release|x64.Build.0 = Release|Any CPU
 		{D02FC313-DD6C-40D6-9E19-B37D4E4270ED}.Release|x86.ActiveCfg = Release|Any CPU
 		{D02FC313-DD6C-40D6-9E19-B37D4E4270ED}.Release|x86.Build.0 = Release|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Debug|x64.Build.0 = Debug|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Debug|x86.Build.0 = Debug|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Release|x64.ActiveCfg = Release|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Release|x64.Build.0 = Release|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Release|x86.ActiveCfg = Release|Any CPU
+		{3A3E55E5-F1C6-4404-BAF3-5DD586F1B434}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
