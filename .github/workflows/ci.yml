@@ -1,0 +1,139 @@
+name: CI/CD
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+jobs:
+    test-backend:
+        name: Build & Test Backend
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup .NET
+              uses: actions/setup-dotnet@v4
+              with:
+                  dotnet-version: "9.0.x"
+
+            - name: Restore
+              run: dotnet restore Backend/Prismatic.sln
+
+            - name: Build
+              run: dotnet build Backend/Prismatic.sln -c Release --no-restore
+
+            - name: Test
+              run: dotnet test Backend/Prismatic.Tests/Prismatic.Tests.csproj -c Release --no-build --verbosity normal
+
+    build-frontend:
+        name: Build Frontend
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "22"
+                  cache: "npm"
+                  cache-dependency-path: Frontend/package-lock.json
+
+            - name: Install
+              working-directory: Frontend
+              run: npm ci
+
+            - name: Build
+              working-directory: Frontend
+              run: npm run build
+
+    push-images:
+        name: Push Docker Images
+        runs-on: ubuntu-latest
+        needs: [test-backend, build-frontend]
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Log in to GitHub Container Registry
+              uses: docker/login-action@v3
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Build and push API image
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./Backend
+                  push: true
+                  tags: |
+                      ghcr.io/${{ github.repository_owner }}/prismatic-api:latest
+                      ghcr.io/${{ github.repository_owner }}/prismatic-api:${{ github.sha }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: Build and push Frontend image
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./Frontend
+                  push: true
+                  tags: |
+                      ghcr.io/${{ github.repository_owner }}/prismatic-frontend:latest
+                      ghcr.io/${{ github.repository_owner }}/prismatic-frontend:${{ github.sha }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+    deploy:
+        name: Deploy to Production
+        runs-on: ubuntu-latest
+        needs: push-images
+        if: false # TODO: enable when server is ready
+        environment: production
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Copy docker-compose.yml to server
+              uses: appleboy/scp-action@v0.1.7
+              with:
+                  host: ${{ secrets.SSH_HOST }}
+                  username: ${{ secrets.SSH_USERNAME }}
+                  key: ${{ secrets.SSH_PRIVATE_KEY }}
+                  source: docker-compose.yml
+                  target: ~/prismatic/
+
+            - name: Write .env and deploy
+              uses: appleboy/ssh-action@v1
+              with:
+                  host: ${{ secrets.SSH_HOST }}
+                  username: ${{ secrets.SSH_USERNAME }}
+                  key: ${{ secrets.SSH_PRIVATE_KEY }}
+                  script: |
+                      cd ~/prismatic
+
+                      # Recreate .env — values are substituted by GitHub Actions before being sent over SSH
+                      {
+                        echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}"
+                        echo "JWT_KEY=${{ secrets.JWT_KEY }}"
+                        echo "GH_OAUTH_CLIENT_ID=${{ secrets.GH_OAUTH_CLIENT_ID }}"
+                        echo "GH_OAUTH_CLIENT_SECRET=${{ secrets.GH_OAUTH_CLIENT_SECRET }}"
+                        echo "GOOGLE_OAUTH_CLIENT_ID=${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}"
+                        echo "GOOGLE_OAUTH_CLIENT_SECRET=${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}"
+                        echo "APP_URL=${{ secrets.APP_URL }}"
+                        echo "EMAIL_FROM=${{ secrets.EMAIL_FROM }}"
+                        echo "EMAIL_SMTP_HOST=${{ secrets.EMAIL_SMTP_HOST }}"
+                        echo "EMAIL_SMTP_PORT=${{ secrets.EMAIL_SMTP_PORT }}"
+                        echo "EMAIL_SMTP_USERNAME=${{ secrets.EMAIL_SMTP_USERNAME }}"
+                        echo "EMAIL_SMTP_PASSWORD=${{ secrets.EMAIL_SMTP_PASSWORD }}"
+                      } > .env
+                      chmod 600 .env
+
+                      docker compose pull
+                      docker compose up -d --remove-orphans

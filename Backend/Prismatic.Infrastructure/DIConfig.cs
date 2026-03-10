@@ -38,6 +38,7 @@ public static class ServiceCollectionExtensions
   {
     using var scope = serviceProvider.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<PrismaticDbContext>();
+    await dbContext.Database.MigrateAsync();
     await UserSeeder.SeedAsync(dbContext);
   }
 
