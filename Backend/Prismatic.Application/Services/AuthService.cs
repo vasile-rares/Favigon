@@ -1,5 +1,4 @@
 using System.IdentityModel.Tokens.Jwt;
-using System.Net;
 using System.Security.Claims;
 using System.Text;
 using Prismatic.Application.DTOs.Requests;
@@ -178,24 +177,8 @@ public class AuthService : IAuthService
     await _userRepository.UpdateAsync(user);
 
     var resetUrl = PasswordResetTokenHelper.BuildResetUrl(_configuration, rawToken);
-    var encodedUrl = WebUtility.HtmlEncode(resetUrl);
-    var htmlBody = string.Join(
-      string.Empty,
-      "<p>Hello,</p>",
-      "<p>We received a request to reset your Prismatic password.</p>",
-      $"<p><a href=\"{encodedUrl}\">Reset your password</a></p>",
-      "<p>If you did not request this, you can ignore this email.</p>",
-      $"<p>This link expires in {tokenLifetimeMinutes} minutes.</p>");
-    var textBody =
-      "We received a request to reset your Prismatic password." + Environment.NewLine +
-      $"Reset your password here: {resetUrl}" + Environment.NewLine +
-      "If you did not request this, you can ignore this email.";
 
-    await _emailSender.SendEmailAsync(
-      user.Email,
-      "Reset your Prismatic password",
-      htmlBody,
-      textBody);
+    await _emailSender.SendPasswordResetEmailAsync(user.Email, resetUrl, tokenLifetimeMinutes);
   }
 
   public async Task ResetPasswordAsync(ResetPasswordRequest request)
