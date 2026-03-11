@@ -30,6 +30,14 @@ export class ProjectService {
     return this.http.delete<void>(`${this.baseUrl}/projects/${projectId}`);
   }
 
+  getByUserId(userId: number, isPublic?: boolean): Observable<ProjectResponse[]> {
+    const params: Record<string, string> = {};
+    if (isPublic !== undefined) {
+      params['isPublic'] = String(isPublic);
+    }
+    return this.http.get<ProjectResponse[]>(`${this.baseUrl}/projects/user/${userId}`, { params });
+  }
+
   getDesign(projectId: number): Observable<ProjectDesignResponse> {
     return this.http.get<ProjectDesignResponse>(`${this.baseUrl}/projects/${projectId}/design`);
   }

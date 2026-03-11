@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, HostListener, Input, Optional, Self } from '@angular/core';
 import { ControlValueAccessor, FormsModule, NgControl } from '@angular/forms';
-import { TextInputComponent } from '../input/text-input.component';
+import { TextInputComponent } from '../text-input/text-input.component';
 
 export interface DropdownSelectOption {
   label: string;

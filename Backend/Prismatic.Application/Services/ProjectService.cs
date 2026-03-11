@@ -38,9 +38,9 @@ public class ProjectService : IProjectService
     return _mapper.Map<List<ProjectResponse>>(projects);
   }
 
-  public async Task<IReadOnlyList<ProjectResponse>> GetByUserIdAsync(int userId)
+  public async Task<IReadOnlyList<ProjectResponse>> GetByUserIdAsync(int userId, bool? isPublic = null)
   {
-    var projects = await _projectRepository.GetByUserIdAsync(userId);
+    var projects = await _projectRepository.GetByUserIdAsync(userId, isPublic);
     return _mapper.Map<List<ProjectResponse>>(projects);
   }
 

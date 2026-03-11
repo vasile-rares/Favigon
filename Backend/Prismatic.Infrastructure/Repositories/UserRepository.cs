@@ -39,6 +39,16 @@ public class UserRepository : IUserRepository
     return _context.Users.FirstOrDefaultAsync(u => u.PasswordResetTokenHash == tokenHash);
   }
 
+  public async Task<IReadOnlyList<User>> SearchByQueryAsync(string query, int limit)
+  {
+    return await _context.Users
+        .AsNoTracking()
+        .Where(u => EF.Functions.ILike(u.Username, $"%{query}%") ||
+                    EF.Functions.ILike(u.DisplayName, $"%{query}%"))
+        .Take(limit)
+        .ToListAsync();
+  }
+
   public async Task<User> AddAsync(User user)
   {
     _context.Users.Add(user);

@@ -129,4 +129,11 @@ public class ProjectsController : ControllerBase
     return Ok(saved);
   }
 
+  [HttpGet("user/{userId:int}")]
+  public async Task<IActionResult> GetPublicByUserId(int userId)
+  {
+    var projects = await _projectService.GetByUserIdAsync(userId, isPublic: true);
+    return Ok(projects);
+  }
+
 }

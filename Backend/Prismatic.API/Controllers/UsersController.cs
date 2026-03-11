@@ -83,6 +83,43 @@ public class UsersController : ControllerBase
     return Ok(updated);
   }
 
+  [HttpGet("search")]
+  public async Task<IActionResult> Search([FromQuery] string q)
+  {
+    if (string.IsNullOrWhiteSpace(q) || q.Length < 2)
+    {
+      return Ok(new List<object>());
+    }
+
+    var users = await _userService.SearchAsync(q);
+    return Ok(users.Select(u => new
+    {
+      userId = u.Id,
+      u.DisplayName,
+      u.Username,
+      u.ProfilePictureUrl
+    }));
+  }
+
+  [HttpGet("by-username/{username}")]
+  public async Task<IActionResult> GetByUsername(string username)
+  {
+    var user = await _userService.GetByUsernameAsync(username);
+    if (user == null)
+    {
+      return NotFound();
+    }
+
+    return Ok(new
+    {
+      userId = user.Id,
+      user.DisplayName,
+      user.Username,
+      user.ProfilePictureUrl,
+      user.CreatedAt
+    });
+  }
+
   [HttpDelete("{id:int}")]
   [Authorize(Roles = "Admin")]
   public async Task<IActionResult> Delete(int id)

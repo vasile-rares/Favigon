@@ -11,8 +11,8 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
-import { ActionButtonComponent } from '../../../shared/components/button/action-button.component';
-import { TextInputComponent } from '../../../shared/components/input/text-input.component';
+import { ActionButtonComponent } from '../../../shared/components/action-button/action-button.component';
+import { TextInputComponent } from '../../../shared/components/text-input/text-input.component';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const CREDENTIAL_MAX_LENGTH = 100;

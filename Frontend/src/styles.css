@@ -6,6 +6,7 @@
     'Segoe UI Symbol', 'Noto Color Emoji';
 
   /* Colors - Base Palette */
+  --color-white: #ffffff;
   --color-zinc-100: #f4f4f5;
   --color-zinc-200: #e4e4e7;
   --color-zinc-300: #d4d4d8;

@@ -10,10 +10,11 @@ import {
 } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
+import { UserService } from '../../../core/services/user.service';
 import { environment } from '../../../../environments/environment';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
-import { TextInputComponent } from '../../../shared/components/input/text-input.component';
-import { ActionButtonComponent } from '../../../shared/components/button/action-button.component';
+import { TextInputComponent } from '../../../shared/components/text-input/text-input.component';
+import { ActionButtonComponent } from '../../../shared/components/action-button/action-button.component';
 import { DIALOG_BOX_IMPORTS } from '../../../shared/components/dialog-box/dialog-box.component';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -44,6 +45,7 @@ function passwordStrengthValidator(): ValidatorFn {
 })
 export class AuthPage implements OnInit {
   private readonly authService = inject(AuthService);
+  private readonly userService = inject(UserService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -196,7 +198,8 @@ export class AuthPage implements OnInit {
 
       this.handleRememberMe(email.trim(), rememberMe);
       this.statusMessage.set({ type: 'success', text: response.message || 'Login successful.' });
-      await this.router.navigate(['/dashboard']);
+      const user = await firstValueFrom(this.userService.getMe());
+      await this.router.navigate(['/', user.username]);
     } catch (error: any) {
       this.handleError(error, 'Could not log in.');
     } finally {
@@ -346,7 +349,8 @@ export class AuthPage implements OnInit {
         await firstValueFrom(this.authService.loginWithGithub({ code }));
       }
 
-      await this.router.navigate(['/dashboard']);
+      const user = await firstValueFrom(this.userService.getMe());
+      await this.router.navigate(['/', user.username]);
     } catch (error: any) {
       this.handleError(
         error,

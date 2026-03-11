@@ -17,10 +17,7 @@
             id="login-email"
             label="Email address"
             type="email"
-            placeholder="name@example.com"
-            autocomplete="off"
-            formControlName="email"
-            [requiredMarker]="loginForm.controls.email.invalid && loginForm.controls.email.dirty"
+            placeholder="Email address"
             [maxLength]="100"
             [errorText]="'Please enter a valid email address.'"></app-text-input>
 
@@ -71,7 +68,7 @@
           <app-text-input
             id="reg-displayname"
             label="Display Name"
-            placeholder="John Doe"
+            placeholder="Display name"
             autocomplete="off"
             formControlName="displayName"
             [requiredMarker]="registerForm.controls.displayName.invalid && registerForm.controls.displayName.dirty"
@@ -81,7 +78,7 @@
           <app-text-input
             id="reg-username"
             label="Username"
-            placeholder="johndoe"
+            placeholder="Username"
             autocomplete="off"
             formControlName="username"
             [requiredMarker]="registerForm.controls.username.invalid && registerForm.controls.username.dirty"
@@ -92,10 +89,7 @@
             id="reg-email"
             label="Email address"
             type="email"
-            placeholder="name@example.com"
-            autocomplete="off"
-            formControlName="email"
-            [requiredMarker]="registerForm.controls.email.invalid && registerForm.controls.email.dirty"
+            placeholder="Email address"
             [maxLength]="100"
             [errorText]="registerForm.controls.email.hasError('required') ? 'Email is required.' : 'Please enter a valid email address.'"></app-text-input>
 
@@ -109,7 +103,7 @@
             <app-text-input
               id="reg-password"
               type="password"
-              placeholder="Create a password"
+              placeholder="Password"
               autocomplete="new-password"
               formControlName="password"
               [enablePasswordToggle]="true"
@@ -135,9 +129,10 @@
             id="reg-confirm"
             label="Confirm Password"
             type="password"
-            placeholder="Confirm your password"
+            placeholder="Confirm password"
             autocomplete="new-password"
             formControlName="confirmPassword"
+            [enablePasswordToggle]="true"
             [requiredMarker]="registerForm.controls.confirmPassword.invalid && registerForm.controls.confirmPassword.dirty"
             [maxLength]="100"
             [errorText]="registerForm.controls.confirmPassword.hasError('required') ? 'Please confirm your password.' : 'Passwords do not match.'"></app-text-input>
@@ -220,10 +215,7 @@
             id="forgot-password-email"
             label="Email address"
             type="email"
-            placeholder="name@example.com"
-            autocomplete="off"
-            formControlName="email"
-            [requiredMarker]="forgotPasswordForm.controls.email.invalid && forgotPasswordForm.controls.email.dirty"
+            placeholder="Email address"
             [maxLength]="100"
             [errorText]="'Please enter a valid email address.'"></app-text-input>
 

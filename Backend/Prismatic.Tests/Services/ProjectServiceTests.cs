@@ -34,7 +34,7 @@ public class ProjectServiceTests
             new() { Id = 1, UserId = 7, Name = "Alpha", CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow },
             new() { Id = 2, UserId = 7, Name = "Beta",  CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
         };
-    _projectRepo.Setup(r => r.GetByUserIdAsync(7)).ReturnsAsync(projects);
+    _projectRepo.Setup(r => r.GetByUserIdAsync(7, It.IsAny<bool?>())).ReturnsAsync(projects);
 
     // Act
     var result = await _sut.GetByUserIdAsync(7);

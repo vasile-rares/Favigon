@@ -10,7 +10,7 @@ import {
   Output,
   TemplateRef,
 } from '@angular/core';
-import { ActionButtonComponent } from '../button/action-button.component';
+import { ActionButtonComponent } from '../action-button/action-button.component';
 
 export interface DialogBoxField {
   key: string;

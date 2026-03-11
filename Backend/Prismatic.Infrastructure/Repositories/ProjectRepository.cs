@@ -19,11 +19,11 @@ public class ProjectRepository : IProjectRepository
     return await _context.Projects.AsNoTracking().ToListAsync();
   }
 
-  public async Task<IReadOnlyList<Project>> GetByUserIdAsync(int userId)
+  public async Task<IReadOnlyList<Project>> GetByUserIdAsync(int userId, bool? isPublic = null)
   {
     return await _context.Projects
         .AsNoTracking()
-        .Where(p => p.UserId == userId)
+        .Where(p => p.UserId == userId && (isPublic == null || p.IsPublic == isPublic))
         .ToListAsync();
   }
 

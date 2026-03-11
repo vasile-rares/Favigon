@@ -6,7 +6,7 @@ namespace Prismatic.Application.Interfaces;
 public interface IProjectService
 {
   Task<IReadOnlyList<ProjectResponse>> GetAllAsync();
-  Task<IReadOnlyList<ProjectResponse>> GetByUserIdAsync(int userId);
+  Task<IReadOnlyList<ProjectResponse>> GetByUserIdAsync(int userId, bool? isPublic = null);
   Task<ProjectResponse?> GetByIdAsync(int id, int userId);
   Task<ProjectResponse> CreateAsync(ProjectCreateRequest request, int userId);
   Task<ProjectResponse?> UpdateAsync(int id, ProjectUpdateRequest request, int userId);

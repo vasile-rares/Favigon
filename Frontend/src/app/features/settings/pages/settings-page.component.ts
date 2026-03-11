@@ -2,8 +2,8 @@ import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
 import { FormsModule } from '@angular/forms';
-import { TextInputComponent } from '../../../shared/components/input/text-input.component';
-import { ActionButtonComponent } from '../../../shared/components/button/action-button.component';
+import { TextInputComponent } from '../../../shared/components/text-input/text-input.component';
+import { ActionButtonComponent } from '../../../shared/components/action-button/action-button.component';
 
 @Component({
   selector: 'app-settings-page',

@@ -23,6 +23,17 @@ public class UserService : IUserService
     return _userRepository.GetByIdAsync(id);
   }
 
+  public Task<User?> GetByUsernameAsync(string username)
+  {
+    return _userRepository.GetByUsernameAsync(username);
+  }
+
+  public Task<IReadOnlyList<User>> SearchAsync(string query)
+  {
+    var sanitized = query.Trim();
+    return _userRepository.SearchByQueryAsync(sanitized, 10);
+  }
+
   public async Task<User> CreateAsync(UserCreateRequest request)
   {
     request.Username = request.Username.Trim().ToLowerInvariant();

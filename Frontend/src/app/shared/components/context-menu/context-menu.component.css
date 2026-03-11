@@ -105,18 +105,18 @@
 /* Submenu */
 .context-menu__submenu {
   position: absolute;
-  left: calc(100% + 0.25rem);
+  left: calc(100% + 0.75rem);
   top: -0.3rem;
   min-width: 160px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border-dark);
-  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-dark-transparent);
+  background: var(--color-surface-transparent);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.55),
     0 2px 8px rgba(0, 0, 0, 0.35);
   padding: 0.3rem;
   z-index: 1;
-  animation: context-menu-in 80ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: context-menu-in 100ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 
   .context-menu__item {
     width: 100%;

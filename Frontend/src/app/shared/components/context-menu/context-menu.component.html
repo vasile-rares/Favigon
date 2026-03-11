@@ -16,8 +16,7 @@
         class="context-menu__item context-menu__item--submenu"
         role="menuitem"
         [class.context-menu__item--disabled]="item.disabled"
-        (mouseenter)="openSubmenuId = item.disabled ? null : item.id"
-        (mouseleave)="openSubmenuId = null">
+        (mouseenter)="openSubmenuId = item.disabled ? null : item.id">
         <span class="context-menu__item-label">{{ item.label }}</span>
         <span class="context-menu__item-arrow">›</span>
 
@@ -47,6 +46,7 @@
         role="menuitem"
         [class.context-menu__item--danger]="item.variant === 'danger'"
         [disabled]="item.disabled"
+        (mouseenter)="openSubmenuId = null"
         (click)="onItemClick(item)">
         <span class="context-menu__item-label">{{ item.label }}</span>
         @if (item.shortcut) {
