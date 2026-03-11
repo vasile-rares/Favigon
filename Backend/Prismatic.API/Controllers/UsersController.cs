@@ -101,7 +101,7 @@ public class UsersController : ControllerBase
     }));
   }
 
-  [HttpGet("by-username/{username}")]
+  [HttpGet("{username}")]
   public async Task<IActionResult> GetByUsername(string username)
   {
     var user = await _userService.GetByUsernameAsync(username);

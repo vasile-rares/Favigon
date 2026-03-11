@@ -15,7 +15,7 @@ export class UserService {
 
   getByUsername(username: string): Observable<UserProfile> {
     return this.http.get<UserProfile>(
-      `${this.baseUrl}/users/by-username/${encodeURIComponent(username)}`,
+      `${this.baseUrl}/users/${encodeURIComponent(username)}`,
     );
   }
 
