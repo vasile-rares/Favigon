@@ -182,8 +182,7 @@
   z-index: 1;
 }
 
-.resize-handle {
-  position: absolute;
+.handle {
   box-sizing: border-box;
   appearance: none;
   border-style: solid;
@@ -192,28 +191,89 @@
   border-radius: 0;
   padding: 0;
   pointer-events: auto;
+  flex-shrink: 0;
 }
 
-.resize-handle-nw {
-  left: var(--resize-handle-offset, -8px);
-  top: var(--resize-handle-offset, -8px);
+.handle-nw {
+  cursor: nwse-resize;
+}
+.handle-ne {
+  cursor: nesw-resize;
+}
+.handle-sw {
+  cursor: nesw-resize;
+}
+.handle-se {
   cursor: nwse-resize;
 }
 
-.resize-handle-ne {
-  right: var(--resize-handle-offset, -8px);
-  top: var(--resize-handle-offset, -8px);
-  cursor: nesw-resize;
+.corner-zone {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  pointer-events: auto;
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
-.resize-handle-sw {
-  left: var(--resize-handle-offset, -8px);
-  bottom: var(--resize-handle-offset, -8px);
-  cursor: nesw-resize;
+.corner-zone-nw {
+  top: var(--corner-zone-offset, -12px);
+  left: var(--corner-zone-offset, -12px);
 }
 
-.resize-handle-se {
-  right: var(--resize-handle-offset, -8px);
-  bottom: var(--resize-handle-offset, -8px);
-  cursor: nwse-resize;
+.corner-zone-ne {
+  top: var(--corner-zone-offset, -12px);
+  right: var(--corner-zone-offset, -12px);
+}
+
+.corner-zone-sw {
+  bottom: var(--corner-zone-offset, -12px);
+  left: var(--corner-zone-offset, -12px);
+}
+
+.corner-zone-se {
+  bottom: var(--corner-zone-offset, -12px);
+  right: var(--corner-zone-offset, -12px);
+}
+
+.edge-hit {
+  position: absolute;
+  pointer-events: auto;
+  background: transparent;
+}
+
+.edge-hit-n {
+  top: calc(-1 * var(--edge-hit-sz, 8px) / 2);
+  height: var(--edge-hit-sz, 8px);
+  left: var(--edge-gap, 16px);
+  right: var(--edge-gap, 16px);
+  cursor: ns-resize;
+}
+
+.edge-hit-s {
+  bottom: calc(-1 * var(--edge-hit-sz, 8px) / 2);
+  height: var(--edge-hit-sz, 8px);
+  left: var(--edge-gap, 16px);
+  right: var(--edge-gap, 16px);
+  cursor: ns-resize;
+}
+
+.edge-hit-e {
+  right: calc(-1 * var(--edge-hit-sz, 8px) / 2);
+  width: var(--edge-hit-sz, 8px);
+  top: var(--edge-gap, 16px);
+  bottom: var(--edge-gap, 16px);
+  cursor: ew-resize;
+}
+
+.edge-hit-w {
+  left: calc(-1 * var(--edge-hit-sz, 8px) / 2);
+  width: var(--edge-hit-sz, 8px);
+  top: var(--edge-gap, 16px);
+  bottom: var(--edge-gap, 16px);
+  cursor: ew-resize;
 }

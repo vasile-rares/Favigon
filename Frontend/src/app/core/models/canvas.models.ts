@@ -20,6 +20,7 @@ export interface CanvasElement {
   y: number;
   width: number;
   height: number;
+  rotation?: number;
   visible?: boolean;
   fill?: string;
   stroke?: string;

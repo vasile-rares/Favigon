@@ -54,6 +54,7 @@
             [style.top.px]="getRenderedY(el)"
             [style.width.px]="el.width"
             [style.height.px]="el.height"
+            [style.transform]="getElementTransform(el)"
             [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
             [style.border]="getElementBorderStyle(el)"
             [style.outline]="getElementOutlineStyle(el)"
@@ -121,18 +122,35 @@
               [style.left.px]="getSelectionOutlineInset()"
               [style.right.px]="getSelectionOutlineInset()"
               [style.bottom.px]="getSelectionOutlineInset()"
-              [style.border-width.px]="getSelectionOutlineBorderWidth()">
-              <button
-                *ngFor="let handle of resizeHandlePositions"
-                type="button"
-                class="resize-handle"
-                [ngClass]="resizeHandleClass(handle)"
-                [style.width.px]="getResizeHandleSize()"
-                [style.height.px]="getResizeHandleSize()"
-                [style.border-width.px]="getResizeHandleBorderWidth()"
-                [style.--resize-handle-offset]="getResizeHandleOffset() + 'px'"
-                (pointerdown)="onResizeHandlePointerDown($event, el.id, handle)"
-                aria-label="Resize element"></button>
+              [style.border-width.px]="getSelectionOutlineBorderWidth()"
+              [style.--edge-hit-sz]="getEdgeHitThickness() + 'px'"
+              [style.--edge-gap]="getEdgeHitCornerGap() + 'px'">
+
+              <!-- Edge resize hit areas: directly on the outline border -->
+              <div class="edge-hit edge-hit-n" (pointerdown)="onResizeHandlePointerDown($event, el.id, 'n')"></div>
+              <div class="edge-hit edge-hit-s" (pointerdown)="onResizeHandlePointerDown($event, el.id, 's')"></div>
+              <div class="edge-hit edge-hit-e" (pointerdown)="onResizeHandlePointerDown($event, el.id, 'e')"></div>
+              <div class="edge-hit edge-hit-w" (pointerdown)="onResizeHandlePointerDown($event, el.id, 'w')"></div>
+
+              <!-- Corner zones: outer area = rotate, inner handle = resize -->
+              <div
+                *ngFor="let corner of cornerHandles"
+                class="corner-zone"
+                [ngClass]="cornerZoneClass(corner)"
+                [style.width.px]="getCornerZoneSize()"
+                [style.height.px]="getCornerZoneSize()"
+                [style.--corner-zone-offset]="getCornerZoneOffset() + 'px'"
+                (pointerdown)="onCornerZonePointerDown($event, el.id, corner)">
+                <button
+                  type="button"
+                  class="handle"
+                  [ngClass]="handleClass(corner)"
+                  [style.width.px]="getResizeHandleSize()"
+                  [style.height.px]="getResizeHandleSize()"
+                  [style.border-width.px]="getResizeHandleBorderWidth()"
+                  (pointerdown)="onResizeHandlePointerDown($event, el.id, corner)"
+                  aria-label="Resize element"></button>
+              </div>
             </div>
           </div>
         </div>

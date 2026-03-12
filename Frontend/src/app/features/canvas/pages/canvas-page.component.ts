@@ -41,7 +41,9 @@ import {
 } from '../../../shared/components/context-menu/context-menu.component';
 
 type SupportedFramework = 'html' | 'react' | 'angular';
-type ResizeHandlePosition = 'nw' | 'ne' | 'sw' | 'se';
+type HandlePosition = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
+type CornerHandle = 'nw' | 'ne' | 'sw' | 'se';
+type EdgeHandle = 'n' | 's' | 'e' | 'w';
 
 interface FrameTemplateSelection {
   name: string;
@@ -71,7 +73,15 @@ interface ResizeState {
   centerY: number;
   aspectRatio: number;
   elementId: string;
-  handle: ResizeHandlePosition;
+  handle: HandlePosition;
+}
+
+interface RotateState {
+  startAngle: number;
+  initialRotation: number;
+  centerX: number;
+  centerY: number;
+  elementId: string;
 }
 
 interface HistorySnapshot {
@@ -164,7 +174,7 @@ export class ProjectPage implements OnDestroy {
   });
 
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
-  readonly resizeHandlePositions: ResizeHandlePosition[] = ['nw', 'ne', 'sw', 'se'];
+  readonly cornerHandles: CornerHandle[] = ['nw', 'ne', 'sw', 'se'];
 
   private readonly projectIdAsNumber = Number.parseInt(this.projectId, 10);
   private readonly imagePlaceholderUrl = 'https://placehold.co/300x200?text=Image';
@@ -187,6 +197,7 @@ export class ProjectPage implements OnDestroy {
   private dragOffset = { x: 0, y: 0 };
   private isDragging = false;
   private isResizing = false;
+  private isRotating = false;
   private isApplyingHistory = false;
   private undoStack: HistorySnapshot[] = [];
   private redoStack: HistorySnapshot[] = [];
@@ -205,6 +216,14 @@ export class ProjectPage implements OnDestroy {
     aspectRatio: 1,
     elementId: '',
     handle: 'se',
+  };
+
+  private rotateStart: RotateState = {
+    startAngle: 0,
+    initialRotation: 0,
+    centerX: 0,
+    centerY: 0,
+    elementId: '',
   };
 
   constructor() {
@@ -356,7 +375,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    if (this.isResizing || this.editingTextElementId() === id) {
+    if (this.isResizing || this.isRotating || this.editingTextElementId() === id) {
       return;
     }
 
@@ -452,7 +471,7 @@ export class ProjectPage implements OnDestroy {
     (event.target as HTMLTextAreaElement | null)?.blur();
   }
 
-  onResizeHandlePointerDown(event: MouseEvent, id: string, handle: ResizeHandlePosition): void {
+  onResizeHandlePointerDown(event: MouseEvent, id: string, handle: HandlePosition): void {
     event.stopPropagation();
     event.preventDefault();
 
@@ -484,6 +503,39 @@ export class ProjectPage implements OnDestroy {
       aspectRatio: element.width / Math.max(element.height, 1),
       elementId: id,
       handle,
+    };
+  }
+
+  onCornerZonePointerDown(event: MouseEvent, id: string, _corner: CornerHandle): void {
+    event.stopPropagation();
+    event.preventDefault();
+
+    const element = this.findElementById(id);
+    if (!element) {
+      return;
+    }
+
+    const pointer = this.getCanvasPoint(event);
+    if (!pointer) {
+      return;
+    }
+
+    const bounds = this.getAbsoluteBounds(element);
+    const cx = bounds.x + element.width / 2;
+    const cy = bounds.y + element.height / 2;
+    const startAngle = Math.atan2(pointer.y - cy, pointer.x - cx) * (180 / Math.PI);
+
+    this.selectedElementId.set(id);
+    this.beginGestureHistory();
+    this.isDragging = false;
+    this.isResizing = false;
+    this.isRotating = true;
+    this.rotateStart = {
+      startAngle,
+      initialRotation: element.rotation ?? 0,
+      centerX: cx,
+      centerY: cy,
+      elementId: id,
     };
   }
 
@@ -851,6 +903,11 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
+    if (this.isRotating) {
+      this.handleRotatePointerMove(event);
+      return;
+    }
+
     if (this.isResizing) {
       this.handleResizePointerMove(event);
       return;
@@ -908,7 +965,7 @@ export class ProjectPage implements OnDestroy {
 
   @HostListener('window:pointerup')
   onPointerUp(): void {
-    const shouldCommitGestureHistory = this.isDragging || this.isResizing;
+    const shouldCommitGestureHistory = this.isDragging || this.isResizing || this.isRotating;
 
     if (this.isPanning() && this.panMoved) {
       this.suppressNextCanvasClick = true;
@@ -917,6 +974,7 @@ export class ProjectPage implements OnDestroy {
     this.isPanning.set(false);
     this.isDragging = false;
     this.isResizing = false;
+    this.isRotating = false;
 
     if (shouldCommitGestureHistory) {
       this.commitGestureHistory();
@@ -1132,8 +1190,37 @@ export class ProjectPage implements OnDestroy {
     return element.id;
   }
 
-  resizeHandleClass(handle: ResizeHandlePosition): string {
-    return `resize-handle-${handle}`;
+  handleClass(handle: CornerHandle): string {
+    return `handle-${handle}`;
+  }
+
+  cornerZoneClass(corner: CornerHandle): string {
+    return `corner-zone-${corner}`;
+  }
+
+  getElementTransform(element: CanvasElement): string | null {
+    const rotation = element.rotation ?? 0;
+    if (rotation === 0) {
+      return null;
+    }
+
+    return `rotate(${rotation}deg)`;
+  }
+
+  getCornerZoneSize(): number {
+    return this.getScreenInvariantSize(24);
+  }
+
+  getCornerZoneOffset(): number {
+    return this.getScreenInvariantSize(-12);
+  }
+
+  getEdgeHitThickness(): number {
+    return this.getScreenInvariantSize(8);
+  }
+
+  getEdgeHitCornerGap(): number {
+    return this.getScreenInvariantSize(16);
   }
 
   validateIR(): void {
@@ -1255,6 +1342,7 @@ export class ProjectPage implements OnDestroy {
     this.isPanning.set(false);
     this.isDragging = false;
     this.isResizing = false;
+    this.isRotating = false;
     this.commitGestureHistory();
     this.commitTextEditHistory();
     this.editingTextElementId.set(null);
@@ -1513,6 +1601,40 @@ export class ProjectPage implements OnDestroy {
     };
   }
 
+  private handleRotatePointerMove(event: MouseEvent): void {
+    const start = this.rotateStart;
+    if (!start.elementId) {
+      return;
+    }
+
+    const pointer = this.getCanvasPoint(event);
+    if (!pointer) {
+      return;
+    }
+
+    const currentAngle =
+      Math.atan2(pointer.y - start.centerY, pointer.x - start.centerX) * (180 / Math.PI);
+    let angleDelta = currentAngle - start.startAngle;
+    let newRotation = start.initialRotation + angleDelta;
+
+    if (event.shiftKey) {
+      newRotation = Math.round(newRotation / 15) * 15;
+    }
+
+    newRotation = ((newRotation % 360) + 360) % 360;
+    newRotation = this.roundToTwoDecimals(newRotation);
+
+    this.updateCurrentPageElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== start.elementId) {
+          return element;
+        }
+
+        return { ...element, rotation: newRotation };
+      }),
+    );
+  }
+
   private handleResizePointerMove(event: MouseEvent): void {
     const start = this.resizeStart;
     if (!start.elementId) {
@@ -1566,7 +1688,14 @@ export class ProjectPage implements OnDestroy {
     const deltaY = pointer.y - start.pointerY;
     const xDirection = start.handle.includes('w') ? -1 : 1;
     const yDirection = start.handle.includes('n') ? -1 : 1;
-    const shouldPreserveAspectRatio = preserveAspectRatio || element.type === 'circle';
+    const isEdgeHandle =
+      start.handle === 'n' || start.handle === 's' || start.handle === 'e' || start.handle === 'w';
+    const isNS = start.handle === 'n' || start.handle === 's';
+    const isEW = start.handle === 'e' || start.handle === 'w';
+    const effectiveDeltaX = isNS ? 0 : deltaX;
+    const effectiveDeltaY = isEW ? 0 : deltaY;
+    const shouldPreserveAspectRatio =
+      !isEdgeHandle && (preserveAspectRatio || element.type === 'circle');
     const aspectRatio = shouldPreserveAspectRatio
       ? start.aspectRatio || 1
       : start.width / Math.max(start.height, 1);
@@ -1584,8 +1713,8 @@ export class ProjectPage implements OnDestroy {
       : Number.POSITIVE_INFINITY;
 
     if (scaleFromCenter) {
-      const candidateHalfWidth = start.width / 2 + xDirection * deltaX;
-      const candidateHalfHeight = start.height / 2 + yDirection * deltaY;
+      const candidateHalfWidth = start.width / 2 + xDirection * effectiveDeltaX;
+      const candidateHalfHeight = start.height / 2 + yDirection * effectiveDeltaY;
       const maxHalfWidth = Math.max(
         this.minElementSize / 2,
         Math.min(start.centerX - minLeft, maxRight - start.centerX),

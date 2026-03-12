@@ -5,7 +5,7 @@
 .user-menu__panel {
   position: absolute;
   right: 0;
-  top: calc(100% + 0.5rem);
+  top: calc(100% + 0.75rem);
   width: 256px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-dark);

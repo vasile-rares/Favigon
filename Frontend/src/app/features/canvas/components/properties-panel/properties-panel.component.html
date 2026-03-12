@@ -89,6 +89,17 @@
             [value]="toDisplayNumber(element.height)"
             (input)="onNumberChange('height', $event)" />
         </label>
+
+        <label class="property-field property-field--inline">
+          <span class="property-label">R°</span>
+          <input
+            type="number"
+            min="0"
+            max="360"
+            step="1"
+            [value]="toDisplayNumber(element.rotation ?? 0)"
+            (input)="onNumberChange('rotation', $event)" />
+        </label>
       </div>
     </section>
 

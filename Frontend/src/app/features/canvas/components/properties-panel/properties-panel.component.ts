@@ -19,6 +19,7 @@ type EditableNumericField =
   | 'y'
   | 'width'
   | 'height'
+  | 'rotation'
   | 'fontSize'
   | 'letterSpacing'
   | 'lineHeight'
