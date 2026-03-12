@@ -84,6 +84,14 @@ interface RotateState {
   elementId: string;
 }
 
+interface CornerRadiusState {
+  absoluteX: number;
+  absoluteY: number;
+  width: number;
+  height: number;
+  elementId: string;
+}
+
 interface HistorySnapshot {
   pages: CanvasPageModel[];
   currentPageId: string | null;
@@ -198,6 +206,7 @@ export class ProjectPage implements OnDestroy {
   private isDragging = false;
   private isResizing = false;
   private isRotating = false;
+  private isAdjustingCornerRadius = false;
   private isApplyingHistory = false;
   private undoStack: HistorySnapshot[] = [];
   private redoStack: HistorySnapshot[] = [];
@@ -223,6 +232,14 @@ export class ProjectPage implements OnDestroy {
     initialRotation: 0,
     centerX: 0,
     centerY: 0,
+    elementId: '',
+  };
+
+  private cornerRadiusStart: CornerRadiusState = {
+    absoluteX: 0,
+    absoluteY: 0,
+    width: 0,
+    height: 0,
     elementId: '',
   };
 
@@ -535,6 +552,37 @@ export class ProjectPage implements OnDestroy {
       initialRotation: element.rotation ?? 0,
       centerX: cx,
       centerY: cy,
+      elementId: id,
+    };
+  }
+
+  onCornerRadiusHandlePointerDown(event: MouseEvent, id: string): void {
+    event.stopPropagation();
+    event.preventDefault();
+
+    const element = this.findElementById(id);
+    if (!element || !this.supportsCornerRadius(element)) {
+      return;
+    }
+
+    const pointer = this.getCanvasPoint(event);
+    if (!pointer) {
+      return;
+    }
+
+    const bounds = this.getAbsoluteBounds(element);
+
+    this.selectedElementId.set(id);
+    this.beginGestureHistory();
+    this.isDragging = false;
+    this.isResizing = false;
+    this.isRotating = false;
+    this.isAdjustingCornerRadius = true;
+    this.cornerRadiusStart = {
+      absoluteX: bounds.x,
+      absoluteY: bounds.y,
+      width: element.width,
+      height: element.height,
       elementId: id,
     };
   }
@@ -913,6 +961,11 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
+    if (this.isAdjustingCornerRadius) {
+      this.handleCornerRadiusPointerMove(event);
+      return;
+    }
+
     if (!this.isDragging) {
       return;
     }
@@ -965,7 +1018,8 @@ export class ProjectPage implements OnDestroy {
 
   @HostListener('window:pointerup')
   onPointerUp(): void {
-    const shouldCommitGestureHistory = this.isDragging || this.isResizing || this.isRotating;
+    const shouldCommitGestureHistory =
+      this.isDragging || this.isResizing || this.isRotating || this.isAdjustingCornerRadius;
 
     if (this.isPanning() && this.panMoved) {
       this.suppressNextCanvasClick = true;
@@ -975,6 +1029,7 @@ export class ProjectPage implements OnDestroy {
     this.isDragging = false;
     this.isResizing = false;
     this.isRotating = false;
+    this.isAdjustingCornerRadius = false;
 
     if (shouldCommitGestureHistory) {
       this.commitGestureHistory();
@@ -1188,6 +1243,27 @@ export class ProjectPage implements OnDestroy {
 
   trackByElementId(_: number, element: CanvasElement): string {
     return element.id;
+  }
+
+  supportsCornerRadius(element: CanvasElement): boolean {
+    return element.type !== 'circle' && element.type !== 'text';
+  }
+
+  getCornerRadiusHandleInset(element: CanvasElement): number {
+    const radius = Number.isFinite(element.cornerRadius ?? Number.NaN)
+      ? (element.cornerRadius as number)
+      : element.type === 'image'
+        ? 6
+        : 0;
+
+    const baseInset = this.getScreenInvariantSize(20);
+    const handleSize = this.getResizeHandleSize();
+    const maxInsetByHeight = Math.max(0, element.height / 2 - handleSize / 2);
+    const maxInsetByWidth = Math.max(0, element.width / 2 - handleSize / 2);
+    const maxInset = Math.min(maxInsetByHeight, maxInsetByWidth);
+    const desiredInset = baseInset + Math.max(0, radius);
+
+    return this.roundToTwoDecimals(this.clamp(desiredInset, 0, maxInset));
   }
 
   handleClass(handle: CornerHandle): string {
@@ -1672,6 +1748,39 @@ export class ProjectPage implements OnDestroy {
 
         this.normalizeElement(nextElement, elements);
         return nextElement;
+      }),
+    );
+  }
+
+  private handleCornerRadiusPointerMove(event: MouseEvent): void {
+    const start = this.cornerRadiusStart;
+    if (!start.elementId) {
+      return;
+    }
+
+    const pointer = this.getCanvasPoint(event);
+    if (!pointer) {
+      return;
+    }
+
+    const cornerX = start.absoluteX + start.width;
+    const cornerY = start.absoluteY;
+    const xRadius = cornerX - pointer.x;
+    const yRadius = pointer.y - cornerY;
+    const rawRadius = Math.min(xRadius, yRadius);
+    const maxRadius = Math.max(0, Math.min(start.width, start.height) / 2);
+    const nextRadius = this.clamp(rawRadius, 0, maxRadius);
+
+    this.updateCurrentPageElements((elements) =>
+      elements.map((element) => {
+        if (element.id !== start.elementId || !this.supportsCornerRadius(element)) {
+          return element;
+        }
+
+        return {
+          ...element,
+          cornerRadius: this.roundToTwoDecimals(nextRadius),
+        };
       }),
     );
   }

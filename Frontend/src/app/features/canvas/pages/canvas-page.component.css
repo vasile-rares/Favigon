@@ -182,6 +182,20 @@
   z-index: 1;
 }
 
+.corner-radius-handle {
+  position: absolute;
+  box-sizing: border-box;
+  appearance: none;
+  border-style: solid;
+  border-color: var(--color-brand-primary);
+  background-color: var(--color-white);
+  border-radius: 50%;
+  padding: 0;
+  cursor: nesw-resize;
+  pointer-events: auto;
+  z-index: 2;
+}
+
 .handle {
   box-sizing: border-box;
   appearance: none;

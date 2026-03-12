@@ -132,6 +132,18 @@
               <div class="edge-hit edge-hit-e" (pointerdown)="onResizeHandlePointerDown($event, el.id, 'e')"></div>
               <div class="edge-hit edge-hit-w" (pointerdown)="onResizeHandlePointerDown($event, el.id, 'w')"></div>
 
+              <button
+                *ngIf="supportsCornerRadius(el)"
+                type="button"
+                class="corner-radius-handle"
+                [style.width.px]="getResizeHandleSize()"
+                [style.height.px]="getResizeHandleSize()"
+                [style.border-width.px]="getResizeHandleBorderWidth()"
+                [style.top.px]="getCornerRadiusHandleInset(el)"
+                [style.right.px]="getCornerRadiusHandleInset(el)"
+                (pointerdown)="onCornerRadiusHandlePointerDown($event, el.id)"
+                aria-label="Adjust corner radius"></button>
+
               <!-- Corner zones: outer area = rotate, inner handle = resize -->
               <div
                 *ngFor="let corner of cornerHandles"
