@@ -1,80 +1,72 @@
-# Copilot Instructions for Prismatic
+# Prismatic
 
-## Scope
+Prismatic is a collaborative design-to-code and code-to-design platform. Designers compose UIs visually on a canvas, developers get structured, production-ready code. Both sides stay in sync through a shared **Intermediate Representation (IR)**.
 
-These guidelines apply to the entire repository.
+Long-term goal: bidirectional sync between visual design and source code, where changes on either side reflect on the other.
 
-## Project Vision
+Core principles when implementing features:
+- Preserve parity between visual composition and programmatic output
+- Reduce friction between designer and developer workflows
+- Avoid coupling either side to tooling specific to the other
 
-Prismatic is a collaborative design-to-code and code-to-design platform.
+---
 
-Designers should work primarily through a visual canvas workflow, while developers interact with structured source code.
-The long-term goal is bidirectional synchronization between visual design and code through a shared intermediate representation.
+## Repository Structure
 
-When proposing or implementing features:
+```
+Backend/          .NET (C#), layered: API → Application → Domain → Infrastructure
+  Prismatic.API/           Controllers, middleware, global exception handler
+  Prismatic.Application/   Business logic, DTOs, service interfaces
+  Prismatic.Domain/        Entities, domain rules
+  Prismatic.Infrastructure/ Repositories, DbContext, external integrations
+  Prismatic.Converter/     IR → HTML/CSS/React/Angular code generation
+  Prismatic.Tests/         Unit/integration tests
 
-* Preserve parity between visual composition and programmatic implementation.
-* Prefer solutions that reduce friction between designer and developer workflows.
-* Avoid coupling either side to tooling specific to the other workflow.
+Frontend/         Angular 18+ (standalone components, Signals)
+  src/app/
+    core/         Shared DTOs/models, cross-feature HTTP services, interceptors
+    shared/       Reusable UI components
+    features/
+      auth/       Login, register
+      canvas/     Visual design editor (main feature)
+      dashboard/  Project listing
+      profile/    User profile
+      settings/   User settings
+```
 
-## Architecture (Required)
+## Canvas Feature (`features/canvas/`)
 
-Backend follows a layered architecture:
+The canvas is the core of the product.
 
-API → Application → Domain → Infrastructure
+- **pages/** — `canvas-page.component.ts` orchestrates the editor
+- **services/** — focused single-responsibility services: `CanvasViewportService`, `CanvasHistoryService`, `CanvasClipboardService`, `CanvasElementService`, `CanvasKeyboardService`, `CanvasContextMenuService`, `CanvasPersistenceService`, `CanvasGenerationService`
+- **mappers/** — `canvas-ir.mapper.ts` converts canvas elements ↔ IR tree
+- **utils/** — `canvas-interaction.util.ts` (math: clamp, rounding, normalization, bounds), `canvas-label.util.ts`
+- **components/** — toolbar, project panel (layers/pages), properties panel
+- **canvas.types.ts** — shared TS types (Point, Bounds, ResizeState, HistorySnapshot, …)
 
-General responsibilities:
+Data flow: Canvas elements → IR tree → Backend converter API → HTML/CSS output.
 
-* **API**: request handling, routing, and orchestration.
-* **Application**: business logic and service coordination.
-* **Domain**: core entities and domain rules.
-* **Infrastructure**: persistence, external services, and integrations.
+---
 
-Guidelines:
+## Key Conventions
 
-* Controllers should remain thin and delegate work to services.
-* Business logic belongs in Application services.
-* Persistence logic belongs in repositories or DbContext.
-* Application depends on repository **interfaces**, not Infrastructure implementations.
-* Dependencies should be registered through each layer’s DI configuration.
+**Backend**
+- Thin controllers — delegate to Application services
+- Business logic belongs in Application, not API or Domain
+- Use repository interfaces (never depend on concrete Infrastructure implementations)
+- Never expose entities directly; always use DTOs
+- Auth: cookie-based JWT; validate resource ownership at service boundaries
+- Database: PostgreSQL; follow existing schema and timestamp conventions
+- Exceptions → HTTP translation handled centrally in middleware
 
-## Authentication and Security
+**Frontend**
+- Feature-scoped files stay inside their feature (`services/`, `utils/`, `mappers/` per feature)
+- `core/` only for cross-feature models (DTOs matching backend) and HTTP services
+- Canvas services are registered with `providers: [...]` on the component, not `providedIn: 'root'`
+- Prefer Angular Signals over observables for local component state
 
-* Authentication uses cookie-based JWT unless explicitly changed.
-* Authorization checks should happen at endpoint or service boundaries.
-* Resource ownership must be validated for user-scoped data.
-* Exception-to-HTTP translation should be handled centrally in middleware.
-* All user-facing messages and errors must be written in English.
-
-## Data and Persistence
-
-* PostgreSQL is the primary database.
-* Maintain compatibility with existing schema conventions and mappings.
-* Entities should not be exposed directly through API responses; use DTOs.
-* Reuse existing mapping profiles when converting between entities and DTOs.
-* Respect existing timestamp conventions when adding entities.
-
-## Backend ↔ Frontend Contracts
-
-* Keep API routes and DTO shapes aligned with frontend services.
-* When changing backend endpoints or response models, update the frontend contracts in the same change.
-* Authenticated frontend requests should continue using credentialed requests unless the auth strategy changes.
-
-## Developer Workflows
-
-* Use workspace tasks for backend build/run when available.
-* Use standard Angular CLI commands for frontend development.
-* After backend changes, ensure the backend builds successfully.
-
-## Coding Guidelines
-
-* Prefer reusing existing services, utilities, and abstractions when possible.
-* Avoid duplicating logic that already exists in the repository.
-* Keep implementations simple and consistent with existing patterns.
-* Favor minimal and focused changes over broad refactors unless explicitly requested.
-
-## UI and Styling
-
-* Maintain the premium UI style established.
-* Ensure new components visually align with existing UI patterns.
-* Use CSS nesting to organize styles hierarchically where appropriate.
+**General**
+- Keep backend DTOs and frontend models in sync — update both in the same change
+- All user-facing text and error messages in English
+- Match existing premium dark UI style; use CSS nesting; maintain visual consistency
