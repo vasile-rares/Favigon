@@ -171,10 +171,8 @@ export class CanvasViewportService {
 
     const padding = 64;
     const minSize = 24;
-    const horizontalZoom =
-      (canvasElement.clientWidth - padding) / Math.max(bounds.width, minSize);
-    const verticalZoom =
-      (canvasElement.clientHeight - padding) / Math.max(bounds.height, minSize);
+    const horizontalZoom = (canvasElement.clientWidth - padding) / Math.max(bounds.width, minSize);
+    const verticalZoom = (canvasElement.clientHeight - padding) / Math.max(bounds.height, minSize);
     const zoom = clamp(Math.min(horizontalZoom, verticalZoom), MIN_ZOOM, MAX_ZOOM);
 
     this.zoomLevel.set(zoom);

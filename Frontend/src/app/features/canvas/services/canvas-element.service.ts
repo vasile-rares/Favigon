@@ -215,14 +215,8 @@ export class CanvasElementService {
 
   // ── Frame Positioning ─────────────────────────────────────
 
-  getNextFramePosition(
-    elements: CanvasElement[],
-    width: number,
-    height: number,
-  ): Point | null {
-    const rootFrames = elements.filter(
-      (element) => element.type === 'frame' && !element.parentId,
-    );
+  getNextFramePosition(elements: CanvasElement[], width: number, height: number): Point | null {
+    const rootFrames = elements.filter((element) => element.type === 'frame' && !element.parentId);
 
     if (rootFrames.length === 0) {
       return null;
@@ -317,11 +311,7 @@ export class CanvasElementService {
       draggedRoot.y = roundToTwoDecimals(draggedBounds.y);
     }
 
-    return [
-      ...remaining.slice(0, insertIndex),
-      ...draggedSubtree,
-      ...remaining.slice(insertIndex),
-    ];
+    return [...remaining.slice(0, insertIndex), ...draggedSubtree, ...remaining.slice(insertIndex)];
   }
 
   collectSubtreeIds(elements: CanvasElement[], rootId: string): string[] {
@@ -329,9 +319,7 @@ export class CanvasElementService {
 
     const visit = (currentId: string): void => {
       collected.push(currentId);
-      const children = elements.filter(
-        (element) => (element.parentId ?? null) === currentId,
-      );
+      const children = elements.filter((element) => (element.parentId ?? null) === currentId);
       for (const child of children) {
         visit(child.id);
       }
@@ -349,9 +337,7 @@ export class CanvasElementService {
     updater: (elements: CanvasElement[]) => CanvasElement[],
   ): CanvasPageModel[] {
     return pages.map((page) =>
-      page.id === currentPageId
-        ? { ...page, elements: updater(page.elements) }
-        : page,
+      page.id === currentPageId ? { ...page, elements: updater(page.elements) } : page,
     );
   }
 
@@ -388,10 +374,7 @@ export class CanvasElementService {
     const bounds = this.getAbsoluteBounds(element, elements);
     const parentBounds = this.getAbsoluteBounds(parent, elements);
     const topInset = Math.max(0, parentBounds.y - bounds.y);
-    const rightInset = Math.max(
-      0,
-      bounds.x + bounds.width - (parentBounds.x + parentBounds.width),
-    );
+    const rightInset = Math.max(0, bounds.x + bounds.width - (parentBounds.x + parentBounds.width));
     const bottomInset = Math.max(
       0,
       bounds.y + bounds.height - (parentBounds.y + parentBounds.height),

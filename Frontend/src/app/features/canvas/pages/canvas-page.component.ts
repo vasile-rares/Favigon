@@ -25,9 +25,7 @@ import { clamp, roundToTwoDecimals, getStrokeWidth } from '../utils/canvas-inter
 import { buildSnapCandidates, computeSnappedPosition } from '../utils/canvas-snap.util';
 import { CanvasGenerationService } from '../services/canvas-generation.service';
 import { CanvasPersistenceService } from '../services/canvas-persistence.service';
-import {
-  ContextMenuComponent,
-} from '../../../shared/components/context-menu/context-menu.component';
+import { ContextMenuComponent } from '../../../shared/components/context-menu/context-menu.component';
 import {
   SupportedFramework,
   HandlePosition,
@@ -45,7 +43,10 @@ import { CanvasViewportService } from '../services/canvas-viewport.service';
 import { CanvasHistoryService } from '../services/canvas-history.service';
 import { CanvasClipboardService } from '../services/canvas-clipboard.service';
 import { CanvasElementService } from '../services/canvas-element.service';
-import { CanvasKeyboardService, KeyboardActionCallbacks } from '../services/canvas-keyboard.service';
+import {
+  CanvasKeyboardService,
+  KeyboardActionCallbacks,
+} from '../services/canvas-keyboard.service';
 import {
   CanvasContextMenuService,
   ContextMenuActionCallbacks,
@@ -150,8 +151,13 @@ export class ProjectPage implements OnDestroy {
   private dragOffset: Point = { x: 0, y: 0 };
   private dragStartAbsolute: Point = { x: 0, y: 0 };
   private _isDragging = false;
-  private get isDragging(): boolean { return this._isDragging; }
-  private set isDragging(value: boolean) { this._isDragging = value; this.isDraggingEl.set(value); }
+  private get isDragging(): boolean {
+    return this._isDragging;
+  }
+  private set isDragging(value: boolean) {
+    this._isDragging = value;
+    this.isDraggingEl.set(value);
+  }
   readonly isDraggingEl = signal(false);
   readonly hoveredElementId = signal<string | null>(null);
   readonly hoveredFrameTitleId = signal<string | null>(null);
@@ -469,9 +475,7 @@ export class ProjectPage implements OnDestroy {
     this.history.beginTextEditHistory(() => this.createHistorySnapshot());
     const value = (event.target as HTMLTextAreaElement).value;
     this.updateCurrentPageElements((elements) =>
-      elements.map((element) =>
-        element.id === id ? { ...element, text: value } : element,
-      ),
+      elements.map((element) => (element.id === id ? { ...element, text: value } : element)),
     );
   }
 
@@ -668,9 +672,7 @@ export class ProjectPage implements OnDestroy {
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) =>
         elements.map((element) =>
-          element.id === elementId
-            ? { ...element, visible: element.visible === false }
-            : element,
+          element.id === elementId ? { ...element, visible: element.visible === false } : element,
         ),
       );
     });
@@ -683,12 +685,7 @@ export class ProjectPage implements OnDestroy {
   }): void {
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) =>
-        this.el.reorderLayerElements(
-          elements,
-          change.draggedId,
-          change.targetId,
-          change.position,
-        ),
+        this.el.reorderLayerElements(elements, change.draggedId, change.targetId, change.position),
       );
     });
   }
@@ -802,10 +799,8 @@ export class ProjectPage implements OnDestroy {
       }
     }
 
-    const { xCandidates, yCandidates } = buildSnapCandidates(
-      selectedId,
-      elements,
-      (el, els) => this.el.getAbsoluteBounds(el, els),
+    const { xCandidates, yCandidates } = buildSnapCandidates(selectedId, elements, (el, els) =>
+      this.el.getAbsoluteBounds(el, els),
     );
     const snap = computeSnappedPosition(
       absoluteX,
@@ -1034,14 +1029,16 @@ export class ProjectPage implements OnDestroy {
   getOverlayCornerRadiusInset(el: CanvasElement): number {
     const radius = Number.isFinite(el.cornerRadius ?? Number.NaN)
       ? (el.cornerRadius as number)
-      : el.type === 'image' ? 6 : 0;
+      : el.type === 'image'
+        ? 6
+        : 0;
     const zoom = this.viewport.zoomLevel();
     const handleRadius = 6; // half of 12px handle size
     // Compute screen-space inset directly: handle center should be at (radius * zoom) px
     // from the element corner in screen space, so CSS top/right = radius*zoom - handleRadius.
     // minScreenInset keeps the handle visibly inside the corner even at radius=0.
     const minScreenInset = 8;
-    const maxScreenInset = Math.max(0, Math.min(el.width, el.height) * zoom / 2 - handleRadius);
+    const maxScreenInset = Math.max(0, (Math.min(el.width, el.height) * zoom) / 2 - handleRadius);
     return roundToTwoDecimals(clamp(radius * zoom - handleRadius, minScreenInset, maxScreenInset));
   }
 
@@ -1218,8 +1215,7 @@ export class ProjectPage implements OnDestroy {
 
     this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
       next: (response) => {
-        const pages =
-          response.pages.length > 0 ? response.pages : [this.el.createPage('Page 1')];
+        const pages = response.pages.length > 0 ? response.pages : [this.el.createPage('Page 1')];
         const activePageId =
           response.activePageId && pages.some((page) => page.id === response.activePageId)
             ? response.activePageId
@@ -1260,11 +1256,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const document = buildCanvasProjectDocument(
-      this.pages(),
-      this.projectId,
-      this.currentPageId(),
-    );
+    const document = buildCanvasProjectDocument(this.pages(), this.projectId, this.currentPageId());
     this.isSavingDesign.set(true);
 
     this.canvasPersistenceService.saveProjectDesign(this.projectIdAsNumber, document).subscribe({
@@ -1483,8 +1475,7 @@ export class ProjectPage implements OnDestroy {
         minSize / Math.max(start.height, 1),
       );
       const maxScale = Math.min(
-        (start.handle.includes('w') ? right - minLeft : maxRight - left) /
-          Math.max(start.width, 1),
+        (start.handle.includes('w') ? right - minLeft : maxRight - left) / Math.max(start.width, 1),
         (start.handle.includes('n') ? bottom - minTop : maxBottom - top) /
           Math.max(start.height, 1),
       );
@@ -1538,17 +1529,13 @@ export class ProjectPage implements OnDestroy {
 
   // ── Private: Helpers ──────────────────────────────────────
 
-  private updateCurrentPageElements(
-    updater: (elements: CanvasElement[]) => CanvasElement[],
-  ): void {
+  private updateCurrentPageElements(updater: (elements: CanvasElement[]) => CanvasElement[]): void {
     const currentPageId = this.currentPageId();
     if (!currentPageId) {
       return;
     }
 
-    this.pages.update((pages) =>
-      this.el.updatePageElements(pages, currentPageId, updater),
-    );
+    this.pages.update((pages) => this.el.updatePageElements(pages, currentPageId, updater));
   }
 
   private shouldStartPanning(event: MouseEvent, target: HTMLElement): boolean {
@@ -1698,9 +1685,7 @@ export class ProjectPage implements OnDestroy {
         const parentId = el.parentId ?? null;
 
         if (parentId !== null || el.type === 'frame') {
-          const firstSiblingIdx = withoutEl.findIndex(
-            (e) => (e.parentId ?? null) === parentId,
-          );
+          const firstSiblingIdx = withoutEl.findIndex((e) => (e.parentId ?? null) === parentId);
           const insertAt = firstSiblingIdx === -1 ? 0 : firstSiblingIdx;
           const result = [...withoutEl];
           result.splice(insertAt, 0, el);
@@ -1728,9 +1713,7 @@ export class ProjectPage implements OnDestroy {
     if (elementsToMove.length === 0) return;
 
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) =>
-        elements.filter((el) => !subtreeIds.has(el.id)),
-      );
+      this.updateCurrentPageElements((elements) => elements.filter((el) => !subtreeIds.has(el.id)));
       this.pages.update((pages) =>
         pages.map((page) =>
           page.id === targetPageId
@@ -1814,9 +1797,7 @@ export class ProjectPage implements OnDestroy {
       onFlipHorizontal: (id) => this.flipHorizontal(id),
       onFlipVertical: (id) => this.flipVertical(id),
       onRename: (id) => {
-        window.dispatchEvent(
-          new CustomEvent('canvas:rename-request', { detail: { id } }),
-        );
+        window.dispatchEvent(new CustomEvent('canvas:rename-request', { detail: { id } }));
       },
       onToggleVisibility: (id) => this.onLayerVisibilityToggled(id),
     };
