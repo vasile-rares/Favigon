@@ -21,7 +21,8 @@ import { ProjectPanelComponent } from '../components/project-panel/project-panel
 import { PropertiesPanelComponent } from '../components/properties-panel/properties-panel.component';
 import { IRNode } from '../../../core/models/ir.models';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
-import { clamp, roundToTwoDecimals } from '../utils/canvas-interaction.util';
+import { clamp, roundToTwoDecimals, getStrokeWidth } from '../utils/canvas-interaction.util';
+import { buildSnapCandidates, computeSnappedPosition } from '../utils/canvas-snap.util';
 import { CanvasGenerationService } from '../services/canvas-generation.service';
 import { CanvasPersistenceService } from '../services/canvas-persistence.service';
 import {
@@ -38,6 +39,7 @@ import {
   RotateState,
   CornerRadiusState,
   HistorySnapshot,
+  SnapLine,
 } from '../canvas.types';
 import { CanvasViewportService } from '../services/canvas-viewport.service';
 import { CanvasHistoryService } from '../services/canvas-history.service';
@@ -146,7 +148,14 @@ export class ProjectPage implements OnDestroy {
   private canPersistDesign = false;
   private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private dragOffset: Point = { x: 0, y: 0 };
-  private isDragging = false;
+  private dragStartAbsolute: Point = { x: 0, y: 0 };
+  private _isDragging = false;
+  private get isDragging(): boolean { return this._isDragging; }
+  private set isDragging(value: boolean) { this._isDragging = value; this.isDraggingEl.set(value); }
+  readonly isDraggingEl = signal(false);
+  readonly hoveredElementId = signal<string | null>(null);
+  readonly hoveredFrameTitleId = signal<string | null>(null);
+  readonly snapLines = signal<SnapLine[]>([]);
   private isResizing = false;
   private isRotating = false;
   private isAdjustingCornerRadius = false;
@@ -359,6 +368,15 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
+    const elementForTypeCheck = this.el.findElementById(id, this.elements());
+    if (elementForTypeCheck?.type === 'frame') {
+      // Frame body is not interactable — clicking it deselects, then stops
+      if (this.currentTool() === 'select') {
+        this.selectedElementId.set(null);
+      }
+      return;
+    }
+
     event.stopPropagation();
     this.selectedElementId.set(id);
 
@@ -393,6 +411,43 @@ export class ProjectPage implements OnDestroy {
       x: pointer.x - bounds.x,
       y: pointer.y - bounds.y,
     };
+    this.dragStartAbsolute = { x: bounds.x, y: bounds.y };
+  }
+
+  onFrameTitlePointerDown(event: MouseEvent, id: string): void {
+    event.stopPropagation();
+
+    if (this.shouldStartPanning(event, event.target as HTMLElement)) {
+      this.viewport.startPanning(event);
+      return;
+    }
+
+    if (this.isResizing || this.isRotating) {
+      return;
+    }
+
+    this.selectedElementId.set(id);
+
+    if (this.currentTool() !== 'select') {
+      this.currentTool.set('select');
+      return;
+    }
+
+    const element = this.el.findElementById(id, this.elements());
+    if (!element) {
+      return;
+    }
+
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    if (!pointer) {
+      return;
+    }
+
+    const bounds = this.el.getAbsoluteBounds(element, this.elements());
+    this.beginGestureHistory();
+    this.isDragging = true;
+    this.dragOffset = { x: pointer.x - bounds.x, y: pointer.y - bounds.y };
+    this.dragStartAbsolute = { x: bounds.x, y: bounds.y };
   }
 
   onElementDoubleClick(event: MouseEvent, id: string): void {
@@ -442,6 +497,38 @@ export class ProjectPage implements OnDestroy {
   }
 
   // ── Resize / Rotate / Corner Radius Handles ──────────────
+
+  onSelectionOutlinePointerDown(event: MouseEvent, id: string): void {
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    const w = rect.width;
+    const h = rect.height;
+    const t = 10; // border hit threshold in screen pixels
+
+    const nearTop = y < t;
+    const nearBottom = y > h - t;
+    const nearLeft = x < t;
+    const nearRight = x > w - t;
+
+    if (!nearTop && !nearBottom && !nearLeft && !nearRight) {
+      // Interior click — overlay doesn't bubble to canvas-element, so delegate drag manually
+      this.onElementPointerDown(event, id);
+      return;
+    }
+
+    let handle: HandlePosition;
+    if (nearTop && nearLeft) handle = 'nw';
+    else if (nearTop && nearRight) handle = 'ne';
+    else if (nearBottom && nearLeft) handle = 'sw';
+    else if (nearBottom && nearRight) handle = 'se';
+    else if (nearTop) handle = 'n';
+    else if (nearBottom) handle = 's';
+    else if (nearLeft) handle = 'w';
+    else handle = 'e';
+
+    this.onResizeHandlePointerDown(event, id, handle);
+  }
 
   onResizeHandlePointerDown(event: MouseEvent, id: string, handle: HandlePosition): void {
     event.stopPropagation();
@@ -696,14 +783,47 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
+    const elements = this.elements();
+    const dragged = this.el.findElementById(selectedId, elements);
+    if (!dragged) {
+      return;
+    }
+
+    let absoluteX = pointer.x - this.dragOffset.x;
+    let absoluteY = pointer.y - this.dragOffset.y;
+
+    if (event.shiftKey) {
+      const dx = Math.abs(absoluteX - this.dragStartAbsolute.x);
+      const dy = Math.abs(absoluteY - this.dragStartAbsolute.y);
+      if (dx >= dy) {
+        absoluteY = this.dragStartAbsolute.y;
+      } else {
+        absoluteX = this.dragStartAbsolute.x;
+      }
+    }
+
+    const { xCandidates, yCandidates } = buildSnapCandidates(
+      selectedId,
+      elements,
+      (el, els) => this.el.getAbsoluteBounds(el, els),
+    );
+    const snap = computeSnappedPosition(
+      absoluteX,
+      absoluteY,
+      dragged.width,
+      dragged.height,
+      xCandidates,
+      yCandidates,
+    );
+    absoluteX = snap.x;
+    absoluteY = snap.y;
+    this.snapLines.set(snap.lines);
+
     this.updateCurrentPageElements((elements) =>
       elements.map((element) => {
         if (element.id !== selectedId) {
           return element;
         }
-
-        const absoluteX = pointer.x - this.dragOffset.x;
-        const absoluteY = pointer.y - this.dragOffset.y;
 
         if (element.type === 'frame') {
           return {
@@ -746,6 +866,7 @@ export class ProjectPage implements OnDestroy {
     this.isResizing = false;
     this.isRotating = false;
     this.isAdjustingCornerRadius = false;
+    this.snapLines.set([]);
 
     if (shouldCommitGestureHistory) {
       this.history.commitGestureHistory(() => this.createHistorySnapshot());
@@ -787,8 +908,8 @@ export class ProjectPage implements OnDestroy {
     return this.viewport.canvasViewportTransform();
   }
 
-  canvasSceneZoom(): number {
-    return this.viewport.canvasSceneZoom();
+  canvasSceneTransform(): string {
+    return this.viewport.canvasSceneTransform();
   }
 
   canvasBackgroundSize(): string {
@@ -837,12 +958,91 @@ export class ProjectPage implements OnDestroy {
     return this.viewport.getScreenInvariantSize(-24);
   }
 
-  getSelectionOutlineInset(): number {
-    return this.viewport.getScreenInvariantSize(-2);
+  getSelectionOutlineInset(element: CanvasElement): number {
+    const strokeOffset = element.stroke ? getStrokeWidth(element) : 0;
+    return this.viewport.getScreenInvariantSize(-2) - strokeOffset;
   }
 
   getSelectionOutlineBorderWidth(): number {
     return this.viewport.getScreenInvariantSize(2);
+  }
+
+  getHoverOutlineBorderWidth(): number {
+    return this.viewport.getScreenInvariantSize(3);
+  }
+
+  // ── Selection overlay: screen-space positioning (no sub-pixel squish) ──
+
+  getOverlayLeft(el: CanvasElement): number {
+    return roundToTwoDecimals(this.getRenderedX(el) * this.viewport.zoomLevel());
+  }
+
+  getOverlayTop(el: CanvasElement): number {
+    return roundToTwoDecimals(this.getRenderedY(el) * this.viewport.zoomLevel());
+  }
+
+  getOverlayWidth(el: CanvasElement): number {
+    return roundToTwoDecimals(el.width * this.viewport.zoomLevel());
+  }
+
+  getOverlayHeight(el: CanvasElement): number {
+    return roundToTwoDecimals(el.height * this.viewport.zoomLevel());
+  }
+
+  // With global box-sizing: border-box, the 2px border is drawn INSIDE the div's width/height.
+  // To place ring fully OUTSIDE the element: left/top -= 2, width/height += 4 (2px each side).
+  getSelectionLeft(el: CanvasElement): number {
+    return roundToTwoDecimals(this.getRenderedX(el) * this.viewport.zoomLevel() - 2);
+  }
+
+  getSelectionTop(el: CanvasElement): number {
+    return roundToTwoDecimals(this.getRenderedY(el) * this.viewport.zoomLevel() - 2);
+  }
+
+  getSelectionWidth(el: CanvasElement): number {
+    return roundToTwoDecimals(el.width * this.viewport.zoomLevel() + 4);
+  }
+
+  getSelectionHeight(el: CanvasElement): number {
+    return roundToTwoDecimals(el.height * this.viewport.zoomLevel() + 4);
+  }
+
+  getOverlaySelLeft(el: CanvasElement): number {
+    const strokeOffset = el.stroke ? getStrokeWidth(el) : 0;
+    const zoom = this.viewport.zoomLevel();
+    return roundToTwoDecimals(this.getRenderedX(el) * zoom - 2 - strokeOffset * zoom);
+  }
+
+  getOverlaySelTop(el: CanvasElement): number {
+    const strokeOffset = el.stroke ? getStrokeWidth(el) : 0;
+    const zoom = this.viewport.zoomLevel();
+    return roundToTwoDecimals(this.getRenderedY(el) * zoom - 2 - strokeOffset * zoom);
+  }
+
+  getOverlaySelWidth(el: CanvasElement): number {
+    const strokeOffset = el.stroke ? getStrokeWidth(el) : 0;
+    const zoom = this.viewport.zoomLevel();
+    return roundToTwoDecimals(el.width * zoom + 4 + 2 * strokeOffset * zoom);
+  }
+
+  getOverlaySelHeight(el: CanvasElement): number {
+    const strokeOffset = el.stroke ? getStrokeWidth(el) : 0;
+    const zoom = this.viewport.zoomLevel();
+    return roundToTwoDecimals(el.height * zoom + 4 + 2 * strokeOffset * zoom);
+  }
+
+  getOverlayCornerRadiusInset(el: CanvasElement): number {
+    const radius = Number.isFinite(el.cornerRadius ?? Number.NaN)
+      ? (el.cornerRadius as number)
+      : el.type === 'image' ? 6 : 0;
+    const zoom = this.viewport.zoomLevel();
+    const handleRadius = 6; // half of 12px handle size
+    // Compute screen-space inset directly: handle center should be at (radius * zoom) px
+    // from the element corner in screen space, so CSS top/right = radius*zoom - handleRadius.
+    // minScreenInset keeps the handle visibly inside the corner even at radius=0.
+    const minScreenInset = 8;
+    const maxScreenInset = Math.max(0, Math.min(el.width, el.height) * zoom / 2 - handleRadius);
+    return roundToTwoDecimals(clamp(radius * zoom - handleRadius, minScreenInset, maxScreenInset));
   }
 
   getResizeHandleSize(): number {
@@ -1366,7 +1566,9 @@ export class ProjectPage implements OnDestroy {
 
   private isCanvasBackgroundTarget(target: HTMLElement): boolean {
     return (
-      target.classList.contains('canvas-container') || target.classList.contains('canvas-viewport')
+      target.classList.contains('canvas-container') ||
+      target.classList.contains('canvas-viewport') ||
+      target.classList.contains('canvas-scene')
     );
   }
 

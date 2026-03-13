@@ -40,13 +40,6 @@ export class CanvasElementService {
     frameBounds: Bounds | null,
     frameTemplateSize: { width: number; height: number },
   ): { element: CanvasElement | null; error: string | null } {
-    if (tool !== 'frame' && !selectedFrame) {
-      return {
-        element: null,
-        error: 'Select a frame first. Shapes, text, and images must be placed inside a frame.',
-      };
-    }
-
     const defaultWidth =
       tool === 'frame' ? frameTemplateSize.width : DEFAULT_ELEMENT_DIMENSIONS[tool].width;
     const defaultHeight =
@@ -431,7 +424,7 @@ export class CanvasElementService {
   }
 
   supportsCornerRadius(element: CanvasElement): boolean {
-    return element.type !== 'circle' && element.type !== 'text';
+    return element.type !== 'circle' && element.type !== 'text' && element.type !== 'frame';
   }
 
   getCornerRadiusHandleInset(element: CanvasElement): number {
@@ -441,14 +434,11 @@ export class CanvasElementService {
         ? 6
         : 0;
 
-    const baseInset = 20;
-    const handleSize = 12;
-    const maxInsetByHeight = Math.max(0, element.height / 2 - handleSize / 2);
-    const maxInsetByWidth = Math.max(0, element.width / 2 - handleSize / 2);
-    const maxInset = Math.min(maxInsetByHeight, maxInsetByWidth);
-    const desiredInset = baseInset + Math.max(0, radius);
-
-    return roundToTwoDecimals(clamp(desiredInset, 0, maxInset));
+    const handleRadius = 6; // half of 12px handle size
+    const maxInset = Math.max(0, Math.min(element.width / 2, element.height / 2) - handleRadius);
+    // Handle center sits at (radius, radius) from the element corner,
+    // so CSS top/right = radius - handleRadius. Clamped for small elements.
+    return roundToTwoDecimals(clamp(radius - handleRadius, 0, maxInset));
   }
 
   // ── Text Rendering Helpers ───────────────────────────────

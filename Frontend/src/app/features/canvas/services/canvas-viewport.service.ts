@@ -148,8 +148,8 @@ export class CanvasViewportService {
     return `translate(${offset.x}px, ${offset.y}px)`;
   }
 
-  canvasSceneZoom(): number {
-    return this.zoomLevel();
+  canvasSceneTransform(): string {
+    return `scale(${this.zoomLevel()})`;
   }
 
   canvasBackgroundSize(): string {

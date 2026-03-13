@@ -111,7 +111,14 @@ app-header-bar {
   color: var(--color-zinc-200);
   font-weight: 600;
   white-space: nowrap;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+}
+
+.frame-title.frame-title-hovered,
+.frame-title.frame-title-selected {
+  color: var(--color-brand-primary);
 }
 
 .text-content,
@@ -147,20 +154,24 @@ app-header-bar {
 
 .selection-outline {
   position: absolute;
-  border-style: solid;
-  border-color: var(--color-brand-primary);
-  pointer-events: none;
-  z-index: 1;
+  border: 2px solid var(--color-brand-primary);
+  pointer-events: auto;
+  z-index: 10;
+}
+
+.selection-outline.is-circle {
+  border-radius: 50%;
 }
 
 .corner-radius-handle {
   position: absolute;
   box-sizing: border-box;
   appearance: none;
-  border-style: solid;
-  border-color: var(--color-brand-primary);
+  border: 2px solid var(--color-brand-primary);
   background-color: var(--color-white);
   border-radius: 50%;
+  width: 12px;
+  height: 12px;
   padding: 0;
   cursor: nesw-resize;
   pointer-events: auto;
@@ -170,10 +181,11 @@ app-header-bar {
 .handle {
   box-sizing: border-box;
   appearance: none;
-  border-style: solid;
-  border-color: var(--color-brand-primary);
+  border: 2px solid var(--color-brand-primary);
   background-color: var(--color-white);
   border-radius: 0;
+  width: 12px;
+  height: 12px;
   padding: 0;
   pointer-events: auto;
   flex-shrink: 0;
@@ -194,6 +206,8 @@ app-header-bar {
 
 .corner-zone {
   position: absolute;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -206,23 +220,23 @@ app-header-bar {
 }
 
 .corner-zone-nw {
-  top: var(--corner-zone-offset, -12px);
-  left: var(--corner-zone-offset, -12px);
+  top: -12px;
+  left: -12px;
 }
 
 .corner-zone-ne {
-  top: var(--corner-zone-offset, -12px);
-  right: var(--corner-zone-offset, -12px);
+  top: -12px;
+  right: -12px;
 }
 
 .corner-zone-sw {
-  bottom: var(--corner-zone-offset, -12px);
-  left: var(--corner-zone-offset, -12px);
+  bottom: -12px;
+  left: -12px;
 }
 
 .corner-zone-se {
-  bottom: var(--corner-zone-offset, -12px);
-  right: var(--corner-zone-offset, -12px);
+  bottom: -12px;
+  right: -12px;
 }
 
 .edge-hit {
@@ -232,33 +246,67 @@ app-header-bar {
 }
 
 .edge-hit-n {
-  top: calc(-1 * var(--edge-hit-sz, 8px) / 2);
-  height: var(--edge-hit-sz, 8px);
-  left: var(--edge-gap, 16px);
-  right: var(--edge-gap, 16px);
+  top: -4px;
+  height: 8px;
+  left: 16px;
+  right: 16px;
   cursor: ns-resize;
 }
 
 .edge-hit-s {
-  bottom: calc(-1 * var(--edge-hit-sz, 8px) / 2);
-  height: var(--edge-hit-sz, 8px);
-  left: var(--edge-gap, 16px);
-  right: var(--edge-gap, 16px);
+  bottom: -4px;
+  height: 8px;
+  left: 16px;
+  right: 16px;
   cursor: ns-resize;
 }
 
 .edge-hit-e {
-  right: calc(-1 * var(--edge-hit-sz, 8px) / 2);
-  width: var(--edge-hit-sz, 8px);
-  top: var(--edge-gap, 16px);
-  bottom: var(--edge-gap, 16px);
+  right: -4px;
+  width: 8px;
+  top: 16px;
+  bottom: 16px;
   cursor: ew-resize;
 }
 
 .edge-hit-w {
-  left: calc(-1 * var(--edge-hit-sz, 8px) / 2);
-  width: var(--edge-hit-sz, 8px);
-  top: var(--edge-gap, 16px);
-  bottom: var(--edge-gap, 16px);
+  left: -4px;
+  width: 8px;
+  top: 16px;
+  bottom: 16px;
   cursor: ew-resize;
+}
+
+/* ── Smart Snap Guide Lines ───────────────────────────────── */
+
+.snap-line {
+  position: absolute;
+  pointer-events: none;
+  background-color: #ea47ff;
+  z-index: 100;
+}
+
+.snap-line-v {
+  top: -9999px;
+  width: 1px;
+  height: 99999px;
+}
+
+.snap-line-h {
+  left: -9999px;
+  height: 1px;
+  width: 99999px;
+}
+
+/* ── Hover Outline (screen-space overlay) ────────────────── */
+
+.overlay-hover-outline {
+  position: absolute;
+  pointer-events: none;
+  border: 2px solid var(--color-brand-primary);
+  z-index: 9;
+}
+
+.overlay-hover-outline.is-circle {
+  border-radius: 50%;
 }

@@ -58,6 +58,11 @@ export interface HistorySnapshot {
   selectedElementId: string | null;
 }
 
+export interface SnapLine {
+  type: 'vertical' | 'horizontal';
+  position: number;
+}
+
 export interface CanvasClipboardSnapshot {
   rootId: string;
   sourcePageId: string | null;
