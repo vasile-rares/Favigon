@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { CanvasElement } from '../../../core/models/canvas.models';
-import { roundToTwoDecimals, clamp } from '../../../core/utils/canvas-interaction.util';
+import { roundToTwoDecimals, clamp } from '../utils/canvas-interaction.util';
 import { CanvasClipboardSnapshot, Bounds } from '../canvas.types';
 
 const PASTE_OFFSET = 24;

@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { ConverterRequest, ConverterResponse } from '../models/converter.models';
-import { IRNode } from '../models/ir.models';
-import { ConverterService } from './converter.service';
+import { ConverterRequest, ConverterResponse } from '../../../core/models/converter.models';
+import { IRNode } from '../../../core/models/ir.models';
+import { ConverterService } from '../../../core/services/converter.service';
 
 @Injectable({ providedIn: 'root' })
 export class CanvasGenerationService {

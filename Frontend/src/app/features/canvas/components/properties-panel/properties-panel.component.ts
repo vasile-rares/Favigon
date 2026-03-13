@@ -8,9 +8,9 @@ import {
   CanvasTextVerticalAlign,
 } from '../../../../core/models/canvas.models';
 import { IRNode } from '../../../../core/models/ir.models';
-import { formatCanvasElementTypeLabel } from '../../../../core/utils/canvas-label.util';
-
-type SupportedFramework = 'html' | 'react' | 'angular';
+import { formatCanvasElementTypeLabel } from '../../utils/canvas-label.util';
+import { roundToTwoDecimals } from '../../utils/canvas-interaction.util';
+import { SupportedFramework } from '../../canvas.types';
 type PropertiesTab = 'design' | 'prototype';
 
 type EditableNumericField =
@@ -124,7 +124,7 @@ export class PropertiesPanelComponent {
       return '';
     }
 
-    return this.roundToTwoDecimals(value as number).toString();
+    return roundToTwoDecimals(value as number).toString();
   }
 
   get elementTypeLabel(): string {
@@ -169,7 +169,7 @@ export class PropertiesPanelComponent {
       return;
     }
 
-    const rounded = this.roundToTwoDecimals(value);
+    const rounded = roundToTwoDecimals(value);
     (event.target as HTMLInputElement).value = rounded.toString();
     this.emitPatch({ [field]: rounded } as Partial<CanvasElement>);
   }
@@ -246,9 +246,6 @@ export class PropertiesPanelComponent {
     this.elementPatch.emit(patch);
   }
 
-  private roundToTwoDecimals(value: number): number {
-    return Math.round((value + Number.EPSILON) * 100) / 100;
-  }
 
   private toHexColorOrFallback(value: string | undefined, fallback: string): string {
     if (!value) {

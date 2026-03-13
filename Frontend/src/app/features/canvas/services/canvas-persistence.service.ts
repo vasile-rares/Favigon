@@ -4,9 +4,10 @@ import {
   buildCanvasProjectDocumentFromUnknown,
   buildPersistedCanvasDesign,
 } from '../mappers/canvas-ir.mapper';
-import { CanvasElement, CanvasPageModel, CanvasProjectDocument } from '../models/canvas.models';
-import { ProjectDesignResponse } from '../models/project.models';
-import { ProjectService } from './project.service';
+import { CanvasPageModel, CanvasProjectDocument } from '../../../core/models/canvas.models';
+import { ProjectDesignResponse } from '../../../core/models/project.models';
+import { ProjectService } from '../../../core/services/project.service';
+import { withRoundedPrecision } from '../utils/canvas-interaction.util';
 
 @Injectable({ providedIn: 'root' })
 export class CanvasPersistenceService {
@@ -28,7 +29,7 @@ export class CanvasPersistenceService {
         return {
           pages: projectDocument.pages.map((page) => ({
             ...page,
-            elements: page.elements.map((element) => this.withRoundedPrecision(element)),
+            elements: page.elements.map((element) => withRoundedPrecision(element)),
           })),
           activePageId: projectDocument.activePageId,
           updatedAt: response.updatedAt ?? null,
@@ -55,27 +56,5 @@ export class CanvasPersistenceService {
     } catch {
       return null;
     }
-  }
-
-  private withRoundedPrecision(element: CanvasElement): CanvasElement {
-    return {
-      ...element,
-      x: this.roundToTwoDecimals(element.x),
-      y: this.roundToTwoDecimals(element.y),
-      width: this.roundToTwoDecimals(element.width),
-      height: this.roundToTwoDecimals(element.height),
-      strokeWidth:
-        typeof element.strokeWidth === 'number'
-          ? this.roundToTwoDecimals(element.strokeWidth)
-          : undefined,
-      fontSize:
-        typeof element.fontSize === 'number'
-          ? this.roundToTwoDecimals(element.fontSize)
-          : undefined,
-    };
-  }
-
-  private roundToTwoDecimals(value: number): number {
-    return Math.round((value + Number.EPSILON) * 100) / 100;
   }
 }

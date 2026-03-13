@@ -2,7 +2,7 @@ import {
   CanvasElement,
   CanvasPageModel,
   CanvasProjectDocument,
-} from '../models/canvas.models';
+} from '../../../core/models/canvas.models';
 import {
   BorderStyle,
   IRBorder,
@@ -15,7 +15,7 @@ import {
   LayoutMode,
   PositionMode,
   px,
-} from '../models/ir.models';
+} from '../../../core/models/ir.models';
 
 const ROOT_ROLE = 'canvas-root';
 const ROOT_TYPE = 'Container';

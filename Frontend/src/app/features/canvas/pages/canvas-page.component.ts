@@ -14,16 +14,16 @@ import {
   CanvasElementType,
   CanvasPageModel,
 } from '../../../core/models/canvas.models';
-import { buildCanvasIR, buildCanvasProjectDocument } from '../../../core/mappers/canvas-ir.mapper';
+import { buildCanvasIR, buildCanvasProjectDocument } from '../mappers/canvas-ir.mapper';
 import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
 import { ToolbarComponent } from '../components/toolbar/toolbar.component';
 import { ProjectPanelComponent } from '../components/project-panel/project-panel.component';
 import { PropertiesPanelComponent } from '../components/properties-panel/properties-panel.component';
 import { IRNode } from '../../../core/models/ir.models';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
-import { clamp, roundToTwoDecimals } from '../../../core/utils/canvas-interaction.util';
-import { CanvasGenerationService } from '../../../core/services/canvas-generation.service';
-import { CanvasPersistenceService } from '../../../core/services/canvas-persistence.service';
+import { clamp, roundToTwoDecimals } from '../utils/canvas-interaction.util';
+import { CanvasGenerationService } from '../services/canvas-generation.service';
+import { CanvasPersistenceService } from '../services/canvas-persistence.service';
 import {
   ContextMenuComponent,
 } from '../../../shared/components/context-menu/context-menu.component';

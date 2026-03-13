@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { CanvasElement } from '../../../core/models/canvas.models';
-import { roundToTwoDecimals, clamp } from '../../../core/utils/canvas-interaction.util';
+import { roundToTwoDecimals, clamp } from '../utils/canvas-interaction.util';
 import { Bounds, Point } from '../canvas.types';
 
 const MIN_ZOOM = 0.25;

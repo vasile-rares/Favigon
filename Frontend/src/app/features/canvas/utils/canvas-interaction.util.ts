@@ -1,4 +1,4 @@
-import { CanvasElement } from '../models/canvas.models';
+import { CanvasElement } from '../../../core/models/canvas.models';
 
 const MIN_SIZE = 24;
 

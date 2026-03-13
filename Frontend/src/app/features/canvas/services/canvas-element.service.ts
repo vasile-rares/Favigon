@@ -10,8 +10,8 @@ import {
   getStrokeWidth,
   normalizeElementInPlace,
   removeWithChildren,
-} from '../../../core/utils/canvas-interaction.util';
-import { formatCanvasElementTypeLabel } from '../../../core/utils/canvas-label.util';
+} from '../utils/canvas-interaction.util';
+import { formatCanvasElementTypeLabel } from '../utils/canvas-label.util';
 import { Bounds, Point } from '../canvas.types';
 
 const IMAGE_PLACEHOLDER_URL = 'https://placehold.co/300x200?text=Image';

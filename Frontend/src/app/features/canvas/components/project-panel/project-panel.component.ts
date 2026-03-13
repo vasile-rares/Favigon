@@ -5,7 +5,7 @@ import {
   CanvasElementType,
   CanvasPageModel,
 } from '../../../../core/models/canvas.models';
-import { formatCanvasElementTypeLabel } from '../../../../core/utils/canvas-label.util';
+import { formatCanvasElementTypeLabel } from '../../utils/canvas-label.util';
 
 interface LayerEntry {
   id: string;
