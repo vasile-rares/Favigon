@@ -27,7 +27,7 @@
     <main
       class="canvas-container"
       [class.pan-ready]="isPanReady()"
-      [class.panning]="isPanning()"
+      [class.panning]="viewport.isPanning()"
       [style.background-size]="canvasBackgroundSize()"
       [style.background-position]="canvasBackgroundPosition()"
       (pointerdown)="onCanvasPointerDown($event)"
@@ -184,10 +184,10 @@
   </div>
 </div>
 
-@if (isContextMenuOpen()) {
+@if (contextMenu.isOpen()) {
   <app-context-menu
-    [x]="contextMenuX()"
-    [y]="contextMenuY()"
-    [items]="contextMenuItems()"
+    [x]="contextMenu.positionX()"
+    [y]="contextMenu.positionY()"
+    [items]="contextMenu.items()"
     (closed)="closeContextMenu()"></app-context-menu>
 }

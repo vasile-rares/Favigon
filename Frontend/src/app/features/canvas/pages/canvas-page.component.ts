@@ -13,7 +13,6 @@ import {
   CanvasElement,
   CanvasElementType,
   CanvasPageModel,
-  CanvasProjectDocument,
 } from '../../../core/models/canvas.models';
 import { buildCanvasIR, buildCanvasProjectDocument } from '../../../core/mappers/canvas-ir.mapper';
 import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
@@ -22,86 +21,33 @@ import { ProjectPanelComponent } from '../components/project-panel/project-panel
 import { PropertiesPanelComponent } from '../components/properties-panel/properties-panel.component';
 import { IRNode } from '../../../core/models/ir.models';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
-import {
-  clamp,
-  getStrokeWidth,
-  isPointInsideElement,
-  normalizeElementInPlace,
-  removeWithChildren,
-  roundToTwoDecimals,
-} from '../../../core/utils/canvas-interaction.util';
-import { formatCanvasElementTypeLabel } from '../../../core/utils/canvas-label.util';
+import { clamp, roundToTwoDecimals } from '../../../core/utils/canvas-interaction.util';
 import { CanvasGenerationService } from '../../../core/services/canvas-generation.service';
 import { CanvasPersistenceService } from '../../../core/services/canvas-persistence.service';
 import {
   ContextMenuComponent,
-  ContextMenuItem,
 } from '../../../shared/components/context-menu/context-menu.component';
-
-type SupportedFramework = 'html' | 'react' | 'angular';
-type HandlePosition = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
-type CornerHandle = 'nw' | 'ne' | 'sw' | 'se';
-type EdgeHandle = 'n' | 's' | 'e' | 'w';
-
-interface FrameTemplateSelection {
-  name: string;
-  sizeLabel: string;
-  width: number;
-  height: number;
-}
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface Bounds extends Point {
-  width: number;
-  height: number;
-}
-
-interface ResizeState {
-  pointerX: number;
-  pointerY: number;
-  width: number;
-  height: number;
-  absoluteX: number;
-  absoluteY: number;
-  centerX: number;
-  centerY: number;
-  aspectRatio: number;
-  elementId: string;
-  handle: HandlePosition;
-}
-
-interface RotateState {
-  startAngle: number;
-  initialRotation: number;
-  centerX: number;
-  centerY: number;
-  elementId: string;
-}
-
-interface CornerRadiusState {
-  absoluteX: number;
-  absoluteY: number;
-  width: number;
-  height: number;
-  elementId: string;
-}
-
-interface HistorySnapshot {
-  pages: CanvasPageModel[];
-  currentPageId: string | null;
-  selectedElementId: string | null;
-}
-
-interface CanvasClipboardSnapshot {
-  rootId: string;
-  sourcePageId: string | null;
-  pasteCount: number;
-  elements: CanvasElement[];
-}
+import {
+  SupportedFramework,
+  HandlePosition,
+  CornerHandle,
+  FrameTemplateSelection,
+  Point,
+  Bounds,
+  ResizeState,
+  RotateState,
+  CornerRadiusState,
+  HistorySnapshot,
+} from '../canvas.types';
+import { CanvasViewportService } from '../services/canvas-viewport.service';
+import { CanvasHistoryService } from '../services/canvas-history.service';
+import { CanvasClipboardService } from '../services/canvas-clipboard.service';
+import { CanvasElementService } from '../services/canvas-element.service';
+import { CanvasKeyboardService, KeyboardActionCallbacks } from '../services/canvas-keyboard.service';
+import {
+  CanvasContextMenuService,
+  ContextMenuActionCallbacks,
+} from '../services/canvas-context-menu.service';
 
 @Component({
   selector: 'app-canvas-page',
@@ -114,6 +60,14 @@ interface CanvasClipboardSnapshot {
     PropertiesPanelComponent,
     ContextMenuComponent,
   ],
+  providers: [
+    CanvasViewportService,
+    CanvasHistoryService,
+    CanvasClipboardService,
+    CanvasElementService,
+    CanvasKeyboardService,
+    CanvasContextMenuService,
+  ],
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
 })
@@ -122,23 +76,28 @@ export class ProjectPage implements OnDestroy {
   private readonly canvasGenerationService = inject(CanvasGenerationService);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
 
-  readonly pages = signal<CanvasPageModel[]>([this.createPage('Page 1')]);
+  readonly viewport = inject(CanvasViewportService);
+  private readonly history = inject(CanvasHistoryService);
+  private readonly clipboard = inject(CanvasClipboardService);
+  readonly el = inject(CanvasElementService);
+  private readonly keyboard = inject(CanvasKeyboardService);
+  readonly contextMenu = inject(CanvasContextMenuService);
+
+  // ── Core State ────────────────────────────────────────────
+
+  readonly pages = signal<CanvasPageModel[]>([this.el.createPage('Page 1')]);
   readonly currentPageId = signal<string | null>(this.pages()[0]?.id ?? null);
   readonly selectedElementId = signal<string | null>(null);
   readonly editingTextElementId = signal<string | null>(null);
   readonly currentTool = signal<CanvasElementType | 'select'>('select');
-  readonly zoomLevel = signal(1);
-  readonly viewportOffset = signal({ x: 0, y: 0 });
-  readonly isPanning = signal(false);
-  readonly isSpacePressed = signal(false);
-  readonly frameTemplate = signal({ width: 390, height: 844 });
+
+  // ── Computed Signals ──────────────────────────────────────
 
   readonly currentPage = computed<CanvasPageModel | null>(() => {
     const activePageId = this.currentPageId();
     if (!activePageId) {
       return this.pages()[0] ?? null;
     }
-
     return this.pages().find((page) => page.id === activePageId) ?? this.pages()[0] ?? null;
   });
 
@@ -149,13 +108,19 @@ export class ProjectPage implements OnDestroy {
     if (!selectedId) {
       return null;
     }
-
     return this.elements().find((element) => element.id === selectedId) ?? null;
   });
 
   readonly visibleElements = computed<CanvasElement[]>(() =>
-    this.elements().filter((element) => this.isElementEffectivelyVisible(element.id)),
+    this.elements().filter((element) =>
+      this.el.isElementEffectivelyVisible(element.id, this.elements()),
+    ),
   );
+
+  readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
+  readonly cornerHandles: CornerHandle[] = ['nw', 'ne', 'sw', 'se'];
+
+  // ── API / Generation State ────────────────────────────────
 
   readonly selectedFramework = signal<SupportedFramework>('html');
   readonly validationResult = signal<boolean | null>(null);
@@ -168,49 +133,25 @@ export class ProjectPage implements OnDestroy {
   readonly isSavingDesign = signal(false);
   readonly lastSavedAt = signal<string | null>(null);
 
-  readonly isContextMenuOpen = signal(false);
-  readonly contextMenuX = signal(0);
-  readonly contextMenuY = signal(0);
-  readonly contextMenuItems = signal<ContextMenuItem[]>([]);
-
-  readonly projectId = this.route.snapshot.paramMap.get('id') ?? 'new-project';
   readonly irPreview = computed<IRNode>(() => {
     const currentPage = this.currentPage();
     return buildCanvasIR(this.visibleElements(), this.projectId, currentPage?.name);
   });
 
-  readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
-  readonly cornerHandles: CornerHandle[] = ['nw', 'ne', 'sw', 'se'];
+  readonly projectId = this.route.snapshot.paramMap.get('id') ?? 'new-project';
+
+  // ── Gesture State (local, not service-worthy) ─────────────
 
   private readonly projectIdAsNumber = Number.parseInt(this.projectId, 10);
-  private readonly imagePlaceholderUrl = 'https://placehold.co/300x200?text=Image';
-  private readonly defaultFrameFill = '#ffffff';
-  private readonly defaultElementFill = '#e0e0e0';
-  private readonly minZoom = 0.25;
-  private readonly maxZoom = 3;
-  private readonly zoomStep = 0.1;
-  private readonly gridSize = 20;
-  private readonly minElementSize = 24;
-  private readonly frameInsertGap = 48;
-  private readonly maxHistorySteps = 10;
-  private readonly clipboardPasteOffset = 24;
-
   private canPersistDesign = false;
   private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  private panStart = { x: 0, y: 0 };
-  private panMoved = false;
-  private suppressNextCanvasClick = false;
-  private dragOffset = { x: 0, y: 0 };
+  private dragOffset: Point = { x: 0, y: 0 };
   private isDragging = false;
   private isResizing = false;
   private isRotating = false;
   private isAdjustingCornerRadius = false;
-  private isApplyingHistory = false;
-  private undoStack: HistorySnapshot[] = [];
-  private redoStack: HistorySnapshot[] = [];
-  private pendingGestureHistorySnapshot: HistorySnapshot | null = null;
-  private pendingTextEditHistorySnapshot: HistorySnapshot | null = null;
-  private clipboardSnapshot: CanvasClipboardSnapshot | null = null;
+  private suppressNextCanvasClick = false;
+
   private resizeStart: ResizeState = {
     pointerX: 0,
     pointerY: 0,
@@ -263,6 +204,8 @@ export class ProjectPage implements OnDestroy {
     }
   }
 
+  // ── Tool Selection ────────────────────────────────────────
+
   selectTool(tool: CanvasElementType | 'select'): void {
     this.currentTool.set(tool);
     if (tool === 'select') {
@@ -271,15 +214,16 @@ export class ProjectPage implements OnDestroy {
 
     const selected = this.selectedElement();
     const shouldKeepSelection = tool !== 'frame' && selected?.type === 'frame';
-
     if (!shouldKeepSelection) {
       this.selectedElementId.set(null);
     }
   }
 
+  // ── Page Management ───────────────────────────────────────
+
   addPage(): void {
     this.runWithHistory(() => {
-      const page = this.createPage(this.getNextPageName());
+      const page = this.el.createPage(this.el.getNextPageName(this.pages()));
       this.pages.update((pages) => [...pages, page]);
       this.currentPageId.set(page.id);
       this.selectedElementId.set(null);
@@ -290,7 +234,6 @@ export class ProjectPage implements OnDestroy {
     if (pageId === this.currentPageId()) {
       return;
     }
-
     this.currentPageId.set(pageId);
     this.selectedElementId.set(null);
     this.currentTool.set('select');
@@ -314,7 +257,6 @@ export class ProjectPage implements OnDestroy {
     }
 
     this.apiError.set(null);
-
     this.runWithHistory(() => {
       const currentPages = this.pages();
       const pageIndex = currentPages.findIndex((entry) => entry.id === pageId);
@@ -333,13 +275,17 @@ export class ProjectPage implements OnDestroy {
     });
   }
 
+  // ── Canvas Events ─────────────────────────────────────────
+
   onCanvasPointerDown(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     if (!this.shouldStartPanning(event, target)) {
       return;
     }
 
-    this.startPanning(event);
+    this.viewport.startPanning(event);
+    this.isDragging = false;
+    this.isResizing = false;
   }
 
   onCanvasClick(event: MouseEvent): void {
@@ -348,7 +294,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    if (this.isSpacePressed()) {
+    if (this.viewport.isSpacePressed()) {
       return;
     }
 
@@ -356,26 +302,41 @@ export class ProjectPage implements OnDestroy {
     const tool = this.currentTool();
     if (tool === 'select') {
       const target = event.target as HTMLElement;
-      if (
-        target.classList.contains('canvas-container') ||
-        target.classList.contains('canvas-viewport')
-      ) {
+      if (this.isCanvasBackgroundTarget(target)) {
         this.selectedElementId.set(null);
       }
-
       return;
     }
 
-    const pointer = this.getCanvasPoint(event);
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
     if (!pointer) {
       return;
     }
 
-    const newElement = this.createElementAtPoint(tool, pointer);
-    if (!newElement) {
+    const selectedFrame = this.el.getSelectedFrame(this.selectedElement());
+    const frameBounds = selectedFrame
+      ? this.el.getAbsoluteBounds(selectedFrame, this.elements())
+      : null;
+
+    const result = this.el.createElementAtPoint(
+      tool,
+      pointer,
+      this.elements(),
+      selectedFrame,
+      frameBounds,
+      this.viewport.frameTemplate(),
+    );
+
+    if (result.error) {
+      this.apiError.set(result.error);
       return;
     }
 
+    if (!result.element) {
+      return;
+    }
+
+    const newElement = result.element;
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) => [...elements, newElement]);
       this.selectedElementId.set(newElement.id);
@@ -383,10 +344,14 @@ export class ProjectPage implements OnDestroy {
     });
   }
 
+  // ── Element Events ────────────────────────────────────────
+
   onElementPointerDown(event: MouseEvent, id: string): void {
     const target = event.target as HTMLElement;
     if (this.shouldStartPanning(event, target)) {
-      this.startPanning(event);
+      this.viewport.startPanning(event);
+      this.isDragging = false;
+      this.isResizing = false;
       return;
     }
 
@@ -398,8 +363,8 @@ export class ProjectPage implements OnDestroy {
     this.selectedElementId.set(id);
 
     if (this.currentTool() !== 'select') {
-      const selectedFrame = this.getSelectedFrame();
-      const clickedElement = this.findElementById(id);
+      const selectedFrame = this.el.getSelectedFrame(this.selectedElement());
+      const clickedElement = this.el.findElementById(id, this.elements());
       if (
         selectedFrame &&
         clickedElement?.id === selectedFrame.id &&
@@ -407,22 +372,21 @@ export class ProjectPage implements OnDestroy {
       ) {
         return;
       }
-
       this.currentTool.set('select');
       return;
     }
 
-    const element = this.findElementById(id);
+    const element = this.el.findElementById(id, this.elements());
     if (!element) {
       return;
     }
 
-    const pointer = this.getCanvasPoint(event);
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
     if (!pointer) {
       return;
     }
 
-    const bounds = this.getAbsoluteBounds(element);
+    const bounds = this.el.getAbsoluteBounds(element, this.elements());
     this.beginGestureHistory();
     this.isDragging = true;
     this.dragOffset = {
@@ -433,12 +397,10 @@ export class ProjectPage implements OnDestroy {
 
   onElementDoubleClick(event: MouseEvent, id: string): void {
     event.stopPropagation();
-
-    const element = this.findElementById(id);
+    const element = this.el.findElementById(id, this.elements());
     if (element?.type !== 'text') {
       return;
     }
-
     this.selectedElementId.set(id);
     this.editingTextElementId.set(id);
     this.focusInlineTextEditor(id);
@@ -449,22 +411,17 @@ export class ProjectPage implements OnDestroy {
   }
 
   onTextEditorInput(id: string, event: Event): void {
-    this.beginTextEditHistory();
+    this.history.beginTextEditHistory(() => this.createHistorySnapshot());
     const value = (event.target as HTMLTextAreaElement).value;
     this.updateCurrentPageElements((elements) =>
       elements.map((element) =>
-        element.id === id
-          ? {
-              ...element,
-              text: value,
-            }
-          : element,
+        element.id === id ? { ...element, text: value } : element,
       ),
     );
   }
 
   onTextEditorBlur(id: string): void {
-    this.commitTextEditHistory();
+    this.history.commitTextEditHistory(() => this.createHistorySnapshot());
     if (this.editingTextElementId() === id) {
       this.editingTextElementId.set(null);
     }
@@ -472,13 +429,11 @@ export class ProjectPage implements OnDestroy {
 
   onTextEditorKeyDown(event: KeyboardEvent, id: string): void {
     event.stopPropagation();
-
     if (event.key !== 'Escape') {
       return;
     }
-
     event.preventDefault();
-    this.commitTextEditHistory();
+    this.history.commitTextEditHistory(() => this.createHistorySnapshot());
     this.editingTextElementId.set(null);
     if (this.selectedElementId() !== id) {
       this.selectedElementId.set(id);
@@ -486,22 +441,23 @@ export class ProjectPage implements OnDestroy {
     (event.target as HTMLTextAreaElement | null)?.blur();
   }
 
+  // ── Resize / Rotate / Corner Radius Handles ──────────────
+
   onResizeHandlePointerDown(event: MouseEvent, id: string, handle: HandlePosition): void {
     event.stopPropagation();
     event.preventDefault();
 
-    const element = this.findElementById(id);
+    const element = this.el.findElementById(id, this.elements());
     if (!element) {
       return;
     }
 
-    const pointer = this.getCanvasPoint(event);
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
     if (!pointer) {
       return;
     }
 
-    const bounds = this.getAbsoluteBounds(element);
-
+    const bounds = this.el.getAbsoluteBounds(element, this.elements());
     this.selectedElementId.set(id);
     this.beginGestureHistory();
     this.isDragging = false;
@@ -525,20 +481,20 @@ export class ProjectPage implements OnDestroy {
     event.stopPropagation();
     event.preventDefault();
 
-    const element = this.findElementById(id);
+    const element = this.el.findElementById(id, this.elements());
     if (!element) {
       return;
     }
 
-    const pointer = this.getCanvasPoint(event);
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
     if (!pointer) {
       return;
     }
 
-    const bounds = this.getAbsoluteBounds(element);
-    const cx = bounds.x + element.width / 2;
-    const cy = bounds.y + element.height / 2;
-    const startAngle = Math.atan2(pointer.y - cy, pointer.x - cx) * (180 / Math.PI);
+    const bounds = this.el.getAbsoluteBounds(element, this.elements());
+    const centerX = bounds.x + element.width / 2;
+    const centerY = bounds.y + element.height / 2;
+    const startAngle = Math.atan2(pointer.y - centerY, pointer.x - centerX) * (180 / Math.PI);
 
     this.selectedElementId.set(id);
     this.beginGestureHistory();
@@ -548,8 +504,8 @@ export class ProjectPage implements OnDestroy {
     this.rotateStart = {
       startAngle,
       initialRotation: element.rotation ?? 0,
-      centerX: cx,
-      centerY: cy,
+      centerX,
+      centerY,
       elementId: id,
     };
   }
@@ -558,18 +514,17 @@ export class ProjectPage implements OnDestroy {
     event.stopPropagation();
     event.preventDefault();
 
-    const element = this.findElementById(id);
-    if (!element || !this.supportsCornerRadius(element)) {
+    const element = this.el.findElementById(id, this.elements());
+    if (!element || !this.el.supportsCornerRadius(element)) {
       return;
     }
 
-    const pointer = this.getCanvasPoint(event);
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
     if (!pointer) {
       return;
     }
 
-    const bounds = this.getAbsoluteBounds(element);
-
+    const bounds = this.el.getAbsoluteBounds(element, this.elements());
     this.selectedElementId.set(id);
     this.beginGestureHistory();
     this.isDragging = false;
@@ -585,6 +540,8 @@ export class ProjectPage implements OnDestroy {
     };
   }
 
+  // ── Panel Event Handlers ──────────────────────────────────
+
   onSelectedElementPatch(patch: Partial<CanvasElement>): void {
     const selectedId = this.selectedElementId();
     if (!selectedId) {
@@ -597,13 +554,8 @@ export class ProjectPage implements OnDestroy {
           if (element.id !== selectedId) {
             return element;
           }
-
-          const nextElement: CanvasElement = {
-            ...element,
-            ...patch,
-          };
-
-          this.normalizeElement(nextElement, elements);
+          const nextElement: CanvasElement = { ...element, ...patch };
+          this.el.normalizeElement(nextElement, elements);
           return nextElement;
         }),
       );
@@ -619,12 +571,7 @@ export class ProjectPage implements OnDestroy {
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) =>
         elements.map((element) =>
-          element.id === change.id
-            ? {
-                ...element,
-                name: change.name,
-              }
-            : element,
+          element.id === change.id ? { ...element, name: change.name } : element,
         ),
       );
     });
@@ -635,10 +582,7 @@ export class ProjectPage implements OnDestroy {
       this.updateCurrentPageElements((elements) =>
         elements.map((element) =>
           element.id === elementId
-            ? {
-                ...element,
-                visible: element.visible === false,
-              }
+            ? { ...element, visible: element.visible === false }
             : element,
         ),
       );
@@ -652,23 +596,29 @@ export class ProjectPage implements OnDestroy {
   }): void {
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) =>
-        this.reorderLayerElements(elements, change.draggedId, change.targetId, change.position),
+        this.el.reorderLayerElements(
+          elements,
+          change.draggedId,
+          change.targetId,
+          change.position,
+        ),
       );
     });
   }
 
   onFrameTemplateSelected(template: FrameTemplateSelection): void {
-    this.frameTemplate.set({
+    this.viewport.frameTemplate.set({
       width: template.width,
       height: template.height,
     });
 
-    const centerPoint = this.getViewportCenterCanvasPoint();
-    const frame = this.createFrameAtCenter(
+    const centerPoint = this.viewport.getViewportCenterCanvasPoint(this.getCanvasElement());
+    const frame = this.el.createFrameAtCenter(
       centerPoint,
       template.width,
       template.height,
       template.name,
+      this.elements(),
     );
 
     this.runWithHistory(() => {
@@ -676,276 +626,44 @@ export class ProjectPage implements OnDestroy {
       this.selectedElementId.set(frame.id);
       this.currentTool.set('select');
     });
-    this.focusElement(frame);
+
+    const bounds = this.el.getAbsoluteBounds(frame, [...this.elements()]);
+    this.viewport.focusElement(frame, bounds, this.getCanvasElement());
   }
 
   setFramework(framework: SupportedFramework): void {
     this.selectedFramework.set(framework);
   }
 
+  // ── Context Menu ──────────────────────────────────────────
+
   onCanvasContextMenu(event: MouseEvent): void {
     event.preventDefault();
-    this.openContextMenu(event.clientX, event.clientY);
+    this.contextMenu.open(event.clientX, event.clientY, this.buildContextMenuCallbacks());
   }
 
   onElementContextMenu(event: MouseEvent, id: string): void {
     event.preventDefault();
     event.stopPropagation();
     this.selectedElementId.set(id);
-    this.openContextMenu(event.clientX, event.clientY);
+    this.contextMenu.open(event.clientX, event.clientY, this.buildContextMenuCallbacks());
   }
 
   onLayerContextMenuRequested(event: { id: string; x: number; y: number }): void {
     this.selectedElementId.set(event.id);
-    this.openContextMenu(event.x, event.y);
+    this.contextMenu.open(event.x, event.y, this.buildContextMenuCallbacks());
   }
 
   closeContextMenu(): void {
-    this.isContextMenuOpen.set(false);
-    this.contextMenuItems.set([]);
+    this.contextMenu.close();
   }
 
-  private openContextMenu(x: number, y: number): void {
-    this.contextMenuItems.set(this.buildContextMenuItems());
-    this.contextMenuX.set(x);
-    this.contextMenuY.set(y);
-    this.isContextMenuOpen.set(true);
-  }
-
-  private buildContextMenuItems(): ContextMenuItem[] {
-    const el = this.selectedElement();
-    const hasEl = !!el;
-    const isVisible = el?.visible !== false;
-    const otherPages = this.pages().filter((p) => p.id !== this.currentPageId());
-
-    return [
-      // Clipboard group
-      {
-        id: 'copy',
-        label: 'Copy',
-        shortcut: 'Ctrl+C',
-        disabled: !hasEl,
-        action: () => this.ctxCopy(),
-      },
-      {
-        id: 'paste',
-        label: 'Paste',
-        shortcut: 'Ctrl+V',
-        action: () => this.ctxPaste(),
-      },
-      {
-        id: 'delete',
-        label: 'Delete',
-        shortcut: 'Del',
-        variant: 'danger' as const,
-        disabled: !hasEl,
-        action: () => this.ctxDelete(),
-      },
-
-      // Order group
-      {
-        id: 'bring-front',
-        label: 'Bring to Front',
-        shortcut: 'Ctrl+]',
-        disabled: !hasEl,
-        separator: true,
-        action: () => this.ctxBringToFront(),
-      },
-      {
-        id: 'send-back',
-        label: 'Send to Back',
-        shortcut: 'Ctrl+[',
-        disabled: !hasEl,
-        action: () => this.ctxSendToBack(),
-      },
-      {
-        id: 'move-to-page',
-        label: 'Move to Page',
-        disabled: !hasEl || otherPages.length === 0,
-        children: otherPages.map((p) => ({
-          id: `move-page-${p.id}`,
-          label: p.name,
-          action: () => this.ctxMoveToPage(p.id),
-        })),
-      },
-
-      // Transform group
-      {
-        id: 'flip-h',
-        label: 'Flip Horizontal',
-        disabled: !hasEl,
-        separator: true,
-        action: () => this.ctxFlipHorizontal(),
-      },
-      {
-        id: 'flip-v',
-        label: 'Flip Vertical',
-        disabled: !hasEl,
-        action: () => this.ctxFlipVertical(),
-      },
-
-      // Element group
-      {
-        id: 'rename',
-        label: 'Rename',
-        shortcut: 'F2',
-        disabled: !hasEl,
-        separator: true,
-        action: () => this.ctxRename(),
-      },
-      {
-        id: 'visibility',
-        label: isVisible ? 'Hide' : 'Show',
-        shortcut: 'Ctrl+Shift+H',
-        disabled: !hasEl,
-        action: () => this.ctxToggleVisibility(),
-      },
-    ];
-  }
-
-  private ctxCopy(): void {
-    this.copySelectedElement();
-  }
-
-  private ctxPaste(): void {
-    this.pasteClipboard();
-  }
-
-  private ctxDelete(): void {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) return;
-    this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => this.removeWithChildren(elements, selectedId));
-      this.selectedElementId.set(null);
-    });
-  }
-
-  private ctxBringToFront(): void {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) return;
-    this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => {
-        const index = elements.findIndex((el) => el.id === selectedId);
-        if (index === -1) return elements;
-        const next = [...elements];
-        const [moved] = next.splice(index, 1);
-        next.push(moved);
-        return next;
-      });
-    });
-  }
-
-  private ctxSendToBack(): void {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) return;
-    this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => {
-        const el = elements.find((e) => e.id === selectedId);
-        if (!el) return elements;
-
-        const withoutEl = elements.filter((e) => e.id !== selectedId);
-        const parentId = el.parentId ?? null;
-
-        // Elements inside a frame: move to the start of their siblings
-        if (parentId !== null || el.type === 'frame') {
-          const firstSiblingIdx = withoutEl.findIndex((e) => (e.parentId ?? null) === parentId);
-          const insertAt = firstSiblingIdx === -1 ? 0 : firstSiblingIdx;
-          const result = [...withoutEl];
-          result.splice(insertAt, 0, el);
-          return result;
-        }
-
-        // Top-level non-frame: place just after the last top-level frame
-        // so it stays above frames but is at the back of non-frame elements
-        let lastFrameIdx = -1;
-        for (let i = 0; i < withoutEl.length; i++) {
-          if (withoutEl[i].type === 'frame' && !withoutEl[i].parentId) {
-            lastFrameIdx = i;
-          }
-        }
-
-        const insertAt = lastFrameIdx + 1;
-        const result = [...withoutEl];
-        result.splice(insertAt, 0, el);
-        return result;
-      });
-    });
-  }
-
-  private ctxMoveToPage(targetPageId: string): void {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) return;
-    const subtreeIds = new Set(this.collectSubtreeIds(this.elements(), selectedId));
-    const elementsToMove = this.elements().filter((el) => subtreeIds.has(el.id));
-    if (elementsToMove.length === 0) return;
-    this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => elements.filter((el) => !subtreeIds.has(el.id)));
-      this.pages.update((pages) =>
-        pages.map((page) =>
-          page.id === targetPageId
-            ? { ...page, elements: [...page.elements, ...elementsToMove] }
-            : page,
-        ),
-      );
-      this.selectedElementId.set(null);
-    });
-  }
-
-  private ctxFlipHorizontal(): void {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) return;
-    this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) =>
-        elements.map((el) => {
-          if (el.id !== selectedId) return el;
-          const currentScale = (el as CanvasElement & { scaleX?: number }).scaleX ?? 1;
-          return { ...el, scaleX: currentScale === -1 ? 1 : -1 } as CanvasElement;
-        }),
-      );
-    });
-  }
-
-  private ctxFlipVertical(): void {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) return;
-    this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) =>
-        elements.map((el) => {
-          if (el.id !== selectedId) return el;
-          const currentScale = (el as CanvasElement & { scaleY?: number }).scaleY ?? 1;
-          return { ...el, scaleY: currentScale === -1 ? 1 : -1 } as CanvasElement;
-        }),
-      );
-    });
-  }
-
-  private ctxRename(): void {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) return;
-    window.dispatchEvent(new CustomEvent('canvas:rename-request', { detail: { id: selectedId } }));
-  }
-
-  private ctxToggleVisibility(): void {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) return;
-    this.onLayerVisibilityToggled(selectedId);
-  }
+  // ── Global Pointer Events ─────────────────────────────────
 
   @HostListener('window:pointermove', ['$event'])
   onPointerMove(event: MouseEvent): void {
-    if (this.isPanning()) {
-      const deltaX = event.clientX - this.panStart.x;
-      const deltaY = event.clientY - this.panStart.y;
-
-      if (deltaX !== 0 || deltaY !== 0) {
-        this.panMoved = true;
-        this.viewportOffset.update((offset) => ({
-          x: this.roundToTwoDecimals(offset.x + deltaX),
-          y: this.roundToTwoDecimals(offset.y + deltaY),
-        }));
-        this.panStart = { x: event.clientX, y: event.clientY };
-      }
-
+    if (this.viewport.isPanning()) {
+      this.viewport.updatePan(event);
       return;
     }
 
@@ -973,7 +691,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.getCanvasPoint(event);
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
     if (!pointer) {
       return;
     }
@@ -990,25 +708,25 @@ export class ProjectPage implements OnDestroy {
         if (element.type === 'frame') {
           return {
             ...element,
-            x: this.roundToTwoDecimals(absoluteX),
-            y: this.roundToTwoDecimals(absoluteY),
+            x: roundToTwoDecimals(absoluteX),
+            y: roundToTwoDecimals(absoluteY),
           };
         }
 
-        const parent = this.findElementById(element.parentId ?? null, elements);
+        const parent = this.el.findElementById(element.parentId ?? null, elements);
         if (!parent) {
           return {
             ...element,
-            x: this.roundToTwoDecimals(absoluteX),
-            y: this.roundToTwoDecimals(absoluteY),
+            x: roundToTwoDecimals(absoluteX),
+            y: roundToTwoDecimals(absoluteY),
           };
         }
 
-        const parentBounds = this.getAbsoluteBounds(parent, elements);
+        const parentBounds = this.el.getAbsoluteBounds(parent, elements);
         return {
           ...element,
-          x: this.clamp(absoluteX - parentBounds.x, 0, parent.width - element.width),
-          y: this.clamp(absoluteY - parentBounds.y, 0, parent.height - element.height),
+          x: clamp(absoluteX - parentBounds.x, 0, parent.width - element.width),
+          y: clamp(absoluteY - parentBounds.y, 0, parent.height - element.height),
         };
       }),
     );
@@ -1019,85 +737,76 @@ export class ProjectPage implements OnDestroy {
     const shouldCommitGestureHistory =
       this.isDragging || this.isResizing || this.isRotating || this.isAdjustingCornerRadius;
 
-    if (this.isPanning() && this.panMoved) {
+    if (this.viewport.isPanning() && this.viewport.panMoved) {
       this.suppressNextCanvasClick = true;
     }
 
-    this.isPanning.set(false);
+    this.viewport.endPan();
     this.isDragging = false;
     this.isResizing = false;
     this.isRotating = false;
     this.isAdjustingCornerRadius = false;
 
     if (shouldCommitGestureHistory) {
-      this.commitGestureHistory();
+      this.history.commitGestureHistory(() => this.createHistorySnapshot());
     }
   }
+
+  // ── Wheel ─────────────────────────────────────────────────
 
   onCanvasWheel(event: WheelEvent): void {
     const canvas = event.currentTarget as HTMLElement | null;
     if (!canvas) {
       return;
     }
-
     event.preventDefault();
-    if (event.ctrlKey) {
-      const rect = canvas.getBoundingClientRect();
-      const delta = event.deltaY < 0 ? this.zoomStep : -this.zoomStep;
-      this.setZoom(this.zoomLevel() + delta, {
-        x: event.clientX - rect.left,
-        y: event.clientY - rect.top,
-      });
-      return;
-    }
-
-    this.viewportOffset.update((offset) => ({
-      x: this.roundToTwoDecimals(offset.x - event.deltaX),
-      y: this.roundToTwoDecimals(offset.y - event.deltaY),
-    }));
+    this.viewport.handleWheel(event, canvas.getBoundingClientRect());
   }
 
+  // ── Zoom Toolbar Delegates ────────────────────────────────
+
   zoomIn(): void {
-    this.setZoom(this.zoomLevel() + this.zoomStep, this.getCanvasScreenCenter());
+    this.viewport.zoomIn();
   }
 
   zoomOut(): void {
-    this.setZoom(this.zoomLevel() - this.zoomStep, this.getCanvasScreenCenter());
+    this.viewport.zoomOut();
   }
 
   resetZoom(): void {
-    this.setZoom(1, this.getCanvasScreenCenter());
+    this.viewport.resetZoom();
   }
 
   zoomPercentage(): number {
-    return Math.round(this.zoomLevel() * 100);
+    return this.viewport.zoomPercentage();
   }
 
+  // ── Template Delegates (viewport) ─────────────────────────
+
   canvasViewportTransform(): string {
-    const offset = this.viewportOffset();
-    return `translate(${offset.x}px, ${offset.y}px)`;
+    return this.viewport.canvasViewportTransform();
   }
 
   canvasSceneZoom(): number {
-    return this.zoomLevel();
+    return this.viewport.canvasSceneZoom();
   }
 
   canvasBackgroundSize(): string {
-    const size = this.roundToTwoDecimals(this.gridSize * this.zoomLevel());
-    return `${size}px ${size}px`;
+    return this.viewport.canvasBackgroundSize();
   }
 
   canvasBackgroundPosition(): string {
-    const offset = this.viewportOffset();
-    return `${offset.x}px ${offset.y}px`;
+    return this.viewport.canvasBackgroundPosition();
   }
 
   isPanReady(): boolean {
-    return this.currentTool() === 'select' || this.isSpacePressed();
+    return this.currentTool() === 'select' || this.viewport.isSpacePressed();
   }
 
+  // ── Template Delegates (element) ──────────────────────────
+
   getElementBorderStyle(element: CanvasElement): string {
-    return this.getElementStrokeStyle(element);
+    return this.el.getElementStrokeStyle(element);
   }
 
   getElementOutlineStyle(_element: CanvasElement): string {
@@ -1109,43 +818,43 @@ export class ProjectPage implements OnDestroy {
   }
 
   getRenderedX(element: CanvasElement): number {
-    return this.getAbsoluteBounds(element).x;
+    return this.el.getAbsoluteBounds(element, this.elements()).x;
   }
 
   getRenderedY(element: CanvasElement): number {
-    return this.getAbsoluteBounds(element).y;
+    return this.el.getAbsoluteBounds(element, this.elements()).y;
   }
 
   getFrameTitle(element: CanvasElement): string {
-    return element.name?.trim() || 'Frame';
+    return this.el.getFrameTitle(element);
   }
 
   getFrameTitleFontSize(): number {
-    return this.getScreenInvariantSize(12.5);
+    return this.viewport.getScreenInvariantSize(12.5);
   }
 
   getFrameTitleOffset(): number {
-    return this.getScreenInvariantSize(-24);
+    return this.viewport.getScreenInvariantSize(-24);
   }
 
   getSelectionOutlineInset(): number {
-    return this.getScreenInvariantSize(-2);
+    return this.viewport.getScreenInvariantSize(-2);
   }
 
   getSelectionOutlineBorderWidth(): number {
-    return this.getScreenInvariantSize(2);
+    return this.viewport.getScreenInvariantSize(2);
   }
 
   getResizeHandleSize(): number {
-    return this.getScreenInvariantSize(12);
+    return this.viewport.getScreenInvariantSize(12);
   }
 
   getResizeHandleBorderWidth(): number {
-    return this.getScreenInvariantSize(2);
+    return this.viewport.getScreenInvariantSize(2);
   }
 
   getResizeHandleOffset(): number {
-    return this.getScreenInvariantSize(-8);
+    return this.viewport.getScreenInvariantSize(-8);
   }
 
   isTextEditing(elementId: string): boolean {
@@ -1153,90 +862,43 @@ export class ProjectPage implements OnDestroy {
   }
 
   getElementClipPath(element: CanvasElement): string {
-    const parent = this.findElementById(element.parentId ?? null);
-    if (!parent) {
-      return 'none';
-    }
-
-    const bounds = this.getAbsoluteBounds(element);
-    const parentBounds = this.getAbsoluteBounds(parent);
-    const topInset = Math.max(0, parentBounds.y - bounds.y);
-    const rightInset = Math.max(0, bounds.x + bounds.width - (parentBounds.x + parentBounds.width));
-    const bottomInset = Math.max(
-      0,
-      bounds.y + bounds.height - (parentBounds.y + parentBounds.height),
-    );
-    const leftInset = Math.max(0, parentBounds.x - bounds.x);
-
-    if (topInset === 0 && rightInset === 0 && bottomInset === 0 && leftInset === 0) {
-      return 'none';
-    }
-
-    return `inset(${topInset}px ${rightInset}px ${bottomInset}px ${leftInset}px)`;
+    return this.el.getElementClipPath(element, this.elements());
   }
 
   isElementClippedOut(element: CanvasElement): boolean {
-    const parent = this.findElementById(element.parentId ?? null);
-    if (!parent) {
-      return false;
-    }
-
-    const bounds = this.getAbsoluteBounds(element);
-    const parentBounds = this.getAbsoluteBounds(parent);
-    const intersectionWidth =
-      Math.min(bounds.x + bounds.width, parentBounds.x + parentBounds.width) -
-      Math.max(bounds.x, parentBounds.x);
-    const intersectionHeight =
-      Math.min(bounds.y + bounds.height, parentBounds.y + parentBounds.height) -
-      Math.max(bounds.y, parentBounds.y);
-
-    return intersectionWidth <= 0 || intersectionHeight <= 0;
+    return this.el.isElementClippedOut(element, this.elements());
   }
 
   getTextFontFamily(element: CanvasElement): string {
-    return element.fontFamily ?? 'Inter';
+    return this.el.getTextFontFamily(element);
   }
 
   getTextFontWeight(element: CanvasElement): number {
-    return element.fontWeight ?? 400;
+    return this.el.getTextFontWeight(element);
   }
 
   getTextFontStyle(element: CanvasElement): string {
-    return element.fontStyle ?? 'normal';
+    return this.el.getTextFontStyle(element);
   }
 
   getTextLineHeight(element: CanvasElement): number {
-    return element.lineHeight ?? 1.2;
+    return this.el.getTextLineHeight(element);
   }
 
   getTextLetterSpacing(element: CanvasElement): string {
-    return `${element.letterSpacing ?? 0}px`;
+    return this.el.getTextLetterSpacing(element);
   }
 
   getTextJustifyContent(element: CanvasElement): string {
-    switch (element.textAlign) {
-      case 'left':
-        return 'flex-start';
-      case 'right':
-        return 'flex-end';
-      default:
-        return 'center';
-    }
+    return this.el.getTextJustifyContent(element);
   }
 
   getTextAlignItems(element: CanvasElement): string {
-    switch (element.textVerticalAlign) {
-      case 'top':
-        return 'flex-start';
-      case 'bottom':
-        return 'flex-end';
-      default:
-        return 'center';
-    }
+    return this.el.getTextAlignItems(element);
   }
 
   getTextAlignValue(element: CanvasElement): string {
-    return element.textAlign ?? 'center';
+    return this.el.getTextAlignValue(element);
   }
 
   trackByElementId(_: number, element: CanvasElement): string {
@@ -1244,24 +906,11 @@ export class ProjectPage implements OnDestroy {
   }
 
   supportsCornerRadius(element: CanvasElement): boolean {
-    return element.type !== 'circle' && element.type !== 'text';
+    return this.el.supportsCornerRadius(element);
   }
 
   getCornerRadiusHandleInset(element: CanvasElement): number {
-    const radius = Number.isFinite(element.cornerRadius ?? Number.NaN)
-      ? (element.cornerRadius as number)
-      : element.type === 'image'
-        ? 6
-        : 0;
-
-    const baseInset = 20;
-    const handleSize = 12;
-    const maxInsetByHeight = Math.max(0, element.height / 2 - handleSize / 2);
-    const maxInsetByWidth = Math.max(0, element.width / 2 - handleSize / 2);
-    const maxInset = Math.min(maxInsetByHeight, maxInsetByWidth);
-    const desiredInset = baseInset + Math.max(0, radius);
-
-    return this.roundToTwoDecimals(this.clamp(desiredInset, 0, maxInset));
+    return this.el.getCornerRadiusHandleInset(element);
   }
 
   handleClass(handle: CornerHandle): string {
@@ -1273,29 +922,50 @@ export class ProjectPage implements OnDestroy {
   }
 
   getElementTransform(element: CanvasElement): string | null {
-    const rotation = element.rotation ?? 0;
-    if (rotation === 0) {
-      return null;
-    }
-
-    return `rotate(${rotation}deg)`;
+    return this.el.getElementTransform(element);
   }
 
   getCornerZoneSize(): number {
-    return this.getScreenInvariantSize(24);
+    return this.viewport.getScreenInvariantSize(24);
   }
 
   getCornerZoneOffset(): number {
-    return this.getScreenInvariantSize(-12);
+    return this.viewport.getScreenInvariantSize(-12);
   }
 
   getEdgeHitThickness(): number {
-    return this.getScreenInvariantSize(8);
+    return this.viewport.getScreenInvariantSize(8);
   }
 
   getEdgeHitCornerGap(): number {
-    return this.getScreenInvariantSize(16);
+    return this.viewport.getScreenInvariantSize(16);
   }
+
+  // ── Keyboard ──────────────────────────────────────────────
+
+  @HostListener('window:keydown', ['$event'])
+  handleKeyDown(event: KeyboardEvent): void {
+    this.keyboard.handleKeyDown(event, this.buildKeyboardCallbacks());
+  }
+
+  @HostListener('window:keyup', ['$event'])
+  handleKeyUp(event: KeyboardEvent): void {
+    this.keyboard.handleKeyUp(event, () => this.viewport.isSpacePressed.set(false));
+  }
+
+  @HostListener('window:blur')
+  handleWindowBlur(): void {
+    this.viewport.isSpacePressed.set(false);
+    this.viewport.endPan();
+    this.isDragging = false;
+    this.isResizing = false;
+    this.isRotating = false;
+    this.history.commitGestureHistory(() => this.createHistorySnapshot());
+    this.history.commitTextEditHistory(() => this.createHistorySnapshot());
+    this.editingTextElementId.set(null);
+  }
+
+  // ── Code Generation ───────────────────────────────────────
 
   validateIR(): void {
     this.apiError.set(null);
@@ -1334,93 +1004,7 @@ export class ProjectPage implements OnDestroy {
     });
   }
 
-  @HostListener('window:keydown', ['$event'])
-  handleKeyDown(event: KeyboardEvent): void {
-    if (event.defaultPrevented) {
-      return;
-    }
-
-    const isTypingContext = this.isTypingContext(event);
-
-    if (!isTypingContext && (event.ctrlKey || event.metaKey)) {
-      const key = event.key.toLowerCase();
-      if (key === 'c') {
-        event.preventDefault();
-        this.copySelectedElement();
-        return;
-      }
-
-      if (key === 'v') {
-        event.preventDefault();
-        this.pasteClipboard();
-        return;
-      }
-
-      if (key === 'z' && !event.shiftKey) {
-        event.preventDefault();
-        this.undo();
-        return;
-      }
-
-      if (key === 'y' || (key === 'z' && event.shiftKey)) {
-        event.preventDefault();
-        this.redo();
-        return;
-      }
-    }
-
-    if (this.editingTextElementId()) {
-      return;
-    }
-
-    if (event.code === 'Space' && !isTypingContext) {
-      this.isSpacePressed.set(true);
-      event.preventDefault();
-      return;
-    }
-
-    if (isTypingContext) {
-      return;
-    }
-
-    if (event.key.toLowerCase() === 'v') this.selectTool('select');
-    if (event.key.toLowerCase() === 'f') this.selectTool('frame');
-    if (event.key.toLowerCase() === 'r') this.selectTool('rectangle');
-    if (event.key.toLowerCase() === 'o') this.selectTool('circle');
-    if (event.key.toLowerCase() === 't') this.selectTool('text');
-    if (event.key.toLowerCase() === 'i') this.selectTool('image');
-
-    if (event.key === 'Delete' || event.key === 'Backspace') {
-      const selectedId = this.selectedElementId();
-      if (!selectedId) {
-        return;
-      }
-
-      this.runWithHistory(() => {
-        this.updateCurrentPageElements((elements) => this.removeWithChildren(elements, selectedId));
-        this.selectedElementId.set(null);
-      });
-    }
-  }
-
-  @HostListener('window:keyup', ['$event'])
-  handleKeyUp(event: KeyboardEvent): void {
-    if (event.code === 'Space') {
-      this.isSpacePressed.set(false);
-    }
-  }
-
-  @HostListener('window:blur')
-  handleWindowBlur(): void {
-    this.isSpacePressed.set(false);
-    this.isPanning.set(false);
-    this.isDragging = false;
-    this.isResizing = false;
-    this.isRotating = false;
-    this.commitGestureHistory();
-    this.commitTextEditHistory();
-    this.editingTextElementId.set(null);
-  }
+  // ── Private: Persistence ──────────────────────────────────
 
   private loadProjectDesign(): void {
     if (!Number.isInteger(this.projectIdAsNumber)) {
@@ -1434,7 +1018,8 @@ export class ProjectPage implements OnDestroy {
 
     this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
       next: (response) => {
-        const pages = response.pages.length > 0 ? response.pages : [this.createPage('Page 1')];
+        const pages =
+          response.pages.length > 0 ? response.pages : [this.el.createPage('Page 1')];
         const activePageId =
           response.activePageId && pages.some((page) => page.id === response.activePageId)
             ? response.activePageId
@@ -1444,7 +1029,7 @@ export class ProjectPage implements OnDestroy {
         this.currentPageId.set(activePageId);
         this.selectedElementId.set(null);
         this.lastSavedAt.set(response.updatedAt ?? null);
-        this.resetHistory();
+        this.history.resetHistory();
         this.isLoadingDesign.set(false);
         this.canPersistDesign = true;
       },
@@ -1475,7 +1060,11 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const document = this.buildProjectDocument();
+    const document = buildCanvasProjectDocument(
+      this.pages(),
+      this.projectId,
+      this.currentPageId(),
+    );
     this.isSavingDesign.set(true);
 
     this.canvasPersistenceService.saveProjectDesign(this.projectIdAsNumber, document).subscribe({
@@ -1490,190 +1079,7 @@ export class ProjectPage implements OnDestroy {
     });
   }
 
-  private buildProjectDocument(): CanvasProjectDocument {
-    return buildCanvasProjectDocument(this.pages(), this.projectId, this.currentPageId());
-  }
-
-  private createElementAtPoint(tool: CanvasElementType, pointer: Point): CanvasElement | null {
-    const selectedFrame = this.getSelectedFrame();
-    if (tool !== 'frame' && !selectedFrame) {
-      this.apiError.set(
-        'Select a frame first. Shapes, text, and images must be placed inside a frame.',
-      );
-      return null;
-    }
-
-    const defaultWidth =
-      tool === 'frame'
-        ? this.frameTemplate().width
-        : tool === 'text'
-          ? 150
-          : tool === 'image'
-            ? 180
-            : 100;
-    const defaultHeight =
-      tool === 'frame'
-        ? this.frameTemplate().height
-        : tool === 'text'
-          ? 40
-          : tool === 'image'
-            ? 120
-            : 100;
-
-    let x = this.roundToTwoDecimals(pointer.x - defaultWidth / 2);
-    let y = this.roundToTwoDecimals(pointer.y - defaultHeight / 2);
-    let parentId: string | null = null;
-
-    if (tool === 'frame') {
-      const nextFramePosition = this.getNextFramePosition(defaultWidth, defaultHeight);
-      if (nextFramePosition) {
-        x = nextFramePosition.x;
-        y = nextFramePosition.y;
-      }
-    }
-
-    if (tool !== 'frame' && selectedFrame) {
-      const frameBounds = this.getAbsoluteBounds(selectedFrame);
-      if (!this.isPointInsideRenderedElement(pointer.x, pointer.y, selectedFrame)) {
-        this.apiError.set('Click inside the selected frame to place the element.');
-        return null;
-      }
-
-      x = this.clamp(
-        pointer.x - frameBounds.x - defaultWidth / 2,
-        0,
-        selectedFrame.width - defaultWidth,
-      );
-      y = this.clamp(
-        pointer.y - frameBounds.y - defaultHeight / 2,
-        0,
-        selectedFrame.height - defaultHeight,
-      );
-      parentId = selectedFrame.id;
-    }
-
-    return {
-      id: crypto.randomUUID(),
-      type: tool,
-      name: this.getNextElementName(tool),
-      x,
-      y,
-      width: defaultWidth,
-      height: defaultHeight,
-      visible: true,
-      fill: tool === 'frame' ? this.defaultFrameFill : this.defaultElementFill,
-      strokeWidth: tool === 'text' ? undefined : 1,
-      strokeStyle: tool === 'text' ? undefined : 'Solid',
-      opacity: 1,
-      cornerRadius: tool === 'image' ? 6 : 0,
-      text: tool === 'text' ? 'New text' : undefined,
-      fontSize: tool === 'text' ? 16 : undefined,
-      fontFamily: tool === 'text' ? 'Inter' : undefined,
-      fontWeight: tool === 'text' ? 400 : undefined,
-      fontStyle: tool === 'text' ? 'normal' : undefined,
-      textAlign: tool === 'text' ? 'center' : undefined,
-      textVerticalAlign: tool === 'text' ? 'middle' : undefined,
-      letterSpacing: tool === 'text' ? 0 : undefined,
-      lineHeight: tool === 'text' ? 1.2 : undefined,
-      imageUrl: tool === 'image' ? this.imagePlaceholderUrl : undefined,
-      parentId,
-    };
-  }
-
-  private createFrameAtCenter(
-    center: Point,
-    width: number,
-    height: number,
-    name: string,
-  ): CanvasElement {
-    const nextFramePosition = this.getNextFramePosition(width, height);
-
-    return {
-      id: crypto.randomUUID(),
-      type: 'frame',
-      name: this.getNextFrameName(name),
-      x: nextFramePosition?.x ?? this.roundToTwoDecimals(center.x - width / 2),
-      y: nextFramePosition?.y ?? this.roundToTwoDecimals(center.y - height / 2),
-      width,
-      height,
-      visible: true,
-      fill: this.defaultFrameFill,
-      strokeWidth: 1,
-      strokeStyle: 'Solid',
-      opacity: 1,
-      cornerRadius: 0,
-      parentId: null,
-    };
-  }
-
-  private copySelectedElement(): void {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) {
-      return;
-    }
-
-    const subtreeIds = new Set(this.collectSubtreeIds(this.elements(), selectedId));
-    const copiedElements = this.elements()
-      .filter((element) => subtreeIds.has(element.id))
-      .map((element) => structuredClone(element));
-
-    if (copiedElements.length === 0) {
-      return;
-    }
-
-    this.clipboardSnapshot = {
-      rootId: selectedId,
-      sourcePageId: this.currentPageId(),
-      pasteCount: 0,
-      elements: copiedElements,
-    };
-    this.apiError.set(null);
-  }
-
-  private pasteClipboard(): void {
-    const clipboard = this.clipboardSnapshot;
-    if (!clipboard) {
-      return;
-    }
-
-    const currentPage = this.currentPage();
-    if (!currentPage) {
-      return;
-    }
-
-    const rootElement = clipboard.elements.find((element) => element.id === clipboard.rootId);
-    if (!rootElement) {
-      return;
-    }
-
-    const targetParentId = this.resolvePasteParentId(rootElement, currentPage.elements);
-    if (rootElement.type !== 'frame' && !targetParentId) {
-      this.apiError.set('Select a destination frame before pasting this element.');
-      return;
-    }
-
-    const pastedElements = this.createPastedElements(
-      clipboard,
-      currentPage.elements,
-      targetParentId,
-    );
-    if (pastedElements.length === 0) {
-      return;
-    }
-
-    this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => [...elements, ...pastedElements]);
-      this.selectedElementId.set(pastedElements[0]?.id ?? null);
-      this.editingTextElementId.set(null);
-      this.currentTool.set('select');
-    });
-
-    this.apiError.set(null);
-    this.clipboardSnapshot = {
-      ...clipboard,
-      pasteCount: clipboard.pasteCount + 1,
-    };
-  }
+  // ── Private: Gesture Handling ─────────────────────────────
 
   private handleRotatePointerMove(event: MouseEvent): void {
     const start = this.rotateStart;
@@ -1681,14 +1087,14 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.getCanvasPoint(event);
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
     if (!pointer) {
       return;
     }
 
     const currentAngle =
       Math.atan2(pointer.y - start.centerY, pointer.x - start.centerX) * (180 / Math.PI);
-    let angleDelta = currentAngle - start.startAngle;
+    const angleDelta = currentAngle - start.startAngle;
     let newRotation = start.initialRotation + angleDelta;
 
     if (event.shiftKey) {
@@ -1696,14 +1102,13 @@ export class ProjectPage implements OnDestroy {
     }
 
     newRotation = ((newRotation % 360) + 360) % 360;
-    newRotation = this.roundToTwoDecimals(newRotation);
+    newRotation = roundToTwoDecimals(newRotation);
 
     this.updateCurrentPageElements((elements) =>
       elements.map((element) => {
         if (element.id !== start.elementId) {
           return element;
         }
-
         return { ...element, rotation: newRotation };
       }),
     );
@@ -1715,7 +1120,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.getCanvasPoint(event);
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
     if (!pointer) {
       return;
     }
@@ -1726,8 +1131,8 @@ export class ProjectPage implements OnDestroy {
           return element;
         }
 
-        const parent = this.findElementById(element.parentId ?? null, elements);
-        const parentBounds = parent ? this.getAbsoluteBounds(parent, elements) : null;
+        const parent = this.el.findElementById(element.parentId ?? null, elements);
+        const parentBounds = parent ? this.el.getAbsoluteBounds(parent, elements) : null;
         const bounds = this.calculateResizedBounds(
           element,
           parentBounds,
@@ -1744,7 +1149,7 @@ export class ProjectPage implements OnDestroy {
           height: bounds.height,
         };
 
-        this.normalizeElement(nextElement, elements);
+        this.el.normalizeElement(nextElement, elements);
         return nextElement;
       }),
     );
@@ -1756,7 +1161,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.getCanvasPoint(event);
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
     if (!pointer) {
       return;
     }
@@ -1767,18 +1172,14 @@ export class ProjectPage implements OnDestroy {
     const yRadius = pointer.y - cornerY;
     const rawRadius = Math.min(xRadius, yRadius);
     const maxRadius = Math.max(0, Math.min(start.width, start.height) / 2);
-    const nextRadius = this.clamp(rawRadius, 0, maxRadius);
+    const nextRadius = clamp(rawRadius, 0, maxRadius);
 
     this.updateCurrentPageElements((elements) =>
       elements.map((element) => {
-        if (element.id !== start.elementId || !this.supportsCornerRadius(element)) {
+        if (element.id !== start.elementId || !this.el.supportsCornerRadius(element)) {
           return element;
         }
-
-        return {
-          ...element,
-          cornerRadius: this.roundToTwoDecimals(nextRadius),
-        };
+        return { ...element, cornerRadius: roundToTwoDecimals(nextRadius) };
       }),
     );
   }
@@ -1791,16 +1192,17 @@ export class ProjectPage implements OnDestroy {
     scaleFromCenter: boolean,
   ): Bounds {
     const start = this.resizeStart;
+    const minSize = 24;
     const deltaX = pointer.x - start.pointerX;
     const deltaY = pointer.y - start.pointerY;
-    const xDirection = start.handle.includes('w') ? -1 : 1;
-    const yDirection = start.handle.includes('n') ? -1 : 1;
     const isEdgeHandle =
       start.handle === 'n' || start.handle === 's' || start.handle === 'e' || start.handle === 'w';
     const isNS = start.handle === 'n' || start.handle === 's';
     const isEW = start.handle === 'e' || start.handle === 'w';
     const effectiveDeltaX = isNS ? 0 : deltaX;
     const effectiveDeltaY = isEW ? 0 : deltaY;
+    const xDirection = start.handle.includes('w') ? -1 : 1;
+    const yDirection = start.handle.includes('n') ? -1 : 1;
     const shouldPreserveAspectRatio =
       !isEdgeHandle && (preserveAspectRatio || element.type === 'circle');
     const aspectRatio = shouldPreserveAspectRatio
@@ -1823,11 +1225,11 @@ export class ProjectPage implements OnDestroy {
       const candidateHalfWidth = start.width / 2 + xDirection * effectiveDeltaX;
       const candidateHalfHeight = start.height / 2 + yDirection * effectiveDeltaY;
       const maxHalfWidth = Math.max(
-        this.minElementSize / 2,
+        minSize / 2,
         Math.min(start.centerX - minLeft, maxRight - start.centerX),
       );
       const maxHalfHeight = Math.max(
-        this.minElementSize / 2,
+        minSize / 2,
         Math.min(start.centerY - minTop, maxBottom - start.centerY),
       );
 
@@ -1836,33 +1238,33 @@ export class ProjectPage implements OnDestroy {
         const scaleY = candidateHalfHeight / Math.max(start.height / 2, 1);
         const dominantScale = Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY;
         const minScale = Math.max(
-          this.minElementSize / Math.max(start.width, 1),
-          this.minElementSize / Math.max(start.height, 1),
+          minSize / Math.max(start.width, 1),
+          minSize / Math.max(start.height, 1),
         );
         const maxScale = Math.min(
           (maxHalfWidth * 2) / Math.max(start.width, 1),
           (maxHalfHeight * 2) / Math.max(start.height, 1),
         );
-        const scale = this.clamp(dominantScale, minScale, Math.max(minScale, maxScale));
-        const width = this.roundToTwoDecimals(start.width * scale);
-        const height = this.roundToTwoDecimals(width / aspectRatio);
+        const scale = clamp(dominantScale, minScale, Math.max(minScale, maxScale));
+        const width = roundToTwoDecimals(start.width * scale);
+        const height = roundToTwoDecimals(width / aspectRatio);
 
         return {
-          x: this.roundToTwoDecimals(start.centerX - width / 2),
-          y: this.roundToTwoDecimals(start.centerY - height / 2),
+          x: roundToTwoDecimals(start.centerX - width / 2),
+          y: roundToTwoDecimals(start.centerY - height / 2),
           width,
           height,
         };
       }
 
-      const halfWidth = this.clamp(candidateHalfWidth, this.minElementSize / 2, maxHalfWidth);
-      const halfHeight = this.clamp(candidateHalfHeight, this.minElementSize / 2, maxHalfHeight);
+      const halfWidth = clamp(candidateHalfWidth, minSize / 2, maxHalfWidth);
+      const halfHeight = clamp(candidateHalfHeight, minSize / 2, maxHalfHeight);
 
       return {
-        x: this.roundToTwoDecimals(start.centerX - halfWidth),
-        y: this.roundToTwoDecimals(start.centerY - halfHeight),
-        width: this.roundToTwoDecimals(halfWidth * 2),
-        height: this.roundToTwoDecimals(halfHeight * 2),
+        x: roundToTwoDecimals(start.centerX - halfWidth),
+        y: roundToTwoDecimals(start.centerY - halfHeight),
+        width: roundToTwoDecimals(halfWidth * 2),
+        height: roundToTwoDecimals(halfHeight * 2),
       };
     }
 
@@ -1877,17 +1279,18 @@ export class ProjectPage implements OnDestroy {
       const scaleY = candidateHeight / Math.max(start.height, 1);
       const dominantScale = Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY;
       const minScale = Math.max(
-        this.minElementSize / Math.max(start.width, 1),
-        this.minElementSize / Math.max(start.height, 1),
+        minSize / Math.max(start.width, 1),
+        minSize / Math.max(start.height, 1),
       );
       const maxScale = Math.min(
-        (start.handle.includes('w') ? right - minLeft : maxRight - left) / Math.max(start.width, 1),
+        (start.handle.includes('w') ? right - minLeft : maxRight - left) /
+          Math.max(start.width, 1),
         (start.handle.includes('n') ? bottom - minTop : maxBottom - top) /
           Math.max(start.height, 1),
       );
-      const scale = this.clamp(dominantScale, minScale, Math.max(minScale, maxScale));
-      const width = this.roundToTwoDecimals(start.width * scale);
-      const height = this.roundToTwoDecimals(width / aspectRatio);
+      const scale = clamp(dominantScale, minScale, Math.max(minScale, maxScale));
+      const width = roundToTwoDecimals(start.width * scale);
+      const height = roundToTwoDecimals(width / aspectRatio);
 
       if (start.handle.includes('w')) {
         left = right - width;
@@ -1902,155 +1305,63 @@ export class ProjectPage implements OnDestroy {
       }
 
       return {
-        x: this.roundToTwoDecimals(left),
-        y: this.roundToTwoDecimals(top),
-        width: this.roundToTwoDecimals(right - left),
-        height: this.roundToTwoDecimals(bottom - top),
+        x: roundToTwoDecimals(left),
+        y: roundToTwoDecimals(top),
+        width: roundToTwoDecimals(right - left),
+        height: roundToTwoDecimals(bottom - top),
       };
     }
 
     if (start.handle.includes('w')) {
-      left = this.clamp(start.absoluteX + deltaX, minLeft, right - this.minElementSize);
+      left = clamp(start.absoluteX + deltaX, minLeft, right - minSize);
     }
 
     if (start.handle.includes('e')) {
-      right = this.clamp(
-        start.absoluteX + start.width + deltaX,
-        left + this.minElementSize,
-        maxRight,
-      );
+      right = clamp(start.absoluteX + start.width + deltaX, left + minSize, maxRight);
     }
 
     if (start.handle.includes('n')) {
-      top = this.clamp(start.absoluteY + deltaY, minTop, bottom - this.minElementSize);
+      top = clamp(start.absoluteY + deltaY, minTop, bottom - minSize);
     }
 
     if (start.handle.includes('s')) {
-      bottom = this.clamp(
-        start.absoluteY + start.height + deltaY,
-        top + this.minElementSize,
-        maxBottom,
-      );
+      bottom = clamp(start.absoluteY + start.height + deltaY, top + minSize, maxBottom);
     }
 
-    let width = this.roundToTwoDecimals(right - left);
-    let height = this.roundToTwoDecimals(bottom - top);
-
     return {
-      x: this.roundToTwoDecimals(left),
-      y: this.roundToTwoDecimals(top),
-      width: this.roundToTwoDecimals(right - left),
-      height: this.roundToTwoDecimals(bottom - top),
+      x: roundToTwoDecimals(left),
+      y: roundToTwoDecimals(top),
+      width: roundToTwoDecimals(right - left),
+      height: roundToTwoDecimals(bottom - top),
     };
   }
 
-  private focusElement(element: CanvasElement): void {
-    const canvas = this.getCanvasElement();
-    if (!canvas) {
+  // ── Private: Helpers ──────────────────────────────────────
+
+  private updateCurrentPageElements(
+    updater: (elements: CanvasElement[]) => CanvasElement[],
+  ): void {
+    const currentPageId = this.currentPageId();
+    if (!currentPageId) {
       return;
     }
 
-    const padding = 64;
-    const bounds = this.getAbsoluteBounds(element);
-    const horizontalZoom =
-      (canvas.clientWidth - padding) / Math.max(bounds.width, this.minElementSize);
-    const verticalZoom =
-      (canvas.clientHeight - padding) / Math.max(bounds.height, this.minElementSize);
-    const zoom = this.clamp(Math.min(horizontalZoom, verticalZoom), this.minZoom, this.maxZoom);
-
-    this.zoomLevel.set(zoom);
-    this.viewportOffset.set({
-      x: this.roundToTwoDecimals((canvas.clientWidth - bounds.width * zoom) / 2 - bounds.x * zoom),
-      y: this.roundToTwoDecimals(
-        (canvas.clientHeight - bounds.height * zoom) / 2 - bounds.y * zoom,
-      ),
-    });
-  }
-
-  private getViewportCenterCanvasPoint(): Point {
-    const canvas = this.getCanvasElement();
-    if (!canvas) {
-      return { x: 320, y: 240 };
-    }
-
-    const offset = this.viewportOffset();
-    return {
-      x: this.roundToTwoDecimals((canvas.clientWidth / 2 - offset.x) / this.zoomLevel()),
-      y: this.roundToTwoDecimals((canvas.clientHeight / 2 - offset.y) / this.zoomLevel()),
-    };
-  }
-
-  private getCanvasScreenCenter(): Point {
-    const canvas = this.getCanvasElement();
-    if (!canvas) return { x: 400, y: 300 };
-    return { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 };
-  }
-
-  private setZoom(nextZoom: number, anchor?: Point): void {
-    const previousZoom = this.zoomLevel();
-    const clampedZoom = this.clamp(nextZoom, this.minZoom, this.maxZoom);
-
-    if (clampedZoom === previousZoom) {
-      return;
-    }
-
-    if (anchor) {
-      const offset = this.viewportOffset();
-      const worldX = (anchor.x - offset.x) / previousZoom;
-      const worldY = (anchor.y - offset.y) / previousZoom;
-
-      this.viewportOffset.set({
-        x: this.roundToTwoDecimals(anchor.x - worldX * clampedZoom),
-        y: this.roundToTwoDecimals(anchor.y - worldY * clampedZoom),
-      });
-    }
-
-    this.zoomLevel.set(clampedZoom);
-  }
-
-  private getScreenInvariantSize(size: number): number {
-    return this.roundToTwoDecimals(size / this.zoomLevel());
-  }
-
-  private getCanvasPoint(event: MouseEvent): Point | null {
-    const canvas = this.getCanvasElement();
-    if (!canvas) {
-      return null;
-    }
-
-    const rect = canvas.getBoundingClientRect();
-    const offset = this.viewportOffset();
-
-    return {
-      x: this.roundToTwoDecimals((event.clientX - rect.left - offset.x) / this.zoomLevel()),
-      y: this.roundToTwoDecimals((event.clientY - rect.top - offset.y) / this.zoomLevel()),
-    };
+    this.pages.update((pages) =>
+      this.el.updatePageElements(pages, currentPageId, updater),
+    );
   }
 
   private shouldStartPanning(event: MouseEvent, target: HTMLElement): boolean {
     if (event.button === 1) {
       return true;
     }
-
     if (event.button !== 0) {
       return false;
     }
-
-    if (this.isSpacePressed()) {
+    if (this.viewport.isSpacePressed()) {
       return true;
     }
-
     return this.currentTool() === 'select' && this.isCanvasBackgroundTarget(target);
-  }
-
-  private startPanning(event: MouseEvent): void {
-    this.isPanning.set(true);
-    this.isDragging = false;
-    this.isResizing = false;
-    this.panMoved = false;
-    this.panStart = { x: event.clientX, y: event.clientY };
-    event.preventDefault();
-    event.stopPropagation();
   }
 
   private isCanvasBackgroundTarget(target: HTMLElement): boolean {
@@ -2079,381 +1390,14 @@ export class ProjectPage implements OnDestroy {
     }, 0);
   }
 
-  private getSelectedFrame(): CanvasElement | null {
-    const selected = this.selectedElement();
-    return selected?.type === 'frame' ? selected : null;
-  }
-
-  private isPointInsideRenderedElement(x: number, y: number, element: CanvasElement): boolean {
-    const bounds = this.getAbsoluteBounds(element);
-    return (
-      x >= bounds.x &&
-      x <= bounds.x + bounds.width &&
-      y >= bounds.y &&
-      y <= bounds.y + bounds.height
-    );
-  }
-
-  private getAbsoluteBounds(element: CanvasElement, elements = this.elements()): Bounds {
-    const parent = this.findElementById(element.parentId ?? null, elements);
-    if (!parent || element.type === 'frame') {
-      return {
-        x: this.roundToTwoDecimals(element.x),
-        y: this.roundToTwoDecimals(element.y),
-        width: this.roundToTwoDecimals(element.width),
-        height: this.roundToTwoDecimals(element.height),
-      };
-    }
-
-    const parentBounds = this.getAbsoluteBounds(parent, elements);
-    return {
-      x: this.roundToTwoDecimals(parentBounds.x + element.x),
-      y: this.roundToTwoDecimals(parentBounds.y + element.y),
-      width: this.roundToTwoDecimals(element.width),
-      height: this.roundToTwoDecimals(element.height),
-    };
-  }
-
-  private findElementById(id: string | null, elements = this.elements()): CanvasElement | null {
-    if (!id) {
-      return null;
-    }
-
-    return elements.find((element) => element.id === id) ?? null;
-  }
-
-  private isElementEffectivelyVisible(elementId: string): boolean {
-    const elements = this.elements();
-    let current = this.findElementById(elementId, elements);
-
-    while (current) {
-      if (current.visible === false) {
-        return false;
-      }
-
-      current = this.findElementById(current.parentId ?? null, elements);
-    }
-
-    return true;
-  }
-
-  private reorderLayerElements(
-    elements: CanvasElement[],
-    draggedId: string,
-    targetId: string,
-    position: 'before' | 'after' | 'inside',
-  ): CanvasElement[] {
-    if (draggedId === targetId) {
-      return elements;
-    }
-
-    const dragged = elements.find((element) => element.id === draggedId);
-    const target = elements.find((element) => element.id === targetId);
-    if (!dragged || !target) {
-      return elements;
-    }
-
-    if (position === 'inside' && (target.type !== 'frame' || dragged.type === 'frame')) {
-      return elements;
-    }
-
-    const draggedSubtreeIds = new Set(this.collectSubtreeIds(elements, draggedId));
-    const targetSubtreeIds = this.collectSubtreeIds(elements, targetId);
-    if (targetSubtreeIds.includes(draggedId)) {
-      return elements;
-    }
-
-    const draggedSubtree = elements.filter((element) => draggedSubtreeIds.has(element.id));
-    const remaining = elements.filter((element) => !draggedSubtreeIds.has(element.id));
-    const draggedRoot = draggedSubtree[0];
-    if (!draggedRoot) {
-      return elements;
-    }
-
-    const draggedBounds = this.getAbsoluteBounds(dragged, elements);
-    const targetIndex = remaining.findIndex((element) => element.id === targetId);
-    if (targetIndex === -1) {
-      return elements;
-    }
-
-    let nextParentId = dragged.parentId ?? null;
-    let insertIndex = targetIndex;
-
-    if (position === 'inside') {
-      nextParentId = target.id;
-      insertIndex = targetIndex + targetSubtreeIds.length;
-    } else {
-      nextParentId = target.parentId ?? null;
-      insertIndex = position === 'after' ? targetIndex + targetSubtreeIds.length : targetIndex;
-    }
-
-    const nextParent = nextParentId
-      ? (remaining.find((element) => element.id === nextParentId) ?? null)
-      : null;
-
-    draggedRoot.parentId = nextParentId;
-    if (nextParent) {
-      const parentBounds = this.getAbsoluteBounds(nextParent, remaining);
-      draggedRoot.x = this.clamp(
-        draggedBounds.x - parentBounds.x,
-        0,
-        nextParent.width - draggedRoot.width,
-      );
-      draggedRoot.y = this.clamp(
-        draggedBounds.y - parentBounds.y,
-        0,
-        nextParent.height - draggedRoot.height,
-      );
-    } else {
-      draggedRoot.x = this.roundToTwoDecimals(draggedBounds.x);
-      draggedRoot.y = this.roundToTwoDecimals(draggedBounds.y);
-    }
-
-    return [...remaining.slice(0, insertIndex), ...draggedSubtree, ...remaining.slice(insertIndex)];
-  }
-
-  private collectSubtreeIds(elements: CanvasElement[], rootId: string): string[] {
-    const collected: string[] = [];
-    const visit = (currentId: string) => {
-      collected.push(currentId);
-      const children = elements.filter((element) => (element.parentId ?? null) === currentId);
-      for (const child of children) {
-        visit(child.id);
-      }
-    };
-
-    visit(rootId);
-    return collected;
-  }
-
-  private getNextFramePosition(width: number, height: number): Point | null {
-    const rootFrames = this.elements().filter(
-      (element) => element.type === 'frame' && !element.parentId,
-    );
-
-    if (rootFrames.length === 0) {
-      return null;
-    }
-
-    const rightMostFrame = rootFrames.reduce((currentRightMost, candidate) => {
-      const currentBounds = this.getAbsoluteBounds(currentRightMost);
-      const candidateBounds = this.getAbsoluteBounds(candidate);
-      const currentRight = currentBounds.x + currentBounds.width;
-      const candidateRight = candidateBounds.x + candidateBounds.width;
-
-      return candidateRight > currentRight ? candidate : currentRightMost;
-    }, rootFrames[0]);
-
-    const bounds = this.getAbsoluteBounds(rightMostFrame);
-    return {
-      x: this.roundToTwoDecimals(bounds.x + bounds.width + this.frameInsertGap),
-      y: this.roundToTwoDecimals(bounds.y),
-    };
-  }
-
-  private updateCurrentPageElements(updater: (elements: CanvasElement[]) => CanvasElement[]): void {
-    const currentPageId = this.currentPageId();
-    if (!currentPageId) {
-      return;
-    }
-
-    this.pages.update((pages) =>
-      pages.map((page) =>
-        page.id === currentPageId
-          ? {
-              ...page,
-              elements: updater(page.elements),
-            }
-          : page,
-      ),
-    );
-  }
-
-  private resolvePasteParentId(
-    rootElement: CanvasElement,
-    currentElements: CanvasElement[],
-  ): string | null {
-    if (rootElement.type === 'frame') {
-      return null;
-    }
-
-    const originalParentId = rootElement.parentId ?? null;
-    if (
-      originalParentId &&
-      currentElements.some((element) => element.id === originalParentId && element.type === 'frame')
-    ) {
-      return originalParentId;
-    }
-
-    const selectedFrame = this.getSelectedFrame();
-    return selectedFrame?.id ?? null;
-  }
-
-  private createPastedElements(
-    clipboard: CanvasClipboardSnapshot,
-    currentElements: CanvasElement[],
-    targetParentId: string | null,
-  ): CanvasElement[] {
-    const rootElement = clipboard.elements.find((element) => element.id === clipboard.rootId);
-    if (!rootElement) {
-      return [];
-    }
-
-    const idMap = new Map(clipboard.elements.map((element) => [element.id, crypto.randomUUID()]));
-    const targetParent = targetParentId
-      ? (currentElements.find((element) => element.id === targetParentId) ?? null)
-      : null;
-    const offset = this.clipboardPasteOffset * (clipboard.pasteCount + 1);
-    const pastedElements = clipboard.elements.map((element) => {
-      const clonedElement = structuredClone(element);
-      clonedElement.id = idMap.get(element.id) ?? crypto.randomUUID();
-
-      if (element.id === clipboard.rootId) {
-        clonedElement.parentId = targetParentId;
-
-        if (targetParent) {
-          clonedElement.x = this.clamp(element.x + offset, 0, targetParent.width - element.width);
-          clonedElement.y = this.clamp(element.y + offset, 0, targetParent.height - element.height);
-        } else {
-          clonedElement.x = this.roundToTwoDecimals(element.x + offset);
-          clonedElement.y = this.roundToTwoDecimals(element.y + offset);
-        }
-
-        return clonedElement;
-      }
-
-      clonedElement.parentId = element.parentId ? (idMap.get(element.parentId) ?? null) : null;
-      return clonedElement;
-    });
-
-    return pastedElements;
-  }
-
-  private getElementStrokeStyle(element: CanvasElement): string {
-    if (!element.stroke || element.type === 'text') {
-      return 'none';
-    }
-
-    const strokeWidth = this.getStrokeWidth(element);
-    if (strokeWidth <= 0) {
-      return 'none';
-    }
-
-    const cssStyle = (element.strokeStyle ?? 'Solid').toLowerCase();
-    return `${strokeWidth}px ${cssStyle} ${element.stroke}`;
-  }
-
-  private createPage(name: string): CanvasPageModel {
-    return {
-      id: crypto.randomUUID(),
-      name,
-      elements: [],
-    };
-  }
-
-  private getNextPageName(): string {
-    return `Page ${this.pages().length + 1}`;
-  }
-
-  private getNextElementName(type: CanvasElementType): string {
-    const index = this.elements().filter((element) => element.type === type).length + 1;
-    return `${formatCanvasElementTypeLabel(type)} ${index}`;
-  }
-
-  private getNextFrameName(templateName: string): string {
-    const frameIndex = this.elements().filter((element) => element.type === 'frame').length + 1;
-    return `${templateName} ${frameIndex}`;
-  }
-
-  private isTypingTarget(target: EventTarget | null): boolean {
-    const element = target as HTMLElement | null;
-    if (!element) {
-      return false;
-    }
-
-    if (element.isContentEditable) {
-      return true;
-    }
-
-    const tagName = element.tagName;
-    return tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT';
-  }
+  // ── Private: History Shortcuts ────────────────────────────
 
   private runWithHistory(action: () => void): void {
-    if (this.isApplyingHistory) {
-      action();
-      return;
-    }
-
-    const snapshot = this.createHistorySnapshot();
-    action();
-    this.pushUndoSnapshotIfChanged(snapshot);
+    this.history.runWithHistory(() => this.createHistorySnapshot(), action);
   }
 
   private beginGestureHistory(): void {
-    if (this.isApplyingHistory || this.pendingGestureHistorySnapshot) {
-      return;
-    }
-
-    this.pendingGestureHistorySnapshot = this.createHistorySnapshot();
-  }
-
-  private commitGestureHistory(): void {
-    if (!this.pendingGestureHistorySnapshot) {
-      return;
-    }
-
-    const snapshot = this.pendingGestureHistorySnapshot;
-    this.pendingGestureHistorySnapshot = null;
-    this.pushUndoSnapshotIfChanged(snapshot);
-  }
-
-  private beginTextEditHistory(): void {
-    if (this.isApplyingHistory || this.pendingTextEditHistorySnapshot) {
-      return;
-    }
-
-    this.pendingTextEditHistorySnapshot = this.createHistorySnapshot();
-  }
-
-  private commitTextEditHistory(): void {
-    if (!this.pendingTextEditHistorySnapshot) {
-      return;
-    }
-
-    const snapshot = this.pendingTextEditHistorySnapshot;
-    this.pendingTextEditHistorySnapshot = null;
-    this.pushUndoSnapshotIfChanged(snapshot);
-  }
-
-  private undo(): void {
-    this.commitGestureHistory();
-    this.commitTextEditHistory();
-
-    const snapshot = this.undoStack.pop();
-    if (!snapshot) {
-      return;
-    }
-
-    this.redoStack.push(this.createHistorySnapshot());
-    this.applyHistorySnapshot(snapshot);
-  }
-
-  private redo(): void {
-    this.commitGestureHistory();
-    this.commitTextEditHistory();
-
-    const snapshot = this.redoStack.pop();
-    if (!snapshot) {
-      return;
-    }
-
-    this.undoStack.push(this.createHistorySnapshot());
-    if (this.undoStack.length > this.maxHistorySteps) {
-      this.undoStack = this.undoStack.slice(-this.maxHistorySteps);
-    }
-
-    this.applyHistorySnapshot(snapshot);
+    this.history.beginGestureHistory(() => this.createHistorySnapshot());
   }
 
   private createHistorySnapshot(): HistorySnapshot {
@@ -2465,71 +1409,214 @@ export class ProjectPage implements OnDestroy {
   }
 
   private applyHistorySnapshot(snapshot: HistorySnapshot): void {
-    this.isApplyingHistory = true;
     this.pages.set(structuredClone(snapshot.pages));
     this.currentPageId.set(snapshot.currentPageId);
     this.selectedElementId.set(snapshot.selectedElementId);
     this.currentTool.set('select');
     this.editingTextElementId.set(null);
-    this.isApplyingHistory = false;
   }
 
-  private pushUndoSnapshotIfChanged(snapshot: HistorySnapshot): void {
-    if (
-      this.isApplyingHistory ||
-      this.areHistorySnapshotsEqual(snapshot, this.createHistorySnapshot())
-    ) {
+  // ── Private: Clipboard ────────────────────────────────────
+
+  private copySelectedElement(): void {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) {
+      return;
+    }
+    this.clipboard.copySubtree(selectedId, this.elements(), this.currentPageId());
+    this.apiError.set(null);
+  }
+
+  private pasteClipboard(): void {
+    if (!this.clipboard.hasClipboard || !this.currentPage()) {
       return;
     }
 
-    this.undoStack.push(snapshot);
-    if (this.undoStack.length > this.maxHistorySteps) {
-      this.undoStack = this.undoStack.slice(-this.maxHistorySteps);
+    const selectedFrame = this.el.getSelectedFrame(this.selectedElement());
+    const { parentId: targetParentId, error } = this.clipboard.resolvePasteParentId(
+      this.elements(),
+      selectedFrame,
+    );
+
+    if (error) {
+      this.apiError.set(error);
+      return;
     }
 
-    this.redoStack = [];
-  }
-
-  private areHistorySnapshotsEqual(left: HistorySnapshot, right: HistorySnapshot): boolean {
-    return JSON.stringify(left) === JSON.stringify(right);
-  }
-
-  private resetHistory(): void {
-    this.undoStack = [];
-    this.redoStack = [];
-    this.pendingGestureHistorySnapshot = null;
-    this.pendingTextEditHistorySnapshot = null;
-  }
-
-  private isTypingContext(event: KeyboardEvent): boolean {
-    if (this.isTypingTarget(event.target)) {
-      return true;
+    const pastedElements = this.clipboard.paste(this.elements(), targetParentId);
+    if (!pastedElements || pastedElements.length === 0) {
+      return;
     }
 
-    return this.isTypingTarget(document.activeElement);
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) => [...elements, ...pastedElements]);
+      this.selectedElementId.set(pastedElements[0]?.id ?? null);
+      this.editingTextElementId.set(null);
+      this.currentTool.set('select');
+    });
+
+    this.apiError.set(null);
   }
 
-  private clamp(value: number, min: number, max: number): number {
-    if (max < min) {
-      return this.roundToTwoDecimals(min);
+  private deleteSelectedElement(): void {
+    const selectedId = this.selectedElementId();
+    if (!selectedId) {
+      return;
     }
-
-    return clamp(value, min, max);
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) =>
+        this.el.removeElementWithChildren(elements, selectedId),
+      );
+      this.selectedElementId.set(null);
+    });
   }
 
-  private roundToTwoDecimals(value: number): number {
-    return roundToTwoDecimals(value);
+  // ── Private: Context Menu Actions ─────────────────────────
+
+  private bringToFront(elementId: string): void {
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) => {
+        const index = elements.findIndex((el) => el.id === elementId);
+        if (index === -1) return elements;
+        const next = [...elements];
+        const [moved] = next.splice(index, 1);
+        next.push(moved);
+        return next;
+      });
+    });
   }
 
-  private normalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
-    normalizeElementInPlace(element, elements);
+  private sendToBack(elementId: string): void {
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) => {
+        const el = elements.find((e) => e.id === elementId);
+        if (!el) return elements;
+
+        const withoutEl = elements.filter((e) => e.id !== elementId);
+        const parentId = el.parentId ?? null;
+
+        if (parentId !== null || el.type === 'frame') {
+          const firstSiblingIdx = withoutEl.findIndex(
+            (e) => (e.parentId ?? null) === parentId,
+          );
+          const insertAt = firstSiblingIdx === -1 ? 0 : firstSiblingIdx;
+          const result = [...withoutEl];
+          result.splice(insertAt, 0, el);
+          return result;
+        }
+
+        let lastFrameIdx = -1;
+        for (let i = 0; i < withoutEl.length; i++) {
+          if (withoutEl[i].type === 'frame' && !withoutEl[i].parentId) {
+            lastFrameIdx = i;
+          }
+        }
+
+        const insertAt = lastFrameIdx + 1;
+        const result = [...withoutEl];
+        result.splice(insertAt, 0, el);
+        return result;
+      });
+    });
   }
 
-  private getStrokeWidth(element: CanvasElement): number {
-    return getStrokeWidth(element);
+  private moveToPage(elementId: string, targetPageId: string): void {
+    const subtreeIds = new Set(this.clipboard.collectSubtreeIds(this.elements(), elementId));
+    const elementsToMove = this.elements().filter((el) => subtreeIds.has(el.id));
+    if (elementsToMove.length === 0) return;
+
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) =>
+        elements.filter((el) => !subtreeIds.has(el.id)),
+      );
+      this.pages.update((pages) =>
+        pages.map((page) =>
+          page.id === targetPageId
+            ? { ...page, elements: [...page.elements, ...elementsToMove] }
+            : page,
+        ),
+      );
+      this.selectedElementId.set(null);
+    });
   }
 
-  private removeWithChildren(elements: CanvasElement[], rootId: string): CanvasElement[] {
-    return removeWithChildren(elements, rootId);
+  private flipHorizontal(elementId: string): void {
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) =>
+        elements.map((el) => {
+          if (el.id !== elementId) return el;
+          const currentScale = (el as CanvasElement & { scaleX?: number }).scaleX ?? 1;
+          return { ...el, scaleX: currentScale === -1 ? 1 : -1 } as CanvasElement;
+        }),
+      );
+    });
+  }
+
+  private flipVertical(elementId: string): void {
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) =>
+        elements.map((el) => {
+          if (el.id !== elementId) return el;
+          const currentScale = (el as CanvasElement & { scaleY?: number }).scaleY ?? 1;
+          return { ...el, scaleY: currentScale === -1 ? 1 : -1 } as CanvasElement;
+        }),
+      );
+    });
+  }
+
+  // ── Private: Callback Builders ────────────────────────────
+
+  private buildKeyboardCallbacks(): KeyboardActionCallbacks {
+    return {
+      onCopy: () => this.copySelectedElement(),
+      onPaste: () => this.pasteClipboard(),
+      onUndo: () =>
+        this.history.undo(
+          () => this.createHistorySnapshot(),
+          (snapshot) => this.applyHistorySnapshot(snapshot),
+        ),
+      onRedo: () =>
+        this.history.redo(
+          () => this.createHistorySnapshot(),
+          (snapshot) => this.applyHistorySnapshot(snapshot),
+        ),
+      onDelete: () => this.deleteSelectedElement(),
+      onSelectTool: (tool) => this.selectTool(tool),
+      onSpaceDown: () => this.viewport.isSpacePressed.set(true),
+      onSpaceUp: () => this.viewport.isSpacePressed.set(false),
+      getEditingTextElementId: () => this.editingTextElementId(),
+      getSelectedElementId: () => this.selectedElementId(),
+    };
+  }
+
+  private buildContextMenuCallbacks(): ContextMenuActionCallbacks {
+    return {
+      getSelectedElementId: () => this.selectedElementId(),
+      getSelectedElement: () => this.selectedElement(),
+      getPages: () => this.pages(),
+      getCurrentPageId: () => this.currentPageId(),
+      getElements: () => this.elements(),
+      onCopy: () => this.copySelectedElement(),
+      onPaste: () => this.pasteClipboard(),
+      onDelete: (id) => {
+        this.runWithHistory(() => {
+          this.updateCurrentPageElements((elements) =>
+            this.el.removeElementWithChildren(elements, id),
+          );
+          this.selectedElementId.set(null);
+        });
+      },
+      onBringToFront: (id) => this.bringToFront(id),
+      onSendToBack: (id) => this.sendToBack(id),
+      onMoveToPage: (id, pageId) => this.moveToPage(id, pageId),
+      onFlipHorizontal: (id) => this.flipHorizontal(id),
+      onFlipVertical: (id) => this.flipVertical(id),
+      onRename: (id) => {
+        window.dispatchEvent(
+          new CustomEvent('canvas:rename-request', { detail: { id } }),
+        );
+      },
+      onToggleVisibility: (id) => this.onLayerVisibilityToggled(id),
+    };
   }
 }
