@@ -4,7 +4,6 @@ import {
   CanvasElement,
   CanvasElementType,
   CanvasFontStyle,
-  CanvasStrokePosition,
   CanvasTextAlign,
   CanvasTextVerticalAlign,
 } from '../../../../core/models/canvas.models';
@@ -68,7 +67,7 @@ export class PropertiesPanelComponent {
 
   activeTab: PropertiesTab = 'design';
 
-  readonly strokePositionOptions: CanvasStrokePosition[] = ['inside', 'outside'];
+  readonly borderStyleOptions = ['Solid', 'Dashed', 'Dotted', 'Double'];
   readonly fontFamilyOptions = [
     'Inter',
     'Poppins',
@@ -185,9 +184,9 @@ export class PropertiesPanelComponent {
     this.emitPatch({ stroke });
   }
 
-  onStrokePositionChange(event: Event): void {
-    const strokePosition = (event.target as HTMLSelectElement).value as CanvasStrokePosition;
-    this.emitPatch({ strokePosition });
+  onBorderStyleChange(event: Event): void {
+    const strokeStyle = (event.target as HTMLSelectElement).value;
+    this.emitPatch({ strokeStyle });
   }
 
   onTypographySelectChange(field: EditableTypographyField, event: Event): void {
@@ -201,8 +200,8 @@ export class PropertiesPanelComponent {
     this.emitPatch({ [field]: value } as Partial<CanvasElement>);
   }
 
-  strokePositionValue(element: CanvasElement): CanvasStrokePosition {
-    return element.strokePosition ?? 'inside';
+  borderStyleValue(element: CanvasElement): string {
+    return element.strokeStyle ?? 'Solid';
   }
 
   fillInputValue(element: CanvasElement): string {

@@ -17,9 +17,9 @@ public abstract class FrameworkMapperBase : IComponentMapper
 
   public string Emit(IRNode node, EmitContext ctx)
   {
-    var cssProps = StyleTransformer.MergeToProperties(node.Layout, node.Style);
+    var cssProps = StyleTransformer.MergeToProperties(node.Layout, node.Style, node.Position);
     ctx.Styles.AddBase(node.Id, cssProps);
-    ctx.Styles.AddResponsive(node.Id, node.Responsive);
+    ctx.Styles.AddVariants(node.Id, node.Variants);
 
     var sb = new StringBuilder();
     sb.Append(OpenNodeComment(node, ctx));
@@ -44,18 +44,42 @@ public abstract class FrameworkMapperBase : IComponentMapper
     return sb.ToString();
   }
 
-  protected static string GetProp(IRNode node, string key, string defaultValue = "") =>
-      node.Props.TryGetValue(key, out var val)
-          ? val.ValueKind == JsonValueKind.String ? val.GetString() ?? defaultValue : val.ToString()
-          : defaultValue;
+  protected static string GetProp(IRNode node, string key, string defaultValue = "")
+  {
+    if (!node.Props.TryGetValue(key, out var val)) return defaultValue;
+    return val switch
+    {
+      null => defaultValue,
+      JsonElement je => je.ValueKind == JsonValueKind.String
+        ? je.GetString() ?? defaultValue
+        : je.ToString(),
+      _ => val.ToString() ?? defaultValue
+    };
+  }
 
-  protected static bool GetBoolProp(IRNode node, string key, bool defaultValue = false) =>
-      node.Props.TryGetValue(key, out var val)
-          ? val.ValueKind == JsonValueKind.True
-          : defaultValue;
+  protected static bool GetBoolProp(IRNode node, string key, bool defaultValue = false)
+  {
+    if (!node.Props.TryGetValue(key, out var val)) return defaultValue;
+    return val switch
+    {
+      null => defaultValue,
+      JsonElement je => je.ValueKind == JsonValueKind.True,
+      bool b => b,
+      _ => bool.TryParse(val?.ToString(), out var parsed) ? parsed : defaultValue
+    };
+  }
 
-  protected static int GetIntProp(IRNode node, string key, int defaultValue = 0) =>
-      node.Props.TryGetValue(key, out var val) && val.TryGetInt32(out var i) ? i : defaultValue;
+  protected static int GetIntProp(IRNode node, string key, int defaultValue = 0)
+  {
+    if (!node.Props.TryGetValue(key, out var val)) return defaultValue;
+    return val switch
+    {
+      null => defaultValue,
+      JsonElement je => je.TryGetInt32(out var i) ? i : defaultValue,
+      int i => i,
+      _ => int.TryParse(val?.ToString(), out var parsed) ? parsed : defaultValue
+    };
+  }
 
   protected static string SelfClosing(string tag, string attrs, string indent) =>
       $"{indent}<{tag}{attrs} />\n";

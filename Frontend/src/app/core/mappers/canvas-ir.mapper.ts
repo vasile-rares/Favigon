@@ -2,23 +2,32 @@ import {
   CanvasElement,
   CanvasPageModel,
   CanvasProjectDocument,
-  CanvasStrokePosition,
 } from '../models/canvas.models';
-import { IRNode, IRStyle } from '../models/ir.models';
+import {
+  BorderStyle,
+  IRBorder,
+  IRLayout,
+  IRLength,
+  IRMeta,
+  IRNode,
+  IRPosition,
+  IRStyle,
+  LayoutMode,
+  PositionMode,
+  px,
+} from '../models/ir.models';
 
 const ROOT_ROLE = 'canvas-root';
 const ROOT_TYPE = 'Container';
 const CANVAS_DOCUMENT_PROP = 'prismaticCanvasDocument';
 const MANAGED_PROP_KEYS = [
-  'x',
-  'y',
   'content',
   'src',
-  'strokePosition',
-  'strokeWidth',
   'name',
-  'visible',
   'textVerticalAlign',
+  'fontStyle',
+  'primitive',
+  'sourceType',
 ] as const;
 
 const DEFAULT_POSITION = 24;
@@ -27,7 +36,6 @@ const DEFAULT_FRAME_FILL = '#3f3f46';
 const DEFAULT_IMAGE_RADIUS = 6;
 const DEFAULT_OPACITY = 1;
 const DEFAULT_STROKE_WIDTH = 1;
-const DEFAULT_STROKE_POSITION: CanvasStrokePosition = 'inside';
 const CIRCLE_RADIUS = 9999;
 
 const DEFAULT_ELEMENT_SIZE = {
@@ -192,7 +200,6 @@ function createRootNode(
   pageName?: string,
 ): IRNode {
   return {
-    version: '1.0',
     id: rootId,
     type: ROOT_TYPE,
     props: {
@@ -201,14 +208,15 @@ function createRootNode(
       ...(pageName ? { pageName } : {}),
     },
     layout: {
-      mode: 'stack',
-      direction: 'column',
+      mode: 'Flex' satisfies LayoutMode,
+      direction: 'Column',
     },
     style: {
-      width: '100%',
-      height: '100%',
+      width: { value: 100, unit: '%' },
+      height: { value: 100, unit: '%' },
     },
-    responsive: {},
+    variants: {},
+    meta: { locked: false, hidden: false, selected: false },
     children,
   };
 }
@@ -217,20 +225,44 @@ function mapCanvasElementToIR(element: CanvasElement): IRNode {
   const primitiveType = mapElementType(element.type);
 
   return {
-    version: '1.0',
     id: element.id,
     type: primitiveType,
     props: buildNodeProps(element, primitiveType),
+    layout: buildNodeLayout(),
     style: buildNodeStyle(element),
-    responsive: {},
+    position: buildNodePosition(element),
+    meta: buildNodeMeta(element),
+    variants: {},
     children: [],
+  };
+}
+
+function buildNodeLayout(): IRLayout {
+  return {
+    mode: 'Flex' satisfies LayoutMode,
+  };
+}
+
+function buildNodePosition(element: CanvasElement): IRPosition {
+  return {
+    mode: 'Absolute' satisfies PositionMode,
+    x: px(element.x),
+    y: px(element.y),
+  };
+}
+
+function buildNodeMeta(element: CanvasElement): IRMeta {
+  return {
+    locked: false,
+    hidden: element.visible === false,
+    selected: false,
   };
 }
 
 function buildNodeStyle(element: CanvasElement): IRStyle {
   const style: IRStyle = {
-    width: `${element.width}px`,
-    height: `${element.height}px`,
+    width: px(element.width),
+    height: px(element.height),
   };
 
   if (element.fill) {
@@ -244,7 +276,11 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
         : DEFAULT_STROKE_WIDTH;
 
     if (strokeWidth > 0) {
-      style.border = `${strokeWidth}px solid ${element.stroke}`;
+      style.border = {
+        width: px(strokeWidth),
+        color: element.stroke,
+        style: ((element.strokeStyle as BorderStyle | undefined) ?? 'Solid'),
+      } satisfies IRBorder;
     }
   }
 
@@ -253,16 +289,16 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
   }
 
   if (element.type === 'circle') {
-    style.borderRadius = CIRCLE_RADIUS;
+    style.borderRadius = px(CIRCLE_RADIUS);
   } else if (typeof element.cornerRadius === 'number') {
-    style.borderRadius = element.cornerRadius;
-  }
-
-  if (element.type === 'text' && element.fontSize) {
-    style.fontSize = element.fontSize;
+    style.borderRadius = px(element.cornerRadius);
   }
 
   if (element.type === 'text') {
+    if (element.fontSize) {
+      style.fontSize = px(element.fontSize);
+    }
+
     if (element.fontFamily) {
       style.fontFamily = element.fontFamily;
     }
@@ -271,20 +307,16 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
       style.fontWeight = element.fontWeight;
     }
 
-    if (element.fontStyle) {
-      style.fontStyle = element.fontStyle;
-    }
-
     if (element.textAlign) {
       style.textAlign = element.textAlign;
     }
 
     if (typeof element.lineHeight === 'number') {
-      style.lineHeight = element.lineHeight;
+      style.lineHeight = px(element.lineHeight);
     }
 
     if (typeof element.letterSpacing === 'number') {
-      style.letterSpacing = element.letterSpacing;
+      style.letterSpacing = px(element.letterSpacing);
     }
   }
 
@@ -294,15 +326,15 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
 function buildNodeProps(element: CanvasElement, primitiveType: string): Record<string, unknown> {
   const props: Record<string, unknown> = {
     ...(element.irMeta?.props ?? {}),
-    x: element.x,
-    y: element.y,
-    visible: element.visible !== false,
     primitive: true,
   };
 
   if (element.type === 'text') {
     props['content'] = element.text ?? '';
     props['textVerticalAlign'] = element.textVerticalAlign ?? 'middle';
+    if (element.fontStyle) {
+      props['fontStyle'] = element.fontStyle;
+    }
   }
 
   if (element.type === 'image') {
@@ -315,12 +347,6 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
 
   if (typeof element.name === 'string') {
     props['name'] = element.name;
-  }
-
-  if (element.type !== 'text') {
-    props['strokeWidth'] =
-      typeof element.strokeWidth === 'number' ? element.strokeWidth : DEFAULT_STROKE_WIDTH;
-    props['strokePosition'] = element.strokePosition ?? DEFAULT_STROKE_POSITION;
   }
 
   return props;
@@ -352,42 +378,40 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     id: node.id,
     type: mappedType,
     name: readOptionalStringProp(node.props, 'name'),
-    x: readNumericProp(node.props, 'x', DEFAULT_POSITION),
-    y: readNumericProp(node.props, 'y', DEFAULT_POSITION),
-    width: readSize(node.style, 'width', defaults.width),
-    height: readSize(node.style, 'height', defaults.height),
-    visible: readBooleanProp(node.props, 'visible', true),
+    x: readLength(node.position?.x, DEFAULT_POSITION),
+    y: readLength(node.position?.y, DEFAULT_POSITION),
+    width: readLength(node.style?.width, defaults.width),
+    height: readLength(node.style?.height, defaults.height),
+    visible: !(node.meta?.hidden ?? false),
     fill:
       mappedType !== 'text'
         ? (node.style?.background ?? (mappedType === 'frame' ? DEFAULT_FRAME_FILL : DEFAULT_FILL))
         : undefined,
-    stroke: readBorderColor(node.style?.border),
+    stroke: node.style?.border?.color,
     strokeWidth:
       mappedType !== 'text'
-        ? readStrokeWidth(node.style?.border, node.props, DEFAULT_STROKE_WIDTH)
+        ? readLength(node.style?.border?.width, DEFAULT_STROKE_WIDTH)
         : undefined,
-    strokePosition:
-      mappedType !== 'text' ? readStrokePosition(node.props, DEFAULT_STROKE_POSITION) : undefined,
+    strokeStyle:
+      mappedType !== 'text' ? (node.style?.border?.style ?? 'Solid') : undefined,
     opacity: readNumber(node.style?.opacity, DEFAULT_OPACITY),
     cornerRadius:
       mappedType !== 'circle' && mappedType !== 'text'
-        ? readNumber(node.style?.borderRadius, mappedType === 'image' ? DEFAULT_IMAGE_RADIUS : 0)
+        ? readLength(node.style?.borderRadius, mappedType === 'image' ? DEFAULT_IMAGE_RADIUS : 0)
         : undefined,
     text: mappedType === 'text' ? readStringProp(node.props, 'content', 'New text') : undefined,
-    fontSize: mappedType === 'text' ? readNumber(node.style?.fontSize, 16) : undefined,
+    fontSize: mappedType === 'text' ? readLength(node.style?.fontSize, 16) : undefined,
     fontFamily:
       mappedType === 'text'
         ? (readOptionalStringStyle(node.style, 'fontFamily') ?? 'Inter')
         : undefined,
     fontWeight: mappedType === 'text' ? readNumber(node.style?.fontWeight, 400) : undefined,
-    fontStyle: mappedType === 'text' ? readFontStyle(node.style?.fontStyle, 'normal') : undefined,
+    fontStyle: mappedType === 'text' ? readFontStyleFromProps(node.props, 'normal') : undefined,
     textAlign: mappedType === 'text' ? readTextAlign(node.style?.textAlign, 'center') : undefined,
     textVerticalAlign:
-      mappedType === 'text'
-        ? readTextVerticalAlign(node.props, 'textVerticalAlign', 'middle')
-        : undefined,
-    letterSpacing: mappedType === 'text' ? readNumber(node.style?.letterSpacing, 0) : undefined,
-    lineHeight: mappedType === 'text' ? readNumber(node.style?.lineHeight, 1.2) : undefined,
+      mappedType === 'text' ? readTextVerticalAlignFromProps(node.props, 'middle') : undefined,
+    letterSpacing: mappedType === 'text' ? readLength(node.style?.letterSpacing, 0) : undefined,
+    lineHeight: mappedType === 'text' ? readLength(node.style?.lineHeight, 1.2) : undefined,
     imageUrl: mappedType === 'image' ? readStringProp(node.props, 'src', '') : undefined,
     irMeta: {
       type: node.type,
@@ -498,13 +522,11 @@ function createDefaultPageModel(): CanvasPageModel {
   };
 }
 
-function readBooleanProp(
-  props: Record<string, unknown> | undefined,
-  key: string,
-  fallback: boolean,
-): boolean {
-  const value = props?.[key];
-  return typeof value === 'boolean' ? value : fallback;
+function readLength(len: IRLength | undefined, fallback: number): number {
+  if (!len) {
+    return fallback;
+  }
+  return Number.isFinite(len.value) ? len.value : fallback;
 }
 
 function readOptionalStringStyle(
@@ -515,7 +537,11 @@ function readOptionalStringStyle(
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
 }
 
-function readFontStyle(value: unknown, fallback: 'normal' | 'italic'): 'normal' | 'italic' {
+function readFontStyleFromProps(
+  props: Record<string, unknown> | undefined,
+  fallback: 'normal' | 'italic',
+): 'normal' | 'italic' {
+  const value = props?.['fontStyle'];
   return value === 'italic' ? 'italic' : fallback;
 }
 
@@ -526,32 +552,12 @@ function readTextAlign(
   return value === 'left' || value === 'center' || value === 'right' ? value : fallback;
 }
 
-function readTextVerticalAlign(
+function readTextVerticalAlignFromProps(
   props: Record<string, unknown> | undefined,
-  key: string,
   fallback: 'top' | 'middle' | 'bottom',
 ): 'top' | 'middle' | 'bottom' {
-  const value = props?.[key];
+  const value = props?.['textVerticalAlign'];
   return value === 'top' || value === 'middle' || value === 'bottom' ? value : fallback;
-}
-
-function readSize(style: IRStyle | undefined, key: 'width' | 'height', fallback: number): number {
-  const value = style?.[key];
-  if (!value) {
-    return fallback;
-  }
-
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function readNumericProp(
-  props: Record<string, unknown> | undefined,
-  key: string,
-  fallback: number,
-): number {
-  const value = props?.[key];
-  return readNumber(value, fallback);
 }
 
 function readStringProp(
@@ -584,62 +590,4 @@ function readNumber(value: unknown, fallback: number): number {
   }
 
   return fallback;
-}
-
-function readBorderColor(border: string | undefined): string | undefined {
-  if (!border) {
-    return undefined;
-  }
-
-  const tokens = border.trim().split(/\s+/);
-  if (tokens.length === 0) {
-    return undefined;
-  }
-
-  const lastToken = tokens[tokens.length - 1];
-  if (isColorToken(lastToken)) {
-    return lastToken;
-  }
-
-  if (isColorToken(border.trim())) {
-    return border.trim();
-  }
-
-  return undefined;
-}
-
-function readStrokeWidth(
-  border: string | undefined,
-  props: Record<string, unknown> | undefined,
-  fallback: number,
-): number {
-  const propStrokeWidth = readNumber(props?.['strokeWidth'], fallback);
-  if (!border) {
-    return propStrokeWidth;
-  }
-
-  const match = border.trim().match(/^(\d+(\.\d+)?)px/i);
-  if (!match) {
-    return propStrokeWidth;
-  }
-
-  const parsed = Number.parseFloat(match[1]);
-  return Number.isFinite(parsed) ? parsed : propStrokeWidth;
-}
-
-function readStrokePosition(
-  props: Record<string, unknown> | undefined,
-  fallback: CanvasStrokePosition,
-): CanvasStrokePosition {
-  const value = props?.['strokePosition'];
-  return value === 'outside' ? 'outside' : fallback;
-}
-
-function isColorToken(value: string): boolean {
-  return (
-    value.startsWith('#') ||
-    value.startsWith('rgb') ||
-    value.startsWith('hsl') ||
-    value.startsWith('var(')
-  );
 }

@@ -155,10 +155,10 @@
         </label>
 
         <label class="property-field property-field--inline">
-          <span class="property-label">Position</span>
-          <select [value]="strokePositionValue(element)" (change)="onStrokePositionChange($event)">
-            <option *ngFor="let position of strokePositionOptions" [value]="position">
-              {{ position === 'inside' ? 'Inside' : 'Outside' }}
+          <span class="property-label">Style</span>
+          <select [value]="borderStyleValue(element)" (change)="onBorderStyleChange($event)">
+            <option *ngFor="let style of borderStyleOptions" [value]="style">
+              {{ style }}
             </option>
           </select>
         </label>

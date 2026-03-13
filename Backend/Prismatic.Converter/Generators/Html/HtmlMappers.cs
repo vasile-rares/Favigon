@@ -355,8 +355,8 @@ public sealed class HtmlStackMapper : HtmlMapperBase
   protected override string EmitElement(IRNode node, EmitContext ctx)
   {
     node.Layout ??= new IRLayout();
-    node.Layout.Mode = "flex";
-    node.Layout.Direction = "column";
+    node.Layout.Mode = LayoutMode.Flex;
+    node.Layout.Direction = FlexDirection.Column;
 
     return Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
   }
@@ -369,8 +369,8 @@ public sealed class HtmlRowMapper : HtmlMapperBase
   protected override string EmitElement(IRNode node, EmitContext ctx)
   {
     node.Layout ??= new IRLayout();
-    node.Layout.Mode = "flex";
-    node.Layout.Direction = "row";
+    node.Layout.Mode = LayoutMode.Flex;
+    node.Layout.Direction = FlexDirection.Row;
 
     return Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
   }
@@ -383,8 +383,8 @@ public sealed class HtmlColumnMapper : HtmlMapperBase
   protected override string EmitElement(IRNode node, EmitContext ctx)
   {
     node.Layout ??= new IRLayout();
-    node.Layout.Mode = "flex";
-    node.Layout.Direction = "column";
+    node.Layout.Mode = LayoutMode.Flex;
+    node.Layout.Direction = FlexDirection.Column;
 
     return Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
   }
@@ -397,7 +397,7 @@ public sealed class HtmlGridMapper : HtmlMapperBase
   protected override string EmitElement(IRNode node, EmitContext ctx)
   {
     node.Layout ??= new IRLayout();
-    node.Layout.Mode = "grid";
+    node.Layout.Mode = LayoutMode.Grid;
     node.Layout.Columns ??= 2;
 
     return Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);

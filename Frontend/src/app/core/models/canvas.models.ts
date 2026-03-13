@@ -1,7 +1,6 @@
 import { IRStyle } from './ir.models';
 
 export type CanvasElementType = 'frame' | 'rectangle' | 'circle' | 'text' | 'image';
-export type CanvasStrokePosition = 'inside' | 'outside';
 export type CanvasTextAlign = 'left' | 'center' | 'right';
 export type CanvasTextVerticalAlign = 'top' | 'middle' | 'bottom';
 export type CanvasFontStyle = 'normal' | 'italic';
@@ -25,7 +24,7 @@ export interface CanvasElement {
   fill?: string;
   stroke?: string;
   strokeWidth?: number;
-  strokePosition?: CanvasStrokePosition;
+  strokeStyle?: string;
   opacity?: number;
   cornerRadius?: number;
   text?: string;

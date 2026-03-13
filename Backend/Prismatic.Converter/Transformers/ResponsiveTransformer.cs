@@ -16,18 +16,18 @@ public static class ResponsiveTransformer
   };
 
   public static string ToCssMediaQueries(
-      Dictionary<string, IRResponsiveOverride> responsive,
+      Dictionary<string, IRVariant> variants,
       string selector)
   {
-    if (responsive.Count == 0) return string.Empty;
+    if (variants.Count == 0) return string.Empty;
 
     var sb = new StringBuilder();
 
     foreach (var breakpoint in Breakpoints.Keys)
     {
-      if (!responsive.TryGetValue(breakpoint, out var @override)) continue;
+      if (!variants.TryGetValue(breakpoint, out var variant)) continue;
 
-      var props = BuildOverrideProperties(@override);
+      var props = BuildVariantProperties(variant);
       if (props.Count == 0) continue;
 
       sb.Append($"@media (min-width: {Breakpoints[breakpoint]}) {{\n");
@@ -41,16 +41,16 @@ public static class ResponsiveTransformer
     return sb.ToString();
   }
 
-  private static Dictionary<string, string> BuildOverrideProperties(IRResponsiveOverride @override)
+  private static Dictionary<string, string> BuildVariantProperties(IRVariant variant)
   {
     var props = new Dictionary<string, string>(StringComparer.Ordinal);
 
-    if (@override.Layout is not null)
-      foreach (var kv in LayoutTransformer.ToCssProperties(@override.Layout))
+    if (variant.Layout is not null)
+      foreach (var kv in LayoutTransformer.ToCssProperties(variant.Layout))
         props[kv.Key] = kv.Value;
 
-    if (@override.Style is not null)
-      foreach (var kv in StyleTransformer.ToCssProperties(@override.Style))
+    if (variant.Style is not null)
+      foreach (var kv in StyleTransformer.ToCssProperties(variant.Style))
         props[kv.Key] = kv.Value;
 
     return props;

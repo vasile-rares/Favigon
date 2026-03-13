@@ -14,7 +14,6 @@ import {
   CanvasElementType,
   CanvasPageModel,
   CanvasProjectDocument,
-  CanvasStrokePosition,
 } from '../../../core/models/canvas.models';
 import { buildCanvasIR, buildCanvasProjectDocument } from '../../../core/mappers/canvas-ir.mapper';
 import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
@@ -25,7 +24,6 @@ import { IRNode } from '../../../core/models/ir.models';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
 import {
   clamp,
-  getStrokePosition,
   getStrokeWidth,
   isPointInsideElement,
   normalizeElementInPlace,
@@ -1099,11 +1097,11 @@ export class ProjectPage implements OnDestroy {
   }
 
   getElementBorderStyle(element: CanvasElement): string {
-    return this.getElementStrokeStyle(element, 'inside');
+    return this.getElementStrokeStyle(element);
   }
 
-  getElementOutlineStyle(element: CanvasElement): string {
-    return this.getElementStrokeStyle(element, 'outside');
+  getElementOutlineStyle(_element: CanvasElement): string {
+    return 'none';
   }
 
   getElementOutlineOffset(_element: CanvasElement): number {
@@ -1565,7 +1563,7 @@ export class ProjectPage implements OnDestroy {
       visible: true,
       fill: tool === 'frame' ? this.defaultFrameFill : this.defaultElementFill,
       strokeWidth: tool === 'text' ? undefined : 1,
-      strokePosition: tool === 'text' ? undefined : 'inside',
+      strokeStyle: tool === 'text' ? undefined : 'Solid',
       opacity: 1,
       cornerRadius: tool === 'image' ? 6 : 0,
       text: tool === 'text' ? 'New text' : undefined,
@@ -1601,7 +1599,7 @@ export class ProjectPage implements OnDestroy {
       visible: true,
       fill: this.defaultFrameFill,
       strokeWidth: 1,
-      strokePosition: 'inside',
+      strokeStyle: 'Solid',
       opacity: 1,
       cornerRadius: 0,
       parentId: null,
@@ -2331,10 +2329,7 @@ export class ProjectPage implements OnDestroy {
     return pastedElements;
   }
 
-  private getElementStrokeStyle(
-    element: CanvasElement,
-    targetPosition: CanvasStrokePosition,
-  ): string {
+  private getElementStrokeStyle(element: CanvasElement): string {
     if (!element.stroke || element.type === 'text') {
       return 'none';
     }
@@ -2344,12 +2339,8 @@ export class ProjectPage implements OnDestroy {
       return 'none';
     }
 
-    const strokePosition = this.getStrokePosition(element);
-    if (strokePosition !== targetPosition) {
-      return 'none';
-    }
-
-    return `${strokeWidth}px solid ${element.stroke}`;
+    const cssStyle = (element.strokeStyle ?? 'Solid').toLowerCase();
+    return `${strokeWidth}px ${cssStyle} ${element.stroke}`;
   }
 
   private createPage(name: string): CanvasPageModel {
@@ -2536,10 +2527,6 @@ export class ProjectPage implements OnDestroy {
 
   private getStrokeWidth(element: CanvasElement): number {
     return getStrokeWidth(element);
-  }
-
-  private getStrokePosition(element: CanvasElement): CanvasStrokePosition {
-    return getStrokePosition(element);
   }
 
   private removeWithChildren(elements: CanvasElement[], rootId: string): CanvasElement[] {

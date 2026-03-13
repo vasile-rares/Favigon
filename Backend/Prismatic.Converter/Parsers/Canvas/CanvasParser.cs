@@ -18,9 +18,9 @@ public sealed class CanvasParser
       Type = "Container",
       Layout = new IRLayout
       {
-        Mode = "flex",
-        Direction = "column",
-        Gap = 8
+        Mode = LayoutMode.Flex,
+        Direction = FlexDirection.Column,
+        Gap = new IRLength { Value = 8 }
       },
       Children = elements.Select(ToIrNode).ToList()
     };
@@ -44,26 +44,32 @@ public sealed class CanvasParser
   {
     var style = new IRStyle
     {
-      Width = $"{Math.Max(element.Width, 0)}px",
-      Height = $"{Math.Max(element.Height, 0)}px"
+      Width = new IRLength { Value = Math.Max(element.Width, 0) },
+      Height = new IRLength { Value = Math.Max(element.Height, 0) }
     };
 
     if (!string.IsNullOrWhiteSpace(element.Fill))
       style.Background = element.Fill;
 
     if (!string.IsNullOrWhiteSpace(element.Stroke))
-      style.Border = $"1px solid {element.Stroke}";
+      style.Border = new IRBorder
+      {
+        Width = new IRLength { Value = 1 },
+        Color = element.Stroke,
+        Style = BorderStyle.Solid
+      };
 
-    var props = new Dictionary<string, JsonElement>
+    var position = new IRPosition
     {
-      ["x"] = JsonSerializer.SerializeToElement(element.X),
-      ["y"] = JsonSerializer.SerializeToElement(element.Y)
+      Mode = PositionMode.Absolute,
+      X = new IRLength { Value = element.X },
+      Y = new IRLength { Value = element.Y }
     };
 
     if (string.Equals(element.Type, "text", StringComparison.OrdinalIgnoreCase))
     {
       if (element.FontSize is not null)
-        style.FontSize = element.FontSize;
+        style.FontSize = new IRLength { Value = element.FontSize.Value };
 
       if (!string.IsNullOrWhiteSpace(element.Fill))
       {
@@ -71,26 +77,25 @@ public sealed class CanvasParser
         style.Background = null;
       }
 
-      props["content"] = JsonSerializer.SerializeToElement(element.Text ?? string.Empty);
-
       return new IRNode
       {
         Id = string.IsNullOrWhiteSpace(element.Id) ? Guid.NewGuid().ToString("N") : element.Id,
         Type = "Text",
         Style = style,
-        Props = props
+        Position = position,
+        Props = new Dictionary<string, object?> { ["content"] = element.Text ?? string.Empty }
       };
     }
 
     if (string.Equals(element.Type, "circle", StringComparison.OrdinalIgnoreCase))
-      style.BorderRadius = Math.Max(0, Math.Min(element.Width, element.Height)) / 2d;
+      style.BorderRadius = new IRLength { Value = Math.Max(0, Math.Min(element.Width, element.Height)) / 2d };
 
     return new IRNode
     {
       Id = string.IsNullOrWhiteSpace(element.Id) ? Guid.NewGuid().ToString("N") : element.Id,
       Type = "Container",
       Style = style,
-      Props = props
+      Position = position
     };
   }
 

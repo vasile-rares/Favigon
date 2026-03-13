@@ -10,38 +10,23 @@ public static class IrValidator
       "Frame", "Container", "Text", "Image"
   ];
 
-  private static readonly HashSet<string> ValidLayoutModes = ["flex", "grid", "stack"];
-  private static readonly HashSet<string> ValidDirections = ["row", "column"];
-  private static readonly HashSet<string> ValidAlignments =
-      ["start", "center", "end", "stretch", "space-between", "space-around", "baseline"];
-  private static readonly HashSet<string> ValidWrapValues = ["nowrap", "wrap", "wrap-reverse"];
   private static readonly HashSet<string> ValidShadows = ["none", "sm", "md", "lg", "xl"];
   private static readonly HashSet<string> ValidBreakpoints = ["xs", "sm", "md", "lg", "xl", "2xl"];
   private static readonly HashSet<int> ValidFontWeights = [100, 200, 300, 400, 500, 600, 700, 800, 900];
-
-  private static readonly Regex SupportedVersions = new(@"^1\.\d+$", RegexOptions.Compiled);
+  private static readonly HashSet<string> ValidUnits = ["px", "%", "rem", "em", "vw", "vh"];
 
   private static readonly Regex CssColor = new(
       @"^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})" +
       @"|rgb\(.+\)|rgba\(.+\)|hsl\(.+\)|hsla\(.+\)|var\(--[a-zA-Z0-9_-]+\)|[a-zA-Z]+)$",
       RegexOptions.Compiled);
 
-  private static readonly Regex CssSize = new(
-      @"^(\d+(\.\d+)?(px|%|rem|em|vw|vh)|auto|100%)$",
-      RegexOptions.Compiled);
-
-  public static bool Validate(IRNode node)
-  {
-    return GetValidationErrors(node).Count == 0;
-  }
+  public static bool Validate(IRNode node) => GetValidationErrors(node).Count == 0;
 
   public static IReadOnlyList<string> GetValidationErrors(IRNode node)
   {
     var errors = new List<string>();
     var seenIds = new HashSet<string>();
-
     ValidateNode(node, path: "root", seenIds, errors);
-
     return errors;
   }
 
@@ -51,11 +36,6 @@ public static class IrValidator
       HashSet<string> seenIds,
       List<string> errors)
   {
-    if (string.IsNullOrWhiteSpace(node.Version))
-      errors.Add(Error(path, "version", "Version is required."));
-    else if (!SupportedVersions.IsMatch(node.Version))
-      errors.Add(Error(path, "version", $"Unsupported version '{node.Version}'. Expected 1.x."));
-
     if (string.IsNullOrWhiteSpace(node.Id))
       errors.Add(Error(path, "id", "Id is required."));
     else if (!seenIds.Add(node.Id))
@@ -72,18 +52,18 @@ public static class IrValidator
     if (node.Style is not null)
       ValidateStyle(node.Style, $"{path}.style", errors);
 
-    foreach (var (breakpoint, @override) in node.Responsive)
+    foreach (var (key, variant) in node.Variants)
     {
-      var overridePath = $"{path}.responsive.{breakpoint}";
+      var variantPath = $"{path}.variants.{key}";
 
-      if (!ValidBreakpoints.Contains(breakpoint))
-        errors.Add(Error(path, $"responsive.{breakpoint}", $"Unknown breakpoint '{breakpoint}'."));
+      if (!ValidBreakpoints.Contains(key))
+        errors.Add(Error(path, $"variants.{key}", $"Unknown variant key '{key}'."));
 
-      if (@override.Layout is not null)
-        ValidateLayout(@override.Layout, $"{overridePath}.layout", errors);
+      if (variant.Layout is not null)
+        ValidateLayout(variant.Layout, $"{variantPath}.layout", errors);
 
-      if (@override.Style is not null)
-        ValidateStyle(@override.Style, $"{overridePath}.style", errors);
+      if (variant.Style is not null)
+        ValidateStyle(variant.Style, $"{variantPath}.style", errors);
     }
 
     for (var i = 0; i < node.Children.Count; i++)
@@ -92,53 +72,11 @@ public static class IrValidator
 
   private static void ValidateLayout(IRLayout layout, string path, List<string> errors)
   {
-    if (!ValidLayoutModes.Contains(layout.Mode))
-      errors.Add(Error(path, "mode", "Invalid layout mode '" + layout.Mode + "'. Must be: flex | grid | stack."));
-
-    if (layout.Direction is not null && !ValidDirections.Contains(layout.Direction))
-      errors.Add(Error(path, "direction", $"Invalid direction '{layout.Direction}'. Must be: row | column."));
-
-    if (layout.Alignment is not null && !ValidAlignments.Contains(layout.Alignment))
-      errors.Add(Error(path, "alignment", $"Invalid alignment '{layout.Alignment}'."));
-
-    if (layout.Justify is not null && !ValidAlignments.Contains(layout.Justify))
-      errors.Add(Error(path, "justify", $"Invalid justify '{layout.Justify}'."));
-
-    if (layout.Wrap is not null && !ValidWrapValues.Contains(layout.Wrap))
-      errors.Add(Error(path, "wrap", $"Invalid wrap '{layout.Wrap}'."));
-
-    if (layout.Gap is < 0)
-      errors.Add(Error(path, "gap", "Gap must be >= 0."));
-
-    if (layout.Columns is < 1)
-      errors.Add(Error(path, "columns", "Columns must be >= 1."));
-
-    if (layout.Rows is < 1)
-      errors.Add(Error(path, "rows", "Rows must be >= 1."));
-
-    if (layout.Padding is not null)
-      ValidateSpacing(layout.Padding, $"{path}.padding", errors);
-
-    if (layout.Margin is not null)
-      ValidateSpacing(layout.Margin, $"{path}.margin", errors);
-
-    if (layout.Mode == "grid" && layout.Columns is null)
+    if (layout.Gap is not null) ValidateLength(layout.Gap, path, "gap", errors, allowNegative: false);
+    if (layout.Columns is < 1) errors.Add(Error(path, "columns", "Columns must be >= 1."));
+    if (layout.Rows is < 1) errors.Add(Error(path, "rows", "Rows must be >= 1."));
+    if (layout.Mode == LayoutMode.Grid && layout.Columns is null)
       errors.Add(Error(path, "columns", "Grid layout should specify 'columns'."));
-  }
-
-  private static void ValidateSpacing(IRSpacing spacing, string path, List<string> errors)
-  {
-    foreach (var (side, value) in new[]
-    {
-            ("top", spacing.Top),
-            ("right", spacing.Right),
-            ("bottom", spacing.Bottom),
-            ("left", spacing.Left)
-        })
-    {
-      if (value is < 0)
-        errors.Add(Error(path, side, $"Spacing.{side} must be >= 0."));
-    }
   }
 
   private static void ValidateStyle(IRStyle style, string path, List<string> errors)
@@ -146,11 +84,9 @@ public static class IrValidator
     ValidateColor(style.Color, path, "color", errors);
     ValidateColor(style.Background, path, "background", errors);
 
-    if (style.BorderRadius is < 0)
-      errors.Add(Error(path, "borderRadius", "borderRadius must be >= 0."));
-
-    if (style.FontSize is < 0)
-      errors.Add(Error(path, "fontSize", "fontSize must be >= 0."));
+    ValidateOptionalLength(style.BorderRadius, path, "borderRadius", errors, allowNegative: false);
+    if (style.Border is not null) ValidateBorder(style.Border, $"{path}.border", errors);
+    ValidateOptionalLength(style.FontSize, path, "fontSize", errors, allowNegative: false);
 
     if (style.FontWeight is not null && !ValidFontWeights.Contains(style.FontWeight.Value))
       errors.Add(Error(path, "fontWeight", $"Invalid fontWeight '{style.FontWeight}'. Must be 100–900 in steps of 100."));
@@ -161,26 +97,53 @@ public static class IrValidator
     if (style.Opacity is not null && (style.Opacity < 0 || style.Opacity > 1))
       errors.Add(Error(path, "opacity", "Opacity must be between 0 and 1."));
 
-    ValidateCssSize(style.Width, path, "width", errors);
-    ValidateCssSize(style.Height, path, "height", errors);
-    ValidateCssSize(style.MinWidth, path, "minWidth", errors);
-    ValidateCssSize(style.MaxWidth, path, "maxWidth", errors);
-    ValidateCssSize(style.MinHeight, path, "minHeight", errors);
-    ValidateCssSize(style.MaxHeight, path, "maxHeight", errors);
+    ValidateOptionalLength(style.Width, path, "width", errors);
+    ValidateOptionalLength(style.Height, path, "height", errors);
+    ValidateOptionalLength(style.MinWidth, path, "minWidth", errors);
+    ValidateOptionalLength(style.MaxWidth, path, "maxWidth", errors);
+    ValidateOptionalLength(style.MinHeight, path, "minHeight", errors);
+    ValidateOptionalLength(style.MaxHeight, path, "maxHeight", errors);
+    ValidateOptionalLength(style.LineHeight, path, "lineHeight", errors);
+    ValidateOptionalLength(style.LetterSpacing, path, "letterSpacing", errors);
+
+    if (style.Padding is not null) ValidateSpacing(style.Padding, $"{path}.padding", errors);
+    if (style.Margin is not null) ValidateSpacing(style.Margin, $"{path}.margin", errors);
   }
 
-  private static void ValidateColor(
-      string? value, string path, string field, List<string> errors)
+  private static void ValidateBorder(IRBorder border, string path, List<string> errors)
+  {
+    ValidateOptionalLength(border.Width, path, "width", errors, allowNegative: false);
+    ValidateColor(border.Color, path, "color", errors);
+  }
+
+  private static void ValidateSpacing(IRSpacing spacing, string path, List<string> errors)
+  {
+    ValidateOptionalLength(spacing.Top, path, "top", errors);
+    ValidateOptionalLength(spacing.Right, path, "right", errors);
+    ValidateOptionalLength(spacing.Bottom, path, "bottom", errors);
+    ValidateOptionalLength(spacing.Left, path, "left", errors);
+  }
+
+  private static void ValidateOptionalLength(
+    IRLength? len, string path, string field, List<string> errors, bool allowNegative = true)
+  {
+    if (len is not null) ValidateLength(len, path, field, errors, allowNegative);
+  }
+
+  private static void ValidateLength(
+    IRLength len, string path, string field, List<string> errors, bool allowNegative = true)
+  {
+    if (!allowNegative && len.Value < 0)
+      errors.Add(Error(path, field, $"{field} value must be >= 0."));
+
+    if (!ValidUnits.Contains(len.Unit))
+      errors.Add(Error(path, field, $"Invalid unit '{len.Unit}' for {field}. Must be: px | % | rem | em | vw | vh."));
+  }
+
+  private static void ValidateColor(string? value, string path, string field, List<string> errors)
   {
     if (value is not null && !CssColor.IsMatch(value))
       errors.Add(Error(path, field, $"Invalid color value '{value}'."));
-  }
-
-  private static void ValidateCssSize(
-      string? value, string path, string field, List<string> errors)
-  {
-    if (value is not null && !CssSize.IsMatch(value))
-      errors.Add(Error(path, field, $"Invalid size value '{value}'. Expected px | % | rem | em | vw | vh | auto."));
   }
 
   private static string Error(string path, string field, string message) =>

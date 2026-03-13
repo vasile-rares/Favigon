@@ -1,5 +1,6 @@
 using System.Text;
 using Prismatic.Converter.Models;
+using Prismatic.Converter.Transformers;
 
 namespace Prismatic.Converter.Transformers;
 
@@ -14,10 +15,10 @@ public sealed class StyleBuilder
       _baseRules.Add((nodeId, props));
   }
 
-  public void AddResponsive(string nodeId, Dictionary<string, IRResponsiveOverride> responsive)
+  public void AddVariants(string nodeId, Dictionary<string, IRVariant> variants)
   {
-    if (responsive.Count == 0) return;
-    var media = ResponsiveTransformer.ToCssMediaQueries(responsive, $".prismatic-{nodeId}");
+    if (variants.Count == 0) return;
+    var media = ResponsiveTransformer.ToCssMediaQueries(variants, $".prismatic-{nodeId}");
     if (!string.IsNullOrWhiteSpace(media))
       _mediaRules.Add(media);
   }

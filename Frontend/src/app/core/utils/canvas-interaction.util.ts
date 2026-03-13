@@ -1,4 +1,4 @@
-import { CanvasElement, CanvasStrokePosition } from '../models/canvas.models';
+import { CanvasElement } from '../models/canvas.models';
 
 const MIN_SIZE = 24;
 
@@ -85,10 +85,8 @@ export function normalizeElementInPlace(element: CanvasElement, elements: Canvas
       ? (element.strokeWidth as number)
       : 1;
     element.strokeWidth = Math.max(0, roundToTwoDecimals(normalizedStrokeWidth));
-    element.strokePosition = getStrokePosition(element);
   } else {
     element.strokeWidth = undefined;
-    element.strokePosition = undefined;
   }
 
   const parent = element.parentId
@@ -135,10 +133,6 @@ export function getStrokeWidth(element: CanvasElement): number {
   }
 
   return 1;
-}
-
-export function getStrokePosition(element: CanvasElement): CanvasStrokePosition {
-  return element.strokePosition === 'outside' ? 'outside' : 'inside';
 }
 
 export function collectDescendantIds(elements: CanvasElement[], rootId: string): Set<string> {

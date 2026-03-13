@@ -8,54 +8,40 @@ public static class LayoutTransformer
   {
     var css = new Dictionary<string, string>(StringComparer.Ordinal);
 
-    css["display"] = layout.Mode switch
-    {
-      "grid" => "grid",
-      "stack" => "flex",
-      _ => "flex"
-    };
+    css["display"] = layout.Mode == LayoutMode.Grid ? "grid" : "flex";
 
-    if (layout.Mode == "stack")
-      css["flex-direction"] = "column";
-    else if (layout.Mode == "flex" && layout.Direction is not null)
-      css["flex-direction"] = layout.Direction == "column" ? "column" : "row";
+    if (layout.Direction is not null)
+      css["flex-direction"] = layout.Direction == FlexDirection.Column ? "column" : "row";
 
-    if (layout.Alignment is not null) css["align-items"] = MapAlignment(layout.Alignment);
-    if (layout.Justify is not null) css["justify-content"] = MapAlignment(layout.Justify);
-    if (layout.Gap is not null) css["gap"] = $"{layout.Gap}px";
-    if (layout.Wrap is not null) css["flex-wrap"] = layout.Wrap;
+    if (layout.Align is not null) css["align-items"] = MapAlignItems(layout.Align.Value);
+    if (layout.Justify is not null) css["justify-content"] = MapJustifyContent(layout.Justify.Value);
+    if (layout.Gap is not null) css["gap"] = layout.Gap.ToString();
+    if (layout.Wrap is not null) css["flex-wrap"] = layout.Wrap.Value ? "wrap" : "nowrap";
 
-    if (layout.Mode == "grid" && layout.Columns is not null)
+    if (layout.Mode == LayoutMode.Grid && layout.Columns is not null)
       css["grid-template-columns"] = $"repeat({layout.Columns}, minmax(0, 1fr))";
-    if (layout.Mode == "grid" && layout.Rows is not null)
+    if (layout.Mode == LayoutMode.Grid && layout.Rows is not null)
       css["grid-template-rows"] = $"repeat({layout.Rows}, minmax(0, 1fr))";
-
-    if (layout.Padding is not null) ApplySpacing(css, "padding", layout.Padding);
-    if (layout.Margin is not null) ApplySpacing(css, "margin", layout.Margin);
 
     return css;
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  private static void ApplySpacing(Dictionary<string, string> css, string prop, IRSpacing s)
+  private static string MapAlignItems(AlignItems value) => value switch
   {
-    if (s.Top == s.Right && s.Right == s.Bottom && s.Bottom == s.Left && s.Top is not null)
-    { css[prop] = $"{s.Top}px"; return; }
-
-    if (s.Top is not null) css[$"{prop}-top"] = $"{s.Top}px";
-    if (s.Right is not null) css[$"{prop}-right"] = $"{s.Right}px";
-    if (s.Bottom is not null) css[$"{prop}-bottom"] = $"{s.Bottom}px";
-    if (s.Left is not null) css[$"{prop}-left"] = $"{s.Left}px";
-  }
-
-  private static string MapAlignment(string value) => value switch
-  {
-    "start" => "flex-start",
-    "end" => "flex-end",
-    "space-between" => "space-between",
-    "space-around" => "space-around",
-    _ => value
+    AlignItems.Start => "flex-start",
+    AlignItems.End => "flex-end",
+    AlignItems.Center => "center",
+    AlignItems.Stretch => "stretch",
+    _ => "stretch"
   };
 
+  private static string MapJustifyContent(JustifyContent value) => value switch
+  {
+    JustifyContent.Start => "flex-start",
+    JustifyContent.End => "flex-end",
+    JustifyContent.Center => "center",
+    JustifyContent.SpaceBetween => "space-between",
+    JustifyContent.SpaceAround => "space-around",
+    _ => "flex-start"
+  };
 }
