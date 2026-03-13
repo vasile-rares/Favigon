@@ -7,7 +7,7 @@ import { environment } from '../../../environments/environment';
 
 export const authRefreshInterceptor: HttpInterceptorFn = (request, next) => {
   // Skip the refresh endpoint itself to avoid infinite loops
-  if (request.url.includes('/account/refresh') || request.url.includes('/account/login')) {
+  if (request.url.includes('/account/refresh') || request.url.includes('/account/login') || request.url.includes('/account/oauth2')) {
     return next(request);
   }
 

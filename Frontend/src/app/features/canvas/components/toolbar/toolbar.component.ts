@@ -19,8 +19,12 @@ interface ToolbarAction {
 })
 export class ToolbarComponent {
   @Input() activeTool: ToolbarTool = 'select';
+  @Input() zoomLevel: number = 100;
 
   @Output() toolSelected = new EventEmitter<ToolbarTool>();
+  @Output() zoomInRequested = new EventEmitter<void>();
+  @Output() zoomOutRequested = new EventEmitter<void>();
+  @Output() zoomResetRequested = new EventEmitter<void>();
 
   readonly actions: ToolbarAction[] = [
     { tool: 'select', label: 'Select', shortcut: 'V' },

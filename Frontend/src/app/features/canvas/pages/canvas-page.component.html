@@ -18,7 +18,11 @@
 
     <app-toolbar
       [activeTool]="currentTool()"
-      (toolSelected)="selectTool($event)"></app-toolbar>
+      [zoomLevel]="zoomPercentage()"
+      (toolSelected)="selectTool($event)"
+      (zoomInRequested)="zoomIn()"
+      (zoomOutRequested)="zoomOut()"
+      (zoomResetRequested)="resetZoom()"></app-toolbar>
 
     <main
       class="canvas-container"
@@ -30,14 +34,6 @@
       (click)="onCanvasClick($event)"
       (wheel)="onCanvasWheel($event)"
       (contextmenu)="onCanvasContextMenu($event)">
-      <div class="zoom-controls" (click)="$event.stopPropagation()">
-        <button type="button" (click)="zoomOut()" title="Zoom out">-</button>
-        <button type="button" class="zoom-percentage" (click)="resetZoom()" title="Reset zoom">
-          {{ zoomPercentage() }}%
-        </button>
-        <button type="button" (click)="zoomIn()" title="Zoom in">+</button>
-      </div>
-
       <div class="canvas-viewport" [style.transform]="canvasViewportTransform()">
         <div class="canvas-scene" [style.zoom]="canvasSceneZoom()">
           <div

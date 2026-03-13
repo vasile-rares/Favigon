@@ -117,11 +117,13 @@ export class ProfilePage implements OnInit {
     source$.subscribe({
       next: (projects) => {
         this.projects.set(
-          projects.map((p) => ({
-            id: p.projectId,
-            name: p.name,
-            lastEdited: new Date(p.updatedAt),
-          })),
+          projects
+            .map((p) => ({
+              id: p.projectId,
+              name: p.name,
+              lastEdited: new Date(p.updatedAt),
+            }))
+            .sort((a, b) => b.lastEdited.getTime() - a.lastEdited.getTime()),
         );
         this.isLoading.set(false);
       },

@@ -1060,15 +1060,15 @@ export class ProjectPage implements OnDestroy {
   }
 
   zoomIn(): void {
-    this.setZoom(this.zoomLevel() + this.zoomStep);
+    this.setZoom(this.zoomLevel() + this.zoomStep, this.getCanvasScreenCenter());
   }
 
   zoomOut(): void {
-    this.setZoom(this.zoomLevel() - this.zoomStep);
+    this.setZoom(this.zoomLevel() - this.zoomStep, this.getCanvasScreenCenter());
   }
 
   resetZoom(): void {
-    this.zoomLevel.set(1);
+    this.setZoom(1, this.getCanvasScreenCenter());
   }
 
   zoomPercentage(): number {
@@ -1256,8 +1256,8 @@ export class ProjectPage implements OnDestroy {
         ? 6
         : 0;
 
-    const baseInset = this.getScreenInvariantSize(20);
-    const handleSize = this.getResizeHandleSize();
+    const baseInset = 20;
+    const handleSize = 12;
     const maxInsetByHeight = Math.max(0, element.height / 2 - handleSize / 2);
     const maxInsetByWidth = Math.max(0, element.width / 2 - handleSize / 2);
     const maxInset = Math.min(maxInsetByHeight, maxInsetByWidth);
@@ -1980,6 +1980,12 @@ export class ProjectPage implements OnDestroy {
       x: this.roundToTwoDecimals((canvas.clientWidth / 2 - offset.x) / this.zoomLevel()),
       y: this.roundToTwoDecimals((canvas.clientHeight / 2 - offset.y) / this.zoomLevel()),
     };
+  }
+
+  private getCanvasScreenCenter(): Point {
+    const canvas = this.getCanvasElement();
+    if (!canvas) return { x: 400, y: 300 };
+    return { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 };
   }
 
   private setZoom(nextZoom: number, anchor?: Point): void {

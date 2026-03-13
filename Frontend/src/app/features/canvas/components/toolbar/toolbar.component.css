@@ -11,7 +11,7 @@
   padding: 0.3rem;
   border: 1px solid var(--color-border-dark-transparent);
   border-radius: var(--radius-lg);
-  background: var(--color-surface-transparent);
+  background: var(--color-bg-page-transparent);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(7px);
   -webkit-backdrop-filter: blur(7px);
@@ -57,4 +57,32 @@
     width: 30px;
     pointer-events: none;
   }
+}
+
+.toolbar__divider {
+  width: 1px;
+  height: 1.5rem;
+  background-color: var(--color-border-dark-transparent);
+  margin: 0 0.2rem;
+  flex-shrink: 0;
+}
+
+.toolbar__zoom-step {
+  width: 2rem;
+  height: 2rem;
+
+  svg {
+    width: 16px;
+  }
+}
+
+.toolbar__zoom-level {
+  width: auto;
+  min-width: 3.2rem;
+  height: 2rem;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  font-weight: 500;
+  color: var(--color-zinc-300);
 }

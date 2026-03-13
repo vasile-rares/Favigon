@@ -15,6 +15,7 @@ interface LayerEntry {
   parentId: string | null;
   name: string;
   visible: boolean;
+  hasChildren: boolean;
 }
 
 type LayerDropPosition = 'before' | 'after' | 'inside';
@@ -49,6 +50,8 @@ export class ProjectPanelComponent implements OnChanges {
   private draggedLayerId: string | null = null;
   private dragOverLayerId: string | null = null;
   private dragOverPosition: LayerDropPosition = 'before';
+  private collapsedLayers = new Set<string>();
+  editingLayerId: string | null = null;
 
   get layerEntries(): LayerEntry[] {
     return this.cachedLayerEntries;
@@ -85,6 +88,30 @@ export class ProjectPanelComponent implements OnChanges {
   onLayerNameInput(id: string, event: Event): void {
     const name = (event.target as HTMLInputElement).value;
     this.layerNameChanged.emit({ id, name });
+  }
+
+  onLayerNameClick(id: string, event: MouseEvent): void {
+    event.stopPropagation();
+    if (this.editingLayerId !== id) {
+      this.layerSelected.emit(id);
+    }
+  }
+
+  startRename(id: string, event: MouseEvent): void {
+    event.stopPropagation();
+    this.editingLayerId = id;
+    setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>(
+        `[data-layer-name-id="${id}"]`,
+      );
+      input?.select();
+    });
+  }
+
+  stopRename(id: string): void {
+    if (this.editingLayerId === id) {
+      this.editingLayerId = null;
+    }
   }
 
   onLayerVisibilityToggle(id: string, event: MouseEvent): void {
@@ -172,6 +199,20 @@ export class ProjectPanelComponent implements OnChanges {
     this.clearDragState();
   }
 
+  isLayerCollapsed(id: string): boolean {
+    return this.collapsedLayers.has(id);
+  }
+
+  toggleLayerCollapse(id: string, event: MouseEvent): void {
+    event.stopPropagation();
+    if (this.collapsedLayers.has(id)) {
+      this.collapsedLayers.delete(id);
+    } else {
+      this.collapsedLayers.add(id);
+    }
+    this.cachedLayerEntries = this.buildLayerEntries(this.elements);
+  }
+
   isLayerDragging(id: string): boolean {
     return this.draggedLayerId === id;
   }
@@ -253,9 +294,12 @@ export class ProjectPanelComponent implements OnChanges {
           parentId: child.parentId ?? null,
           name: typeof child.name === 'string' ? child.name : fallbackName,
           visible: child.visible !== false,
+          hasChildren: (childrenByParent.get(child.id)?.length ?? 0) > 0,
         });
 
-        walk(child.id, depth + 1);
+        if (!this.collapsedLayers.has(child.id)) {
+          walk(child.id, depth + 1);
+        }
       }
     };
 

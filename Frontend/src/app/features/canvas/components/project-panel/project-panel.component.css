@@ -1,18 +1,31 @@
 :host {
-  width: 300px;
-  min-width: 300px;
-  border-right: 1px solid var(--color-border);
-  background-color: var(--color-zinc-900);
-  z-index: 10;
+  position: absolute;
+  left: 12px;
+  top: 60px;
+  bottom: 12px;
+  width: 280px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
 }
 
 .project-panel {
-  height: 100%;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
   overflow: auto;
+  pointer-events: all;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border-dark-transparent);
+  background: var(--color-bg-page-transparent);
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 
   h3,
   h4 {
@@ -38,7 +51,7 @@
   padding: 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  background-color: var(--color-zinc-800);
+  background-color: var(--color-surface-transparent);
 
   h4 {
     font-size: 0.86rem;
@@ -189,18 +202,30 @@
   }
 }
 
-.project-layer-grip {
+.project-layer-expand {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: var(--color-zinc-600);
-  cursor: grab;
-  margin-right: 0.25rem;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--color-zinc-500);
+  cursor: pointer;
+  padding: 0;
+  border-radius: 3px;
+  margin-right: 0.15rem;
+  transition:
+    transform 0.15s ease,
+    color 0.15s ease;
 
-  svg {
-    width: 9px;
-    display: block;
+  &:hover {
+    color: var(--color-zinc-300);
+  }
+
+  &.is-collapsed svg {
+    transform: rotate(-90deg);
   }
 }
 
@@ -232,6 +257,10 @@
   font-weight: 600;
   line-height: 1.2;
 
+  &[readonly] {
+    cursor: default;
+  }
+
   &:focus-visible {
     outline: none;
   }
@@ -239,12 +268,6 @@
   &::placeholder {
     color: var(--color-zinc-500);
   }
-}
-
-.project-layer-meta {
-  color: var(--color-zinc-400);
-  font-size: 0.5rem;
-  line-height: 1.25;
 }
 
 .project-layer-visibility {
@@ -256,9 +279,4 @@
   &:hover {
     background-color: var(--color-btn-tertiary-hover);
   }
-}
-
-.project-layer-indent {
-  display: inline-block;
-  height: 1px;
 }

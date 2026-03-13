@@ -59,11 +59,11 @@
           "configurations": {
             "production": {
               "buildTarget": "Frontend:build:production",
-              "ssl": true
+              "ssl": false
             },
             "development": {
               "buildTarget": "Frontend:build:development",
-              "ssl": true
+              "ssl": false
             }
           },
           "defaultConfiguration": "development"

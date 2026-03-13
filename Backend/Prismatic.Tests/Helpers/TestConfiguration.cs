@@ -18,7 +18,7 @@ public static class TestConfiguration
       ["JwtSettings:AccessTokenMinutes"] = "60",
       ["JwtSettings:RefreshTokenDays"] = "30",
       ["PasswordReset:TokenMinutes"] = "30",
-      ["Client:BaseUrl"] = "https://localhost:4200",
+      ["Client:BaseUrl"] = "http://localhost:4200",
     };
 
     if (overrides is not null)
