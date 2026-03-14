@@ -1,4 +1,4 @@
-import {
+﻿import {
   CanvasElement,
   CanvasPageModel,
   CanvasProjectDocument,
@@ -19,7 +19,7 @@ import {
 
 const ROOT_ROLE = 'canvas-root';
 const ROOT_TYPE = 'Container';
-const CANVAS_DOCUMENT_PROP = 'prismaticCanvasDocument';
+const CANVAS_DOCUMENT_PROP = 'favigonCanvasDocument';
 const MANAGED_PROP_KEYS = [
   'content',
   'src',

@@ -1,14 +1,14 @@
-services:
+﻿services:
     db:
         image: postgres:16-alpine
         environment:
-            POSTGRES_DB: PrismaticDb
+            POSTGRES_DB: FavigonDb
             POSTGRES_USER: postgres
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
         volumes:
             - postgres_data:/var/lib/postgresql/data
         healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U postgres -d PrismaticDb"]
+            test: ["CMD-SHELL", "pg_isready -U postgres -d FavigonDb"]
             interval: 10s
             timeout: 5s
             retries: 5
@@ -21,10 +21,10 @@ services:
         environment:
             ASPNETCORE_ENVIRONMENT: Production
             ASPNETCORE_URLS: http://+:8080
-            ConnectionStrings__PrismaticDb: "Host=db;Port=5432;Database=PrismaticDb;Username=postgres;Password=${POSTGRES_PASSWORD}"
+            ConnectionStrings__FavigonDb: "Host=db;Port=5432;Database=FavigonDb;Username=postgres;Password=${POSTGRES_PASSWORD}"
             JwtSettings__Key: ${JWT_KEY}
-            JwtSettings__Issuer: PrismaticAPI
-            JwtSettings__Audience: PrismaticClient
+            JwtSettings__Issuer: FavigonAPI
+            JwtSettings__Audience: FavigonClient
             JwtSettings__AccessTokenMinutes: 360
             JwtSettings__RefreshTokenDays: 30
             GithubOAuth__ClientId: ${GH_OAUTH_CLIENT_ID}
@@ -36,7 +36,7 @@ services:
             Cors__AllowedOrigins__0: ${APP_URL}
             PasswordReset__TokenMinutes: 30
             Email__FromEmail: ${EMAIL_FROM}
-            Email__FromName: Prismatic
+            Email__FromName: Favigon
             Email__SmtpHost: ${EMAIL_SMTP_HOST}
             Email__SmtpPort: ${EMAIL_SMTP_PORT:-587}
             Email__EnableSsl: "true"

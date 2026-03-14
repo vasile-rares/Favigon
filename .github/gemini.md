@@ -1,67 +1,72 @@
-# Copilot Instructions for Prismatic
+﻿# Favigon
 
-## Scope
+Favigon is a collaborative design-to-code and code-to-design platform. Designers compose UIs visually on a canvas, developers get structured, production-ready code. Both sides stay in sync through a shared **Intermediate Representation (IR)**.
 
-- Apply these instructions to the entire repository.
+Long-term goal: bidirectional sync between visual design and source code, where changes on either side reflect on the other.
 
-## Project Vision
+Core principles when implementing features:
+- Preserve parity between visual composition and programmatic output
+- Reduce friction between designer and developer workflows
+- Avoid coupling either side to tooling specific to the other
 
-- Prismatic is a collaborative design-to-code and code-to-design platform.
-- Designers should be able to work only in a visual canvas workflow, and developers should be able to work only in structured source code.
-- The product direction is bidirectional synchronization between visual design and code through a shared intermediate representation.
-- When proposing or implementing features, preserve parity between visual composition and programmatic implementation.
-- Prefer changes that reduce designer/developer workflow friction and avoid coupling either side to the other side's tooling.
+---
 
-## Big Picture Architecture
+## Repository Structure
 
-- Prismatic is a full-stack app with a .NET backend and Angular frontend.
-- Backend follows a layered design: API -> Application -> Domain -> Infrastructure.
-- Keep request flow consistent: controller orchestration in API, business logic in services, persistence in repositories/DbContext.
-- Register dependencies through each layer's DI configuration instead of ad-hoc wiring.
+```
+Backend/          .NET (C#), layered: API → Application → Domain → Infrastructure
+  Favigon.API/           Controllers, middleware, global exception handler
+  Favigon.Application/   Business logic, DTOs, service interfaces
+  Favigon.Domain/        Entities, domain rules
+  Favigon.Infrastructure/ Repositories, DbContext, external integrations
+  Favigon.Converter/     IR → HTML/CSS/React/Angular code generation
+  Favigon.Tests/         Unit/integration tests
 
-## Auth, Security, and Error Handling
+Frontend/         Angular 18+ (standalone components, Signals)
+  src/app/
+    core/         Shared DTOs/models, cross-feature HTTP services, interceptors
+    shared/       Reusable UI components
+    features/
+      auth/       Login, register
+      canvas/     Visual design editor (main feature)
+      dashboard/  Project listing
+      profile/    User profile
+      settings/   User settings
+```
 
-- Preserve cookie-based JWT authentication behavior unless a migration is explicitly requested.
-- Keep authorization at endpoint/service boundaries and enforce resource ownership checks.
-- Centralize exception-to-HTTP mapping in middleware; avoid duplicating error translation in controllers.
-- Ensure all error messages and user-facing text are in English; translate any Romanian text if found.
+## Canvas Feature (`features/canvas/`)
 
-## Data and Persistence Conventions
+The canvas is the core of the product.
 
-- Treat PostgreSQL as the primary persistence target and keep provider-specific mappings compatible with existing schema patterns.
-- Respect automatic timestamp handling and existing mapping profiles when adding entities/DTOs.
+- **pages/** — `canvas-page.component.ts` orchestrates the editor
+- **services/** — focused single-responsibility services: `CanvasViewportService`, `CanvasHistoryService`, `CanvasClipboardService`, `CanvasElementService`, `CanvasKeyboardService`, `CanvasContextMenuService`, `CanvasPersistenceService`, `CanvasGenerationService`
+- **mappers/** — `canvas-ir.mapper.ts` converts canvas elements ↔ IR tree
+- **utils/** — `canvas-interaction.util.ts` (math: clamp, rounding, normalization, bounds), `canvas-label.util.ts`
+- **components/** — toolbar, project panel (layers/pages), properties panel
+- **canvas.types.ts** — shared TS types (Point, Bounds, ResizeState, HistorySnapshot, …)
 
-## Developer Workflows
+Data flow: Canvas elements → IR tree → Backend converter API → HTML/CSS output.
 
-- Use workspace tasks for backend build/run when available.
-- Use standard Angular CLI commands for frontend development and verification.
-- After backend code changes, validate with at least one successful backend build.
+---
 
-## Integration Notes (Backend <-> Frontend)
+## Key Conventions
 
-- Keep backend/ frontend contracts aligned when changing routes, DTO shapes, or auth behavior.
-- Preserve credentialed frontend requests for authenticated API flows unless auth strategy is intentionally changed.
-- When introducing new backend capabilities, ensure frontend service contracts are updated in the same change.
+**Backend**
+- Thin controllers — delegate to Application services
+- Business logic belongs in Application, not API or Domain
+- Use repository interfaces (never depend on concrete Infrastructure implementations)
+- Never expose entities directly; always use DTOs
+- Auth: cookie-based JWT; validate resource ownership at service boundaries
+- Database: PostgreSQL; follow existing schema and timestamp conventions
+- Exceptions → HTTP translation handled centrally in middleware
 
-## Code Quality
+**Frontend**
+- Feature-scoped files stay inside their feature (`services/`, `utils/`, `mappers/` per feature)
+- `core/` only for cross-feature models (DTOs matching backend) and HTTP services
+- Canvas services are registered with `providers: [...]` on the component, not `providedIn: 'root'`
+- Prefer Angular Signals over observables for local component state
 
-- Keep all new code clean, readable, and maintainable.
-- Avoid duplicating logic that already exists in the repository.
-- Do not introduce parallel implementations that perform nearly the same task.
-- Prefer reusing or slightly refactoring existing utilities, services, or mappers instead of creating new ones.
-- Avoid redundant code and unnecessary complexity.
-- Follow the existing architecture, naming conventions, and project structure.
-
-## Design & UI Guidelines
-
-<!-- - Follow the design philosophy and component styling of **PrimeUI** (https://primeui.com/), specifically the Dark Mode theme. -->
-- Ensure all new UI components match the "premium" look and feel established in the Project Dashboard and Canvas.
-- Use CSS nesting to organize styles hierarchically and improve readability.
-
-## Change Guidelines for AI Agents
-
-- Make minimal, focused changes and avoid unrelated refactors.
-- Keep public contracts stable unless explicitly asked to evolve them.
-- Favor consistency with existing naming, folder structure, and coding style over new patterns.
-- Avoid excessive or redundant comments.
-
+**General**
+- Keep backend DTOs and frontend models in sync — update both in the same change
+- All user-facing text and error messages in English
+- Match existing premium dark UI style; use CSS nesting; maintain visual consistency

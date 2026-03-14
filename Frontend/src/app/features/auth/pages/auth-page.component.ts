@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+﻿import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   AbstractControl,
@@ -50,7 +50,7 @@ export class AuthPage implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
-  private static readonly REMEMBER_EMAIL_KEY = 'prismatic.rememberedEmail';
+  private static readonly REMEMBER_EMAIL_KEY = 'favigon.rememberedEmail';
 
   // --- State Signals ---
   readonly mode = signal<'login' | 'register'>('login');

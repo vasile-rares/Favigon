@@ -1,4 +1,4 @@
-{
+﻿{
     "version": "2.0.0",
     "tasks": [
         {
@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/Backend/Prismatic.sln",
+                "${workspaceFolder}/Backend/Favigon.sln",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -19,7 +19,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/Backend/Prismatic.sln",
+                "${workspaceFolder}/Backend/Favigon.sln",
                 "/property:GenerateFullPaths=true",
                 "/consoleloggerparameters:NoSummary;ForceNoAlign"
             ],
@@ -33,7 +33,7 @@
                 "watch",
                 "run",
                 "--project",
-                "${workspaceFolder}/Backend/Prismatic.sln"
+                "${workspaceFolder}/Backend/Favigon.sln"
             ],
             "problemMatcher": "$msCompile"
         },
@@ -43,7 +43,7 @@
             "type": "process",
             "args": [
                 "test",
-                "${workspaceFolder}/Backend/Prismatic.Tests/Prismatic.Tests.csproj",
+                "${workspaceFolder}/Backend/Favigon.Tests/Favigon.Tests.csproj",
                 "-c",
                 "Release",
                 "--verbosity",
@@ -69,7 +69,7 @@
                 "watch",
                 "test",
                 "--project",
-                "${workspaceFolder}/Backend/Prismatic.Tests/Prismatic.Tests.csproj",
+                "${workspaceFolder}/Backend/Favigon.Tests/Favigon.Tests.csproj",
                 "-c",
                 "Release"
             ],

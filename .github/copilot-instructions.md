@@ -1,6 +1,6 @@
-# Prismatic
+﻿# Favigon
 
-Prismatic is a collaborative design-to-code and code-to-design platform. Designers compose UIs visually on a canvas, developers get structured, production-ready code. Both sides stay in sync through a shared **Intermediate Representation (IR)**.
+Favigon is a collaborative design-to-code and code-to-design platform. Designers compose UIs visually on a canvas, developers get structured, production-ready code. Both sides stay in sync through a shared **Intermediate Representation (IR)**.
 
 Long-term goal: bidirectional sync between visual design and source code, where changes on either side reflect on the other.
 
@@ -15,12 +15,12 @@ Core principles when implementing features:
 
 ```
 Backend/          .NET (C#), layered: API → Application → Domain → Infrastructure
-  Prismatic.API/           Controllers, middleware, global exception handler
-  Prismatic.Application/   Business logic, DTOs, service interfaces
-  Prismatic.Domain/        Entities, domain rules
-  Prismatic.Infrastructure/ Repositories, DbContext, external integrations
-  Prismatic.Converter/     IR → HTML/CSS/React/Angular code generation
-  Prismatic.Tests/         Unit/integration tests
+  Favigon.API/           Controllers, middleware, global exception handler
+  Favigon.Application/   Business logic, DTOs, service interfaces
+  Favigon.Domain/        Entities, domain rules
+  Favigon.Infrastructure/ Repositories, DbContext, external integrations
+  Favigon.Converter/     IR → HTML/CSS/React/Angular code generation
+  Favigon.Tests/         Unit/integration tests
 
 Frontend/         Angular 18+ (standalone components, Signals)
   src/app/

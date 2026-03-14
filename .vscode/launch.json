@@ -1,4 +1,4 @@
-{
+﻿{
     "version": "0.2.0",
     "configurations": [
         {
@@ -9,11 +9,11 @@
             "args": [
                 "run",
                 "--project",
-                "${workspaceFolder}/Backend/Prismatic.API/Prismatic.API.csproj",
+                "${workspaceFolder}/Backend/Favigon.API/Favigon.API.csproj",
                 "--launch-profile",
                 "https"
             ],
-            "cwd": "${workspaceFolder}/Backend/Prismatic.API",
+            "cwd": "${workspaceFolder}/Backend/Favigon.API",
             "console": "integratedTerminal",
             "stopAtEntry": false,
             "serverReadyAction": {
@@ -46,13 +46,13 @@
             "program": "dotnet",
             "args": [
                 "test",
-                "${workspaceFolder}/Backend/Prismatic.Tests/Prismatic.Tests.csproj",
+                "${workspaceFolder}/Backend/Favigon.Tests/Favigon.Tests.csproj",
                 "-c",
                 "Release",
                 "--verbosity",
                 "normal"
             ],
-            "cwd": "${workspaceFolder}/Backend/Prismatic.Tests",
+            "cwd": "${workspaceFolder}/Backend/Favigon.Tests",
             "console": "integratedTerminal",
             "stopAtEntry": false
         }

@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+﻿name: CI/CD Pipeline
 
 on:
     push:
@@ -19,13 +19,13 @@ jobs:
                   dotnet-version: "9.0.x"
 
             - name: Restore
-              run: dotnet restore Backend/Prismatic.sln
+              run: dotnet restore Backend/Favigon.sln
 
             - name: Build
-              run: dotnet build Backend/Prismatic.sln -c Release --no-restore
+              run: dotnet build Backend/Favigon.sln -c Release --no-restore
 
             - name: Test
-              run: dotnet test Backend/Prismatic.Tests/Prismatic.Tests.csproj -c Release --no-build --verbosity normal
+              run: dotnet test Backend/Favigon.Tests/Favigon.Tests.csproj -c Release --no-build --verbosity normal
 
     frontend:
         name: Build Frontend
@@ -75,8 +75,8 @@ jobs:
                   context: ./Backend
                   push: true
                   tags: |
-                      ghcr.io/${{ github.repository_owner }}/prismatic-api:latest
-                      ghcr.io/${{ github.repository_owner }}/prismatic-api:${{ github.sha }}
+                      ghcr.io/${{ github.repository_owner }}/favigon-api:latest
+                      ghcr.io/${{ github.repository_owner }}/favigon-api:${{ github.sha }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -86,8 +86,8 @@ jobs:
                   context: ./Frontend
                   push: true
                   tags: |
-                      ghcr.io/${{ github.repository_owner }}/prismatic-client:latest
-                      ghcr.io/${{ github.repository_owner }}/prismatic-client:${{ github.sha }}
+                      ghcr.io/${{ github.repository_owner }}/favigon-client:latest
+                      ghcr.io/${{ github.repository_owner }}/favigon-client:${{ github.sha }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
@@ -107,7 +107,7 @@ jobs:
                   username: ${{ secrets.SSH_USERNAME }}
                   key: ${{ secrets.SSH_PRIVATE_KEY }}
                   source: docker-compose.yml
-                  target: ~/prismatic/
+                  target: ~/favigon/
 
             - name: Write .env and deploy
               uses: appleboy/ssh-action@v1
@@ -116,7 +116,7 @@ jobs:
                   username: ${{ secrets.SSH_USERNAME }}
                   key: ${{ secrets.SSH_PRIVATE_KEY }}
                   script: |
-                      cd ~/prismatic
+                      cd ~/favigon
 
                       # Recreate .env — values are substituted by GitHub Actions before being sent over SSH
                       {
