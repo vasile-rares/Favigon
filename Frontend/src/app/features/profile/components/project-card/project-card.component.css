@@ -3,9 +3,14 @@
 }
 
 .project-card {
-  background-color: var(--color-surface);
-  border: 1px solid var(--color-border-dark);
-  border-radius: 12px;
+  border-radius: 16px;
+  background: linear-gradient(137deg, rgba(17, 18, 20, .75) 4.87%, rgba(12, 13, 15, .9) 75.88%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--Card-Border, rgba(255, 255, 255, .06));
+  box-shadow: 
+    0 16px 40px rgba(0, 0, 0, 0.3),
+    inset 0 1px 1px 0 rgba(255, 255, 255, .15);
   overflow: hidden;
   height: 220px;
   position: relative;
@@ -15,7 +20,11 @@
     opacity 0.2s ease-out;
 
   &:hover {
-    border-color: var(--color-border);
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 
+      0 20px 50px rgba(0, 0, 0, 0.4),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 
     .project-overlay {
       opacity: 0;
@@ -51,7 +60,7 @@
 
 .card-preview {
   flex: 1;
-  background-color: var(--color-bg-page);
+  background: rgba(0, 0, 0, 0.2); /* recessed canvas area */
   position: relative;
   display: flex;
   align-items: center;
@@ -85,8 +94,8 @@
 .card-info {
   padding: 1rem;
   padding-right: 3.75rem;
-  background-color: var(--color-surface);
-  border-top: 1px solid var(--color-border-dark);
+  background: transparent;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
   align-items: center;
   min-height: 72px;

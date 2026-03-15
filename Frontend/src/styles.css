@@ -110,3 +110,55 @@ textarea {
   color: #000000;
   background: #b3b3b3;
 }
+
+/* Global Apple Background Animation */
+.apple-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+  background-color: #050505;
+  perspective: 1000px; /* force hardware layer */
+}
+
+.apple-background::after {
+  content: "";
+  position: absolute;
+  inset: -100px; /* extend beyond edges */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  opacity: 0.08; /* Stronger noise to eliminate banding */
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  z-index: 10;
+  transform: translateZ(0); /* Lock noise to screen pixels */
+}
+
+.bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(150px); /* Massive static blur prevents banding completely */
+}
+
+/* Single Auth Glow at Top Center */
+.bg-orb-1 {
+  width: 70vw;
+  height: 40vh;
+  background: rgba(79, 70, 229, 0.35); /* Solid indigo */
+  top: -20vh;
+  left: 50%;
+  transform: translateX(-50%); /* perfectly centered */
+}
+
+/* Neutral Orbs for Profile / Settings */
+.bg-orb-neutral-1 {
+  width: 70vw;
+  height: 40vh;
+  background: rgba(255, 255, 255, 0.05); /* Solid white glow */
+  top: -20vh;
+  left: 50%;
+  transform: translateX(-50%);
+}
