@@ -100,7 +100,7 @@ export class CanvasElementService {
         strokeStyle: tool === 'text' ? undefined : 'Solid',
         opacity: 1,
         cornerRadius: tool === 'image' ? 6 : 0,
-        text: tool === 'text' ? 'New text' : undefined,
+        text: tool === 'text' ? '' : undefined,
         fontSize: tool === 'text' ? 16 : undefined,
         fontFamily: tool === 'text' ? 'Inter' : undefined,
         fontWeight: tool === 'text' ? 400 : undefined,

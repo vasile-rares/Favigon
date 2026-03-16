@@ -10,6 +10,8 @@ export interface KeyboardActionCallbacks {
   onSelectTool: (tool: CanvasElementType | 'select') => void;
   onSpaceDown: () => void;
   onSpaceUp: () => void;
+  onZoomIn: () => void;
+  onZoomOut: () => void;
   getEditingTextElementId: () => string | null;
   getSelectedElementId: () => string | null;
 }
@@ -31,6 +33,20 @@ export class CanvasKeyboardService {
     }
 
     const isTypingContext = this.isTypingContext(event);
+
+    if (event.ctrlKey || event.metaKey) {
+      const key = event.key;
+      if (key === '+' || key === '=') {
+        event.preventDefault();
+        callbacks.onZoomIn();
+        return;
+      }
+      if (key === '-') {
+        event.preventDefault();
+        callbacks.onZoomOut();
+        return;
+      }
+    }
 
     if (!isTypingContext && (event.ctrlKey || event.metaKey)) {
       const key = event.key.toLowerCase();

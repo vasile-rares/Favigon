@@ -360,6 +360,11 @@ export class ProjectPage implements OnDestroy {
       this.selectedElementId.set(newElement.id);
       this.currentTool.set('select');
     });
+
+    if (newElement.type === 'text') {
+      this.editingTextElementId.set(newElement.id);
+      this.focusInlineTextEditor(newElement.id);
+    }
   }
 
   // ── Element Events ────────────────────────────────────────
@@ -1783,6 +1788,8 @@ export class ProjectPage implements OnDestroy {
       onSelectTool: (tool) => this.selectTool(tool),
       onSpaceDown: () => this.viewport.isSpacePressed.set(true),
       onSpaceUp: () => this.viewport.isSpacePressed.set(false),
+      onZoomIn: () => this.viewport.zoomIn(),
+      onZoomOut: () => this.viewport.zoomOut(),
       getEditingTextElementId: () => this.editingTextElementId(),
       getSelectedElementId: () => this.selectedElementId(),
     };
