@@ -111,6 +111,16 @@ public class ProjectService : IProjectService
     };
   }
 
+  public async Task<bool> SaveThumbnailAsync(int projectId, int userId, ProjectThumbnailSaveRequest request)
+  {
+    var project = await _projectRepository.GetByIdAsync(projectId, userId);
+    if (project == null) return false;
+
+    project.ThumbnailDataUrl = request.ThumbnailDataUrl;
+    await _projectRepository.UpdateAsync(project);
+    return true;
+  }
+
   private string NormalizeAndValidateDesignJson(string? designJson)
   {
     if (string.IsNullOrWhiteSpace(designJson))

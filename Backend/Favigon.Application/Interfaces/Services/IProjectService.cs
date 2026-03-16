@@ -13,4 +13,5 @@ public interface IProjectService
   Task<bool> DeleteAsync(int id, int userId);
   Task<ProjectDesignResponse?> GetDesignByProjectIdAsync(int projectId, int userId);
   Task<ProjectDesignResponse?> SaveDesignAsync(int projectId, int userId, ProjectDesignSaveRequest request);
+  Task<bool> SaveThumbnailAsync(int projectId, int userId, ProjectThumbnailSaveRequest request);
 }

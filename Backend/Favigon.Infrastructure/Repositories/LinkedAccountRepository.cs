@@ -22,6 +22,19 @@ public class LinkedAccountRepository : ILinkedAccountRepository
         la.Provider == provider && la.ProviderUserId == providerUserId);
   }
 
+  public async Task<IReadOnlyList<LinkedAccount>> GetByUserIdAsync(int userId)
+  {
+    return await _context.LinkedAccounts
+      .Where(la => la.UserId == userId)
+      .ToListAsync();
+  }
+
+  public Task<LinkedAccount?> GetByUserIdAndProviderAsync(int userId, string provider)
+  {
+    return _context.LinkedAccounts
+      .FirstOrDefaultAsync(la => la.UserId == userId && la.Provider == provider);
+  }
+
   public async Task<LinkedAccount> AddAsync(LinkedAccount linkedAccount)
   {
     _context.LinkedAccounts.Add(linkedAccount);
@@ -32,6 +45,12 @@ public class LinkedAccountRepository : ILinkedAccountRepository
   public async Task UpdateAsync(LinkedAccount linkedAccount)
   {
     _context.LinkedAccounts.Update(linkedAccount);
+    await _context.SaveChangesAsync();
+  }
+
+  public async Task RemoveAsync(LinkedAccount linkedAccount)
+  {
+    _context.LinkedAccounts.Remove(linkedAccount);
     await _context.SaveChangesAsync();
   }
 }

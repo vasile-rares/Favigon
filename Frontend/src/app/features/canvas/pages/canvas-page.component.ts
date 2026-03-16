@@ -23,6 +23,7 @@ import { IRNode } from '../../../core/models/ir.models';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
 import { clamp, roundToTwoDecimals, getStrokeWidth } from '../utils/canvas-interaction.util';
 import { buildSnapCandidates, computeSnappedPosition } from '../utils/canvas-snap.util';
+import { generateThumbnail } from '../utils/canvas-thumbnail.util';
 import { CanvasGenerationService } from '../services/canvas-generation.service';
 import { CanvasPersistenceService } from '../services/canvas-persistence.service';
 import { ContextMenuComponent } from '../../../shared/components/context-menu/context-menu.component';
@@ -217,6 +218,8 @@ export class ProjectPage implements OnDestroy {
       clearTimeout(this.saveTimeoutId);
       this.saveTimeoutId = null;
     }
+
+    this.persistThumbnailIfDue();
   }
 
   // ── Tool Selection ────────────────────────────────────────
@@ -1269,6 +1272,15 @@ export class ProjectPage implements OnDestroy {
         this.isSavingDesign.set(false);
       },
     });
+  }
+
+  private persistThumbnailIfDue(): void {
+    const thumbnail = generateThumbnail(this.currentPage());
+    if (!thumbnail) {
+      return;
+    }
+
+    this.canvasPersistenceService.saveProjectThumbnail(this.projectIdAsNumber, thumbnail).subscribe();
   }
 
   // ── Private: Gesture Handling ─────────────────────────────

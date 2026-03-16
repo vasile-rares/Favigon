@@ -22,7 +22,7 @@ export interface DialogBoxField {
 
 export interface DialogBoxAction {
   label: string;
-  variant?: 'primary' | 'outline';
+  variant?: 'primary' | 'outline' | 'danger';
   disabled?: boolean;
 }
 

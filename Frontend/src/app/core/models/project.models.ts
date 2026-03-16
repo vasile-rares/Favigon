@@ -5,6 +5,7 @@ export interface ProjectResponse {
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;
+  thumbnailDataUrl?: string | null;
 }
 
 export interface ProjectCreateRequest {

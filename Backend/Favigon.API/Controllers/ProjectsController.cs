@@ -129,6 +129,19 @@ public class ProjectsController : ControllerBase
     return Ok(saved);
   }
 
+  [HttpPut("{id:int}/thumbnail")]
+  public async Task<IActionResult> SaveThumbnail(int id, [FromBody] ProjectThumbnailSaveRequest request)
+  {
+    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdValue, out var userId))
+    {
+      return Unauthorized();
+    }
+
+    var saved = await _projectService.SaveThumbnailAsync(id, userId, request);
+    return saved ? NoContent() : NotFound();
+  }
+
   [HttpGet("user/{userId:int}")]
   public async Task<IActionResult> GetPublicByUserId(int userId)
   {

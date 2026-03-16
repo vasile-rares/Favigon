@@ -1,4 +1,5 @@
 ﻿using Favigon.Application.DTOs.Requests;
+using Favigon.Application.DTOs.Responses;
 using Favigon.Domain.Entities;
 
 namespace Favigon.Application.Interfaces;
@@ -12,4 +13,8 @@ public interface IUserService
   Task<User> CreateAsync(UserCreateRequest request);
   Task<User?> UpdateAsync(int id, UserUpdateRequest request);
   Task<bool> DeleteAsync(int id);
+  Task<UserResponse?> GetMyProfileAsync(int userId);
+  Task<UserResponse?> UpdateMyProfileAsync(int userId, UserProfileUpdateRequest request);
+  Task<bool> DeleteMyAccountAsync(int userId);
+  Task<bool> UnlinkProviderAsync(int userId, string provider);
 }

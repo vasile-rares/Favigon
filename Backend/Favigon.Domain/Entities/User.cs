@@ -25,6 +25,9 @@ public class User
     [MaxLength(255)]
     public string? ProfilePictureUrl { get; set; }
 
+    [MaxLength(300)]
+    public string? Bio { get; set; }
+
     [MaxLength(20)]
     public string Role { get; set; } = "User";
 

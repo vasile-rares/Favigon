@@ -202,6 +202,57 @@ public class AuthService : IAuthService
     await _userRepository.UpdateAsync(user);
   }
 
+  public async Task LinkWithGithubAsync(int userId, GithubAuthRequest request)
+  {
+    var code = request.Code?.Trim();
+    if (string.IsNullOrWhiteSpace(code))
+      throw new ArgumentException("GitHub authorization code is required.");
+
+    var githubProfile = await _githubOAuthClient.GetUserProfileAsync(code);
+    var normalizedEmail = githubProfile.Email.Trim().ToLowerInvariant();
+    await LinkProviderAsync(userId, "github", githubProfile.ProviderUserId, normalizedEmail);
+  }
+
+  public async Task LinkWithGoogleAsync(int userId, GoogleAuthRequest request)
+  {
+    var code = request.Code?.Trim();
+    if (string.IsNullOrWhiteSpace(code))
+      throw new ArgumentException("Google authorization code is required.");
+
+    var googleProfile = await _googleOAuthClient.GetUserProfileAsync(code);
+    var normalizedEmail = googleProfile.Email.Trim().ToLowerInvariant();
+    await LinkProviderAsync(userId, "google", googleProfile.ProviderUserId, normalizedEmail);
+  }
+
+  private async Task LinkProviderAsync(int userId, string provider, string providerUserId, string normalizedEmail)
+  {
+    var existingLink = await _linkedAccountRepository.GetByProviderAsync(provider, providerUserId);
+    if (existingLink != null && existingLink.UserId != userId)
+      throw new InvalidOperationException($"This {provider} account is already linked to a different Favigon account.");
+
+    if (existingLink != null)
+    {
+      if (!string.Equals(existingLink.ProviderEmail, normalizedEmail, StringComparison.OrdinalIgnoreCase))
+      {
+        existingLink.ProviderEmail = normalizedEmail;
+        await _linkedAccountRepository.UpdateAsync(existingLink);
+      }
+      return;
+    }
+
+    var existingUserLink = await _linkedAccountRepository.GetByUserIdAndProviderAsync(userId, provider);
+    if (existingUserLink != null)
+      throw new InvalidOperationException($"You already have a {provider} account connected.");
+
+    await _linkedAccountRepository.AddAsync(new LinkedAccount
+    {
+      UserId = userId,
+      Provider = provider,
+      ProviderUserId = providerUserId,
+      ProviderEmail = normalizedEmail,
+    });
+  }
+
 
 
 

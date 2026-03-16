@@ -9,20 +9,35 @@
   }
 
   <div class="input-control-wrap">
-    <input
-      class="text-input"
-      [class.text-input--with-toggle]="type === 'password' && enablePasswordToggle"
-      [id]="id"
-      [type]="computedType"
-      [placeholder]="placeholder"
-      [value]="value"
-      [disabled]="disabled"
-      [autocomplete]="autocomplete"
-      [attr.maxlength]="maxLength ?? null"
-      (input)="handleInput($event)"
-      (blur)="handleBlur()" />
+    @if (multiline) {
+      <textarea
+        class="text-input text-input--textarea"
+        [id]="id"
+        [placeholder]="placeholder"
+        [value]="value"
+        [disabled]="disabled"
+        [readonly]="readonly"
+        [attr.maxlength]="maxLength ?? null"
+        [rows]="rows"
+        (input)="handleInput($event)"
+        (blur)="handleBlur()"></textarea>
+    } @else {
+      <input
+        class="text-input"
+        [class.text-input--with-toggle]="type === 'password' && enablePasswordToggle"
+        [id]="id"
+        [type]="computedType"
+        [placeholder]="placeholder"
+        [value]="value"
+        [disabled]="disabled"
+        [readonly]="readonly"
+        [autocomplete]="autocomplete"
+        [attr.maxlength]="maxLength ?? null"
+        (input)="handleInput($event)"
+        (blur)="handleBlur()" />
+    }
 
-    @if (type === 'password' && enablePasswordToggle) {
+    @if (!multiline && type === 'password' && enablePasswordToggle) {
       <div class="toggle-visibility-wrapper">
         <button
           type="button"

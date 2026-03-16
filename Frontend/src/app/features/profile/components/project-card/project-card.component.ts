@@ -6,7 +6,7 @@ export interface ProjectCardViewModel {
   id: number;
   name: string;
   lastEdited: Date;
-  thumbnailUrl?: string;
+  thumbnailDataUrl?: string | null;
 }
 
 @Component({

@@ -122,6 +122,7 @@ export class ProfilePage implements OnInit {
               id: p.projectId,
               name: p.name,
               lastEdited: new Date(p.updatedAt),
+              thumbnailDataUrl: p.thumbnailDataUrl ?? null,
             }))
             .sort((a, b) => b.lastEdited.getTime() - a.lastEdited.getTime()),
         );

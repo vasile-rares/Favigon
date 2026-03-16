@@ -51,4 +51,10 @@ export class ProjectService {
       request,
     );
   }
+
+  saveThumbnail(projectId: number, thumbnailDataUrl: string): Observable<void> {
+    return this.http.put<void>(`${this.baseUrl}/projects/${projectId}/thumbnail`, {
+      thumbnailDataUrl,
+    });
+  }
 }

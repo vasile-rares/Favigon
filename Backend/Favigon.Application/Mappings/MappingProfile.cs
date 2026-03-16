@@ -25,7 +25,10 @@ public class MappingProfile : Profile
       .ForMember(dest => dest.CreatedAt, opt => opt.Ignore());
 
     CreateMap<User, UserResponse>()
-      .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.Id));
+      .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.Id))
+      .ForMember(dest => dest.LinkedAccounts, opt => opt.Ignore());
+
+    CreateMap<LinkedAccount, LinkedAccountResponse>();
 
     CreateMap<User, AuthResponse>()
       .ForMember(dest => dest.UserId, opt => opt.MapFrom(src => src.Id))

@@ -14,7 +14,7 @@
   align-items: center;
   justify-content: center;
   padding: 1.25rem;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.5);
   animation: dialog-box-layer-in var(--dialog-motion-duration) var(--dialog-motion-ease-in);
 
   &.dialog-box__layer--blur {
@@ -40,7 +40,7 @@
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--Card-Border, rgba(255, 255, 255, .06));
-  box-shadow: 
+  box-shadow:
     0 30px 60px rgba(0, 0, 0, 0.4),
     inset 0 1px 1px 0 rgba(255, 255, 255, .15);
   overflow: hidden;

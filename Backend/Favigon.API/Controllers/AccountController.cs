@@ -1,7 +1,9 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.Authorization;
 using Favigon.Application.DTOs.Requests;
 using Favigon.Application.Interfaces;
+using System.Security.Claims;
 
 namespace Favigon.API.Controllers;
 
@@ -56,6 +58,32 @@ public class AccountController : ControllerBase
     SetAccessTokenCookie(response.Token);
     SetRefreshTokenCookie(response.RefreshToken);
     return Ok(new { message = "Google authentication successful." });
+  }
+
+  [HttpPost("oauth2/github/link")]
+  [Authorize]
+  [DisableRateLimiting]
+  public async Task<IActionResult> LinkWithGithub([FromBody] GithubAuthRequest request)
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    await _authService.LinkWithGithubAsync(userId, request);
+    return Ok(new { message = "GitHub account linked successfully." });
+  }
+
+  [HttpPost("oauth2/google/link")]
+  [Authorize]
+  [DisableRateLimiting]
+  public async Task<IActionResult> LinkWithGoogle([FromBody] GoogleAuthRequest request)
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    await _authService.LinkWithGoogleAsync(userId, request);
+    return Ok(new { message = "Google account linked successfully." });
   }
 
   [HttpPost("forgot-password")]

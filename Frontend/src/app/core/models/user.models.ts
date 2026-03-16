@@ -12,3 +12,28 @@ export interface UserSearchResult {
   username: string;
   profilePictureUrl: string | null;
 }
+
+export interface LinkedAccountInfo {
+  provider: string;
+  providerEmail: string;
+  createdAt: string;
+}
+
+export interface UserMe {
+  userId: number;
+  displayName: string;
+  username: string;
+  email: string;
+  role: string;
+  profilePictureUrl: string | null;
+  bio: string | null;
+  createdAt: string;
+  linkedAccounts: LinkedAccountInfo[];
+}
+
+export interface UserProfileUpdateRequest {
+  displayName: string;
+  username: string;
+  bio: string | null;
+}
+

@@ -31,25 +31,51 @@ public class UsersController : ControllerBase
   {
     var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
     if (!int.TryParse(userIdClaim, out var userId))
-    {
       return Unauthorized();
-    }
 
-    var user = await _userService.GetByIdAsync(userId);
-    if (user == null)
-    {
-      return NotFound();
-    }
+    var profile = await _userService.GetMyProfileAsync(userId);
+    if (profile == null) return NotFound();
 
-    return Ok(new
-    {
-      user.Id,
-      user.DisplayName,
-      user.Username,
-      user.Email,
-      user.Role,
-      user.ProfilePictureUrl
-    });
+    return Ok(profile);
+  }
+
+  [HttpPut("me")]
+  public async Task<IActionResult> UpdateMe([FromBody] UserProfileUpdateRequest request)
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    var updated = await _userService.UpdateMyProfileAsync(userId, request);
+    if (updated == null) return NotFound();
+
+    return Ok(updated);
+  }
+
+  [HttpDelete("me")]
+  public async Task<IActionResult> DeleteMe()
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    var deleted = await _userService.DeleteMyAccountAsync(userId);
+    if (!deleted) return NotFound();
+
+    Response.Cookies.Delete("jwt");
+    Response.Cookies.Delete("refresh_token");
+    return NoContent();
+  }
+
+  [HttpDelete("me/linked-accounts/{provider}")]
+  public async Task<IActionResult> UnlinkProvider(string provider)
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    var unlinked = await _userService.UnlinkProviderAsync(userId, provider.ToLowerInvariant());
+    return unlinked ? NoContent() : NotFound();
   }
 
   [HttpGet("{id:int}")]

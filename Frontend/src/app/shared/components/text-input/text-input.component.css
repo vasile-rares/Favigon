@@ -58,6 +58,37 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
+
+  &[readonly] {
+    opacity: 0.8;
+    background: rgba(255, 255, 255, 0.04);
+    pointer-events: none; /* Make interaction inactive but allows selection natively via CSS */
+    user-select: text; /* Allow user to copy email but not type */
+  }
+
+  &.text-input--textarea {
+    resize: vertical;
+    line-height: 1.5;
+    padding-top: 0.625rem;
+    padding-bottom: 0.625rem;
+    min-height: 120px;
+    overflow-y: auto;
+    pointer-events: auto; /* enable interaction for resize even if readonly is false */
+
+    &::-webkit-scrollbar {
+      width: 6px;
+    }
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+    &::-webkit-scrollbar-corner {
+      background: transparent;
+    }
+  }
 }
 
 .input-control-wrap {
@@ -99,17 +130,13 @@
     &:hover:not(:disabled) {
       color: var(--color-text-light);
     }
-
-    &:disabled {
-      cursor: not-allowed;
-      opacity: 0.7;
-    }
   }
 }
 
 .validation-message {
   font-size: 0.8rem;
   color: var(--color-danger-light);
+  margin-top: 0.25rem;
 }
 
 .failed-validation {

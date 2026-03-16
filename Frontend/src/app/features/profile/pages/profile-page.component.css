@@ -23,16 +23,29 @@
   min-height: 0;
 }
 
-.profile-content {
+.profile-page-wrapper {
   flex: 1;
-  padding: 2.5rem 3rem;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   max-width: 960px;
   width: 100%;
   margin: 0 auto;
+  padding: 2.5rem 3rem 0; /* Only top/side padding, bottom handled by scroll area */
+  position: relative;
+  min-height: 0;
   transition:
     filter 0.15s ease,
     transform 0.15s ease;
+}
+
+/* Moving the scroll setup from profile-content to projects-scroll-area */
+.projects-scroll-area {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 2.5rem; /* Room at the bottom of the scroll */
+  padding-top: 1.5rem; /* Room under the header */
+  border-top: 1px solid rgba(255, 255, 255, 0.08); /* Replaces profile-divider */
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -46,7 +59,7 @@
   }
 }
 
-.profile-content--blurred {
+.profile-page-wrapper--blurred {
   filter: blur(5px);
   pointer-events: none;
   user-select: none;
@@ -57,7 +70,8 @@
   display: flex;
   align-items: flex-start;
   gap: 1.5rem;
-  margin-bottom: 1.5rem;
+  padding-bottom: 1.5rem;
+  flex-shrink: 0;
 }
 
 .profile-header__avatar-wrap {
@@ -109,10 +123,10 @@
 }
 
 /* Divider */
+
+/* Removing the divider as we use border-top on scroll area now */
 .profile-divider {
-  height: 1px;
-  background-color: var(--color-border-dark);
-  margin-bottom: 2rem;
+  display: none;
 }
 
 /* Projects section */

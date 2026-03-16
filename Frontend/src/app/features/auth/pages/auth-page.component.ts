@@ -340,6 +340,29 @@ export class AuthPage implements OnInit {
 
     const state = this.route.snapshot.queryParamMap.get('state')?.trim().toLowerCase();
 
+    if (state === 'github-link' || state === 'google-link') {
+      this.startLoading();
+      try {
+        if (state === 'google-link') {
+          await firstValueFrom(this.authService.linkWithGoogle({ code }));
+        } else {
+          await firstValueFrom(this.authService.linkWithGithub({ code }));
+        }
+        await this.router.navigate(['/settings']);
+      } catch (error: any) {
+        this.handleError(
+          error,
+          state === 'google-link'
+            ? 'Could not link Google account.'
+            : 'Could not link GitHub account.',
+        );
+        await this.router.navigate(['/settings'], { replaceUrl: true });
+      } finally {
+        this.isSubmitting.set(false);
+      }
+      return;
+    }
+
     this.startLoading();
 
     try {

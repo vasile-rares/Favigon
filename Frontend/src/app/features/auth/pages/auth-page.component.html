@@ -22,14 +22,17 @@
             label="Email address"
             type="email"
             placeholder="Email address"
+            formControlName="email"
+            autocomplete="username"
+            [requiredMarker]="loginForm.controls.email.invalid && loginForm.controls.email.touched"
             [maxLength]="100"
-            [errorText]="'Please enter a valid email address.'"></app-text-input>
+            [errorText]="loginForm.controls.email.hasError('required') ? 'Email is required.' : 'Please enter a valid email address.'"></app-text-input>
 
-          <div class="input-wrapper" [class.failed-validation]="loginForm.controls.password.invalid && loginForm.controls.password.dirty">
+          <div class="input-wrapper" [class.failed-validation]="loginForm.controls.password.invalid && loginForm.controls.password.touched">
             <div class="label-row">
               <label class="input-label" for="login-password">
                 Password
-                @if (loginForm.controls.password.invalid && loginForm.controls.password.dirty) {
+                @if (loginForm.controls.password.invalid && loginForm.controls.password.touched) {
                   <span class="failed-validation">*</span>
                 }
               </label>
@@ -41,10 +44,10 @@
               id="login-password"
               type="password"
               placeholder="Password"
-              autocomplete="new-password"
+              autocomplete="current-password"
               formControlName="password"
               [enablePasswordToggle]="true"
-              [forceInvalid]="loginForm.controls.password.invalid && loginForm.controls.password.dirty"
+              [forceInvalid]="loginForm.controls.password.invalid && loginForm.controls.password.touched"
               [maxLength]="100"
               [errorText]="'Password is required.'"></app-text-input>
           </div>
@@ -75,7 +78,7 @@
             placeholder="Display name"
             autocomplete="off"
             formControlName="displayName"
-            [requiredMarker]="registerForm.controls.displayName.invalid && registerForm.controls.displayName.dirty"
+            [requiredMarker]="registerForm.controls.displayName.invalid && registerForm.controls.displayName.touched"
             [maxLength]="50"
             [errorText]="'Display Name is required.'"></app-text-input>
 
@@ -85,7 +88,7 @@
             placeholder="Username"
             autocomplete="off"
             formControlName="username"
-            [requiredMarker]="registerForm.controls.username.invalid && registerForm.controls.username.dirty"
+            [requiredMarker]="registerForm.controls.username.invalid && registerForm.controls.username.touched"
             [maxLength]="30"
             [errorText]="registerForm.controls.username.hasError('required') ? 'Username is required.' : 'Username can only contain letters, numbers, and underscores.'"></app-text-input>
 
@@ -94,13 +97,15 @@
             label="Email address"
             type="email"
             placeholder="Email address"
+            formControlName="email"
+            [requiredMarker]="registerForm.controls.email.invalid && registerForm.controls.email.touched"
             [maxLength]="100"
             [errorText]="registerForm.controls.email.hasError('required') ? 'Email is required.' : 'Please enter a valid email address.'"></app-text-input>
 
-          <div class="input-wrapper" [class.failed-validation]="registerForm.controls.password.invalid && registerForm.controls.password.dirty">
+          <div class="input-wrapper" [class.failed-validation]="registerForm.controls.password.invalid && registerForm.controls.password.touched">
             <label class="input-label" for="reg-password">
               Password
-              @if (registerForm.controls.password.invalid && registerForm.controls.password.dirty) {
+              @if (registerForm.controls.password.invalid && registerForm.controls.password.touched) {
                 <span class="failed-validation">*</span>
               }
             </label>
@@ -111,11 +116,11 @@
               autocomplete="new-password"
               formControlName="password"
               [enablePasswordToggle]="true"
-              [forceInvalid]="registerForm.controls.password.invalid && registerForm.controls.password.dirty"
+              [forceInvalid]="registerForm.controls.password.invalid && registerForm.controls.password.touched"
               [maxLength]="100"></app-text-input>
-            @if (registerForm.controls.password.invalid && registerForm.controls.password.dirty) {
+            @if (registerForm.controls.password.invalid && registerForm.controls.password.touched) {
                <div class="complex-password-rules">
-                 @if (registerForm.controls.password.hasError('pattern') || registerForm.controls.password.hasError('minlength')) {
+                 @if (registerForm.controls.password.hasError('pattern') || registerForm.controls.password.hasError('minlength') || registerForm.controls.password.hasError('weakPassword')) {
                     <div class="rule-item">
                        <div class="rule-bullet"></div> Must be at least 8 characters.
                     </div>
@@ -137,7 +142,7 @@
             autocomplete="new-password"
             formControlName="confirmPassword"
             [enablePasswordToggle]="true"
-            [requiredMarker]="registerForm.controls.confirmPassword.invalid && registerForm.controls.confirmPassword.dirty"
+            [requiredMarker]="registerForm.controls.confirmPassword.invalid && registerForm.controls.confirmPassword.touched"
             [maxLength]="100"
             [errorText]="registerForm.controls.confirmPassword.hasError('required') ? 'Please confirm your password.' : 'Passwords do not match.'"></app-text-input>
 
@@ -200,8 +205,9 @@
       </button>
     </p>
   </div>
+</div> <!-- Close .auth-box -->
 
-  @if (isForgotPasswordDialogOpen()) {
+@if (isForgotPasswordDialogOpen()) {
     <app-dialog-box
       #forgotPasswordDialog
       title="Forgot password"
@@ -220,6 +226,7 @@
             label="Email address"
             type="email"
             placeholder="Email address"
+            formControlName="email"
             [maxLength]="100"
             [errorText]="'Please enter a valid email address.'"></app-text-input>
 

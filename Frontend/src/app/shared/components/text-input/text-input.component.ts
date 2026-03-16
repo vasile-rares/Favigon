@@ -20,6 +20,11 @@ export class TextInputComponent implements ControlValueAccessor {
   @Input() errorText = '';
   @Input() forceInvalid = false;
   @Input() enablePasswordToggle = false;
+  @Input() readonly = false;
+  
+  // Multiline specific
+  @Input() multiline = false;
+  @Input() rows = 3;
 
   value = '';
   disabled = false;
@@ -74,7 +79,8 @@ export class TextInputComponent implements ControlValueAccessor {
   }
 
   handleBlur(): void {
-    this.onTouched();
+    // onTouched() intentionally omitted — validation errors are shown
+    // only after the form is submitted via markAllAsTouched(), not on blur.
   }
 
   togglePasswordVisibility(): void {

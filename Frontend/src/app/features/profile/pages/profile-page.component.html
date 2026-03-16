@@ -2,7 +2,7 @@
   <app-header-bar></app-header-bar>
 
   <div class="profile-main-shell">
-    <main class="profile-content" [class.profile-content--blurred]="isCreateDialogOpen()">
+    <div class="profile-page-wrapper" [class.profile-page-wrapper--blurred]="isCreateDialogOpen()">
 
       @if (errorMessage() && !profile()) {
         <div class="profile-error">
@@ -31,10 +31,9 @@
           </div>
         </section>
 
-        <div class="profile-divider"></div>
-
-        <!-- Projects Section -->
-        <section class="projects-section">
+        <!-- Scrollable Projects Section -->
+        <main class="projects-scroll-area">
+          <section class="projects-section">
           <div class="section-header">
             <div class="section-header__texts">
               <h2>{{ isOwnProfile() ? 'Your Projects' : 'Public Projects' }}</h2>
@@ -81,9 +80,10 @@
               }
             </div>
           }
-        </section>
+          </section>
+        </main>
       }
-    </main>
+    </div>
 
     @if (isCreateDialogOpen()) {
       <app-dialog-box

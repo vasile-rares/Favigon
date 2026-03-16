@@ -9,7 +9,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
   styleUrl: './action-button.component.css',
 })
 export class ActionButtonComponent {
-  @Input() variant: 'primary' | 'outline' = 'primary';
+  @Input() variant: 'primary' | 'outline' | 'danger' = 'primary';
   @Input() type: 'button' | 'submit' | 'reset' = 'button';
   @Input() form?: string;
   @Input() disabled = false;

@@ -22,6 +22,8 @@ public class Project
 
     public bool IsPublic { get; set; }
 
+    public string? ThumbnailDataUrl { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
