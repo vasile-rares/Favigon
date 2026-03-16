@@ -1,4 +1,5 @@
-﻿using Moq;
+﻿using AutoMapper;
+using Moq;
 using Favigon.Application.DTOs.Requests;
 using Favigon.Application.Interfaces;
 using Favigon.Application.Services;
@@ -9,11 +10,13 @@ namespace Favigon.Tests.Services;
 public class UserServiceTests
 {
   private readonly Mock<IUserRepository> _userRepo = new();
+  private readonly Mock<ILinkedAccountRepository> _linkedAccountRepo = new();
+  private readonly Mock<IMapper> _mapper = new();
   private readonly UserService _sut;
 
   public UserServiceTests()
   {
-    _sut = new UserService(_userRepo.Object);
+    _sut = new UserService(_userRepo.Object, _linkedAccountRepo.Object, _mapper.Object);
   }
 
   [Fact]
