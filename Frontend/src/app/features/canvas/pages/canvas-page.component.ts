@@ -1280,7 +1280,9 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    this.canvasPersistenceService.saveProjectThumbnail(this.projectIdAsNumber, thumbnail).subscribe();
+    this.canvasPersistenceService
+      .saveProjectThumbnail(this.projectIdAsNumber, thumbnail)
+      .subscribe();
   }
 
   // ── Private: Gesture Handling ─────────────────────────────

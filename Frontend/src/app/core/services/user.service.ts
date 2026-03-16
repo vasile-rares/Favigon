@@ -2,7 +2,12 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { UserMe, UserProfile, UserProfileUpdateRequest, UserSearchResult } from '../models/user.models';
+import {
+  UserMe,
+  UserProfile,
+  UserProfileUpdateRequest,
+  UserSearchResult,
+} from '../models/user.models';
 
 @Injectable({ providedIn: 'root' })
 export class UserService {
@@ -28,9 +33,7 @@ export class UserService {
   }
 
   getByUsername(username: string): Observable<UserProfile> {
-    return this.http.get<UserProfile>(
-      `${this.baseUrl}/users/${encodeURIComponent(username)}`,
-    );
+    return this.http.get<UserProfile>(`${this.baseUrl}/users/${encodeURIComponent(username)}`);
   }
 
   search(query: string): Observable<UserSearchResult[]> {

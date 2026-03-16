@@ -135,10 +135,10 @@ export class SettingsPage implements OnInit {
     try {
       // NOTE: Here you would call your backend API to change the password
       // await firstValueFrom(this.userService.changePassword(...));
-      
+
       // Simulate network request
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
       this.statusMessage.set({ type: 'success', text: 'Password changed successfully.' });
       this.isPasswordDialogOpen.set(false);
     } catch (error: unknown) {

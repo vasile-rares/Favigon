@@ -34,11 +34,17 @@ export class AuthService {
   }
 
   linkWithGithub(request: GithubAuthRequest): Observable<AuthMessageResponse> {
-    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/oauth2/github/link`, request);
+    return this.http.post<AuthMessageResponse>(
+      `${this.baseUrl}/account/oauth2/github/link`,
+      request,
+    );
   }
 
   linkWithGoogle(request: GoogleAuthRequest): Observable<AuthMessageResponse> {
-    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/oauth2/google/link`, request);
+    return this.http.post<AuthMessageResponse>(
+      `${this.baseUrl}/account/oauth2/google/link`,
+      request,
+    );
   }
 
   forgotPassword(request: ForgotPasswordRequest): Observable<AuthMessageResponse> {

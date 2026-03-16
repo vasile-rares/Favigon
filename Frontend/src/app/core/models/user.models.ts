@@ -36,4 +36,3 @@ export interface UserProfileUpdateRequest {
   username: string;
   bio: string | null;
 }
-

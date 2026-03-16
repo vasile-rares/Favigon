@@ -21,7 +21,7 @@ export class TextInputComponent implements ControlValueAccessor {
   @Input() forceInvalid = false;
   @Input() enablePasswordToggle = false;
   @Input() readonly = false;
-  
+
   // Multiline specific
   @Input() multiline = false;
   @Input() rows = 3;
