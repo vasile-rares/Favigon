@@ -524,8 +524,13 @@ export class ProjectPage implements OnDestroy {
     const nearRight = x > w - t;
 
     if (!nearTop && !nearBottom && !nearLeft && !nearRight) {
-      // Interior click — overlay doesn't bubble to canvas-element, so delegate drag manually
-      this.onElementPointerDown(event, id);
+      // Interior click — find the topmost element at this canvas point.
+      // The selection-outline (z-index:10) sits above all element divs, so without
+      // this hit-test clicking on an overlapping element would always re-select/drag
+      // the already-selected one instead.
+      const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+      const topId = pointer ? this.getTopElementIdAtPoint(pointer.x, pointer.y) : null;
+      this.onElementPointerDown(event, topId ?? id);
       return;
     }
 
@@ -859,6 +864,10 @@ export class ProjectPage implements OnDestroy {
   onPointerUp(): void {
     const shouldCommitGestureHistory =
       this.isDragging || this.isResizing || this.isRotating || this.isAdjustingCornerRadius;
+
+    if (this.isDragging) {
+      this.autoGroupOnDrop();
+    }
 
     if (this.viewport.isPanning() && this.viewport.panMoved) {
       this.suppressNextCanvasClick = true;
@@ -1580,6 +1589,71 @@ export class ProjectPage implements OnDestroy {
 
   private getCanvasElement(): HTMLElement | null {
     return document.querySelector('.canvas-container') as HTMLElement | null;
+  }
+
+  /** Returns the id of the topmost non-frame element whose bounds contain (x, y)
+   *  in canvas (world) coordinates, or null if none. */
+  private getTopElementIdAtPoint(x: number, y: number): string | null {
+    const elements = this.visibleElements();
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const el = elements[i];
+      if (el.type === 'frame') continue;
+      const b = this.el.getAbsoluteBounds(el, this.elements());
+      if (x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height) {
+        return el.id;
+      }
+    }
+    return null;
+  }
+
+  /** After a drag, if a free element was dropped inside a frame that is larger
+   *  than the element, auto-reparent it to that frame. */
+  private autoGroupOnDrop(): void {
+    const id = this.selectedElementId();
+    if (!id) return;
+
+    const elements = this.elements();
+    const element = this.el.findElementById(id, elements);
+    if (!element || element.type === 'frame' || element.parentId) return;
+
+    const elementBounds = this.el.getAbsoluteBounds(element, elements);
+    const centerX = elementBounds.x + elementBounds.width / 2;
+    const centerY = elementBounds.y + elementBounds.height / 2;
+
+    // Find all frames whose bounds contain the element's center and that are
+    // strictly larger than the element in both dimensions.
+    const candidateFrames = elements.filter((el) => {
+      if (el.type !== 'frame') return false;
+      const fb = this.el.getAbsoluteBounds(el, elements);
+      const centerInside =
+        centerX >= fb.x &&
+        centerX <= fb.x + fb.width &&
+        centerY >= fb.y &&
+        centerY <= fb.y + fb.height;
+      const frameLarger = el.width > element.width && el.height > element.height;
+      return centerInside && frameLarger;
+    });
+
+    if (candidateFrames.length === 0) return;
+
+    // Pick the smallest qualifying frame (the most specific container).
+    const targetFrame = candidateFrames.reduce((best, current) =>
+      current.width * current.height < best.width * best.height ? current : best,
+    );
+
+    const fb = this.el.getAbsoluteBounds(targetFrame, elements);
+    this.updateCurrentPageElements((els) =>
+      els.map((el) =>
+        el.id === id
+          ? {
+              ...el,
+              parentId: targetFrame.id,
+              x: clamp(elementBounds.x - fb.x, 0, targetFrame.width - element.width),
+              y: clamp(elementBounds.y - fb.y, 0, targetFrame.height - element.height),
+            }
+          : el,
+      ),
+    );
   }
 
   private focusInlineTextEditor(elementId: string): void {
