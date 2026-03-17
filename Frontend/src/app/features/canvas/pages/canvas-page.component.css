@@ -84,6 +84,11 @@ app-header-bar {
   &.text {
     color: var(--color-white);
     display: flex;
+
+    &.editing.has-text {
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8);
+      border-radius: 2px;
+    }
   }
 
   &.editing {
@@ -125,17 +130,13 @@ app-header-bar {
 .text-inline-editor {
   width: 100%;
   height: 100%;
-  padding: 0.15rem 0.25rem;
+  padding: 0;
   overflow: hidden;
 }
 
 .text-content {
-  display: flex;
-
   span {
-    width: 100%;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
+    white-space: pre;
   }
 }
 
@@ -143,13 +144,11 @@ app-header-bar {
   border: none;
   outline: none;
   resize: none;
-  background: rgba(24, 24, 27, 0.88);
+  background: transparent;
   color: inherit;
   font: inherit;
-  white-space: pre-wrap;
-  caret-color: var(--color-white);
-  border-radius: 4px;
-  box-shadow: inset 0 0 0 1px var(--color-brand-primary-30);
+  white-space: pre;
+  caret-color: currentColor;
 }
 
 .selection-outline {

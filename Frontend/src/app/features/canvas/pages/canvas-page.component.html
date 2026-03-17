@@ -41,6 +41,7 @@
             class="canvas-element"
             [class.selected]="selectedElementId() === el.id"
             [class.editing]="isTextEditing(el.id)"
+            [class.has-text]="el.type === 'text' && !!el.text"
             [class.frame]="el.type === 'frame'"
             [class.rectangle]="el.type === 'rectangle'"
             [class.circle]="el.type === 'circle'"
@@ -88,8 +89,6 @@
                   [style.font-style]="getTextFontStyle(el)"
                   [style.line-height]="getTextLineHeight(el)"
                   [style.letter-spacing]="getTextLetterSpacing(el)"
-                  [style.justify-content]="getTextJustifyContent(el)"
-                  [style.align-items]="getTextAlignItems(el)"
                   [style.text-align]="getTextAlignValue(el)">
                   <span>{{ el.text }}</span>
                 </div>
@@ -141,7 +140,7 @@
           <!-- Hover outline (visual only, no pointer events) -->
           <ng-container *ngFor="let el of visibleElements(); trackBy: trackByElementId">
             <div
-              *ngIf="hoveredElementId() === el.id && el.type !== 'frame'"
+              *ngIf="hoveredElementId() === el.id && el.type !== 'frame' && !isTextEditing(el.id)"
               class="overlay-hover-outline"
               [class.is-circle]="el.type === 'circle'"
               [style.left.px]="getSelectionLeft(el)"
@@ -153,7 +152,7 @@
           </ng-container>
 
           <!-- Selection outline + handles -->
-          <ng-container *ngIf="selectedElement() as sel">
+          <ng-container *ngIf="getSelectionOverlayElement() as sel">
             <div
               class="selection-outline"
               [class.is-circle]="sel.type === 'circle'"

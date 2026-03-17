@@ -483,7 +483,15 @@ export class ProjectPage implements OnDestroy {
     this.history.beginTextEditHistory(() => this.createHistorySnapshot());
     const value = (event.target as HTMLTextAreaElement).value;
     this.updateCurrentPageElements((elements) =>
-      elements.map((element) => (element.id === id ? { ...element, text: value } : element)),
+      elements.map((element) => {
+        if (element.id !== id) return element;
+        const updated = { ...element, text: value };
+        if (value) {
+          const size = this.measureTextSize(updated);
+          return { ...updated, width: size.width, height: size.height };
+        }
+        return updated;
+      }),
     );
   }
 
@@ -491,6 +499,11 @@ export class ProjectPage implements OnDestroy {
     this.history.commitTextEditHistory(() => this.createHistorySnapshot());
     if (this.editingTextElementId() === id) {
       this.editingTextElementId.set(null);
+    }
+    const element = this.el.findElementById(id, this.elements());
+    if (element?.type === 'text' && !element.text?.trim()) {
+      this.updateCurrentPageElements((elements) => elements.filter((el) => el.id !== id));
+      this.selectedElementId.set(null);
     }
   }
 
@@ -948,6 +961,13 @@ export class ProjectPage implements OnDestroy {
 
   getElementOutlineOffset(_element: CanvasElement): number {
     return 0;
+  }
+
+  getSelectionOverlayElement(): CanvasElement | null {
+    const sel = this.selectedElement();
+    if (!sel) return null;
+    if (sel.type === 'text') return null;
+    return sel;
   }
 
   getRenderedX(element: CanvasElement): number {
@@ -1670,6 +1690,35 @@ export class ProjectPage implements OnDestroy {
       const textLength = editor.value.length;
       editor.setSelectionRange(textLength, textLength);
     }, 0);
+  }
+
+  private measureTextSize(element: CanvasElement): { width: number; height: number } {
+    const mirror = document.createElement('textarea');
+    mirror.style.cssText = [
+      'position:fixed',
+      'top:-9999px',
+      'left:-9999px',
+      'visibility:hidden',
+      'border:none',
+      'outline:none',
+      'resize:none',
+      'padding:0',
+      'overflow:hidden',
+      'white-space:pre',
+      'width:1px',
+      `font-size:${element.fontSize ?? 16}px`,
+      `font-family:${this.el.getTextFontFamily(element)}`,
+      `font-weight:${this.el.getTextFontWeight(element)}`,
+      `font-style:${this.el.getTextFontStyle(element)}`,
+      `line-height:${this.el.getTextLineHeight(element)}`,
+      `letter-spacing:${this.el.getTextLetterSpacing(element)}`,
+    ].join(';');
+    mirror.value = element.text || ' ';
+    document.body.appendChild(mirror);
+    const w = mirror.scrollWidth;
+    const h = mirror.scrollHeight;
+    document.body.removeChild(mirror);
+    return { width: Math.max(w, 24), height: Math.max(h, 24) };
   }
 
   // ── Private: History Shortcuts ────────────────────────────
