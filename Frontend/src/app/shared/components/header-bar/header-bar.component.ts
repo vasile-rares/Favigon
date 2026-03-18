@@ -299,7 +299,7 @@ export class HeaderBarComponent implements OnInit {
     this.isUserMenuOpen = false;
     HeaderBarComponent.cachedProfile = undefined;
     this.authService.logout().subscribe();
-    void this.router.navigate(['/login']);
+    void this.router.navigate(['/login'], { replaceUrl: true });
   }
 
   toggleUserMenu(): void {

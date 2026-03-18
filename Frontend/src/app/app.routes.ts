@@ -4,12 +4,14 @@ import { ResetPasswordPage } from './features/auth/pages/reset-password-page.com
 import { ProjectPage } from './features/canvas/pages/canvas-page.component';
 import { ProfilePage } from './features/profile/pages/profile-page.component';
 import { SettingsPage } from './features/settings/pages/settings-page.component';
+import { authGuard } from './core/guards/auth.guard';
+import { loginGuard } from './core/guards/login.guard';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/login', pathMatch: 'full' },
-  { path: 'login', component: AuthPage },
+  { path: 'login', component: AuthPage, canActivate: [loginGuard] },
   { path: 'reset-password', component: ResetPasswordPage },
-  { path: 'project/:id', component: ProjectPage },
-  { path: 'settings', component: SettingsPage },
-  { path: ':username', component: ProfilePage },
+  { path: 'project/:id', component: ProjectPage, canActivate: [authGuard] },
+  { path: 'settings', component: SettingsPage, canActivate: [authGuard] },
+  { path: ':username', component: ProfilePage, canActivate: [authGuard] },
 ];

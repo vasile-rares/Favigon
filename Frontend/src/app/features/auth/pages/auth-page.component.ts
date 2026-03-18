@@ -199,7 +199,7 @@ export class AuthPage implements OnInit {
       this.handleRememberMe(email.trim(), rememberMe);
       this.statusMessage.set({ type: 'success', text: response.message || 'Login successful.' });
       const user = await firstValueFrom(this.userService.getMe());
-      await this.router.navigate(['/', user.username]);
+      await this.navigateAfterLogin(user.username);
     } catch (error: any) {
       this.handleError(error, 'Could not log in.');
     } finally {
@@ -373,7 +373,7 @@ export class AuthPage implements OnInit {
       }
 
       const user = await firstValueFrom(this.userService.getMe());
-      await this.router.navigate(['/', user.username]);
+      await this.navigateAfterLogin(user.username);
     } catch (error: any) {
       this.handleError(
         error,
@@ -389,5 +389,15 @@ export class AuthPage implements OnInit {
 
   private handleError(error: any, defaultMsg: string) {
     this.statusMessage.set({ type: 'error', text: extractApiErrorMessage(error, defaultMsg) });
+  }
+
+  private navigateAfterLogin(username: string): Promise<boolean> {
+    const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl')?.trim() ?? '';
+
+    if (returnUrl.startsWith('/') && returnUrl !== '/login') {
+      return this.router.navigateByUrl(returnUrl, { replaceUrl: true });
+    }
+
+    return this.router.navigate(['/', username], { replaceUrl: true });
   }
 }
