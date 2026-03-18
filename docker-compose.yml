@@ -1,53 +1,59 @@
 ﻿services:
-  db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: FavigonDb
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - internal
+    db:
+        image: postgres:16-alpine
+        environment:
+            POSTGRES_DB: FavigonDb
+            POSTGRES_USER: ${POSTGRES_USER}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test:
+                [
+                    "CMD-SHELL",
+                    "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
+                ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        networks:
+            - internal
 
-  api:
-    build:
-      context: ./Backend
-    environment:
-      ASPNETCORE_ENVIRONMENT: Production
-      ASPNETCORE_URLS: http://+:8080
-      ConnectionStrings__FavigonDb: "Host=db;Port=5432;Database=FavigonDb;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - internal
+    api:
+        build:
+            context: ./Backend
+        environment:
+            ASPNETCORE_ENVIRONMENT: Production
+            ASPNETCORE_URLS: http://+:8080
+            ConnectionStrings__FavigonDb: "Host=db;Port=5432;Database=FavigonDb;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+        depends_on:
+            db:
+                condition: service_healthy
+        networks:
+            - internal
 
-  frontend:
-    build:
-      context: ./Frontend
-    depends_on:
-      - api
-    networks:
-      - internal
+    frontend:
+        build:
+            context: ./Frontend
+            args:
+                USE_PRODUCTION_ENV_FILE: "true"
+        depends_on:
+            - api
+        networks:
+            - internal
 
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      - frontend
-    restart: unless-stopped
-    networks:
-      - internal
+    cloudflared:
+        image: cloudflare/cloudflared:latest
+        command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+        depends_on:
+            - frontend
+        restart: unless-stopped
+        networks:
+            - internal
 
 volumes:
-  postgres_data:
+    postgres_data:
 
 networks:
-  internal:
-    driver: bridge
+    internal:
+        driver: bridge
