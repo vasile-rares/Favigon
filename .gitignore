@@ -14,6 +14,7 @@
 # Local development settings (contain sensitive data)
 **/appsettings.Development.json
 **/appsettings.Production.json
+**/environment.production.ts
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
