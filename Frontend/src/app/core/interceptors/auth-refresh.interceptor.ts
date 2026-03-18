@@ -32,7 +32,13 @@ export const authRefreshInterceptor: HttpInterceptorFn = (request, next) => {
       return authService.refresh().pipe(
         switchMap(() => next(request)),
         catchError((refreshError) => {
-          router.navigate(['/login'], { replaceUrl: true });
+          const currentPath = router.url.split('?')[0];
+          const isPublicAuthPath = currentPath === '/login' || currentPath === '/reset-password';
+
+          if (!isPublicAuthPath) {
+            router.navigate(['/login'], { replaceUrl: true });
+          }
+
           return throwError(() => refreshError);
         }),
       );

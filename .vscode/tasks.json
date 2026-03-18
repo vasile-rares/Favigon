@@ -1,4 +1,4 @@
-﻿{
+{
     "version": "2.0.0",
     "tasks": [
         {
@@ -80,6 +80,57 @@
                 "reveal": "always",
                 "panel": "dedicated"
             }
+        },
+        {
+            "label": "docker: compose up (detached, build)",
+            "type": "process",
+            "command": "docker",
+            "args": [
+                "compose",
+                "up",
+                "-d",
+                "--build",
+                "--remove-orphans"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "docker: compose down",
+            "type": "process",
+            "command": "docker",
+            "args": [
+                "compose",
+                "down"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "docker: compose pull",
+            "type": "process",
+            "command": "docker",
+            "args": [
+                "compose",
+                "pull"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "docker: refresh (pull + recreate)",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "docker: compose pull",
+                "docker: compose up (detached, build)"
+            ],
+            "problemMatcher": []
         }
     ]
 }

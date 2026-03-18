@@ -58,7 +58,7 @@
 
     cloudflared:
         image: cloudflare/cloudflared:latest
-        command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+        command: tunnel --no-autoupdate --protocol http2 run --token ${CLOUDFLARE_TUNNEL_TOKEN}
         depends_on:
             - frontend
         restart: unless-stopped
