@@ -13,7 +13,8 @@
         *ngFor="let page of pages; trackBy: trackByPageId"
         [class.active]="page.id === currentPageId">
         <button type="button" class="project-page-select" (click)="onPageSelect(page.id)">
-          {{ page.name }}
+          <span class="project-page-name">{{ page.name }}</span>
+          <span class="project-page-meta">{{ getPageViewportLabel(page) }}</span>
         </button>
         <button
           type="button"
@@ -34,9 +35,25 @@
 
   <section class="project-layers">
     <h4>Layers</h4>
-    <p class="project-layers-empty" *ngIf="layerEntries.length === 0">No elements on canvas yet.</p>
+    <p class="project-layers-empty" *ngIf="visiblePageLayers.length === 0 && layerEntries.length === 0">No elements on canvas yet.</p>
 
-    <div class="project-layers-list" *ngIf="layerEntries.length > 0">
+    <div class="project-page-layers-list" *ngIf="visiblePageLayers.length > 0">
+      <button
+        type="button"
+        class="project-layer-item project-page-layer-item"
+        *ngFor="let page of visiblePageLayers; trackBy: trackByPageId"
+        [class.active]="page.id === focusedPageId"
+        (click)="onPageSelect(page.id)">
+        <span class="project-layer-icon" aria-hidden="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        </span>
+        <div class="project-layer-body">
+          <span class="project-page-layer-name">{{ page.name }}</span>
+        </div>
+      </button>
+    </div>
+
+    <div class="project-layers-list" *ngIf="focusedPageId && layerEntries.length > 0">
       <div
         class="project-layer-item"
         *ngFor="let layer of layerEntries; trackBy: trackByLayerId"
@@ -46,7 +63,7 @@
         [class.is-drop-before]="isLayerDropTarget(layer.id, 'before')"
         [class.is-drop-after]="isLayerDropTarget(layer.id, 'after')"
         [class.is-drop-inside]="isLayerDropTarget(layer.id, 'inside')"
-        [style.padding-left]="'calc(0.7rem + ' + (layer.depth * 12) + 'px)'"
+        [style.padding-left]="'calc(1.4rem + ' + (layer.depth * 12) + 'px)'"
         draggable="true"
         (dragstart)="onLayerDragStart(layer.id, $event)"
         (dragover)="onLayerDragOver(layer, $event)"

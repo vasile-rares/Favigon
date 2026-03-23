@@ -4,6 +4,7 @@ export type CanvasElementType = 'frame' | 'rectangle' | 'circle' | 'text' | 'ima
 export type CanvasTextAlign = 'left' | 'center' | 'right';
 export type CanvasTextVerticalAlign = 'top' | 'middle' | 'bottom';
 export type CanvasFontStyle = 'normal' | 'italic';
+export type CanvasPageViewportPreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
 
 export interface CanvasElementIrMeta {
   type?: string;
@@ -44,6 +45,11 @@ export interface CanvasElement {
 export interface CanvasPageModel {
   id: string;
   name: string;
+  viewportPreset?: CanvasPageViewportPreset;
+  viewportWidth?: number;
+  viewportHeight?: number;
+  canvasX?: number;
+  canvasY?: number;
   elements: CanvasElement[];
 }
 

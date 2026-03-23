@@ -8,11 +8,12 @@ import {
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   CanvasElement,
   CanvasElementType,
   CanvasPageModel,
+  CanvasPageViewportPreset,
 } from '../../../core/models/canvas.models';
 import { buildCanvasIR, buildCanvasProjectDocument } from '../mappers/canvas-ir.mapper';
 import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
@@ -26,7 +27,14 @@ import { buildSnapCandidates, computeSnappedPosition } from '../utils/canvas-sna
 import { generateThumbnail } from '../utils/canvas-thumbnail.util';
 import { CanvasGenerationService } from '../services/canvas-generation.service';
 import { CanvasPersistenceService } from '../services/canvas-persistence.service';
-import { ContextMenuComponent } from '../../../shared/components/context-menu/context-menu.component';
+import {
+  ContextMenuComponent,
+  ContextMenuItem,
+} from '../../../shared/components/context-menu/context-menu.component';
+import {
+  DialogBoxComponent,
+  DialogBoxField,
+} from '../../../shared/components/dialog-box/dialog-box.component';
 import {
   SupportedFramework,
   HandlePosition,
@@ -53,6 +61,55 @@ import {
   ContextMenuActionCallbacks,
 } from '../services/canvas-context-menu.service';
 
+interface ViewportPresetOption {
+  id: CanvasPageViewportPreset;
+  label: string;
+  width: number;
+  height: number;
+}
+
+interface PageCanvasLayout {
+  pageId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface PageDragState {
+  pageId: string;
+  pointerX: number;
+  pointerY: number;
+  startX: number;
+  startY: number;
+}
+
+type DeviceFramePreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
+
+const VIEWPORT_PRESET_OPTIONS: ViewportPresetOption[] = [
+  { id: 'desktop', label: 'Desktop', width: 1280, height: 720 },
+  { id: 'tablet', label: 'Tablet', width: 800, height: 1100 },
+  { id: 'mobile', label: 'Mobile', width: 375, height: 812 },
+];
+
+const DEVICE_FRAME_OPTIONS: ViewportPresetOption[] = [
+  { id: 'desktop', label: 'Desktop', width: 1280, height: 720 },
+  { id: 'tablet', label: 'Tablet', width: 800, height: 1100 },
+  { id: 'mobile', label: 'Mobile', width: 375, height: 812 },
+];
+
+const MIN_CUSTOM_VIEWPORT_SIZE = 100;
+const PAGE_CANVAS_GAP = 120;
+const ROOT_FRAME_INSERT_GAP = 48;
+const PAGE_SHELL_SIDE_PADDING = 28;
+const PAGE_SHELL_BOTTOM_PADDING = 28;
+const PAGE_SHELL_HEADER_TOP_PADDING = 10;
+const PAGE_SHELL_HEADER_HEIGHT = 32;
+const PAGE_SHELL_HEADER_TO_FRAME_TITLE_GAP = 52;
+const PAGE_FRAME_TITLE_OFFSET = 24;
+const PAGE_SHELL_HEADER_HORIZONTAL_INSET = 8;
+const FRAME_TITLE_MIN_ZOOM = 0.62;
+
 @Component({
   selector: 'app-canvas-page',
   standalone: true,
@@ -63,6 +120,7 @@ import {
     ProjectPanelComponent,
     PropertiesPanelComponent,
     ContextMenuComponent,
+    DialogBoxComponent,
   ],
   providers: [
     CanvasViewportService,
@@ -77,6 +135,7 @@ import {
 })
 export class ProjectPage implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly canvasGenerationService = inject(CanvasGenerationService);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
 
@@ -89,11 +148,35 @@ export class ProjectPage implements OnDestroy {
 
   // ── Core State ────────────────────────────────────────────
 
-  readonly pages = signal<CanvasPageModel[]>([this.el.createPage('Page 1')]);
-  readonly currentPageId = signal<string | null>(this.pages()[0]?.id ?? null);
+  readonly pages = signal<CanvasPageModel[]>([]);
+  readonly currentPageId = signal<string | null>(null);
   readonly selectedElementId = signal<string | null>(null);
   readonly editingTextElementId = signal<string | null>(null);
   readonly currentTool = signal<CanvasElementType | 'select'>('select');
+  readonly layersFocusedPageId = signal<string | null>(null);
+  readonly isViewportMenuOpen = signal(false);
+  readonly isDeviceMenuOpen = signal(false);
+  readonly deviceMenuX = signal(0);
+  readonly deviceMenuY = signal(0);
+  readonly deviceMenuItems = signal<ContextMenuItem[]>([]);
+  readonly deviceMenuTargetPageId = signal<string | null>(null);
+  readonly isCustomFrameDialogOpen = signal(false);
+  readonly customFrameWidth = signal(480);
+  readonly customFrameHeight = signal(800);
+  readonly customFrameDialogFields = computed<DialogBoxField[]>(() => [
+    {
+      key: 'width',
+      label: 'Width',
+      type: 'number',
+      initialValue: String(this.customFrameWidth()),
+    },
+    {
+      key: 'height',
+      label: 'Height',
+      type: 'number',
+      initialValue: String(this.customFrameHeight()),
+    },
+  ]);
 
   // ── Computed Signals ──────────────────────────────────────
 
@@ -122,6 +205,54 @@ export class ProjectPage implements OnDestroy {
   );
 
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
+  readonly pageLayouts = computed<PageCanvasLayout[]>(() => {
+    const pages = this.pages();
+    let cursorX = 0;
+    return pages.map((page) => {
+      const width = this.normalizeViewportSize(page.viewportWidth, 1280);
+      const height = this.normalizeViewportSize(page.viewportHeight, 720);
+      const pageX =
+        typeof page.canvasX === 'number' && Number.isFinite(page.canvasX) ? page.canvasX : cursorX;
+      const pageY =
+        typeof page.canvasY === 'number' && Number.isFinite(page.canvasY) ? page.canvasY : 0;
+      const layout: PageCanvasLayout = {
+        pageId: page.id,
+        x: pageX,
+        y: pageY,
+        width,
+        height,
+      };
+      cursorX = Math.max(cursorX, pageX + width + PAGE_CANVAS_GAP);
+      return layout;
+    });
+  });
+  readonly activePageLayout = computed<PageCanvasLayout | null>(() => {
+    const activeId = this.currentPageId();
+    if (!activeId) {
+      return null;
+    }
+    return this.pageLayouts().find((layout) => layout.pageId === activeId) ?? null;
+  });
+  readonly inactivePageLayouts = computed<PageCanvasLayout[]>(() => {
+    const activeId = this.currentPageId();
+    return this.pageLayouts().filter((layout) => layout.pageId !== activeId);
+  });
+  readonly deviceFrameOptions = DEVICE_FRAME_OPTIONS;
+  readonly viewportPresetOptions = VIEWPORT_PRESET_OPTIONS;
+  readonly currentViewportPreset = computed<CanvasPageViewportPreset>(
+    () => this.currentPage()?.viewportPreset ?? 'desktop',
+  );
+  readonly currentViewportWidth = computed<number>(() =>
+    this.normalizeViewportSize(this.currentPage()?.viewportWidth, 1280),
+  );
+  readonly currentViewportHeight = computed<number>(() =>
+    this.normalizeViewportSize(this.currentPage()?.viewportHeight, 720),
+  );
+  readonly currentViewportLabel = computed<string>(() => {
+    const preset = this.currentViewportPreset();
+    const matchedOption = this.viewportPresetOptions.find((option) => option.id === preset);
+    return matchedOption ? matchedOption.label : 'Custom';
+  });
   readonly cornerHandles: CornerHandle[] = ['nw', 'ne', 'sw', 'se'];
 
   // ── API / Generation State ────────────────────────────────
@@ -163,9 +294,21 @@ export class ProjectPage implements OnDestroy {
   readonly hoveredElementId = signal<string | null>(null);
   readonly hoveredFrameTitleId = signal<string | null>(null);
   readonly snapLines = signal<SnapLine[]>([]);
+  readonly isFrameReorderAnimating = signal(false);
   private isResizing = false;
   private isRotating = false;
   private isAdjustingCornerRadius = false;
+  private isDraggingPage = false;
+  private hasMovedPageDuringDrag = false;
+  private suppressNextPageShellClick = false;
+  private frameReorderAnimationTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private pageDragState: PageDragState = {
+    pageId: '',
+    pointerX: 0,
+    pointerY: 0,
+    startX: 0,
+    startY: 0,
+  };
   private suppressNextCanvasClick = false;
 
   private resizeStart: ResizeState = {
@@ -219,10 +362,24 @@ export class ProjectPage implements OnDestroy {
       this.saveTimeoutId = null;
     }
 
+    if (this.frameReorderAnimationTimeoutId) {
+      clearTimeout(this.frameReorderAnimationTimeoutId);
+      this.frameReorderAnimationTimeoutId = null;
+    }
+
     this.persistThumbnailIfDue();
   }
 
   // ── Tool Selection ────────────────────────────────────────
+
+  onToolbarToolSelected(tool: CanvasElementType | 'select'): void {
+    if (tool === 'frame') {
+      this.addPage();
+      return;
+    }
+
+    this.selectTool(tool);
+  }
 
   selectTool(tool: CanvasElementType | 'select'): void {
     this.currentTool.set(tool);
@@ -241,20 +398,59 @@ export class ProjectPage implements OnDestroy {
 
   addPage(): void {
     this.runWithHistory(() => {
-      const page = this.el.createPage(this.el.getNextPageName(this.pages()));
+      const position = this.getNextPageCanvasPosition();
+      const basePage = this.el.createPage(this.el.getNextPageName(this.pages()));
+      const desktopWidth = this.normalizeViewportSize(basePage.viewportWidth, 1280);
+      const desktopHeight = this.normalizeViewportSize(basePage.viewportHeight, 720);
+      const desktopFrame = {
+        ...this.el.createFrameAtCenter(
+          {
+            x: desktopWidth / 2,
+            y: desktopHeight / 2,
+          },
+          desktopWidth,
+          desktopHeight,
+          'Desktop',
+          [],
+        ),
+        name: 'Desktop',
+        x: 0,
+        y: 0,
+      };
+      const page = {
+        ...basePage,
+        canvasX: position.x,
+        canvasY: position.y,
+        elements: [desktopFrame],
+      };
       this.pages.update((pages) => [...pages, page]);
       this.currentPageId.set(page.id);
+      this.layersFocusedPageId.set(page.id);
       this.selectedElementId.set(null);
+      this.currentTool.set('select');
     });
   }
 
   selectPage(pageId: string): void {
-    if (pageId === this.currentPageId()) {
-      return;
+    if (pageId !== this.currentPageId()) {
+      this.currentPageId.set(pageId);
     }
-    this.currentPageId.set(pageId);
+
+    this.closeViewportMenu();
+    this.closeDeviceFrameMenu();
+    this.layersFocusedPageId.set(pageId);
     this.selectedElementId.set(null);
     this.currentTool.set('select');
+    this.focusPageSmooth(pageId);
+  }
+
+  onInactivePageShellClick(pageId: string): void {
+    if (this.suppressNextPageShellClick) {
+      this.suppressNextPageShellClick = false;
+      return;
+    }
+
+    this.selectPage(pageId);
   }
 
   deletePage(pageId: string): void {
@@ -293,10 +489,457 @@ export class ProjectPage implements OnDestroy {
     });
   }
 
+  toggleViewportMenu(): void {
+    this.isViewportMenuOpen.update((open) => !open);
+  }
+
+  closeViewportMenu(): void {
+    this.isViewportMenuOpen.set(false);
+  }
+
+  openDeviceFrameMenu(event: MouseEvent, pageId?: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const target = event.currentTarget as HTMLElement | null;
+    if (!target) {
+      return;
+    }
+
+    const bounds = target.getBoundingClientRect();
+    this.deviceMenuTargetPageId.set(pageId ?? this.currentPageId());
+    this.deviceMenuItems.set([
+      {
+        id: 'device-mobile',
+        label: 'Phone',
+        action: () => this.addDeviceFrame('mobile'),
+      },
+      {
+        id: 'device-tablet',
+        label: 'Tablet',
+        action: () => this.addDeviceFrame('tablet'),
+      },
+      {
+        id: 'device-custom',
+        label: 'Custom...',
+        action: () => this.addDeviceFrame('custom'),
+      },
+    ]);
+    this.deviceMenuX.set(Math.round(bounds.left));
+    this.deviceMenuY.set(Math.round(bounds.bottom + 6));
+    this.isDeviceMenuOpen.set(true);
+  }
+
+  closeDeviceFrameMenu(clearTarget = true): void {
+    this.isDeviceMenuOpen.set(false);
+    this.deviceMenuItems.set([]);
+    if (clearTarget) {
+      this.deviceMenuTargetPageId.set(null);
+    }
+  }
+
+  onPageNamePointerDown(event: MouseEvent, pageId: string): void {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const layout = this.getPageLayoutById(pageId);
+    if (!layout) {
+      return;
+    }
+
+    this.startPageDrag(event, pageId, layout);
+  }
+
+  onPageShellPointerDown(event: MouseEvent, pageId: string): void {
+    if (event.button !== 0) {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    if (!target) {
+      return;
+    }
+
+    if (target.closest('.page-shell-header')) {
+      return;
+    }
+
+    const layout = this.getPageLayoutById(pageId);
+    if (!layout) {
+      return;
+    }
+
+    this.startPageDrag(event, pageId, layout);
+  }
+
+  private startPageDrag(event: MouseEvent, pageId: string, layout: PageCanvasLayout): void {
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    if (!pointer) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    this.hasMovedPageDuringDrag = false;
+    this.beginGestureHistory();
+    this.isDraggingPage = true;
+    this.pageDragState = {
+      pageId,
+      pointerX: pointer.x,
+      pointerY: pointer.y,
+      startX: layout.x,
+      startY: layout.y,
+    };
+  }
+
+  addDeviceFrame(preset: DeviceFramePreset): void {
+    const targetPageId = this.deviceMenuTargetPageId() ?? this.currentPageId();
+    if (!targetPageId) {
+      this.closeDeviceFrameMenu();
+      return;
+    }
+
+    if (preset === 'custom') {
+      this.closeDeviceFrameMenu(false);
+      this.openCustomFrameDialog();
+      return;
+    }
+
+    this.closeDeviceFrameMenu();
+
+    const option = this.deviceFrameOptions.find((entry) => entry.id === preset);
+    if (!option) {
+      return;
+    }
+
+    const desktopFrame = this.getDesktopFrameForPage(targetPageId);
+    const forcedHeight = desktopFrame
+      ? desktopFrame.height
+      : this.normalizeViewportSize(this.getPageById(targetPageId)?.viewportHeight, option.height);
+    const forcedY = desktopFrame ? desktopFrame.y : 0;
+
+    this.insertFrameIntoPage(targetPageId, option.label, option.width, option.height, {
+      forcedHeight,
+      forcedY,
+    });
+  }
+
+  openCustomFrameDialog(): void {
+    this.customFrameWidth.set(480);
+    this.customFrameHeight.set(800);
+    this.isCustomFrameDialogOpen.set(true);
+  }
+
+  closeCustomFrameDialog(): void {
+    this.isCustomFrameDialogOpen.set(false);
+  }
+
+  onCustomFrameWidthInput(event: Event): void {
+    const value = Number.parseInt((event.target as HTMLInputElement | null)?.value ?? '', 10);
+    if (!Number.isFinite(value)) {
+      return;
+    }
+    this.customFrameWidth.set(this.normalizeViewportSize(value, this.customFrameWidth()));
+  }
+
+  onCustomFrameHeightInput(event: Event): void {
+    const value = Number.parseInt((event.target as HTMLInputElement | null)?.value ?? '', 10);
+    if (!Number.isFinite(value)) {
+      return;
+    }
+    this.customFrameHeight.set(this.normalizeViewportSize(value, this.customFrameHeight()));
+  }
+
+  submitCustomFrameDialog(): void {
+    const targetPageId = this.deviceMenuTargetPageId() ?? this.currentPageId();
+    if (targetPageId) {
+      this.insertFrameIntoPage(
+        targetPageId,
+        'Custom',
+        this.customFrameWidth(),
+        this.customFrameHeight(),
+      );
+    }
+    this.deviceMenuTargetPageId.set(null);
+    this.closeCustomFrameDialog();
+  }
+
+  onCustomFrameDialogPrimary(values: Record<string, string>): void {
+    const width = Number.parseInt(values['width'] ?? '', 10);
+    const height = Number.parseInt(values['height'] ?? '', 10);
+
+    if (Number.isFinite(width)) {
+      this.customFrameWidth.set(this.normalizeViewportSize(width, this.customFrameWidth()));
+    }
+
+    if (Number.isFinite(height)) {
+      this.customFrameHeight.set(this.normalizeViewportSize(height, this.customFrameHeight()));
+    }
+
+    this.submitCustomFrameDialog();
+  }
+
+  applyViewportPreset(preset: CanvasPageViewportPreset): void {
+    const option = this.viewportPresetOptions.find((entry) => entry.id === preset);
+    if (!option) {
+      return;
+    }
+
+    this.runWithHistory(() => {
+      this.updateCurrentPage((page) => ({
+        ...page,
+        viewportPreset: preset,
+        viewportWidth: option.width,
+        viewportHeight: option.height,
+      }));
+    });
+
+    this.closeViewportMenu();
+  }
+
+  updateCustomViewportWidth(value: string): void {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+
+    this.runWithHistory(() => {
+      this.updateCurrentPage((page) => ({
+        ...page,
+        viewportPreset: 'custom',
+        viewportWidth: this.normalizeViewportSize(parsed, this.currentViewportWidth()),
+      }));
+    });
+  }
+
+  updateCustomViewportWidthFromEvent(event: Event): void {
+    const value = (event.target as HTMLInputElement | null)?.value ?? '';
+    this.updateCustomViewportWidth(value);
+  }
+
+  updateCustomViewportHeight(value: string): void {
+    const parsed = Number.parseInt(value, 10);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+
+    this.runWithHistory(() => {
+      this.updateCurrentPage((page) => ({
+        ...page,
+        viewportPreset: 'custom',
+        viewportHeight: this.normalizeViewportSize(parsed, this.currentViewportHeight()),
+      }));
+    });
+  }
+
+  updateCustomViewportHeightFromEvent(event: Event): void {
+    const value = (event.target as HTMLInputElement | null)?.value ?? '';
+    this.updateCustomViewportHeight(value);
+  }
+
+  openPreview(): void {
+    const currentPageId = this.currentPageId();
+    const urlTree = this.router.createUrlTree(['project', this.projectId, 'preview'], {
+      queryParams: currentPageId ? { pageId: currentPageId } : undefined,
+    });
+    const url = this.router.serializeUrl(urlTree);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  openPreviewForPage(pageId: string): void {
+    const urlTree = this.router.createUrlTree(['project', this.projectId, 'preview'], {
+      queryParams: { pageId },
+    });
+    const url = this.router.serializeUrl(urlTree);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  getPageById(pageId: string): CanvasPageModel | null {
+    return this.pages().find((page) => page.id === pageId) ?? null;
+  }
+
+  getPageLayoutById(pageId: string): PageCanvasLayout | null {
+    return this.pageLayouts().find((layout) => layout.pageId === pageId) ?? null;
+  }
+
+  getVisibleElementsForPage(pageId: string): CanvasElement[] {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return [];
+    }
+
+    return page.elements.filter((element) =>
+      this.el.isElementEffectivelyVisible(element.id, page.elements),
+    );
+  }
+
+  getPageShellLeft(pageId: string): number {
+    const layout = this.getPageLayoutById(pageId);
+    if (!layout) {
+      return 0;
+    }
+
+    const bounds = this.getPageContentBounds(pageId, layout.width, layout.height);
+    return roundToTwoDecimals(layout.x + bounds.minX - PAGE_SHELL_SIDE_PADDING);
+  }
+
+  getPageShellTop(pageId: string): number {
+    const layout = this.getPageLayoutById(pageId);
+    if (!layout) {
+      return 0;
+    }
+
+    const bounds = this.getPageContentBounds(pageId, layout.width, layout.height);
+    return roundToTwoDecimals(layout.y + bounds.minY - this.getPageShellTopPadding());
+  }
+
+  getPageShellWidth(pageId: string): number {
+    const layout = this.getPageLayoutById(pageId);
+    if (!layout) {
+      return 0;
+    }
+
+    const bounds = this.getPageContentBounds(pageId, layout.width, layout.height);
+    return roundToTwoDecimals(bounds.maxX - bounds.minX + PAGE_SHELL_SIDE_PADDING * 2);
+  }
+
+  getPageShellHeight(pageId: string): number {
+    const layout = this.getPageLayoutById(pageId);
+    if (!layout) {
+      return 0;
+    }
+
+    const bounds = this.getPageContentBounds(pageId, layout.width, layout.height);
+    return roundToTwoDecimals(
+      bounds.maxY - bounds.minY + this.getPageShellTopPadding() + PAGE_SHELL_BOTTOM_PADDING,
+    );
+  }
+
+  getPageShellHeaderLeft(pageId: string): number {
+    return roundToTwoDecimals(this.getPageShellLeft(pageId) + PAGE_SHELL_HEADER_HORIZONTAL_INSET);
+  }
+
+  getPageShellHeaderTop(pageId: string): number {
+    return roundToTwoDecimals(this.getPageShellTop(pageId) + PAGE_SHELL_HEADER_TOP_PADDING);
+  }
+
+  getPageShellHeaderWidth(pageId: string): number {
+    return roundToTwoDecimals(
+      Math.max(120, this.getPageShellWidth(pageId) - PAGE_SHELL_HEADER_HORIZONTAL_INSET * 2),
+    );
+  }
+
+  getPageShellHeaderScreenLeft(pageId: string): number {
+    return roundToTwoDecimals(this.getPageShellHeaderLeft(pageId) * this.viewport.zoomLevel());
+  }
+
+  getPageShellHeaderScreenTop(pageId: string): number {
+    return roundToTwoDecimals(this.getPageShellHeaderTop(pageId) * this.viewport.zoomLevel());
+  }
+
+  getPageShellHeaderScreenWidth(pageId: string): number {
+    return roundToTwoDecimals(this.getPageShellHeaderWidth(pageId) * this.viewport.zoomLevel());
+  }
+
+  getRenderedXForPage(element: CanvasElement, pageId: string): number {
+    const page = this.getPageById(pageId);
+    const layout = this.getPageLayoutById(pageId);
+    if (!page || !layout) {
+      return 0;
+    }
+
+    return layout.x + this.el.getAbsoluteBounds(element, page.elements).x;
+  }
+
+  getRenderedYForPage(element: CanvasElement, pageId: string): number {
+    const page = this.getPageById(pageId);
+    const layout = this.getPageLayoutById(pageId);
+    if (!page || !layout) {
+      return 0;
+    }
+
+    return layout.y + this.el.getAbsoluteBounds(element, page.elements).y;
+  }
+
+  private getPageShellTopPadding(): number {
+    return (
+      PAGE_SHELL_HEADER_TOP_PADDING +
+      PAGE_SHELL_HEADER_HEIGHT +
+      PAGE_SHELL_HEADER_TO_FRAME_TITLE_GAP +
+      PAGE_FRAME_TITLE_OFFSET
+    );
+  }
+
+  private getPageContentBounds(
+    pageId: string,
+    fallbackWidth: number,
+    fallbackHeight: number,
+  ): { minX: number; minY: number; maxX: number; maxY: number } {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return { minX: 0, minY: 0, maxX: fallbackWidth, maxY: fallbackHeight };
+    }
+
+    const rootFrames = page.elements.filter(
+      (element) => element.type === 'frame' && !element.parentId,
+    );
+    if (rootFrames.length === 0) {
+      return { minX: 0, minY: 0, maxX: fallbackWidth, maxY: fallbackHeight };
+    }
+
+    const firstBounds = this.el.getAbsoluteBounds(rootFrames[0], page.elements);
+    let minX = firstBounds.x;
+    let minY = firstBounds.y;
+    let maxX = firstBounds.x + firstBounds.width;
+    let maxY = firstBounds.y + firstBounds.height;
+
+    for (const frame of rootFrames) {
+      const bounds = this.el.getAbsoluteBounds(frame, page.elements);
+      minX = Math.min(minX, bounds.x);
+      minY = Math.min(minY, bounds.y);
+      maxX = Math.max(maxX, bounds.x + bounds.width);
+      maxY = Math.max(maxY, bounds.y + bounds.height);
+    }
+
+    return { minX, minY, maxX, maxY };
+  }
+
+  getElementClipPathForPage(element: CanvasElement, pageId: string): string {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return 'none';
+    }
+
+    return this.el.getElementClipPath(element, page.elements);
+  }
+
+  isElementClippedOutForPage(element: CanvasElement, pageId: string): boolean {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return false;
+    }
+
+    return this.el.isElementClippedOut(element, page.elements);
+  }
+
+  getSnapLineX(position: number): number {
+    const layout = this.activePageLayout();
+    return position + (layout?.x ?? 0);
+  }
+
+  getSnapLineY(position: number): number {
+    const layout = this.activePageLayout();
+    return position + (layout?.y ?? 0);
+  }
+
   // ── Canvas Events ─────────────────────────────────────────
 
   onCanvasPointerDown(event: MouseEvent): void {
     const target = event.target as HTMLElement;
+    if (this.isCanvasBackgroundTarget(target)) {
+      this.layersFocusedPageId.set(null);
+    }
     if (!this.shouldStartPanning(event, target)) {
       return;
     }
@@ -322,11 +965,14 @@ export class ProjectPage implements OnDestroy {
       const target = event.target as HTMLElement;
       if (this.isCanvasBackgroundTarget(target)) {
         this.selectedElementId.set(null);
+        this.layersFocusedPageId.set(null);
       }
       return;
     }
 
-    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    this.layersFocusedPageId.set(this.currentPageId());
+
+    const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) {
       return;
     }
@@ -383,15 +1029,10 @@ export class ProjectPage implements OnDestroy {
     }
 
     const elementForTypeCheck = this.el.findElementById(id, this.elements());
-    if (elementForTypeCheck?.type === 'frame') {
-      // Frame body is not interactable — clicking it deselects, then stops
-      if (this.currentTool() === 'select') {
-        this.selectedElementId.set(null);
-      }
-      return;
-    }
 
+    event.preventDefault();
     event.stopPropagation();
+    this.layersFocusedPageId.set(this.currentPageId());
     this.selectedElementId.set(id);
 
     if (this.currentTool() !== 'select') {
@@ -408,12 +1049,16 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const element = this.el.findElementById(id, this.elements());
+    const element = elementForTypeCheck ?? this.el.findElementById(id, this.elements());
     if (!element) {
       return;
     }
 
-    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    if (this.isRootFrame(element) && this.getRootFrameCount(this.elements()) <= 1) {
+      return;
+    }
+
+    const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) {
       return;
     }
@@ -441,6 +1086,7 @@ export class ProjectPage implements OnDestroy {
     }
 
     this.selectedElementId.set(id);
+    this.layersFocusedPageId.set(this.currentPageId());
 
     if (this.currentTool() !== 'select') {
       this.currentTool.set('select');
@@ -452,7 +1098,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) {
       return;
     }
@@ -470,6 +1116,7 @@ export class ProjectPage implements OnDestroy {
     if (element?.type !== 'text') {
       return;
     }
+    this.layersFocusedPageId.set(this.currentPageId());
     this.selectedElementId.set(id);
     this.editingTextElementId.set(id);
     this.focusInlineTextEditor(id);
@@ -541,7 +1188,7 @@ export class ProjectPage implements OnDestroy {
       // The selection-outline (z-index:10) sits above all element divs, so without
       // this hit-test clicking on an overlapping element would always re-select/drag
       // the already-selected one instead.
-      const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+      const pointer = this.getActivePageCanvasPoint(event);
       const topId = pointer ? this.getTopElementIdAtPoint(pointer.x, pointer.y) : null;
       this.onElementPointerDown(event, topId ?? id);
       return;
@@ -569,7 +1216,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) {
       return;
     }
@@ -603,7 +1250,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) {
       return;
     }
@@ -636,7 +1283,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) {
       return;
     }
@@ -680,6 +1327,7 @@ export class ProjectPage implements OnDestroy {
   }
 
   onLayerSelected(elementId: string): void {
+    this.layersFocusedPageId.set(this.currentPageId());
     this.selectedElementId.set(elementId);
     this.currentTool.set('select');
   }
@@ -723,8 +1371,12 @@ export class ProjectPage implements OnDestroy {
     });
 
     const centerPoint = this.viewport.getViewportCenterCanvasPoint(this.getCanvasElement());
+    const pageOffset = this.getActivePageOffset();
     const frame = this.el.createFrameAtCenter(
-      centerPoint,
+      {
+        x: centerPoint.x - pageOffset.x,
+        y: centerPoint.y - pageOffset.y,
+      },
       template.width,
       template.height,
       template.name,
@@ -772,6 +1424,31 @@ export class ProjectPage implements OnDestroy {
 
   @HostListener('window:pointermove', ['$event'])
   onPointerMove(event: MouseEvent): void {
+    if (this.isDraggingPage) {
+      const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+      if (!pointer) {
+        return;
+      }
+
+      const deltaX = pointer.x - this.pageDragState.pointerX;
+      const deltaY = pointer.y - this.pageDragState.pointerY;
+      if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+        this.hasMovedPageDuringDrag = true;
+      }
+      this.pages.update((pages) =>
+        pages.map((page) =>
+          page.id === this.pageDragState.pageId
+            ? {
+                ...page,
+                canvasX: roundToTwoDecimals(this.pageDragState.startX + deltaX),
+                canvasY: roundToTwoDecimals(this.pageDragState.startY + deltaY),
+              }
+            : page,
+        ),
+      );
+      return;
+    }
+
     if (this.viewport.isPanning()) {
       this.viewport.updatePan(event);
       return;
@@ -801,7 +1478,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) {
       return;
     }
@@ -828,6 +1505,10 @@ export class ProjectPage implements OnDestroy {
     const { xCandidates, yCandidates } = buildSnapCandidates(selectedId, elements, (el, els) =>
       this.el.getAbsoluteBounds(el, els),
     );
+    const pageWidth = this.currentViewportWidth();
+    const pageHeight = this.currentViewportHeight();
+    xCandidates.push(0, pageWidth / 2, pageWidth);
+    yCandidates.push(0, pageHeight / 2, pageHeight);
     const snap = computeSnappedPosition(
       absoluteX,
       absoluteY,
@@ -838,7 +1519,22 @@ export class ProjectPage implements OnDestroy {
     );
     absoluteX = snap.x;
     absoluteY = snap.y;
-    this.snapLines.set(snap.lines);
+    const isRootFrameDrag = dragged.type === 'frame' && !dragged.parentId;
+    if (isRootFrameDrag) {
+      absoluteY = this.dragStartAbsolute.y;
+      this.snapLines.set(snap.lines.filter((line) => line.type === 'vertical'));
+
+      this.updateCurrentPageElements((elements) => {
+        if (this.getRootFrameCount(elements) <= 1) {
+          return elements;
+        }
+
+        return this.reflowRootFrames(elements, selectedId, absoluteX);
+      });
+      return;
+    } else {
+      this.snapLines.set(snap.lines);
+    }
 
     this.updateCurrentPageElements((elements) =>
       elements.map((element) => {
@@ -847,6 +1543,14 @@ export class ProjectPage implements OnDestroy {
         }
 
         if (element.type === 'frame') {
+          if (isRootFrameDrag && !element.parentId) {
+            return {
+              ...element,
+              x: roundToTwoDecimals(absoluteX),
+              y: roundToTwoDecimals(this.dragStartAbsolute.y),
+            };
+          }
+
           return {
             ...element,
             x: roundToTwoDecimals(absoluteX),
@@ -873,13 +1577,43 @@ export class ProjectPage implements OnDestroy {
     );
   }
 
+  @HostListener('window:click', ['$event'])
+  onWindowClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement | null;
+    if (!target) {
+      return;
+    }
+
+    const viewportControl = target.closest('.canvas-viewport-control');
+    if (!viewportControl) {
+      this.closeViewportMenu();
+    }
+
+    const deviceControl = target.closest('.page-device-add');
+    if (!deviceControl) {
+      this.closeDeviceFrameMenu();
+    }
+  }
+
   @HostListener('window:pointerup')
   onPointerUp(): void {
+    const selectedOnDrop = this.selectedElement();
     const shouldCommitGestureHistory =
-      this.isDragging || this.isResizing || this.isRotating || this.isAdjustingCornerRadius;
+      this.isDragging ||
+      this.isResizing ||
+      this.isRotating ||
+      this.isAdjustingCornerRadius ||
+      this.isDraggingPage;
 
     if (this.isDragging) {
       this.autoGroupOnDrop();
+      if (selectedOnDrop?.type === 'frame' && !selectedOnDrop.parentId) {
+        this.alignRootFramesOnDrop();
+      }
+    }
+
+    if (this.isDraggingPage && this.hasMovedPageDuringDrag) {
+      this.suppressNextPageShellClick = true;
     }
 
     if (this.viewport.isPanning() && this.viewport.panMoved) {
@@ -891,6 +1625,8 @@ export class ProjectPage implements OnDestroy {
     this.isResizing = false;
     this.isRotating = false;
     this.isAdjustingCornerRadius = false;
+    this.isDraggingPage = false;
+    this.hasMovedPageDuringDrag = false;
     this.snapLines.set([]);
 
     if (shouldCommitGestureHistory) {
@@ -971,15 +1707,21 @@ export class ProjectPage implements OnDestroy {
   }
 
   getRenderedX(element: CanvasElement): number {
-    return this.el.getAbsoluteBounds(element, this.elements()).x;
+    const layout = this.activePageLayout();
+    return this.el.getAbsoluteBounds(element, this.elements()).x + (layout?.x ?? 0);
   }
 
   getRenderedY(element: CanvasElement): number {
-    return this.el.getAbsoluteBounds(element, this.elements()).y;
+    const layout = this.activePageLayout();
+    return this.el.getAbsoluteBounds(element, this.elements()).y + (layout?.y ?? 0);
   }
 
   getFrameTitle(element: CanvasElement): string {
     return this.el.getFrameTitle(element);
+  }
+
+  isRootFrame(element: CanvasElement): boolean {
+    return element.type === 'frame' && !element.parentId;
   }
 
   getFrameTitleFontSize(): number {
@@ -988,6 +1730,24 @@ export class ProjectPage implements OnDestroy {
 
   getFrameTitleOffset(): number {
     return this.viewport.getScreenInvariantSize(-24);
+  }
+
+  isFrameTitleVisible(): boolean {
+    return this.viewport.zoomLevel() >= FRAME_TITLE_MIN_ZOOM;
+  }
+
+  private alignRootFramesOnDrop(): void {
+    this.updateCurrentPageElements((elements) => this.reflowRootFrames(elements));
+
+    this.isFrameReorderAnimating.set(true);
+    if (this.frameReorderAnimationTimeoutId) {
+      clearTimeout(this.frameReorderAnimationTimeoutId);
+    }
+
+    this.frameReorderAnimationTimeoutId = setTimeout(() => {
+      this.isFrameReorderAnimating.set(false);
+      this.frameReorderAnimationTimeoutId = null;
+    }, 260);
   }
 
   getSelectionOutlineInset(element: CanvasElement): number {
@@ -1143,6 +1903,53 @@ export class ProjectPage implements OnDestroy {
     return this.el.supportsCornerRadius(element);
   }
 
+  private getRootFrameCount(elements: CanvasElement[]): number {
+    return elements.filter((element) => this.isRootFrame(element)).length;
+  }
+
+  private reflowRootFrames(
+    elements: CanvasElement[],
+    draggedId?: string,
+    draggedX?: number,
+  ): CanvasElement[] {
+    const rootFrames = elements.filter((element) => this.isRootFrame(element));
+    if (rootFrames.length <= 1) {
+      return elements;
+    }
+
+    const ordered = [...rootFrames].sort((a, b) => {
+      const ax = a.id === draggedId && typeof draggedX === 'number' ? draggedX : a.x;
+      const bx = b.id === draggedId && typeof draggedX === 'number' ? draggedX : b.x;
+      return ax - bx;
+    });
+
+    const startX = Math.min(...rootFrames.map((frame) => frame.x));
+    const baselineY = rootFrames[0]?.y ?? 0;
+    let cursorX = startX;
+    const nextById = new Map<string, { x: number; y: number }>();
+
+    for (const frame of ordered) {
+      nextById.set(frame.id, {
+        x: roundToTwoDecimals(cursorX),
+        y: roundToTwoDecimals(baselineY),
+      });
+      cursorX += frame.width + ROOT_FRAME_INSERT_GAP;
+    }
+
+    return elements.map((element) => {
+      const next = nextById.get(element.id);
+      if (!next) {
+        return element;
+      }
+
+      return {
+        ...element,
+        x: next.x,
+        y: next.y,
+      };
+    });
+  }
+
   getCornerRadiusHandleInset(element: CanvasElement): number {
     return this.el.getCornerRadiusHandleInset(element);
   }
@@ -1252,7 +2059,7 @@ export class ProjectPage implements OnDestroy {
 
     this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
       next: (response) => {
-        const pages = response.pages.length > 0 ? response.pages : [this.el.createPage('Page 1')];
+        const pages = response.pages;
         const activePageId =
           response.activePageId && pages.some((page) => page.id === response.activePageId)
             ? response.activePageId
@@ -1327,7 +2134,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) {
       return;
     }
@@ -1360,13 +2167,13 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) {
       return;
     }
 
-    this.updateCurrentPageElements((elements) =>
-      elements.map((element) => {
+    this.updateCurrentPageElements((elements) => {
+      const resizedElements = elements.map((element) => {
         if (element.id !== start.elementId) {
           return element;
         }
@@ -1391,8 +2198,20 @@ export class ProjectPage implements OnDestroy {
 
         this.el.normalizeElement(nextElement, elements);
         return nextElement;
-      }),
-    );
+      });
+
+      const resizedTarget =
+        resizedElements.find((element) => element.id === start.elementId) ?? null;
+      if (
+        !resizedTarget ||
+        !this.isRootFrame(resizedTarget) ||
+        this.getRootFrameCount(resizedElements) <= 1
+      ) {
+        return resizedElements;
+      }
+
+      return this.reflowRootFrames(resizedElements, resizedTarget.id, resizedTarget.x);
+    });
   }
 
   private handleCornerRadiusPointerMove(event: MouseEvent): void {
@@ -1401,7 +2220,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) {
       return;
     }
@@ -1439,12 +2258,13 @@ export class ProjectPage implements OnDestroy {
       start.handle === 'n' || start.handle === 's' || start.handle === 'e' || start.handle === 'w';
     const isNS = start.handle === 'n' || start.handle === 's';
     const isEW = start.handle === 'e' || start.handle === 'w';
+    const lockVerticalResize = element.type === 'frame';
     const effectiveDeltaX = isNS ? 0 : deltaX;
-    const effectiveDeltaY = isEW ? 0 : deltaY;
+    const effectiveDeltaY = isEW || lockVerticalResize ? 0 : deltaY;
     const xDirection = start.handle.includes('w') ? -1 : 1;
     const yDirection = start.handle.includes('n') ? -1 : 1;
     const shouldPreserveAspectRatio =
-      !isEdgeHandle && (preserveAspectRatio || element.type === 'circle');
+      !lockVerticalResize && !isEdgeHandle && (preserveAspectRatio || element.type === 'circle');
     const aspectRatio = shouldPreserveAspectRatio
       ? start.aspectRatio || 1
       : start.width / Math.max(start.height, 1);
@@ -1559,11 +2379,11 @@ export class ProjectPage implements OnDestroy {
       right = clamp(start.absoluteX + start.width + deltaX, left + minSize, maxRight);
     }
 
-    if (start.handle.includes('n')) {
+    if (start.handle.includes('n') && !lockVerticalResize) {
       top = clamp(start.absoluteY + deltaY, minTop, bottom - minSize);
     }
 
-    if (start.handle.includes('s')) {
+    if (start.handle.includes('s') && !lockVerticalResize) {
       bottom = clamp(start.absoluteY + start.height + deltaY, top + minSize, maxBottom);
     }
 
@@ -1584,6 +2404,185 @@ export class ProjectPage implements OnDestroy {
     }
 
     this.pages.update((pages) => this.el.updatePageElements(pages, currentPageId, updater));
+  }
+
+  private updateCurrentPage(updater: (page: CanvasPageModel) => CanvasPageModel): void {
+    const currentPageId = this.currentPageId();
+    if (!currentPageId) {
+      return;
+    }
+
+    this.pages.update((pages) =>
+      pages.map((page) => (page.id === currentPageId ? updater(page) : page)),
+    );
+  }
+
+  private normalizeViewportSize(value: number | undefined, fallback: number): number {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return fallback;
+    }
+
+    return Math.max(MIN_CUSTOM_VIEWPORT_SIZE, Math.round(value));
+  }
+
+  private getActivePageOffset(): Point {
+    const layout = this.activePageLayout();
+    if (!layout) {
+      return { x: 0, y: 0 };
+    }
+    return { x: layout.x, y: layout.y };
+  }
+
+  private getActivePageCanvasPoint(event: MouseEvent): Point | null {
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    if (!pointer) {
+      return null;
+    }
+
+    const offset = this.getActivePageOffset();
+    return {
+      x: roundToTwoDecimals(pointer.x - offset.x),
+      y: roundToTwoDecimals(pointer.y - offset.y),
+    };
+  }
+
+  private getNextPageCanvasPosition(): Point {
+    const layouts = this.pageLayouts();
+    if (layouts.length === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    const rightMost = layouts.reduce((acc, layout) => {
+      const currentRight = layout.x + layout.width;
+      const bestRight = acc.x + acc.width;
+      return currentRight > bestRight ? layout : acc;
+    }, layouts[0]);
+
+    return {
+      x: Math.round(rightMost.x + rightMost.width + PAGE_CANVAS_GAP),
+      y: Math.round(rightMost.y),
+    };
+  }
+
+  private focusPageSmooth(pageId: string): void {
+    const canvas = this.getCanvasElement();
+    const layout = this.getPageLayoutById(pageId);
+    if (!canvas || !layout) {
+      return;
+    }
+
+    const padding = 64;
+    const minSize = 24;
+    const horizontalZoom = (canvas.clientWidth - padding) / Math.max(layout.width, minSize);
+    const verticalZoom = (canvas.clientHeight - padding) / Math.max(layout.height, minSize);
+    const targetZoom = clamp(Math.min(horizontalZoom, verticalZoom), 0.25, 3);
+    const targetOffset: Point = {
+      x: roundToTwoDecimals(
+        (canvas.clientWidth - layout.width * targetZoom) / 2 - layout.x * targetZoom,
+      ),
+      y: roundToTwoDecimals(
+        (canvas.clientHeight - layout.height * targetZoom) / 2 - layout.y * targetZoom,
+      ),
+    };
+
+    const startZoom = this.viewport.zoomLevel();
+    const startOffset = this.viewport.viewportOffset();
+    const durationMs = 240;
+    const startTs = performance.now();
+
+    const animate = (now: number) => {
+      const t = Math.min(1, (now - startTs) / durationMs);
+      const eased = 1 - Math.pow(1 - t, 3);
+
+      const zoom = startZoom + (targetZoom - startZoom) * eased;
+      const x = startOffset.x + (targetOffset.x - startOffset.x) * eased;
+      const y = startOffset.y + (targetOffset.y - startOffset.y) * eased;
+
+      this.viewport.zoomLevel.set(roundToTwoDecimals(zoom));
+      this.viewport.viewportOffset.set({
+        x: roundToTwoDecimals(x),
+        y: roundToTwoDecimals(y),
+      });
+
+      if (t < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+
+    requestAnimationFrame(animate);
+  }
+
+  private insertFrameIntoPage(
+    pageId: string,
+    name: string,
+    width: number,
+    height: number,
+    options?: {
+      forcedHeight?: number;
+      forcedY?: number;
+    },
+  ): void {
+    const normalizedWidth = this.normalizeViewportSize(width, 1280);
+    const normalizedHeight = this.normalizeViewportSize(
+      options?.forcedHeight ?? height,
+      options?.forcedHeight ?? 720,
+    );
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return;
+    }
+
+    this.runWithHistory(() => {
+      const currentElements = page.elements;
+      const position = this.el.getNextFramePosition(
+        currentElements,
+        normalizedWidth,
+        normalizedHeight,
+      );
+      const frame = this.el.createFrameAtCenter(
+        {
+          x: position?.x ?? 80 + normalizedWidth / 2,
+          y:
+            options?.forcedY != null
+              ? options.forcedY + normalizedHeight / 2
+              : (position?.y ?? 60 + normalizedHeight / 2),
+        },
+        normalizedWidth,
+        normalizedHeight,
+        name,
+        currentElements,
+      );
+
+      if (options?.forcedY != null) {
+        frame.y = roundToTwoDecimals(options.forcedY);
+      }
+
+      this.pages.update((pages) =>
+        this.el.updatePageElements(pages, pageId, (elements) => [...elements, frame]),
+      );
+      if (this.currentPageId() === pageId) {
+        this.selectedElementId.set(frame.id);
+      }
+      this.currentTool.set('select');
+    });
+  }
+
+  private getDesktopFrameForPage(pageId: string): CanvasElement | null {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return null;
+    }
+
+    return (
+      page.elements.find(
+        (element) =>
+          element.type === 'frame' &&
+          !element.parentId &&
+          this.getFrameTitle(element) === 'Desktop',
+      ) ??
+      page.elements.find((element) => element.type === 'frame' && !element.parentId) ??
+      null
+    );
   }
 
   private shouldStartPanning(event: MouseEvent, target: HTMLElement): boolean {
@@ -1908,7 +2907,7 @@ export class ProjectPage implements OnDestroy {
           (snapshot) => this.applyHistorySnapshot(snapshot),
         ),
       onDelete: () => this.deleteSelectedElement(),
-      onSelectTool: (tool) => this.selectTool(tool),
+      onSelectTool: (tool) => this.onToolbarToolSelected(tool),
       onSpaceDown: () => this.viewport.isSpacePressed.set(true),
       onSpaceUp: () => this.viewport.isSpacePressed.set(false),
       onZoomIn: () => this.viewport.zoomIn(),

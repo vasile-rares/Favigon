@@ -28,7 +28,7 @@ export class ToolbarComponent {
 
   readonly actions: ToolbarAction[] = [
     { tool: 'select', label: 'Select', shortcut: 'V' },
-    { tool: 'frame', label: 'Frame', shortcut: 'F' },
+    { tool: 'frame', label: 'Page', shortcut: 'P' },
     { tool: 'rectangle', label: 'Rectangle', shortcut: 'R' },
     { tool: 'circle', label: 'Circle', shortcut: 'O' },
     { tool: 'text', label: 'Text', shortcut: 'T' },

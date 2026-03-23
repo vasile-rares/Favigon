@@ -32,6 +32,8 @@ app-header-bar {
   background-size: 20px 20px;
   cursor: crosshair;
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .canvas-container.pan-ready {
@@ -55,6 +57,139 @@ app-header-bar {
   width: 100%;
   height: 100%;
   transform-origin: top left;
+}
+
+.page-shell {
+  position: absolute;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(180deg, rgba(34, 36, 41, 0.82) 0%, rgba(25, 27, 31, 0.78) 100%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 18px 46px rgba(0, 0, 0, 0.42);
+  cursor: grab;
+}
+
+.page-shell--active {
+  pointer-events: auto;
+}
+
+.page-shell--inactive {
+  cursor: pointer;
+}
+
+.page-shell-toolbar-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 45;
+}
+
+.page-shell-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: auto;
+  z-index: 1;
+  transform-origin: top left;
+  overflow: visible;
+}
+
+.page-shell-header-content {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transform-origin: top left;
+  box-sizing: border-box;
+  overflow: visible;
+  padding: 0 0.2rem;
+}
+
+.page-shell-header--active {
+  top: 8px;
+}
+
+.page-shell-header--inactive {
+  justify-content: flex-start;
+  gap: 0.35rem;
+}
+
+.page-shell-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+  max-width: calc(100% - 44px);
+  transform-origin: top left;
+}
+
+.page-run-preview {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: #17191d;
+  color: #86efac;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.page-name-input,
+.page-name-readonly {
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #181a1f;
+  color: var(--color-zinc-100);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 0.7rem;
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+  width: fit-content;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.page-name-input {
+  outline: none;
+}
+
+.page-device-add {
+  position: relative;
+  flex-shrink: 0;
+  transform-origin: top right;
+}
+
+.page-device-add-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: #17191d;
+  color: var(--color-zinc-100);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.canvas-element-preview {
+  pointer-events: none;
 }
 
 .canvas-element {
@@ -108,6 +243,30 @@ app-header-bar {
       user-select: none;
     }
   }
+}
+
+.canvas-element.frame-reorder-animating {
+  transition:
+    left 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    top 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.canvas-element.frame-reorder-live {
+  transition:
+    left 0.18s cubic-bezier(0.2, 0.9, 0.2, 1),
+    top 0.18s cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+.canvas-element.frame-hovered {
+  box-shadow:
+    0 0 0 2px rgba(79, 70, 229, 0.55),
+    0 6px 18px rgba(0, 0, 0, 0.22);
+}
+
+.canvas-element.frame-selected-body {
+  box-shadow:
+    0 0 0 2px rgba(79, 70, 229, 0.95),
+    0 8px 22px rgba(0, 0, 0, 0.28);
 }
 
 .frame-title {
@@ -282,7 +441,7 @@ app-header-bar {
   position: absolute;
   pointer-events: none;
   background-color: #ea47ff;
-  z-index: 100;
+  z-index: 1000;
 }
 
 .snap-line-v {

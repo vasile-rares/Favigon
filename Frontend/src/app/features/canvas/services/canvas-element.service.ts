@@ -147,6 +147,11 @@ export class CanvasElementService {
     return {
       id: crypto.randomUUID(),
       name,
+      viewportPreset: 'desktop',
+      viewportWidth: 1280,
+      viewportHeight: 720,
+      canvasX: 0,
+      canvasY: 0,
       elements: [],
     };
   }

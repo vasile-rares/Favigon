@@ -5,6 +5,7 @@
     <app-project-panel
       [pages]="pages()"
       [currentPageId]="currentPageId()"
+      [focusedPageId]="layersFocusedPageId()"
       [elements]="elements()"
       [selectedElementId]="selectedElementId()"
       (pageSelected)="selectPage($event)"
@@ -19,7 +20,7 @@
     <app-toolbar
       [activeTool]="currentTool()"
       [zoomLevel]="zoomPercentage()"
-      (toolSelected)="selectTool($event)"
+      (toolSelected)="onToolbarToolSelected($event)"
       (zoomInRequested)="zoomIn()"
       (zoomOutRequested)="zoomOut()"
       (zoomResetRequested)="resetZoom()"></app-toolbar>
@@ -36,6 +37,68 @@
       (contextmenu)="onCanvasContextMenu($event)">
       <div class="canvas-viewport" [style.transform]="canvasViewportTransform()">
         <div class="canvas-scene" [style.transform]="canvasSceneTransform()">
+          <ng-container *ngFor="let layout of inactivePageLayouts()">
+            <div
+              class="page-shell page-shell--inactive"
+              [style.left.px]="getPageShellLeft(layout.pageId)"
+              [style.top.px]="getPageShellTop(layout.pageId)"
+              [style.width.px]="getPageShellWidth(layout.pageId)"
+              [style.height.px]="getPageShellHeight(layout.pageId)"
+              (pointerdown)="onPageShellPointerDown($event, layout.pageId)"
+              (click)="onInactivePageShellClick(layout.pageId)">
+            </div>
+
+            <div
+              *ngFor="let pageElement of getVisibleElementsForPage(layout.pageId); trackBy: trackByElementId"
+              class="canvas-element canvas-element-preview"
+              [class.frame]="pageElement.type === 'frame'"
+              [class.rectangle]="pageElement.type === 'rectangle'"
+              [class.circle]="pageElement.type === 'circle'"
+              [class.text]="pageElement.type === 'text'"
+              [class.image]="pageElement.type === 'image'"
+              [style.left.px]="getRenderedXForPage(pageElement, layout.pageId)"
+              [style.top.px]="getRenderedYForPage(pageElement, layout.pageId)"
+              [style.width.px]="pageElement.width"
+              [style.height.px]="pageElement.height"
+              [style.transform]="getElementTransform(pageElement)"
+              [style.background-color]="pageElement.type !== 'text' && pageElement.type !== 'image' ? pageElement.fill : 'transparent'"
+              [style.border]="getElementBorderStyle(pageElement)"
+              [style.opacity]="pageElement.opacity ?? 1"
+              [style.clip-path]="getElementClipPathForPage(pageElement, layout.pageId)"
+              [style.visibility]="isElementClippedOutForPage(pageElement, layout.pageId) ? 'hidden' : 'visible'"
+              [style.border-radius.px]="pageElement.type === 'circle' ? null : (pageElement.cornerRadius ?? (pageElement.type === 'image' ? 6 : 0))">
+
+              <ng-container *ngIf="pageElement.type === 'text'">
+                <div
+                  class="text-content"
+                  [style.font-size.px]="pageElement.fontSize"
+                  [style.font-family]="getTextFontFamily(pageElement)"
+                  [style.font-weight]="getTextFontWeight(pageElement)"
+                  [style.font-style]="getTextFontStyle(pageElement)"
+                  [style.line-height]="getTextLineHeight(pageElement)"
+                  [style.letter-spacing]="getTextLetterSpacing(pageElement)"
+                  [style.text-align]="getTextAlignValue(pageElement)">
+                  <span>{{ pageElement.text }}</span>
+                </div>
+              </ng-container>
+
+              <ng-container *ngIf="pageElement.type === 'image'">
+                <img [src]="pageElement.imageUrl" alt="Canvas image" draggable="false" />
+              </ng-container>
+            </div>
+          </ng-container>
+
+          <ng-container *ngIf="activePageLayout() as activeLayout">
+            <div
+              class="page-shell page-shell--active"
+              [style.left.px]="getPageShellLeft(activeLayout.pageId)"
+              [style.top.px]="getPageShellTop(activeLayout.pageId)"
+              [style.width.px]="getPageShellWidth(activeLayout.pageId)"
+              [style.height.px]="getPageShellHeight(activeLayout.pageId)"
+              (pointerdown)="onPageShellPointerDown($event, activeLayout.pageId)"></div>
+
+          </ng-container>
+
           <div
             *ngFor="let el of visibleElements(); trackBy: trackByElementId"
             class="canvas-element"
@@ -43,6 +106,10 @@
             [class.editing]="isTextEditing(el.id)"
             [class.has-text]="el.type === 'text' && !!el.text"
             [class.frame]="el.type === 'frame'"
+            [class.frame-hovered]="el.type === 'frame' && hoveredElementId() === el.id && !isDraggingEl()"
+            [class.frame-selected-body]="el.type === 'frame' && selectedElementId() === el.id"
+            [class.frame-reorder-animating]="isRootFrame(el) && isFrameReorderAnimating() && selectedElementId() !== el.id"
+            [class.frame-reorder-live]="isRootFrame(el) && isDraggingEl() && selectedElementId() !== el.id"
             [class.rectangle]="el.type === 'rectangle'"
             [class.circle]="el.type === 'circle'"
             [class.text]="el.type === 'text'"
@@ -68,7 +135,7 @@
 
             <div
               class="frame-title"
-              *ngIf="el.type === 'frame'"
+              *ngIf="el.type === 'frame' && isFrameTitleVisible()"
               [class.frame-title-hovered]="hoveredFrameTitleId() === el.id && !isDraggingEl()"
               [class.frame-title-selected]="selectedElementId() === el.id"
               [style.top.px]="getFrameTitleOffset()"
@@ -123,13 +190,53 @@
             <div
               *ngIf="line.type === 'vertical'"
               class="snap-line snap-line-v"
-              [style.left.px]="line.position"></div>
+              [style.left.px]="getSnapLineX(line.position)"></div>
             <div
               *ngIf="line.type === 'horizontal'"
               class="snap-line snap-line-h"
-              [style.top.px]="line.position"></div>
+              [style.top.px]="getSnapLineY(line.position)"></div>
           </ng-container>
 
+        </div>
+
+        <div class="page-shell-toolbar-layer">
+          <ng-container *ngFor="let layout of pageLayouts()">
+            <div
+              class="page-shell-header"
+              [class.page-shell-header--active]="layout.pageId === currentPageId()"
+              [class.page-shell-header--inactive]="layout.pageId !== currentPageId()"
+              [style.left.px]="getPageShellHeaderScreenLeft(layout.pageId)"
+              [style.top.px]="getPageShellHeaderScreenTop(layout.pageId)"
+              [style.width.px]="getPageShellHeaderScreenWidth(layout.pageId)"
+              (click)="$event.stopPropagation()">
+              <div class="page-shell-header-content">
+                <div class="page-shell-header-left">
+                  <button
+                    type="button"
+                    class="page-run-preview"
+                    (click)="openPreviewForPage(layout.pageId); $event.stopPropagation()"
+                    aria-label="Run preview">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                  </button>
+                  <span
+                    class="page-name-readonly"
+                    (pointerdown)="onPageNamePointerDown($event, layout.pageId)">
+                    {{ getPageById(layout.pageId)?.name }}
+                  </span>
+                </div>
+
+                <div class="page-device-add">
+                  <button
+                    type="button"
+                    class="page-device-add-btn"
+                    aria-label="Add device frame"
+                    (click)="openDeviceFrameMenu($event, layout.pageId)">
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+          </ng-container>
         </div>
 
         <!-- Selection UI overlay — lives in .canvas-viewport (pans with content)
@@ -223,4 +330,24 @@
     [y]="contextMenu.positionY()"
     [items]="contextMenu.items()"
     (closed)="closeContextMenu()"></app-context-menu>
+}
+
+@if (isDeviceMenuOpen()) {
+  <app-context-menu
+    [x]="deviceMenuX()"
+    [y]="deviceMenuY()"
+    [items]="deviceMenuItems()"
+    (closed)="closeDeviceFrameMenu()"></app-context-menu>
+}
+
+@if (isCustomFrameDialogOpen()) {
+  <app-dialog-box
+    title="Custom Frame"
+    description="Set custom width and height for the new frame."
+    [fields]="customFrameDialogFields()"
+    [primaryAction]="{ label: 'Add Frame', variant: 'primary' }"
+    [secondaryAction]="{ label: 'Cancel', variant: 'outline' }"
+    (primaryClicked)="onCustomFrameDialogPrimary($event)"
+    (secondaryClicked)="closeCustomFrameDialog()"
+    (closed)="closeCustomFrameDialog()"></app-dialog-box>
 }

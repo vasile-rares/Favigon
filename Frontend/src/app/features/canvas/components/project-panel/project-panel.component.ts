@@ -30,6 +30,7 @@ type LayerDropPosition = 'before' | 'after' | 'inside';
 export class ProjectPanelComponent implements OnChanges {
   @Input() pages: CanvasPageModel[] = [];
   @Input() currentPageId: string | null = null;
+  @Input() focusedPageId: string | null = null;
   @Input() elements: CanvasElement[] = [];
   @Input() selectedElementId: string | null = null;
 
@@ -55,6 +56,10 @@ export class ProjectPanelComponent implements OnChanges {
 
   get layerEntries(): LayerEntry[] {
     return this.cachedLayerEntries;
+  }
+
+  get visiblePageLayers(): CanvasPageModel[] {
+    return this.pages;
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -101,9 +106,7 @@ export class ProjectPanelComponent implements OnChanges {
     event.stopPropagation();
     this.editingLayerId = id;
     setTimeout(() => {
-      const input = document.querySelector<HTMLInputElement>(
-        `[data-layer-name-id="${id}"]`,
-      );
+      const input = document.querySelector<HTMLInputElement>(`[data-layer-name-id="${id}"]`);
       input?.select();
     });
   }
@@ -243,6 +246,29 @@ export class ProjectPanelComponent implements OnChanges {
 
   trackByPageId(_: number, page: CanvasPageModel): string {
     return page.id;
+  }
+
+  getPageViewportLabel(page: CanvasPageModel): string {
+    const preset = page.viewportPreset ?? 'desktop';
+    const width =
+      typeof page.viewportWidth === 'number' && Number.isFinite(page.viewportWidth)
+        ? Math.max(100, Math.round(page.viewportWidth))
+        : 1280;
+    const height =
+      typeof page.viewportHeight === 'number' && Number.isFinite(page.viewportHeight)
+        ? Math.max(100, Math.round(page.viewportHeight))
+        : 720;
+
+    const presetLabel =
+      preset === 'desktop'
+        ? 'Desktop'
+        : preset === 'tablet'
+          ? 'Tablet'
+          : preset === 'mobile'
+            ? 'Mobile'
+            : 'Custom';
+
+    return `${presetLabel} · ${width} × ${height}`;
   }
 
   canDeletePage(): boolean {

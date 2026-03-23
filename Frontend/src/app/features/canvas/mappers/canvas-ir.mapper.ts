@@ -37,6 +37,8 @@ const DEFAULT_IMAGE_RADIUS = 6;
 const DEFAULT_OPACITY = 1;
 const DEFAULT_STROKE_WIDTH = 1;
 const CIRCLE_RADIUS = 9999;
+const DEFAULT_PAGE_VIEWPORT_WIDTH = 1280;
+const DEFAULT_PAGE_VIEWPORT_HEIGHT = 720;
 
 const DEFAULT_ELEMENT_SIZE = {
   text: { width: 150, height: 40 },
@@ -69,6 +71,11 @@ export function buildCanvasProjectDocument(
     pages: normalizedPages.map((page) => ({
       id: page.id,
       name: page.name,
+      viewportPreset: normalizeViewportPreset(page.viewportPreset),
+      viewportWidth: normalizePageDimension(page.viewportWidth, DEFAULT_PAGE_VIEWPORT_WIDTH),
+      viewportHeight: normalizePageDimension(page.viewportHeight, DEFAULT_PAGE_VIEWPORT_HEIGHT),
+      canvasX: normalizeCanvasCoordinate(page.canvasX, 0),
+      canvasY: normalizeCanvasCoordinate(page.canvasY, 0),
       elements: page.elements.map((element) => ({
         ...element,
         visible: element.visible !== false,
@@ -279,7 +286,7 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
       style.border = {
         width: px(strokeWidth),
         color: element.stroke,
-        style: ((element.strokeStyle as BorderStyle | undefined) ?? 'Solid'),
+        style: (element.strokeStyle as BorderStyle | undefined) ?? 'Solid',
       } satisfies IRBorder;
     }
   }
@@ -392,8 +399,7 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
       mappedType !== 'text'
         ? readLength(node.style?.border?.width, DEFAULT_STROKE_WIDTH)
         : undefined,
-    strokeStyle:
-      mappedType !== 'text' ? (node.style?.border?.style ?? 'Solid') : undefined,
+    strokeStyle: mappedType !== 'text' ? (node.style?.border?.style ?? 'Solid') : undefined,
     opacity: readNumber(node.style?.opacity, DEFAULT_OPACITY),
     cornerRadius:
       mappedType !== 'circle' && mappedType !== 'text'
@@ -505,6 +511,11 @@ function normalizeCanvasPage(rawPage: unknown, pageIndex: number): CanvasPageMod
   return {
     id: typeof page.id === 'string' && page.id.trim().length > 0 ? page.id : crypto.randomUUID(),
     name: normalizedName,
+    viewportPreset: normalizeViewportPreset(page.viewportPreset),
+    viewportWidth: normalizePageDimension(page.viewportWidth, DEFAULT_PAGE_VIEWPORT_WIDTH),
+    viewportHeight: normalizePageDimension(page.viewportHeight, DEFAULT_PAGE_VIEWPORT_HEIGHT),
+    canvasX: normalizeCanvasCoordinate(page.canvasX, 0),
+    canvasY: normalizeCanvasCoordinate(page.canvasY, 0),
     elements: Array.isArray(page.elements)
       ? page.elements.map((element) => ({
           ...element,
@@ -518,8 +529,35 @@ function createDefaultPageModel(): CanvasPageModel {
   return {
     id: crypto.randomUUID(),
     name: 'Page 1',
+    viewportPreset: 'desktop',
+    viewportWidth: DEFAULT_PAGE_VIEWPORT_WIDTH,
+    viewportHeight: DEFAULT_PAGE_VIEWPORT_HEIGHT,
+    canvasX: 0,
+    canvasY: 0,
     elements: [],
   };
+}
+
+function normalizeViewportPreset(value: unknown): 'desktop' | 'tablet' | 'mobile' | 'custom' {
+  return value === 'desktop' || value === 'tablet' || value === 'mobile' || value === 'custom'
+    ? value
+    : 'desktop';
+}
+
+function normalizePageDimension(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.max(100, Math.round(value));
+}
+
+function normalizeCanvasCoordinate(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.round(value);
 }
 
 function readLength(len: IRLength | undefined, fallback: number): number {
