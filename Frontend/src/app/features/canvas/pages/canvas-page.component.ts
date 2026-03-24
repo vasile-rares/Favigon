@@ -654,12 +654,7 @@ export class ProjectPage implements OnDestroy {
   submitCustomFrameDialog(): void {
     const targetPageId = this.deviceMenuTargetPageId() ?? this.currentPageId();
     if (targetPageId) {
-      this.insertFrameIntoPage(
-        targetPageId,
-        'Custom',
-        this.customFrameWidth(),
-        this.customFrameHeight(),
-      );
+      this.insertFrameIntoPage(targetPageId, 'Custom', this.customFrameWidth(), this.customFrameHeight());
     }
     this.deviceMenuTargetPageId.set(null);
     this.closeCustomFrameDialog();
@@ -769,9 +764,7 @@ export class ProjectPage implements OnDestroy {
       return [];
     }
 
-    return page.elements.filter((element) =>
-      this.el.isElementEffectivelyVisible(element.id, page.elements),
-    );
+    return page.elements.filter((element) => this.el.isElementEffectivelyVisible(element.id, page.elements));
   }
 
   getPageShellLeft(pageId: string): number {
@@ -826,7 +819,10 @@ export class ProjectPage implements OnDestroy {
 
   getPageShellHeaderWidth(pageId: string): number {
     return roundToTwoDecimals(
-      Math.max(120, this.getPageShellWidth(pageId) - PAGE_SHELL_HEADER_HORIZONTAL_INSET * 2),
+      Math.max(
+        120,
+        this.getPageShellWidth(pageId) - PAGE_SHELL_HEADER_HORIZONTAL_INSET * 2,
+      ),
     );
   }
 
@@ -881,9 +877,7 @@ export class ProjectPage implements OnDestroy {
       return { minX: 0, minY: 0, maxX: fallbackWidth, maxY: fallbackHeight };
     }
 
-    const rootFrames = page.elements.filter(
-      (element) => element.type === 'frame' && !element.parentId,
-    );
+    const rootFrames = page.elements.filter((element) => element.type === 'frame' && !element.parentId);
     if (rootFrames.length === 0) {
       return { minX: 0, minY: 0, maxX: fallbackWidth, maxY: fallbackHeight };
     }
@@ -964,6 +958,11 @@ export class ProjectPage implements OnDestroy {
     if (tool === 'select') {
       const target = event.target as HTMLElement;
       if (this.isCanvasBackgroundTarget(target)) {
+        // commit text editing if active
+        if (this.editingTextElementId()) {
+          this.history.commitTextEditHistory(() => this.createHistorySnapshot());
+          this.editingTextElementId.set(null);
+        }
         this.selectedElementId.set(null);
         this.layersFocusedPageId.set(null);
       }
@@ -1002,7 +1001,10 @@ export class ProjectPage implements OnDestroy {
 
     const newElement = result.element;
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => [...elements, newElement]);
+      this.updateCurrentPageElements((elements) => {
+        const synced = this.createSyncedCopies(newElement, elements);
+        return [...elements, newElement, ...synced];
+      });
       this.selectedElementId.set(newElement.id);
       this.currentTool.set('select');
     });
@@ -1026,6 +1028,13 @@ export class ProjectPage implements OnDestroy {
 
     if (this.isResizing || this.isRotating || this.editingTextElementId() === id) {
       return;
+    }
+
+    // Exit text editing if clicking a different element
+    const editingId = this.editingTextElementId();
+    if (editingId && editingId !== id) {
+      this.history.commitTextEditHistory(() => this.createHistorySnapshot());
+      this.editingTextElementId.set(null);
     }
 
     const elementForTypeCheck = this.el.findElementById(id, this.elements());
@@ -1129,17 +1138,20 @@ export class ProjectPage implements OnDestroy {
   onTextEditorInput(id: string, event: Event): void {
     this.history.beginTextEditHistory(() => this.createHistorySnapshot());
     const value = (event.target as HTMLTextAreaElement).value;
-    this.updateCurrentPageElements((elements) =>
-      elements.map((element) => {
+    this.updateCurrentPageElements((elements) => {
+      let effectivePatch: Partial<CanvasElement> = { text: value };
+      const withText = elements.map((element) => {
         if (element.id !== id) return element;
         const updated = { ...element, text: value };
         if (value) {
           const size = this.measureTextSize(updated);
+          effectivePatch = { text: value, width: size.width, height: size.height };
           return { ...updated, width: size.width, height: size.height };
         }
         return updated;
-      }),
-    );
+      });
+      return this.syncElementPatchToPrimary(id, effectivePatch, withText);
+    });
   }
 
   onTextEditorBlur(id: string): void {
@@ -1313,16 +1325,17 @@ export class ProjectPage implements OnDestroy {
     }
 
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) =>
-        elements.map((element) => {
+      this.updateCurrentPageElements((elements) => {
+        const withPatch = elements.map((element) => {
           if (element.id !== selectedId) {
             return element;
           }
           const nextElement: CanvasElement = { ...element, ...patch };
           this.el.normalizeElement(nextElement, elements);
           return nextElement;
-        }),
-      );
+        });
+        return this.syncElementPatchToPrimary(selectedId, patch, withPatch);
+      });
     });
   }
 
@@ -1334,21 +1347,25 @@ export class ProjectPage implements OnDestroy {
 
   onLayerNameChanged(change: { id: string; name: string }): void {
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) =>
-        elements.map((element) =>
+      this.updateCurrentPageElements((elements) => {
+        const updated = elements.map((element) =>
           element.id === change.id ? { ...element, name: change.name } : element,
-        ),
-      );
+        );
+        return this.syncElementPatchToPrimary(change.id, { name: change.name }, updated);
+      });
     });
   }
 
   onLayerVisibilityToggled(elementId: string): void {
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) =>
-        elements.map((element) =>
+      this.updateCurrentPageElements((elements) => {
+        const el = elements.find((e) => e.id === elementId);
+        const newVisible = el?.visible === false;
+        const updated = elements.map((element) =>
           element.id === elementId ? { ...element, visible: element.visible === false } : element,
-        ),
-      );
+        );
+        return this.syncElementPatchToPrimary(elementId, { visible: newVisible }, updated);
+      });
     });
   }
 
@@ -1612,6 +1629,12 @@ export class ProjectPage implements OnDestroy {
       }
     }
 
+    if ((this.isDragging || this.isResizing) && selectedOnDrop) {
+      this.updateCurrentPageElements((elements) =>
+        this.syncElementMoveToPrimary(selectedOnDrop, elements),
+      );
+    }
+
     if (this.isDraggingPage && this.hasMovedPageDuringDrag) {
       this.suppressNextPageShellClick = true;
     }
@@ -1732,8 +1755,15 @@ export class ProjectPage implements OnDestroy {
     return this.viewport.getScreenInvariantSize(-24);
   }
 
-  isFrameTitleVisible(): boolean {
-    return this.viewport.zoomLevel() >= FRAME_TITLE_MIN_ZOOM;
+  isFrameTitleHiddenByHeader(element: CanvasElement): boolean {
+    const layout = this.activePageLayout();
+    if (!layout) return false;
+    const zoom = this.viewport.zoomLevel();
+    // Title is always 24px above the frame top in screen-space (inside scaled canvas-scene)
+    const titleScreenRelY = this.getRenderedY(element) * zoom - 24;
+    // Header bottom in screen-space (header is fixed-size, not scaled)
+    const headerScreenBottom = this.getPageShellHeaderTop(layout.pageId) * zoom + 44;
+    return titleScreenRelY < headerScreenBottom;
   }
 
   private alignRootFramesOnDrop(): void {
@@ -1748,37 +1778,6 @@ export class ProjectPage implements OnDestroy {
       this.isFrameReorderAnimating.set(false);
       this.frameReorderAnimationTimeoutId = null;
     }, 260);
-  }
-
-  getSelectionOutlineInset(element: CanvasElement): number {
-    const strokeOffset = element.stroke ? getStrokeWidth(element) : 0;
-    return this.viewport.getScreenInvariantSize(-2) - strokeOffset;
-  }
-
-  getSelectionOutlineBorderWidth(): number {
-    return this.viewport.getScreenInvariantSize(2);
-  }
-
-  getHoverOutlineBorderWidth(): number {
-    return this.viewport.getScreenInvariantSize(3);
-  }
-
-  // ── Selection overlay: screen-space positioning (no sub-pixel squish) ──
-
-  getOverlayLeft(el: CanvasElement): number {
-    return roundToTwoDecimals(this.getRenderedX(el) * this.viewport.zoomLevel());
-  }
-
-  getOverlayTop(el: CanvasElement): number {
-    return roundToTwoDecimals(this.getRenderedY(el) * this.viewport.zoomLevel());
-  }
-
-  getOverlayWidth(el: CanvasElement): number {
-    return roundToTwoDecimals(el.width * this.viewport.zoomLevel());
-  }
-
-  getOverlayHeight(el: CanvasElement): number {
-    return roundToTwoDecimals(el.height * this.viewport.zoomLevel());
   }
 
   // With global box-sizing: border-box, the 2px border is drawn INSIDE the div's width/height.
@@ -1799,30 +1798,6 @@ export class ProjectPage implements OnDestroy {
     return roundToTwoDecimals(el.height * this.viewport.zoomLevel() + 4);
   }
 
-  getOverlaySelLeft(el: CanvasElement): number {
-    const strokeOffset = el.stroke ? getStrokeWidth(el) : 0;
-    const zoom = this.viewport.zoomLevel();
-    return roundToTwoDecimals(this.getRenderedX(el) * zoom - 2 - strokeOffset * zoom);
-  }
-
-  getOverlaySelTop(el: CanvasElement): number {
-    const strokeOffset = el.stroke ? getStrokeWidth(el) : 0;
-    const zoom = this.viewport.zoomLevel();
-    return roundToTwoDecimals(this.getRenderedY(el) * zoom - 2 - strokeOffset * zoom);
-  }
-
-  getOverlaySelWidth(el: CanvasElement): number {
-    const strokeOffset = el.stroke ? getStrokeWidth(el) : 0;
-    const zoom = this.viewport.zoomLevel();
-    return roundToTwoDecimals(el.width * zoom + 4 + 2 * strokeOffset * zoom);
-  }
-
-  getOverlaySelHeight(el: CanvasElement): number {
-    const strokeOffset = el.stroke ? getStrokeWidth(el) : 0;
-    const zoom = this.viewport.zoomLevel();
-    return roundToTwoDecimals(el.height * zoom + 4 + 2 * strokeOffset * zoom);
-  }
-
   getOverlayCornerRadiusInset(el: CanvasElement): number {
     const radius = Number.isFinite(el.cornerRadius ?? Number.NaN)
       ? (el.cornerRadius as number)
@@ -1837,18 +1812,6 @@ export class ProjectPage implements OnDestroy {
     const minScreenInset = 8;
     const maxScreenInset = Math.max(0, (Math.min(el.width, el.height) * zoom) / 2 - handleRadius);
     return roundToTwoDecimals(clamp(radius * zoom - handleRadius, minScreenInset, maxScreenInset));
-  }
-
-  getResizeHandleSize(): number {
-    return this.viewport.getScreenInvariantSize(12);
-  }
-
-  getResizeHandleBorderWidth(): number {
-    return this.viewport.getScreenInvariantSize(2);
-  }
-
-  getResizeHandleOffset(): number {
-    return this.viewport.getScreenInvariantSize(-8);
   }
 
   isTextEditing(elementId: string): boolean {
@@ -1881,14 +1844,6 @@ export class ProjectPage implements OnDestroy {
 
   getTextLetterSpacing(element: CanvasElement): string {
     return this.el.getTextLetterSpacing(element);
-  }
-
-  getTextJustifyContent(element: CanvasElement): string {
-    return this.el.getTextJustifyContent(element);
-  }
-
-  getTextAlignItems(element: CanvasElement): string {
-    return this.el.getTextAlignItems(element);
   }
 
   getTextAlignValue(element: CanvasElement): string {
@@ -1964,22 +1919,6 @@ export class ProjectPage implements OnDestroy {
 
   getElementTransform(element: CanvasElement): string | null {
     return this.el.getElementTransform(element);
-  }
-
-  getCornerZoneSize(): number {
-    return this.viewport.getScreenInvariantSize(24);
-  }
-
-  getCornerZoneOffset(): number {
-    return this.viewport.getScreenInvariantSize(-12);
-  }
-
-  getEdgeHitThickness(): number {
-    return this.viewport.getScreenInvariantSize(8);
-  }
-
-  getEdgeHitCornerGap(): number {
-    return this.viewport.getScreenInvariantSize(16);
   }
 
   // ── Keyboard ──────────────────────────────────────────────
@@ -2200,13 +2139,8 @@ export class ProjectPage implements OnDestroy {
         return nextElement;
       });
 
-      const resizedTarget =
-        resizedElements.find((element) => element.id === start.elementId) ?? null;
-      if (
-        !resizedTarget ||
-        !this.isRootFrame(resizedTarget) ||
-        this.getRootFrameCount(resizedElements) <= 1
-      ) {
+      const resizedTarget = resizedElements.find((element) => element.id === start.elementId) ?? null;
+      if (!resizedTarget || !this.isRootFrame(resizedTarget) || this.getRootFrameCount(resizedElements) <= 1) {
         return resizedElements;
       }
 
@@ -2477,12 +2411,8 @@ export class ProjectPage implements OnDestroy {
     const verticalZoom = (canvas.clientHeight - padding) / Math.max(layout.height, minSize);
     const targetZoom = clamp(Math.min(horizontalZoom, verticalZoom), 0.25, 3);
     const targetOffset: Point = {
-      x: roundToTwoDecimals(
-        (canvas.clientWidth - layout.width * targetZoom) / 2 - layout.x * targetZoom,
-      ),
-      y: roundToTwoDecimals(
-        (canvas.clientHeight - layout.height * targetZoom) / 2 - layout.y * targetZoom,
-      ),
+      x: roundToTwoDecimals((canvas.clientWidth - layout.width * targetZoom) / 2 - layout.x * targetZoom),
+      y: roundToTwoDecimals((canvas.clientHeight - layout.height * targetZoom) / 2 - layout.y * targetZoom),
     };
 
     const startZoom = this.viewport.zoomLevel();
@@ -2534,11 +2464,7 @@ export class ProjectPage implements OnDestroy {
 
     this.runWithHistory(() => {
       const currentElements = page.elements;
-      const position = this.el.getNextFramePosition(
-        currentElements,
-        normalizedWidth,
-        normalizedHeight,
-      );
+      const position = this.el.getNextFramePosition(currentElements, normalizedWidth, normalizedHeight);
       const frame = this.el.createFrameAtCenter(
         {
           x: position?.x ?? 80 + normalizedWidth / 2,
@@ -2558,7 +2484,35 @@ export class ProjectPage implements OnDestroy {
       }
 
       this.pages.update((pages) =>
-        this.el.updatePageElements(pages, pageId, (elements) => [...elements, frame]),
+        this.el.updatePageElements(pages, pageId, (elements) => {
+          const primaryFrame = this.getPrimaryFrame(elements);
+          const primaryChildren = primaryFrame
+            ? elements.filter((el) => el.parentId === primaryFrame.id)
+            : [];
+          const copies = primaryChildren.map((child) => ({
+            ...child,
+            id: crypto.randomUUID(),
+            parentId: frame.id,
+            primarySyncId: child.primarySyncId ?? child.id,
+            x:
+              primaryFrame!.width > 0
+                ? roundToTwoDecimals((child.x / primaryFrame!.width) * normalizedWidth)
+                : child.x,
+            y:
+              primaryFrame!.height > 0
+                ? roundToTwoDecimals((child.y / primaryFrame!.height) * normalizedHeight)
+                : child.y,
+            width:
+              primaryFrame!.width > 0
+                ? roundToTwoDecimals((child.width / primaryFrame!.width) * normalizedWidth)
+                : child.width,
+            height:
+              primaryFrame!.height > 0
+                ? roundToTwoDecimals((child.height / primaryFrame!.height) * normalizedHeight)
+                : child.height,
+          }));
+          return [...elements, frame, ...copies];
+        }),
       );
       if (this.currentPageId() === pageId) {
         this.selectedElementId.set(frame.id);
@@ -2575,10 +2529,7 @@ export class ProjectPage implements OnDestroy {
 
     return (
       page.elements.find(
-        (element) =>
-          element.type === 'frame' &&
-          !element.parentId &&
-          this.getFrameTitle(element) === 'Desktop',
+        (element) => element.type === 'frame' && !element.parentId && this.getFrameTitle(element) === 'Desktop',
       ) ??
       page.elements.find((element) => element.type === 'frame' && !element.parentId) ??
       null
@@ -2794,9 +2745,10 @@ export class ProjectPage implements OnDestroy {
       return;
     }
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) =>
-        this.el.removeElementWithChildren(elements, selectedId),
-      );
+      this.updateCurrentPageElements((elements) => {
+        const withoutElement = this.el.removeElementWithChildren(elements, selectedId);
+        return withoutElement.filter((el) => el.primarySyncId !== selectedId);
+      });
       this.selectedElementId.set(null);
     });
   }
@@ -2928,9 +2880,10 @@ export class ProjectPage implements OnDestroy {
       onPaste: () => this.pasteClipboard(),
       onDelete: (id) => {
         this.runWithHistory(() => {
-          this.updateCurrentPageElements((elements) =>
-            this.el.removeElementWithChildren(elements, id),
-          );
+          this.updateCurrentPageElements((elements) => {
+            const withoutElement = this.el.removeElementWithChildren(elements, id);
+            return withoutElement.filter((el) => el.primarySyncId !== id);
+          });
           this.selectedElementId.set(null);
         });
       },
@@ -2943,6 +2896,152 @@ export class ProjectPage implements OnDestroy {
         window.dispatchEvent(new CustomEvent('canvas:rename-request', { detail: { id } }));
       },
       onToggleVisibility: (id) => this.onLayerVisibilityToggled(id),
+      onSetAsPrimary: (id) => this.setPrimaryFrame(id),
     };
+  }
+
+  // ── Primary Frame ─────────────────────────────────────────
+
+  private getPrimaryFrame(elements: CanvasElement[]): CanvasElement | null {
+    const rootFrames = elements.filter((el) => el.type === 'frame' && !el.parentId);
+    return (
+      rootFrames.find((el) => el.isPrimary) ??
+      rootFrames.find((el) => el.name?.toLowerCase() === 'desktop') ??
+      rootFrames[0] ??
+      null
+    );
+  }
+
+  private setPrimaryFrame(elementId: string): void {
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) =>
+        elements.map((el) =>
+          el.type === 'frame' && !el.parentId
+            ? { ...el, isPrimary: el.id === elementId }
+            : el,
+        ),
+      );
+    });
+  }
+
+  private createSyncedCopies(newElement: CanvasElement, elements: CanvasElement[]): CanvasElement[] {
+    const primaryFrame = this.getPrimaryFrame(elements);
+    if (!primaryFrame || newElement.parentId !== primaryFrame.id) {
+      return [];
+    }
+
+    const otherRootFrames = elements.filter(
+      (el) => el.type === 'frame' && !el.parentId && el.id !== primaryFrame.id,
+    );
+
+    return otherRootFrames.map((frame) => ({
+      ...newElement,
+      id: crypto.randomUUID(),
+      parentId: frame.id,
+      primarySyncId: newElement.id,
+      x:
+        primaryFrame.width > 0
+          ? roundToTwoDecimals((newElement.x / primaryFrame.width) * frame.width)
+          : newElement.x,
+      y:
+        primaryFrame.height > 0
+          ? roundToTwoDecimals((newElement.y / primaryFrame.height) * frame.height)
+          : newElement.y,
+      width:
+        primaryFrame.width > 0
+          ? roundToTwoDecimals((newElement.width / primaryFrame.width) * frame.width)
+          : newElement.width,
+      height:
+        primaryFrame.height > 0
+          ? roundToTwoDecimals((newElement.height / primaryFrame.height) * frame.height)
+          : newElement.height,
+    }));
+  }
+
+  private syncElementPatchToPrimary(
+    elementId: string,
+    patch: Partial<CanvasElement>,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    const element = elements.find((el) => el.id === elementId);
+    if (!element || !element.parentId) {
+      return elements;
+    }
+
+    const primaryFrame = this.getPrimaryFrame(elements);
+    if (!primaryFrame || element.parentId !== primaryFrame.id) {
+      return elements;
+    }
+
+    const otherRootFrames = elements.filter(
+      (el) => el.type === 'frame' && !el.parentId && el.id !== primaryFrame.id,
+    );
+
+    return elements.map((el) => {
+      if (el.primarySyncId !== elementId) {
+        return el;
+      }
+      const parentFrame = otherRootFrames.find((f) => f.id === el.parentId);
+      if (!parentFrame) {
+        return el;
+      }
+      const scaleX = primaryFrame.width > 0 ? parentFrame.width / primaryFrame.width : 1;
+      const scaleY = primaryFrame.height > 0 ? parentFrame.height / primaryFrame.height : 1;
+      const syncedPatch: Partial<CanvasElement> = { ...patch };
+      if (patch.x !== undefined) syncedPatch.x = roundToTwoDecimals(patch.x * scaleX);
+      if (patch.y !== undefined) syncedPatch.y = roundToTwoDecimals(patch.y * scaleY);
+      if (patch.width !== undefined) syncedPatch.width = roundToTwoDecimals(patch.width * scaleX);
+      if (patch.height !== undefined) syncedPatch.height = roundToTwoDecimals(patch.height * scaleY);
+      return { ...el, ...syncedPatch };
+    });
+  }
+
+  private syncElementMoveToPrimary(
+    movedElement: CanvasElement | null,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    if (!movedElement || !movedElement.parentId) {
+      return elements;
+    }
+
+    const primaryFrame = this.getPrimaryFrame(elements);
+    if (!primaryFrame || movedElement.parentId !== primaryFrame.id) {
+      return elements;
+    }
+
+    const otherRootFrames = elements.filter(
+      (el) => el.type === 'frame' && !el.parentId && el.id !== primaryFrame.id,
+    );
+
+    const syncId = movedElement.id;
+
+    return elements.map((el) => {
+      if (el.primarySyncId !== syncId) {
+        return el;
+      }
+      const parentFrame = otherRootFrames.find((f) => f.id === el.parentId);
+      if (!parentFrame) {
+        return el;
+      }
+      return {
+        ...el,
+        x:
+          primaryFrame.width > 0
+            ? roundToTwoDecimals((movedElement.x / primaryFrame.width) * parentFrame.width)
+            : movedElement.x,
+        y:
+          primaryFrame.height > 0
+            ? roundToTwoDecimals((movedElement.y / primaryFrame.height) * parentFrame.height)
+            : movedElement.y,
+        width:
+          primaryFrame.width > 0
+            ? roundToTwoDecimals((movedElement.width / primaryFrame.width) * parentFrame.width)
+            : movedElement.width,
+        height:
+          primaryFrame.height > 0
+            ? roundToTwoDecimals((movedElement.height / primaryFrame.height) * parentFrame.height)
+            : movedElement.height,
+      };
+    });
   }
 }

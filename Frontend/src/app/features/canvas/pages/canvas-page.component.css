@@ -30,18 +30,26 @@ app-header-bar {
   background-color: #0f0f0f;
   background-image: radial-gradient(var(--color-zinc-800) 1px, transparent 1px);
   background-size: 20px 20px;
-  cursor: crosshair;
+  cursor: url('/cursor-canvas.svg') 4 2, default;
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+
+  * {
+    cursor: inherit;
+  }
 }
 
 .canvas-container.pan-ready {
-  cursor: grab;
+  cursor: url('/cursor-canvas.svg') 4 2, default;
 }
 
 .canvas-container.panning {
   cursor: grabbing;
+
+  * {
+    cursor: grabbing;
+  }
 }
 
 .canvas-viewport {
@@ -97,6 +105,14 @@ app-header-bar {
   z-index: 1;
   transform-origin: top left;
   overflow: visible;
+  background: rgb(18, 20, 24);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  padding: 5px 6px;
+  will-change: transform;
 }
 
 .page-shell-header-content {
@@ -109,11 +125,7 @@ app-header-bar {
   transform-origin: top left;
   box-sizing: border-box;
   overflow: visible;
-  padding: 0 0.2rem;
-}
-
-.page-shell-header--active {
-  top: 8px;
+  gap: 4px;
 }
 
 .page-shell-header--inactive {
@@ -124,36 +136,45 @@ app-header-bar {
 .page-shell-header-left {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 4px;
   flex: 1;
   min-width: 0;
-  max-width: calc(100% - 44px);
+  max-width: calc(100% - 46px);
   transform-origin: top left;
 }
 
 .page-run-preview {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: #17191d;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(134, 239, 172, 0.2);
+  background: rgba(134, 239, 172, 0.07);
   color: #86efac;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background: rgba(134, 239, 172, 0.14);
+    border-color: rgba(134, 239, 172, 0.38);
+  }
 }
 
 .page-name-input,
 .page-name-readonly {
-  height: 32px;
+  height: 34px;
   border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: #181a1f;
+  border: 1px solid transparent;
+  background: transparent;
   color: var(--color-zinc-100);
-  font-size: 0.8rem;
+  font-size: 0.875rem;
   font-weight: 600;
-  padding: 0 0.7rem;
+  padding: 0 0.65rem;
   display: inline-flex;
   align-items: center;
   user-select: none;
@@ -164,10 +185,20 @@ app-header-bar {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  cursor: grab;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.07);
+  }
 }
 
 .page-name-input {
   outline: none;
+  cursor: text;
 }
 
 .page-device-add {
@@ -177,15 +208,28 @@ app-header-bar {
 }
 
 .page-device-add-btn {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: #17191d;
-  color: var(--color-zinc-100);
-  font-size: 1rem;
-  font-weight: 700;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--color-zinc-300);
+  font-size: 1.1rem;
+  font-weight: 600;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.22);
+    color: var(--color-zinc-100);
+  }
 }
 
 .canvas-element-preview {
@@ -219,9 +263,10 @@ app-header-bar {
   &.text {
     color: var(--color-white);
     display: flex;
+    align-items: flex-start;
 
     &.editing.has-text {
-      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8);
+      box-shadow: 0 0 0 1.5px var(--color-brand-primary);
       border-radius: 2px;
     }
   }
@@ -278,6 +323,21 @@ app-header-bar {
   pointer-events: auto;
   cursor: pointer;
   user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.frame-primary-badge {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--color-brand-primary);
+  background: color-mix(in srgb, var(--color-brand-primary) 15%, transparent);
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, var(--color-brand-primary) 40%, transparent);
 }
 
 .frame-title.frame-title-hovered,

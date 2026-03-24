@@ -20,6 +20,7 @@ export interface ContextMenuActionCallbacks {
   onFlipVertical: (elementId: string) => void;
   onRename: (elementId: string) => void;
   onToggleVisibility: (elementId: string) => void;
+  onSetAsPrimary: (elementId: string) => void;
 }
 
 @Injectable()
@@ -47,6 +48,7 @@ export class CanvasContextMenuService {
     const element = callbacks.getSelectedElement();
     const hasElement = !!element;
     const isVisible = element?.visible !== false;
+    const isRootFrame = element?.type === 'frame' && !element.parentId;
     const otherPages = callbacks
       .getPages()
       .filter((page) => page.id !== callbacks.getCurrentPageId());
@@ -141,6 +143,15 @@ export class CanvasContextMenuService {
         shortcut: 'Ctrl+Shift+H',
         disabled: !hasElement,
         action: guardAction((id) => callbacks.onToggleVisibility(id)),
+      },
+
+      // Primary frame group
+      {
+        id: 'set-primary',
+        label: element?.isPrimary ? 'Primary Frame ✓' : 'Set as Primary Frame',
+        disabled: !isRootFrame || !!element?.isPrimary,
+        separator: true,
+        action: guardAction((id) => callbacks.onSetAsPrimary(id)),
       },
     ];
   }

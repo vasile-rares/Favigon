@@ -478,7 +478,8 @@ export class CanvasElementService {
   }
 
   getFrameTitle(element: CanvasElement): string {
-    return element.name?.trim() || 'Frame';
+    const name = element.name?.trim() || 'Frame';
+    return `${name}  ${Math.round(element.width)} × ${Math.round(element.height)}`;
   }
 
   // ── Normalize / Remove Delegates ─────────────────────────

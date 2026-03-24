@@ -39,6 +39,8 @@ export interface CanvasElement {
   lineHeight?: number;
   imageUrl?: string;
   parentId?: string | null;
+  isPrimary?: boolean;
+  primarySyncId?: string;
   irMeta?: CanvasElementIrMeta;
 }
 
