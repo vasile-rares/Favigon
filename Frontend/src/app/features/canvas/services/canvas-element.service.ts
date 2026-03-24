@@ -95,7 +95,12 @@ export class CanvasElementService {
         width: defaultWidth,
         height: defaultHeight,
         visible: true,
-        fill: tool === 'frame' ? DEFAULT_FRAME_FILL : DEFAULT_ELEMENT_FILL,
+        fill:
+          tool === 'frame'
+            ? DEFAULT_FRAME_FILL
+            : tool === 'text'
+              ? '#000000'
+              : DEFAULT_ELEMENT_FILL,
         strokeWidth: tool === 'text' ? undefined : 1,
         strokeStyle: tool === 'text' ? undefined : 'Solid',
         opacity: 1,
@@ -479,7 +484,8 @@ export class CanvasElementService {
 
   getFrameTitle(element: CanvasElement): string {
     const name = element.name?.trim() || 'Frame';
-    return `${name}  ${Math.round(element.width)} × ${Math.round(element.height)}`;
+    const primary = element.isPrimary ? ' · Primary' : '';
+    return `${name}${primary}  ${Math.round(element.width)} × ${Math.round(element.height)}`;
   }
 
   // ── Normalize / Remove Delegates ─────────────────────────

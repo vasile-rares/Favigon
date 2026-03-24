@@ -30,7 +30,6 @@ export class ToolbarComponent {
     { tool: 'select', label: 'Select', shortcut: 'V' },
     { tool: 'frame', label: 'Page', shortcut: 'P' },
     { tool: 'rectangle', label: 'Rectangle', shortcut: 'R' },
-    { tool: 'circle', label: 'Circle', shortcut: 'O' },
     { tool: 'text', label: 'Text', shortcut: 'T' },
     { tool: 'image', label: 'Image', shortcut: 'I' },
   ];

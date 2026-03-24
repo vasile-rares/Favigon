@@ -37,6 +37,7 @@ export class ProjectPanelComponent implements OnChanges {
   @Output() pageSelected = new EventEmitter<string>();
   @Output() pageCreateRequested = new EventEmitter<void>();
   @Output() pageDeleteRequested = new EventEmitter<string>();
+  @Output() pageNameChanged = new EventEmitter<{ id: string; name: string }>();
   @Output() layerSelected = new EventEmitter<string>();
   @Output() layerNameChanged = new EventEmitter<{ id: string; name: string }>();
   @Output() layerVisibilityToggled = new EventEmitter<string>();
@@ -53,12 +54,17 @@ export class ProjectPanelComponent implements OnChanges {
   private dragOverPosition: LayerDropPosition = 'before';
   private collapsedLayers = new Set<string>();
   editingLayerId: string | null = null;
+  editingPageId: string | null = null;
+  private editingPageName = '';
 
   get layerEntries(): LayerEntry[] {
     return this.cachedLayerEntries;
   }
 
   get visiblePageLayers(): CanvasPageModel[] {
+    if (this.focusedPageId) {
+      return this.pages.filter((p) => p.id === this.focusedPageId);
+    }
     return this.pages;
   }
 
@@ -70,6 +76,41 @@ export class ProjectPanelComponent implements OnChanges {
 
   onPageSelect(pageId: string): void {
     this.pageSelected.emit(pageId);
+  }
+
+  startPageRename(pageId: string, event: MouseEvent): void {
+    event.stopPropagation();
+    const page = this.pages.find((p) => p.id === pageId);
+    this.editingPageName = page?.name ?? '';
+    this.editingPageId = pageId;
+    setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>(`[data-page-name-id="${pageId}"]`);
+      input?.select();
+    });
+  }
+
+  stopPageRename(pageId: string): void {
+    if (this.editingPageId === pageId) {
+      const trimmed = this.editingPageName.trim();
+      if (trimmed) {
+        this.pageNameChanged.emit({ id: pageId, name: trimmed });
+      }
+      this.editingPageId = null;
+      this.editingPageName = '';
+    }
+  }
+
+  onPageNameInput(pageId: string, event: Event): void {
+    this.editingPageName = (event.target as HTMLInputElement).value;
+  }
+
+  onPageNameKeyDown(pageId: string, event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      (event.target as HTMLInputElement).blur();
+    } else if (event.key === 'Escape') {
+      this.editingPageId = null;
+      this.editingPageName = '';
+    }
   }
 
   onPageCreate(): void {

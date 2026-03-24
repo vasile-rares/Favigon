@@ -62,7 +62,7 @@ export function buildCanvasProjectDocument(
   projectId: string,
   activePageId: string | null,
 ): CanvasProjectDocument {
-  const normalizedPages = pages.length > 0 ? pages : [createDefaultPageModel()];
+  const normalizedPages = pages;
 
   return {
     version: '2.0',
@@ -133,17 +133,11 @@ export function buildCanvasProjectDocumentFromUnknown(
   }
 
   const legacyElements = buildCanvasElementsFromIR(rawDesign as IRNode | null | undefined);
-  return buildCanvasProjectDocument(
-    [
-      {
-        id: crypto.randomUUID(),
-        name: 'Page 1',
-        elements: legacyElements,
-      },
-    ],
-    projectId,
-    null,
-  );
+  const legacyPages =
+    legacyElements.length > 0
+      ? [{ id: crypto.randomUUID(), name: 'Page 1', elements: legacyElements }]
+      : [];
+  return buildCanvasProjectDocument(legacyPages, projectId, null);
 }
 
 export function buildCanvasElementsFromIR(root: IRNode | null | undefined): CanvasElement[] {

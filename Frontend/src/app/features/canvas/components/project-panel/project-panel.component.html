@@ -4,7 +4,7 @@
   <section class="project-pages">
     <div class="project-section-header">
       <h4>Pages</h4>
-      <button type="button" class="project-page-add" (click)="onPageCreate()">+ New Page</button>
+      <button type="button" class="project-page-add" (click)="onPageCreate()" aria-label="New page" title="New page">+</button>
     </div>
 
     <div class="project-pages-list">
@@ -12,10 +12,20 @@
         class="project-page-item"
         *ngFor="let page of pages; trackBy: trackByPageId"
         [class.active]="page.id === currentPageId">
-        <button type="button" class="project-page-select" (click)="onPageSelect(page.id)">
-          <span class="project-page-name">{{ page.name }}</span>
-          <span class="project-page-meta">{{ getPageViewportLabel(page) }}</span>
-        </button>
+        <div class="project-page-select" (click)="onPageSelect(page.id)" (dblclick)="startPageRename(page.id, $event)">
+          <input
+            *ngIf="editingPageId === page.id"
+            type="text"
+            class="project-page-name-input"
+            [attr.data-page-name-id]="page.id"
+            [value]="page.name"
+            (input)="onPageNameInput(page.id, $event)"
+            (blur)="stopPageRename(page.id)"
+            (keydown)="onPageNameKeyDown(page.id, $event)"
+            (click)="$event.stopPropagation()"
+            (dblclick)="$event.stopPropagation()" />
+          <span *ngIf="editingPageId !== page.id" class="project-page-name">{{ page.name }}</span>
+        </div>
         <button
           type="button"
           class="project-page-delete"

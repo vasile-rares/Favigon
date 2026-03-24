@@ -61,13 +61,20 @@
 }
 
 .project-page-add {
+  width: 26px;
+  height: 26px;
   border: 1px solid var(--color-border);
   background-color: var(--color-zinc-900);
   color: var(--color-zinc-200);
   border-radius: 6px;
-  padding: 0.35rem 0.55rem;
-  font-size: 0.76rem;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 
   &:hover {
     border-color: var(--color-brand-primary-30);
@@ -118,18 +125,31 @@
   font: inherit;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
+  align-items: center;
+  min-width: 0;
 }
 
 .project-page-name {
   font-size: 0.78rem;
   font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
-.project-page-meta {
-  font-size: 0.68rem;
-  color: var(--color-zinc-400);
+.project-page-name-input {
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: transparent;
+  border: none;
+  outline: 1px solid var(--color-brand-primary-30);
+  border-radius: 3px;
+  color: inherit;
+  padding: 0 2px;
+  width: 100%;
+  min-width: 0;
+  font-family: inherit;
 }
 
 .project-page-delete,

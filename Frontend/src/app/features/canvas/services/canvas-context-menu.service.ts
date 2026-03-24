@@ -1,8 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { CanvasElement, CanvasPageModel } from '../../../core/models/canvas.models';
-import {
-  ContextMenuItem,
-} from '../../../shared/components/context-menu/context-menu.component';
+import { ContextMenuItem } from '../../../shared/components/context-menu/context-menu.component';
 
 export interface ContextMenuActionCallbacks {
   getSelectedElementId: () => string | null;

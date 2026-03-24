@@ -15,7 +15,8 @@
       (layerNameChanged)="onLayerNameChanged($event)"
       (layerMoved)="onLayerMoved($event)"
       (layerVisibilityToggled)="onLayerVisibilityToggled($event)"
-      (layerContextMenuRequested)="onLayerContextMenuRequested($event)"></app-project-panel>
+      (layerContextMenuRequested)="onLayerContextMenuRequested($event)"
+      (pageNameChanged)="onPageNameChanged($event)"></app-project-panel>
 
     <app-toolbar
       [activeTool]="currentTool()"
@@ -29,8 +30,8 @@
       class="canvas-container"
       [class.pan-ready]="isPanReady()"
       [class.panning]="viewport.isPanning()"
-      [style.background-size]="canvasBackgroundSize()"
-      [style.background-position]="canvasBackgroundPosition()"
+      [style.--dot-size]="canvasBackgroundSize()"
+      [style.--dot-pos]="canvasBackgroundPosition()"
       (pointerdown)="onCanvasPointerDown($event)"
       (click)="onCanvasClick($event)"
       (wheel)="onCanvasWheel($event)"
@@ -44,6 +45,8 @@
               [style.top.px]="getPageShellTop(layout.pageId)"
               [style.width.px]="getPageShellWidth(layout.pageId)"
               [style.height.px]="getPageShellHeight(layout.pageId)"
+              [style.border-radius.px]="getShellBorderRadius()"
+              [style.border-width.px]="getShellBorderWidth()"
               (pointerdown)="onPageShellPointerDown($event, layout.pageId)"
               (click)="onInactivePageShellClick(layout.pageId)">
             </div>
@@ -62,6 +65,7 @@
               [style.height.px]="pageElement.height"
               [style.transform]="getElementTransform(pageElement)"
               [style.background-color]="pageElement.type !== 'text' && pageElement.type !== 'image' ? pageElement.fill : 'transparent'"
+              [style.color]="pageElement.type === 'text' ? pageElement.fill : null"
               [style.border]="getElementBorderStyle(pageElement)"
               [style.opacity]="pageElement.opacity ?? 1"
               [style.clip-path]="getElementClipPathForPage(pageElement, layout.pageId)"
@@ -95,7 +99,10 @@
               [style.top.px]="getPageShellTop(activeLayout.pageId)"
               [style.width.px]="getPageShellWidth(activeLayout.pageId)"
               [style.height.px]="getPageShellHeight(activeLayout.pageId)"
-              (pointerdown)="onPageShellPointerDown($event, activeLayout.pageId)"></div>
+              [style.border-radius.px]="getShellBorderRadius()"
+              [style.border-width.px]="getShellBorderWidth()"
+              (pointerdown)="onPageShellPointerDown($event, activeLayout.pageId)"
+              (click)="onActivePageShellClick(activeLayout.pageId)"></div>
 
           </ng-container>
 
@@ -120,6 +127,7 @@
             [style.height.px]="el.height"
             [style.transform]="getElementTransform(el)"
             [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
+            [style.color]="el.type === 'text' ? el.fill : null"
             [style.border]="getElementBorderStyle(el)"
             [style.outline]="getElementOutlineStyle(el)"
             [style.outline-offset.px]="getElementOutlineOffset(el)"
@@ -143,7 +151,7 @@
               (pointerenter)="hoveredFrameTitleId.set(el.id)"
               (pointerleave)="hoveredFrameTitleId.set(null)"
               (pointerdown)="onFrameTitlePointerDown($event, el.id)">
-              <span class="frame-primary-badge" *ngIf="el.isPrimary">Primary</span>{{ getFrameTitle(el) }}
+              <span class="frame-title-text">{{ getFrameTitle(el) }}</span>
             </div>
 
             <ng-container *ngIf="el.type === 'text'">
@@ -238,6 +246,15 @@
             </div>
           </ng-container>
         </div>
+
+        <!-- Page shell selection outline (no resize handles) -->
+        <div
+          *ngIf="layersFocusedPageId() && !selectedElementId() && !isDraggingEl()"
+          class="page-shell-selection-outline"
+          [style.left.px]="getPageShellSelectionLeft(layersFocusedPageId()!)"
+          [style.top.px]="getPageShellSelectionTop(layersFocusedPageId()!)"
+          [style.width.px]="getPageShellSelectionWidth(layersFocusedPageId()!)"
+          [style.height.px]="getPageShellSelectionHeight(layersFocusedPageId()!)"></div>
 
         <!-- Selection UI overlay — lives in .canvas-viewport (pans with content)
              but NOT in .canvas-scene, so no scale() transform applies.
