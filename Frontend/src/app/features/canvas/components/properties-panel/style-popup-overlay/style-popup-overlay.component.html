@@ -1,0 +1,16 @@
+<div
+  #popoverElement
+  class="spo-popup"
+  popover="manual"
+  [style.top.px]="top"
+  [style.bottom.px]="bottom"
+  [style.left.px]="left"
+  [style.width.px]="width"
+  (pointerdown)="$event.stopPropagation()">
+  <div class="spo-popup__header">
+    <p class="spo-popup__title">{{ title }}</p>
+    <button type="button" class="spo-popup__close" (click)="onCloseClick()">×</button>
+  </div>
+
+  <ng-content></ng-content>
+</div>

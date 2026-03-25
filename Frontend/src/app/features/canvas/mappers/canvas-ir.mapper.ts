@@ -24,6 +24,7 @@ const MANAGED_PROP_KEYS = [
   'content',
   'src',
   'name',
+  'overflow',
   'textVerticalAlign',
   'fontStyle',
   'primitive',
@@ -36,7 +37,6 @@ const DEFAULT_FRAME_FILL = '#3f3f46';
 const DEFAULT_IMAGE_RADIUS = 6;
 const DEFAULT_OPACITY = 1;
 const DEFAULT_STROKE_WIDTH = 1;
-const CIRCLE_RADIUS = 9999;
 const DEFAULT_PAGE_VIEWPORT_WIDTH = 1280;
 const DEFAULT_PAGE_VIEWPORT_HEIGHT = 720;
 
@@ -289,9 +289,15 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     style.opacity = element.opacity;
   }
 
-  if (element.type === 'circle') {
-    style.borderRadius = px(CIRCLE_RADIUS);
-  } else if (typeof element.cornerRadius === 'number') {
+  if (element.type === 'frame' && element.overflow) {
+    style.overflow = element.overflow;
+  }
+
+  if (element.shadow) {
+    style.shadow = element.shadow;
+  }
+
+  if (typeof element.cornerRadius === 'number') {
     style.borderRadius = px(element.cornerRadius);
   }
 
@@ -342,6 +348,10 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
     props['src'] = element.imageUrl ?? '';
   }
 
+  if (element.type === 'frame') {
+    props['overflow'] = element.overflow ?? 'clip';
+  }
+
   if (element.irMeta?.type && element.irMeta.type !== primitiveType) {
     props['sourceType'] = element.irMeta.type;
   }
@@ -358,7 +368,6 @@ function mapElementType(type: CanvasElement['type']): string {
     case 'frame':
       return 'Frame';
     case 'rectangle':
-    case 'circle':
       return 'Container';
     case 'text':
       return 'Text';
@@ -396,9 +405,14 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     strokeStyle: mappedType !== 'text' ? (node.style?.border?.style ?? 'Solid') : undefined,
     opacity: readNumber(node.style?.opacity, DEFAULT_OPACITY),
     cornerRadius:
-      mappedType !== 'circle' && mappedType !== 'text'
+      mappedType !== 'text'
         ? readLength(node.style?.borderRadius, mappedType === 'image' ? DEFAULT_IMAGE_RADIUS : 0)
         : undefined,
+    overflow:
+      mappedType === 'frame'
+        ? readOverflow(node.style?.overflow, readOverflowFromProps(node.props, 'clip'))
+        : undefined,
+    shadow: readShadow(node.style?.shadow, 'none'),
     text: mappedType === 'text' ? readStringProp(node.props, 'content', 'New text') : undefined,
     fontSize: mappedType === 'text' ? readLength(node.style?.fontSize, 16) : undefined,
     fontFamily:
@@ -592,6 +606,18 @@ function readTextVerticalAlignFromProps(
   return value === 'top' || value === 'middle' || value === 'bottom' ? value : fallback;
 }
 
+function readOverflowFromProps(
+  props: Record<string, unknown> | undefined,
+  fallback: 'clip' | 'visible',
+): 'clip' | 'visible' {
+  const value = props?.['overflow'];
+  return value === 'clip' || value === 'visible' ? value : fallback;
+}
+
+function readOverflow(value: unknown, fallback: 'clip' | 'visible'): 'clip' | 'visible' {
+  return value === 'clip' || value === 'visible' ? value : fallback;
+}
+
 function readStringProp(
   props: Record<string, unknown> | undefined,
   key: string,
@@ -607,6 +633,15 @@ function readOptionalStringProp(
 ): string | undefined {
   const value = props?.[key];
   return typeof value === 'string' ? value : undefined;
+}
+
+function readShadow(
+  value: unknown,
+  fallback: 'none' | 'sm' | 'md' | 'lg' | 'xl',
+): 'none' | 'sm' | 'md' | 'lg' | 'xl' {
+  return value === 'none' || value === 'sm' || value === 'md' || value === 'lg' || value === 'xl'
+    ? value
+    : fallback;
 }
 
 function readNumber(value: unknown, fallback: number): number {

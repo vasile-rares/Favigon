@@ -28,6 +28,7 @@ public static class StyleTransformer
     if (style.TextAlign is not null) css["text-align"] = style.TextAlign;
     if (style.LineHeight is not null) css["line-height"] = style.LineHeight.ToString();
     if (style.LetterSpacing is not null) css["letter-spacing"] = style.LetterSpacing.ToString();
+    if (style.Overflow is not null) css["overflow"] = style.Overflow;
 
     if (style.Shadow is not null && ShadowMap.TryGetValue(style.Shadow, out var shadow))
       css["box-shadow"] = shadow;
@@ -119,10 +120,10 @@ public static class StyleTransformer
     }
 
     // Emit all four sides explicitly so unselected sides are cleared
-    css["border-top"]    = border.Top    is true ? declaration : "none";
-    css["border-right"]  = border.Right  is true ? declaration : "none";
+    css["border-top"] = border.Top is true ? declaration : "none";
+    css["border-right"] = border.Right is true ? declaration : "none";
     css["border-bottom"] = border.Bottom is true ? declaration : "none";
-    css["border-left"]   = border.Left   is true ? declaration : "none";
+    css["border-left"] = border.Left is true ? declaration : "none";
   }
 
   private static string MapBorderStyle(Models.BorderStyle style) => style switch

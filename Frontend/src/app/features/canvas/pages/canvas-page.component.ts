@@ -149,11 +149,13 @@ export class ProjectPage implements OnDestroy {
   readonly el = inject(CanvasElementService);
   private readonly keyboard = inject(CanvasKeyboardService);
   readonly contextMenu = inject(CanvasContextMenuService);
+  private isPropertyNumberGestureActive = false;
 
   // ── Core State ────────────────────────────────────────────
 
   readonly pages = signal<CanvasPageModel[]>([]);
   readonly currentPageId = signal<string | null>(null);
+  readonly editingCanvasHeaderPageId = signal<string | null>(null);
   readonly selectedElementId = signal<string | null>(null);
   readonly editingTextElementId = signal<string | null>(null);
   readonly currentTool = signal<CanvasElementType | 'select'>('select');
@@ -209,6 +211,7 @@ export class ProjectPage implements OnDestroy {
   );
 
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
+  readonly editingCanvasHeaderPageName = signal('');
   readonly pageLayouts = computed<PageCanvasLayout[]>(() => {
     const pages = this.pages();
     let cursorX = 0;
@@ -556,6 +559,11 @@ export class ProjectPage implements OnDestroy {
   }
 
   onPageNamePointerDown(event: MouseEvent, pageId: string): void {
+    if (this.editingCanvasHeaderPageId() === pageId) {
+      event.stopPropagation();
+      return;
+    }
+
     if (event.button !== 0) {
       return;
     }
@@ -566,6 +574,48 @@ export class ProjectPage implements OnDestroy {
     }
 
     this.startPageDrag(event, pageId, layout);
+  }
+
+  onCanvasHeaderPageNameDoubleClick(event: MouseEvent, pageId: string): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return;
+    }
+
+    this.editingCanvasHeaderPageId.set(pageId);
+    this.editingCanvasHeaderPageName.set(page.name);
+    setTimeout(() => {
+      const input = document.querySelector<HTMLInputElement>(
+        `[data-canvas-page-name-id="${pageId}"]`,
+      );
+      input?.focus();
+      input?.select();
+    });
+  }
+
+  onCanvasHeaderPageNameInput(event: Event): void {
+    this.editingCanvasHeaderPageName.set((event.target as HTMLInputElement).value);
+  }
+
+  onCanvasHeaderPageNameBlur(pageId: string): void {
+    this.commitCanvasHeaderPageRename(pageId);
+  }
+
+  onCanvasHeaderPageNameKeyDown(pageId: string, event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      (event.target as HTMLInputElement).blur();
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.editingCanvasHeaderPageId.set(null);
+      this.editingCanvasHeaderPageName.set('');
+    }
   }
 
   onPageShellPointerDown(event: MouseEvent, pageId: string): void {
@@ -999,16 +1049,16 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const selectedFrame = this.el.getSelectedFrame(this.selectedElement());
-    const frameBounds = selectedFrame
-      ? this.el.getAbsoluteBounds(selectedFrame, this.elements())
+    const targetFrame = this.resolveInsertionFrame(pointer);
+    const frameBounds = targetFrame
+      ? this.el.getAbsoluteBounds(targetFrame, this.elements())
       : null;
 
     const result = this.el.createElementAtPoint(
       tool,
       pointer,
       this.elements(),
-      selectedFrame,
+      targetFrame,
       frameBounds,
       this.viewport.frameTemplate(),
     );
@@ -1061,6 +1111,13 @@ export class ProjectPage implements OnDestroy {
     }
 
     const elementForTypeCheck = this.el.findElementById(id, this.elements());
+
+    if (elementForTypeCheck?.type === 'frame' && this.selectedElementId() !== id) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.layersFocusedPageId.set(this.currentPageId());
+      return;
+    }
 
     event.preventDefault();
     event.stopPropagation();
@@ -1354,7 +1411,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    this.runWithHistory(() => {
+    const applyPatch = (): void => {
       this.updateCurrentPageElements((elements) => {
         const withPatch = elements.map((element) => {
           if (element.id !== selectedId) {
@@ -1372,7 +1429,34 @@ export class ProjectPage implements OnDestroy {
         }
         return this.syncElementPatchToPrimary(selectedId, patch, withPatch);
       });
+    };
+
+    if (this.isPropertyNumberGestureActive) {
+      applyPatch();
+      return;
+    }
+
+    this.runWithHistory(() => {
+      applyPatch();
     });
+  }
+
+  onPropertyNumberGestureStarted(): void {
+    if (this.isPropertyNumberGestureActive) {
+      return;
+    }
+
+    this.isPropertyNumberGestureActive = true;
+    this.beginGestureHistory();
+  }
+
+  onPropertyNumberGestureCommitted(): void {
+    if (!this.isPropertyNumberGestureActive) {
+      return;
+    }
+
+    this.isPropertyNumberGestureActive = false;
+    this.history.commitGestureHistory(() => this.createHistorySnapshot());
   }
 
   onLayerSelected(elementId: string): void {
@@ -1387,6 +1471,11 @@ export class ProjectPage implements OnDestroy {
         pages.map((p) => (p.id === change.id ? { ...p, name: change.name } : p)),
       );
     });
+
+    if (this.editingCanvasHeaderPageId() === change.id) {
+      this.editingCanvasHeaderPageId.set(null);
+      this.editingCanvasHeaderPageName.set('');
+    }
   }
 
   onLayerNameChanged(change: { id: string; name: string }): void {
@@ -1792,6 +1881,10 @@ export class ProjectPage implements OnDestroy {
 
   getElementBorderStyle(element: CanvasElement): string {
     return this.el.getElementStrokeStyle(element);
+  }
+
+  getElementBoxShadow(element: CanvasElement): string {
+    return this.el.getElementBoxShadow(element);
   }
 
   getElementOutlineStyle(_element: CanvasElement): string {
@@ -2331,8 +2424,7 @@ export class ProjectPage implements OnDestroy {
     const effectiveDeltaY = isEW ? 0 : deltaY;
     const xDirection = start.handle.includes('w') ? -1 : 1;
     const yDirection = start.handle.includes('n') ? -1 : 1;
-    const shouldPreserveAspectRatio =
-      !isEdgeHandle && (preserveAspectRatio || element.type === 'circle');
+    const shouldPreserveAspectRatio = !isEdgeHandle && preserveAspectRatio;
     const aspectRatio = shouldPreserveAspectRatio
       ? start.aspectRatio || 1
       : start.width / Math.max(start.height, 1);
@@ -2746,6 +2838,48 @@ export class ProjectPage implements OnDestroy {
       }
     }
     return null;
+  }
+
+  private commitCanvasHeaderPageRename(pageId: string): void {
+    if (this.editingCanvasHeaderPageId() !== pageId) {
+      return;
+    }
+
+    const trimmed = this.editingCanvasHeaderPageName().trim();
+    if (trimmed) {
+      this.onPageNameChanged({ id: pageId, name: trimmed });
+      return;
+    }
+
+    this.editingCanvasHeaderPageId.set(null);
+    this.editingCanvasHeaderPageName.set('');
+  }
+
+  private resolveInsertionFrame(pointer: Point): CanvasElement | null {
+    const elements = this.elements();
+    const hoveredFrames = elements.filter((element) => {
+      if (element.type !== 'frame' || !this.el.isElementEffectivelyVisible(element.id, elements)) {
+        return false;
+      }
+
+      const bounds = this.el.getAbsoluteBounds(element, elements);
+      return (
+        pointer.x >= bounds.x &&
+        pointer.x <= bounds.x + bounds.width &&
+        pointer.y >= bounds.y &&
+        pointer.y <= bounds.y + bounds.height
+      );
+    });
+
+    if (hoveredFrames.length > 0) {
+      return hoveredFrames.reduce((best, candidate) => {
+        const bestArea = best.width * best.height;
+        const candidateArea = candidate.width * candidate.height;
+        return candidateArea < bestArea ? candidate : best;
+      });
+    }
+
+    return this.el.getSelectedFrame(this.selectedElement());
   }
 
   /** After a drag, if a free element was dropped inside a frame that is larger

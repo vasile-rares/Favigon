@@ -121,6 +121,10 @@ export class CanvasPreviewPage {
     return this.el.getElementStrokeStyle(element);
   }
 
+  getElementBoxShadow(element: CanvasElement): string {
+    return this.el.getElementBoxShadow(element);
+  }
+
   getElementTransform(element: CanvasElement): string | null {
     return this.el.getElementTransform(element);
   }

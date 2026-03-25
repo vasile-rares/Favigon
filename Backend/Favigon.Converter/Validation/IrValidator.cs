@@ -10,6 +10,7 @@ public static class IrValidator
       "Frame", "Container", "Text", "Image"
   ];
 
+  private static readonly HashSet<string> ValidOverflow = ["clip", "visible"];
   private static readonly HashSet<string> ValidShadows = ["none", "sm", "md", "lg", "xl"];
   private static readonly HashSet<string> ValidBreakpoints = ["xs", "sm", "md", "lg", "xl", "2xl"];
   private static readonly HashSet<int> ValidFontWeights = [100, 200, 300, 400, 500, 600, 700, 800, 900];
@@ -93,6 +94,9 @@ public static class IrValidator
 
     if (style.Shadow is not null && !ValidShadows.Contains(style.Shadow))
       errors.Add(Error(path, "shadow", $"Invalid shadow '{style.Shadow}'. Must be: none | sm | md | lg | xl."));
+
+    if (style.Overflow is not null && !ValidOverflow.Contains(style.Overflow))
+      errors.Add(Error(path, "overflow", $"Invalid overflow '{style.Overflow}'. Must be: clip | visible."));
 
     if (style.Opacity is not null && (style.Opacity < 0 || style.Opacity > 1))
       errors.Add(Error(path, "opacity", "Opacity must be between 0 and 1."));

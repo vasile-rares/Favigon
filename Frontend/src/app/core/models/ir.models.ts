@@ -56,6 +56,7 @@ export interface IRStyle {
   borderRadius?: IRLength;
   border?: IRBorder;
 
+  overflow?: 'clip' | 'visible';
   shadow?: string;
 
   opacity?: number;

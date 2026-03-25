@@ -1,0 +1,120 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.number-input {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  min-height: 34px;
+}
+
+.number-input--boxed {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 0.38rem 0.55rem;
+
+  &:focus-within {
+    border-color: var(--color-accent-border);
+  }
+}
+
+.number-input--compact {
+  width: 72px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 0.38rem 0.55rem;
+
+  &:focus-within {
+    border-color: var(--color-brand-primary-30);
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.number-input--popup {
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 0.5rem 0.55rem;
+
+  &:focus-within {
+    border-color: var(--color-brand-primary-30);
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.number-input__field {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-zinc-100);
+  font-size: 0.8rem;
+  padding: 0 18px 0 0;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: text;
+  text-align: left;
+}
+
+.number-input__stepper {
+  position: absolute;
+  top: 50%;
+  right: 0.35rem;
+  width: 12px;
+  height: calc(100% - 6px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  transform: translateY(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+}
+
+.number-input:hover .number-input__stepper,
+.number-input:focus-within .number-input__stepper {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.number-input__stepper-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: rgba(244, 244, 245, 0.9);
+  cursor: ns-resize;
+  min-height: 8px;
+
+  &:hover {
+    color: var(--color-zinc-100);
+  }
+}
+
+.number-input__stepper-icon {
+  display: block;
+  width: 8px;
+  height: 6px;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.55));
+}

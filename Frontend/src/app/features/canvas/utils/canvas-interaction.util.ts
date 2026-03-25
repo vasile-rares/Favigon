@@ -60,18 +60,12 @@ export function normalizeElementInPlace(element: CanvasElement, elements: Canvas
     element.lineHeight = Math.max(0.8, roundToTwoDecimals(element.lineHeight ?? 1.2));
   }
 
-  if (element.type === 'circle') {
-    const circleSize = Math.max(MIN_SIZE, Math.min(element.width, element.height));
-    element.width = circleSize;
-    element.height = circleSize;
-  }
-
   const normalizedOpacity = Number.isFinite(element.opacity ?? Number.NaN)
     ? (element.opacity as number)
     : 1;
   element.opacity = clamp(normalizedOpacity, 0, 1);
 
-  if (element.type !== 'circle' && element.type !== 'text') {
+  if (element.type !== 'text') {
     const normalizedCornerRadius = Number.isFinite(element.cornerRadius ?? Number.NaN)
       ? (element.cornerRadius as number)
       : element.type === 'image'
@@ -109,12 +103,6 @@ export function normalizeElementInPlace(element: CanvasElement, elements: Canvas
 
   element.width = clamp(element.width, MIN_SIZE, maxWidth);
   element.height = clamp(element.height, MIN_SIZE, maxHeight);
-
-  if (element.type === 'circle') {
-    const constrainedCircleSize = Math.max(MIN_SIZE, Math.min(element.width, element.height));
-    element.width = constrainedCircleSize;
-    element.height = constrainedCircleSize;
-  }
 
   element.x = clamp(element.x, 0, parent.width - element.width);
   element.y = clamp(element.y, 0, parent.height - element.height);

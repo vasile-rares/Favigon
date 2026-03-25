@@ -4,10 +4,14 @@ import {
   CanvasElement,
   CanvasElementType,
   CanvasFontStyle,
+  CanvasOverflowMode,
+  CanvasShadowPreset,
   CanvasTextAlign,
   CanvasTextVerticalAlign,
 } from '../../../../core/models/canvas.models';
 import { IRNode } from '../../../../core/models/ir.models';
+import { NumberInputComponent } from './number-input/number-input.component';
+import { StylePopupFieldComponent } from './style-popup-field/style-popup-field.component';
 import { formatCanvasElementTypeLabel } from '../../utils/canvas-label.util';
 import { roundToTwoDecimals } from '../../utils/canvas-interaction.util';
 import { SupportedFramework } from '../../canvas.types';
@@ -43,7 +47,7 @@ interface FrameTemplate {
 @Component({
   selector: 'app-properties-panel',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, NumberInputComponent, StylePopupFieldComponent],
   templateUrl: './properties-panel.component.html',
   styleUrl: './properties-panel.component.css',
 })
@@ -60,6 +64,8 @@ export class PropertiesPanelComponent {
   @Input() irPreview: IRNode | null = null;
 
   @Output() elementPatch = new EventEmitter<Partial<CanvasElement>>();
+  @Output() numberInputGestureStarted = new EventEmitter<void>();
+  @Output() numberInputGestureCommitted = new EventEmitter<void>();
   @Output() frameTemplateSelected = new EventEmitter<FrameTemplate>();
   @Output() frameworkChanged = new EventEmitter<SupportedFramework>();
   @Output() validateRequested = new EventEmitter<void>();
@@ -80,6 +86,8 @@ export class PropertiesPanelComponent {
   readonly fontStyleOptions: CanvasFontStyle[] = ['normal', 'italic'];
   readonly textAlignOptions: CanvasTextAlign[] = ['left', 'center', 'right'];
   readonly textVerticalAlignOptions: CanvasTextVerticalAlign[] = ['top', 'middle', 'bottom'];
+  readonly overflowOptions: CanvasOverflowMode[] = ['clip', 'visible'];
+  readonly shadowOptions: CanvasShadowPreset[] = ['sm', 'md', 'lg', 'xl'];
 
   readonly frameTemplates: FrameTemplate[] = [
     {
@@ -119,12 +127,12 @@ export class PropertiesPanelComponent {
     this.frameworkChanged.emit(framework);
   }
 
-  toDisplayNumber(value: number | undefined): string {
+  toDisplayInt(value: number | undefined): string {
     if (!Number.isFinite(value ?? Number.NaN)) {
       return '';
     }
 
-    return roundToTwoDecimals(value as number).toString();
+    return Math.round(value as number).toString();
   }
 
   get elementTypeLabel(): string {
@@ -144,7 +152,7 @@ export class PropertiesPanelComponent {
   }
 
   supportsCornerRadius(type: CanvasElementType): boolean {
-    return type !== 'circle' && type !== 'text';
+    return type !== 'text';
   }
 
   isFrame(type: CanvasElementType): boolean {
@@ -163,30 +171,38 @@ export class PropertiesPanelComponent {
     return type === 'image';
   }
 
-  onNumberChange(field: EditableNumericField, event: Event): void {
-    const value = Number((event.target as HTMLInputElement).value);
+  supportsOverflow(type: CanvasElementType): boolean {
+    return type === 'frame';
+  }
+
+  supportsShadow(type: CanvasElementType): boolean {
+    return type !== 'text';
+  }
+
+  onNumberChange(field: EditableNumericField, valueOrEvent: number | Event): void {
+    const value =
+      typeof valueOrEvent === 'number'
+        ? valueOrEvent
+        : Number((valueOrEvent.target as HTMLInputElement).value);
+
     if (!Number.isFinite(value)) {
       return;
     }
 
-    const rounded = roundToTwoDecimals(value);
-    (event.target as HTMLInputElement).value = rounded.toString();
-    this.emitPatch({ [field]: rounded } as Partial<CanvasElement>);
+    this.emitPatch({ [field]: value } as Partial<CanvasElement>);
   }
 
-  onFillChange(event: Event): void {
-    const fill = (event.target as HTMLInputElement).value;
-    this.emitPatch({ fill });
+  onNumberInputGestureStarted(): void {
+    this.numberInputGestureStarted.emit();
   }
 
-  onStrokeChange(event: Event): void {
-    const stroke = (event.target as HTMLInputElement).value;
-    this.emitPatch({ stroke });
+  onNumberInputGestureCommitted(): void {
+    this.numberInputGestureCommitted.emit();
   }
 
-  onBorderStyleChange(event: Event): void {
-    const strokeStyle = (event.target as HTMLSelectElement).value;
-    this.emitPatch({ strokeStyle });
+  onOverflowChange(event: Event): void {
+    const overflow = (event.target as HTMLSelectElement).value as CanvasOverflowMode;
+    this.emitPatch({ overflow });
   }
 
   onTypographySelectChange(field: EditableTypographyField, event: Event): void {
@@ -204,9 +220,38 @@ export class PropertiesPanelComponent {
     return element.strokeStyle ?? 'Solid';
   }
 
+  overflowValue(element: CanvasElement): CanvasOverflowMode {
+    return element.overflow ?? 'clip';
+  }
+
+  shadowValue(element: CanvasElement): CanvasShadowPreset {
+    return element.shadow ?? 'none';
+  }
+
+  isVisible(element: CanvasElement): boolean {
+    return element.visible !== false;
+  }
+
+  hasActiveBorder(element: CanvasElement): boolean {
+    return !!element.stroke && (element.strokeWidth ?? 1) > 0;
+  }
+
+  hasActiveShadow(element: CanvasElement): boolean {
+    return (element.shadow ?? 'none') !== 'none';
+  }
+
   fillInputValue(element: CanvasElement): string {
     const fallback = element.type === 'frame' ? this.defaultFrameFillColor : this.defaultFillColor;
     return this.toHexColorOrFallback(element.fill, fallback);
+  }
+
+  fillPickerValue(element: CanvasElement): string {
+    const fillValue = this.fillInputValue(element);
+    if (fillValue !== 'transparent') {
+      return fillValue;
+    }
+
+    return element.type === 'frame' ? this.defaultFrameFillColor : this.defaultFillColor;
   }
 
   strokeInputValue(element: CanvasElement): string {
@@ -242,10 +287,51 @@ export class PropertiesPanelComponent {
     return element.textVerticalAlign ?? 'middle';
   }
 
+  fillLabel(element: CanvasElement): string {
+    const value = this.fillInputValue(element);
+    return value === 'transparent' ? 'Transparent' : preserveColorDisplayValue(value);
+  }
+
+  borderSummary(element: CanvasElement): string {
+    return `${this.toDisplayInt(element.strokeWidth ?? 1)}px ${this.borderStyleValue(element)}`;
+  }
+
+  shadowSummary(element: CanvasElement): string {
+    return (element.shadow ?? 'none').toUpperCase();
+  }
+
+  isTransparentFill(element: CanvasElement): boolean {
+    return isTransparentColor(this.fillInputValue(element));
+  }
+
+  fillSwatchBackground(element: CanvasElement): string | null {
+    const value = this.fillInputValue(element);
+    return value === 'transparent' ? null : value;
+  }
+
+  strokeSwatchBackground(element: CanvasElement): string {
+    return this.strokeInputValue(element);
+  }
+
+  setVisible(visible: boolean): void {
+    this.emitPatch({ visible });
+  }
+
+  setFontStyle(style: CanvasFontStyle): void {
+    this.emitPatch({ fontStyle: style });
+  }
+
+  setTextAlign(align: CanvasTextAlign): void {
+    this.emitPatch({ textAlign: align });
+  }
+
+  setTextVerticalAlign(align: CanvasTextVerticalAlign): void {
+    this.emitPatch({ textVerticalAlign: align });
+  }
+
   private emitPatch(patch: Partial<CanvasElement>): void {
     this.elementPatch.emit(patch);
   }
-
 
   private toHexColorOrFallback(value: string | undefined, fallback: string): string {
     if (!value) {
@@ -253,10 +339,43 @@ export class PropertiesPanelComponent {
     }
 
     const normalized = value.trim();
-    if (/^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{6})$/.test(normalized)) {
+    if (normalized.toLowerCase() === 'transparent') {
+      return 'transparent';
+    }
+
+    if (
+      /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(normalized) ||
+      /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(
+        normalized,
+      )
+    ) {
       return normalized;
     }
 
     return fallback;
   }
+}
+
+function preserveColorDisplayValue(value: string): string {
+  return value.startsWith('#') ? value.toUpperCase() : value;
+}
+
+function isTransparentColor(value: string): boolean {
+  if (value.toLowerCase() === 'transparent') {
+    return true;
+  }
+
+  if (/^#([A-Fa-f0-9]{4}|[A-Fa-f0-9]{8})$/.test(value)) {
+    const alphaHex = value.length === 5 ? value[4] : value.slice(7, 9);
+    return alphaHex.toLowerCase() === '0' || alphaHex.toLowerCase() === '00';
+  }
+
+  const rgbaMatch = value.match(
+    /^rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(\d*\.?\d+)\s*\)$/i,
+  );
+  if (!rgbaMatch) {
+    return false;
+  }
+
+  return Number(rgbaMatch[1]) === 0;
 }

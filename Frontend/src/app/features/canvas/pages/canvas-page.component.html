@@ -56,7 +56,6 @@
               class="canvas-element canvas-element-preview"
               [class.frame]="pageElement.type === 'frame'"
               [class.rectangle]="pageElement.type === 'rectangle'"
-              [class.circle]="pageElement.type === 'circle'"
               [class.text]="pageElement.type === 'text'"
               [class.image]="pageElement.type === 'image'"
               [style.left.px]="getRenderedXForPage(pageElement, layout.pageId)"
@@ -70,7 +69,7 @@
               [style.opacity]="pageElement.opacity ?? 1"
               [style.clip-path]="getElementClipPathForPage(pageElement, layout.pageId)"
               [style.visibility]="isElementClippedOutForPage(pageElement, layout.pageId) ? 'hidden' : 'visible'"
-              [style.border-radius.px]="pageElement.type === 'circle' ? null : (pageElement.cornerRadius ?? (pageElement.type === 'image' ? 6 : 0))">
+              [style.border-radius.px]="pageElement.cornerRadius ?? (pageElement.type === 'image' ? 6 : 0)">
 
               <ng-container *ngIf="pageElement.type === 'text'">
                 <div
@@ -118,7 +117,6 @@
             [class.frame-reorder-animating]="isRootFrame(el) && isFrameReorderAnimating() && selectedElementId() !== el.id"
             [class.frame-reorder-live]="isRootFrame(el) && isDraggingEl() && selectedElementId() !== el.id"
             [class.rectangle]="el.type === 'rectangle'"
-            [class.circle]="el.type === 'circle'"
             [class.text]="el.type === 'text'"
             [class.image]="el.type === 'image'"
             [style.left.px]="getRenderedX(el)"
@@ -129,12 +127,13 @@
             [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
             [style.color]="el.type === 'text' ? el.fill : null"
             [style.border]="getElementBorderStyle(el)"
+            [style.box-shadow]="getElementBoxShadow(el)"
             [style.outline]="getElementOutlineStyle(el)"
             [style.outline-offset.px]="getElementOutlineOffset(el)"
             [style.opacity]="el.opacity ?? 1"
             [style.clip-path]="getElementClipPath(el)"
             [style.visibility]="isElementClippedOut(el) ? 'hidden' : 'visible'"
-            [style.border-radius.px]="el.type === 'circle' ? null : (el.cornerRadius ?? (el.type === 'image' ? 6 : 0))"
+            [style.border-radius.px]="el.cornerRadius ?? (el.type === 'image' ? 6 : 0)"
             (pointerdown)="onElementPointerDown($event, el.id)"
             (pointerenter)="hoveredElementId.set(el.id)"
             (pointerleave)="hoveredElementId.set(null)"
@@ -226,11 +225,26 @@
                     aria-label="Run preview">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                   </button>
-                  <span
-                    class="page-name-readonly"
-                    (pointerdown)="onPageNamePointerDown($event, layout.pageId)">
-                    {{ getPageById(layout.pageId)?.name }}
-                  </span>
+                  <ng-container *ngIf="editingCanvasHeaderPageId() === layout.pageId; else canvasHeaderPageNameReadonly">
+                    <input
+                      type="text"
+                      class="page-name-input"
+                      [attr.data-canvas-page-name-id]="layout.pageId"
+                      [value]="editingCanvasHeaderPageName()"
+                      (input)="onCanvasHeaderPageNameInput($event)"
+                      (blur)="onCanvasHeaderPageNameBlur(layout.pageId)"
+                      (keydown)="onCanvasHeaderPageNameKeyDown(layout.pageId, $event)"
+                      (pointerdown)="$event.stopPropagation()"
+                      (dblclick)="$event.stopPropagation()" />
+                  </ng-container>
+                  <ng-template #canvasHeaderPageNameReadonly>
+                    <span
+                      class="page-name-readonly"
+                      (pointerdown)="onPageNamePointerDown($event, layout.pageId)"
+                      (dblclick)="onCanvasHeaderPageNameDoubleClick($event, layout.pageId)">
+                      {{ getPageById(layout.pageId)?.name }}
+                    </span>
+                  </ng-template>
                 </div>
 
                 <div class="page-device-add">
@@ -266,7 +280,6 @@
             <div
               *ngIf="hoveredElementId() === el.id && el.type !== 'frame' && !isTextEditing(el.id)"
               class="overlay-hover-outline"
-              [class.is-circle]="el.type === 'circle'"
               [style.left.px]="getSelectionLeft(el)"
               [style.top.px]="getSelectionTop(el)"
               [style.width.px]="getSelectionWidth(el)"
@@ -279,7 +292,6 @@
           <ng-container *ngIf="getSelectionOverlayElement() as sel">
             <div
               class="selection-outline"
-              [class.is-circle]="sel.type === 'circle'"
               [style.left.px]="getSelectionLeft(sel)"
               [style.top.px]="getSelectionTop(sel)"
               [style.width.px]="getSelectionWidth(sel)"
@@ -337,6 +349,8 @@
       (validateRequested)="validateIR()"
       (generateRequested)="generateCode()"
       (frameTemplateSelected)="onFrameTemplateSelected($event)"
+      (numberInputGestureStarted)="onPropertyNumberGestureStarted()"
+      (numberInputGestureCommitted)="onPropertyNumberGestureCommitted()"
       (elementPatch)="onSelectedElementPatch($event)"></app-properties-panel>
   </div>
 </div>

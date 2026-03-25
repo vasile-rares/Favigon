@@ -137,10 +137,6 @@
   position: absolute;
   box-sizing: border-box;
 
-  &.circle {
-    border-radius: 50%;
-  }
-
   &.image {
     overflow: hidden;
 

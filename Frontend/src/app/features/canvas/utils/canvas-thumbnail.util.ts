@@ -107,9 +107,6 @@ function drawElement(
   }
 
   switch (el.type) {
-    case 'circle':
-      drawCircle(ctx, el, x, y, w, h, scale);
-      break;
     case 'text':
       drawText(ctx, el, x, y, w, h, scale);
       break;
@@ -139,30 +136,6 @@ function drawRect(
   } else {
     ctx.rect(x, y, w, h);
   }
-
-  if (el.fill && el.fill !== 'transparent') {
-    ctx.fillStyle = el.fill;
-    ctx.fill();
-  }
-
-  if (el.stroke && el.strokeWidth) {
-    ctx.strokeStyle = el.stroke;
-    ctx.lineWidth = el.strokeWidth * scale;
-    ctx.stroke();
-  }
-}
-
-function drawCircle(
-  ctx: CanvasRenderingContext2D,
-  el: CanvasElement,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  scale: number,
-): void {
-  ctx.beginPath();
-  ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
 
   if (el.fill && el.fill !== 'transparent') {
     ctx.fillStyle = el.fill;

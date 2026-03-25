@@ -1,28 +1,24 @@
-<aside class="properties-panel">
+﻿<aside class="properties-panel">
+
+  <!-- ── Header ──────────────────────────────────────────── -->
   <div class="properties-panel-header">
-    <h3>Properties</h3>
+    <div class="pp-header-top">
+      <h3>Properties</h3>
+      <span class="pp-element-badge" *ngIf="selectedElement">{{ elementTypeLabel }}</span>
+    </div>
     <div class="properties-tabs">
-      <button
-        type="button"
-        class="properties-tab"
-        [class.active]="isTabActive('design')"
-        (click)="selectTab('design')">
-        Design
-      </button>
-      <button
-        type="button"
-        class="properties-tab"
-        [class.active]="isTabActive('prototype')"
-        (click)="selectTab('prototype')">
-        Prototype
-      </button>
+      <button type="button" class="properties-tab" [class.active]="isTabActive('design')" (click)="selectTab('design')">Design</button>
+      <button type="button" class="properties-tab" [class.active]="isTabActive('prototype')" (click)="selectTab('prototype')">Prototype</button>
     </div>
   </div>
 
+  <!-- ── Design Tab ─────────────────────────────────────── -->
   <ng-container *ngIf="isTabActive('design'); else prototypeTab">
+
+    <!-- Frame templates -->
     <section class="properties-section" *ngIf="isFrameToolSelected()">
-      <p class="properties-section-title">Frame templates</p>
-      <p class="properties-section-hint">Select a preset to add a new frame and focus it in the canvas.</p>
+      <p class="properties-section-title">Frame presets</p>
+      <p class="properties-section-hint">Select a preset to add a new frame.</p>
       <div class="frame-template-grid">
         <button
           type="button"
@@ -35,270 +31,402 @@
       </div>
     </section>
 
+    <!-- Empty state -->
     <div class="properties-empty-state" *ngIf="!selectedElement && !isFrameToolSelected()">
-      <p>Select an element in the canvas to edit design properties.</p>
+      <div class="pp-empty-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+          <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+          <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+          <rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+        </svg>
+      </div>
+      <p>Select an element to edit its properties.</p>
     </div>
 
+    <!-- ── Element properties ─────────────────────────── -->
     <ng-container *ngIf="selectedElement as element">
+
+      <!-- ── Dimensions ── -->
       <section class="properties-section">
-        <div class="properties-section-header">
-          <p class="properties-section-title">Position</p>
-          <span class="properties-element-type">{{ elementTypeLabel }}</span>
-        </div>
-
-      <div class="properties-grid properties-grid--single">
-        <label class="property-field property-field--inline">
-          <span class="property-label">X</span>
-          <input
-            type="number"
-            step="0.01"
-            [value]="toDisplayNumber(element.x)"
-            (input)="onNumberChange('x', $event)" />
-        </label>
-
-        <label class="property-field property-field--inline">
-          <span class="property-label">Y</span>
-          <input
-            type="number"
-            step="0.01"
-            [value]="toDisplayNumber(element.y)"
-            (input)="onNumberChange('y', $event)" />
-        </label>
-      </div>
-    </section>
-
-    <section class="properties-section">
-      <p class="properties-section-title">Layout</p>
-      <div class="properties-grid properties-grid--single">
-        <label class="property-field property-field--inline">
-          <span class="property-label">W</span>
-          <input
-            type="number"
-            min="24"
-            step="0.01"
-            [value]="toDisplayNumber(element.width)"
-            (input)="onNumberChange('width', $event)" />
-        </label>
-
-        <label class="property-field property-field--inline">
-          <span class="property-label">H</span>
-          <input
-            type="number"
-            min="24"
-            step="0.01"
-            [value]="toDisplayNumber(element.height)"
-            (input)="onNumberChange('height', $event)" />
-        </label>
-
-        <label class="property-field property-field--inline">
-          <span class="property-label">R°</span>
-          <input
-            type="number"
-            min="0"
-            max="360"
-            step="1"
-            [value]="toDisplayNumber(element.rotation ?? 0)"
-            (input)="onNumberChange('rotation', $event)" />
-        </label>
-      </div>
-    </section>
-
-    <section class="properties-section">
-      <p class="properties-section-title">Appearance</p>
-      <div class="properties-grid">
-        <label class="property-field property-field--inline">
-          <span class="property-label">Opacity</span>
-          <input
-            type="number"
-            min="0"
-            max="1"
-            step="0.01"
-            [value]="toDisplayNumber(element.opacity ?? 1)"
-            (input)="onNumberChange('opacity', $event)" />
-        </label>
-
-        <label class="property-field property-field--inline" *ngIf="supportsCornerRadius(element.type)">
-          <span class="property-label">Corner radius</span>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            [value]="toDisplayNumber(element.cornerRadius ?? (element.type === 'image' ? 6 : 0))"
-            (input)="onNumberChange('cornerRadius', $event)" />
-        </label>
-      </div>
-    </section>
-
-    <section class="properties-section" *ngIf="hasFill(element.type)">
-      <p class="properties-section-title">Fill</p>
-      <label class="property-field property-field--inline property-field--color">
-        <span class="property-label">Color</span>
-        <div class="property-inline-group">
-          <input type="color" [value]="fillInputValue(element)" (input)="onFillChange($event)" />
-          <span class="property-inline-value">{{ fillInputValue(element) | uppercase }}</span>
-        </div>
-      </label>
-    </section>
-
-    <section class="properties-section" *ngIf="hasStroke(element.type)">
-      <p class="properties-section-title">Stroke</p>
-      <div class="properties-grid properties-grid--single">
-        <label class="property-field property-field--inline property-field--color">
-          <span class="property-label">Color</span>
-          <div class="property-inline-group">
-            <input
-              type="color"
-              [value]="strokeInputValue(element)"
-              (input)="onStrokeChange($event)" />
-            <span class="property-inline-value">{{ strokeInputValue(element) | uppercase }}</span>
+        <p class="properties-section-title">Dimensions</p>
+        <div class="pp-metric-list">
+          <div class="pp-style-row pp-style-row--metric">
+            <span class="pp-row-label">Width</span>
+            <div class="pp-style-control pp-style-control--metric">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Width"
+                [value]="element.width"
+                [min]="1"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onNumberChange('width', $event)" />
+            </div>
           </div>
-        </label>
 
-        <label class="property-field property-field--inline">
-          <span class="property-label">Style</span>
-          <select [value]="borderStyleValue(element)" (change)="onBorderStyleChange($event)">
-            <option *ngFor="let style of borderStyleOptions" [value]="style">
-              {{ style }}
-            </option>
-          </select>
-        </label>
+          <div class="pp-style-row pp-style-row--metric">
+            <span class="pp-row-label">Height</span>
+            <div class="pp-style-control pp-style-control--metric">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Height"
+                [value]="element.height"
+                [min]="1"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onNumberChange('height', $event)" />
+            </div>
+          </div>
 
-        <label class="property-field property-field--inline">
-          <span class="property-label">Weight</span>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            [value]="toDisplayNumber(element.strokeWidth ?? 1)"
-            (input)="onNumberChange('strokeWidth', $event)" />
-        </label>
-      </div>
-    </section>
+          <div class="pp-style-row pp-style-row--metric">
+            <span class="pp-row-label">Rotation</span>
+            <div class="pp-style-control pp-style-control--metric">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Rotation"
+                [value]="element.rotation ?? 0"
+                [min]="0"
+                [max]="360"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onNumberChange('rotation', $event)" />
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <section class="properties-section" *ngIf="isText(element.type)">
-      <p class="properties-section-title">Text</p>
-      <label class="property-field">
-        <span>Content</span>
+      <!-- ── Style ── -->
+      <section class="properties-section">
+        <p class="properties-section-title">Style</p>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Opacity</span>
+          <div class="pp-style-control pp-style-control--opacity">
+            <input
+              class="pp-slider"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              [value]="element.opacity ?? 1"
+              (input)="onNumberChange('opacity', $event)" />
+            <app-number-input
+              appearance="compact"
+              ariaLabel="Opacity"
+              [value]="element.opacity ?? 1"
+              [min]="0"
+              [max]="1"
+              [step]="0.01"
+              (gestureStarted)="onNumberInputGestureStarted()"
+              (gestureCommitted)="onNumberInputGestureCommitted()"
+              (valueChange)="onNumberChange('opacity', $event)" />
+          </div>
+        </div>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Visible</span>
+          <div class="pp-toggle-group">
+            <button type="button" class="pp-toggle-btn" [class.active]="isVisible(element)" (click)="setVisible(true)">Yes</button>
+            <button type="button" class="pp-toggle-btn" [class.active]="!isVisible(element)" (click)="setVisible(false)">No</button>
+          </div>
+        </div>
+
+        <div class="pp-style-row" *ngIf="hasFill(element.type)">
+          <span class="pp-row-label">Fill</span>
+          <div class="pp-style-control pp-style-control--trigger">
+            <app-style-popup-field
+              kind="fill"
+              [triggerText]="fillLabel(element)"
+              [swatchColor]="fillSwatchBackground(element)"
+              [isTransparent]="isTransparentFill(element)"
+              [colorValue]="fillInputValue(element)"
+              [pickerColor]="fillPickerValue(element)"
+              [clearPatch]="{ fill: 'transparent' }"
+              (patchRequested)="elementPatch.emit($event)">
+            </app-style-popup-field>
+          </div>
+        </div>
+
+        <div class="pp-style-row" *ngIf="supportsOverflow(element.type)">
+          <span class="pp-row-label">Overflow</span>
+          <div class="pp-style-control">
+            <select class="pp-inline-select" [value]="overflowValue(element)" (change)="onOverflowChange($event)">
+              <option *ngFor="let option of overflowOptions" [value]="option">{{ option | titlecase }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pp-style-row" *ngIf="supportsCornerRadius(element.type)">
+          <span class="pp-row-label">Radius</span>
+          <div class="pp-style-control">
+            <app-number-input
+              appearance="compact"
+              ariaLabel="Corner radius"
+              [value]="element.cornerRadius ?? (element.type === 'image' ? 6 : 0)"
+              [min]="0"
+              [step]="1"
+              (gestureStarted)="onNumberInputGestureStarted()"
+              (gestureCommitted)="onNumberInputGestureCommitted()"
+              (valueChange)="onNumberChange('cornerRadius', $event)" />
+            <div class="pp-icon-group pp-icon-group--compact">
+              <button type="button" class="pp-icon-btn active" title="Uniform radius">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                  <rect x="2" y="2" width="9" height="9" rx="2.5" stroke="currentColor" stroke-width="1.3"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <ng-container *ngIf="hasStroke(element.type)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Stroke</span>
+            <div class="pp-style-control pp-style-control--trigger">
+              <app-style-popup-field
+                kind="stroke"
+                [hasValue]="hasActiveBorder(element)"
+                [triggerText]="borderSummary(element)"
+                [swatchColor]="strokeSwatchBackground(element)"
+                [colorValue]="strokeInputValue(element)"
+                [pickerColor]="strokeInputValue(element)"
+                [strokeWidth]="element.strokeWidth ?? 1"
+                [strokeStyle]="borderStyleValue(element)"
+                [borderStyleOptions]="borderStyleOptions"
+                [activationPatch]="{ stroke: '#52525b', strokeWidth: 1, strokeStyle: 'Solid' }"
+                [clearPatch]="{ stroke: undefined, strokeWidth: 0, strokeStyle: undefined }"
+                (patchRequested)="elementPatch.emit($event)"
+                (numberGestureStarted)="onNumberInputGestureStarted()"
+                (numberGestureCommitted)="onNumberInputGestureCommitted()">
+              </app-style-popup-field>
+            </div>
+          </div>
+        </ng-container>
+
+        <div class="pp-style-row" *ngIf="supportsShadow(element.type)">
+          <span class="pp-row-label">Shadows</span>
+          <div class="pp-style-control pp-style-control--trigger">
+            <app-style-popup-field
+              kind="shadow"
+              [hasValue]="hasActiveShadow(element)"
+              [triggerText]="shadowSummary(element)"
+              [shadowPreview]="shadowValue(element)"
+              [shadowOptions]="shadowOptions"
+              [activationPatch]="{ shadow: 'md' }"
+              [clearPatch]="{ shadow: 'none' }"
+              (patchRequested)="elementPatch.emit($event)">
+            </app-style-popup-field>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ── Text ── -->
+      <section class="properties-section" *ngIf="isText(element.type)">
+        <p class="properties-section-title">Text</p>
         <input
           type="text"
+          class="pp-full-input"
           [value]="element.text || ''"
           (input)="onTextChange('text', $event)"
           placeholder="Text content" />
-      </label>
 
-      <label class="property-field">
-        <span>Font size</span>
-        <input
-          type="number"
-          min="8"
-          step="0.01"
-          [value]="toDisplayNumber(element.fontSize || 16)"
-          (input)="onNumberChange('fontSize', $event)" />
-      </label>
-    </section>
+        <!-- Font family + size -->
+        <div class="pp-typo-row">
+          <div class="pp-field pp-field--grow">
+            <span class="pp-field-label pp-field-label--icon">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M2 10.5 5.5 3h1L10 10.5" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M3.5 7.5h5.5" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <select [value]="fontFamilyValue(element)" (change)="onTypographySelectChange('fontFamily', $event)">
+              <option *ngFor="let font of fontFamilyOptions" [value]="font">{{ font }}</option>
+            </select>
+          </div>
+          <div class="pp-field pp-field--size">
+            <span class="pp-field-label">px</span>
+            <app-number-input
+              ariaLabel="Font size"
+              [value]="element.fontSize || 16"
+              [min]="8"
+              [step]="1"
+              (gestureStarted)="onNumberInputGestureStarted()"
+              (gestureCommitted)="onNumberInputGestureCommitted()"
+              (valueChange)="onNumberChange('fontSize', $event)" />
+          </div>
+        </div>
 
-    <section class="properties-section" *ngIf="isText(element.type)">
-      <p class="properties-section-title">Typography</p>
+        <!-- Weight + italic toggle -->
+        <div class="pp-typo-row">
+          <div class="pp-field pp-field--grow">
+            <select [value]="fontWeightValue(element)" (change)="onTypographySelectChange('fontWeight', $event)">
+              <option *ngFor="let weight of fontWeightOptions" [value]="weight">{{ weight }}</option>
+            </select>
+          </div>
+          <div class="pp-icon-group">
+            <button
+              type="button"
+              class="pp-icon-btn pp-italic-btn"
+              [class.active]="fontStyleValue(element) === 'italic'"
+              (click)="setFontStyle(fontStyleValue(element) === 'italic' ? 'normal' : 'italic')"
+              title="Italic">
+              <em>I</em>
+            </button>
+          </div>
+        </div>
 
-      <div class="properties-grid properties-grid--single">
-        <label class="property-field property-field--inline">
-          <span class="property-label">Font</span>
-          <select [value]="fontFamilyValue(element)" (change)="onTypographySelectChange('fontFamily', $event)">
-            <option *ngFor="let font of fontFamilyOptions" [value]="font">{{ font }}</option>
-          </select>
-        </label>
+        <!-- Horizontal align -->
+        <div class="pp-row">
+          <span class="pp-row-label">Align</span>
+          <div class="pp-icon-group">
+            <button type="button" class="pp-icon-btn" [class.active]="textAlignValue(element) === 'left'" (click)="setTextAlign('left')" title="Left">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="2" width="12" height="1.6" rx="0.8" fill="currentColor"/>
+                <rect x="1" y="6.2" width="7.5" height="1.6" rx="0.8" fill="currentColor"/>
+                <rect x="1" y="10.4" width="10" height="1.6" rx="0.8" fill="currentColor"/>
+              </svg>
+            </button>
+            <button type="button" class="pp-icon-btn" [class.active]="textAlignValue(element) === 'center'" (click)="setTextAlign('center')" title="Center">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="2" width="12" height="1.6" rx="0.8" fill="currentColor"/>
+                <rect x="3.25" y="6.2" width="7.5" height="1.6" rx="0.8" fill="currentColor"/>
+                <rect x="2" y="10.4" width="10" height="1.6" rx="0.8" fill="currentColor"/>
+              </svg>
+            </button>
+            <button type="button" class="pp-icon-btn" [class.active]="textAlignValue(element) === 'right'" (click)="setTextAlign('right')" title="Right">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="2" width="12" height="1.6" rx="0.8" fill="currentColor"/>
+                <rect x="5.5" y="6.2" width="7.5" height="1.6" rx="0.8" fill="currentColor"/>
+                <rect x="3" y="10.4" width="10" height="1.6" rx="0.8" fill="currentColor"/>
+              </svg>
+            </button>
+          </div>
+        </div>
 
-        <label class="property-field property-field--inline">
-          <span class="property-label">Weight</span>
-          <select [value]="fontWeightValue(element)" (change)="onTypographySelectChange('fontWeight', $event)">
-            <option *ngFor="let weight of fontWeightOptions" [value]="weight">{{ weight }}</option>
-          </select>
-        </label>
+        <!-- Vertical align -->
+        <div class="pp-row">
+          <span class="pp-row-label">Vertical</span>
+          <div class="pp-icon-group">
+            <button type="button" class="pp-icon-btn" [class.active]="textVerticalAlignValue(element) === 'top'" (click)="setTextVerticalAlign('top')" title="Top">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="1.5" width="12" height="1.5" rx="0.75" fill="currentColor"/>
+                <path d="M4 3.5v8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                <path d="M7 3.5v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                <path d="M10 3.5v7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <button type="button" class="pp-icon-btn" [class.active]="textVerticalAlignValue(element) === 'middle'" (click)="setTextVerticalAlign('middle')" title="Middle">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="6.25" width="12" height="1.5" rx="0.75" fill="currentColor"/>
+                <path d="M4 2v10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                <path d="M7 4v6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                <path d="M10 3v8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+            </button>
+            <button type="button" class="pp-icon-btn" [class.active]="textVerticalAlignValue(element) === 'bottom'" (click)="setTextVerticalAlign('bottom')" title="Bottom">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="11" width="12" height="1.5" rx="0.75" fill="currentColor"/>
+                <path d="M4 2v9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                <path d="M7 4.5v7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+                <path d="M10 3v8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
 
-        <label class="property-field property-field--inline">
-          <span class="property-label">Style</span>
-          <select [value]="fontStyleValue(element)" (change)="onTypographySelectChange('fontStyle', $event)">
-            <option *ngFor="let style of fontStyleOptions" [value]="style">
-              {{ style === 'italic' ? 'Italic' : 'Regular' }}
-            </option>
-          </select>
-        </label>
+        <!-- Letter spacing + Line height -->
+        <div class="pp-grid-2">
+          <div class="pp-field">
+            <span class="pp-field-label pp-field-label--icon" title="Letter spacing">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M1 6.5h11M3 3.5 1 6.5l2 3M10 3.5l2 3-2 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <app-number-input
+              ariaLabel="Letter spacing"
+              [value]="element.letterSpacing ?? 0"
+              [step]="0.01"
+              (gestureStarted)="onNumberInputGestureStarted()"
+              (gestureCommitted)="onNumberInputGestureCommitted()"
+              (valueChange)="onNumberChange('letterSpacing', $event)" />
+          </div>
+          <div class="pp-field">
+            <span class="pp-field-label pp-field-label--icon" title="Line height">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                <path d="M1 3h11M1 10h11M4.5 1 3 3l1.5 2M4.5 12 3 10l1.5-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <app-number-input
+              ariaLabel="Line height"
+              [value]="element.lineHeight ?? 1.2"
+              [min]="0.8"
+              [step]="0.01"
+              (gestureStarted)="onNumberInputGestureStarted()"
+              (gestureCommitted)="onNumberInputGestureCommitted()"
+              (valueChange)="onNumberChange('lineHeight', $event)" />
+          </div>
+        </div>
 
-        <label class="property-field property-field--inline">
-          <span class="property-label">Horizontal</span>
-          <select [value]="textAlignValue(element)" (change)="onTypographySelectChange('textAlign', $event)">
-            <option *ngFor="let align of textAlignOptions" [value]="align">{{ align | titlecase }}</option>
-          </select>
-        </label>
+      </section>
 
-        <label class="property-field property-field--inline">
-          <span class="property-label">Vertical</span>
-          <select [value]="textVerticalAlignValue(element)" (change)="onTypographySelectChange('textVerticalAlign', $event)">
-            <option *ngFor="let align of textVerticalAlignOptions" [value]="align">
-              {{ align === 'middle' ? 'Middle' : (align | titlecase) }}
-            </option>
-          </select>
-        </label>
-
-        <label class="property-field property-field--inline">
-          <span class="property-label">Letter spacing</span>
-          <input
-            type="number"
-            step="0.01"
-            [value]="toDisplayNumber(element.letterSpacing ?? 0)"
-            (input)="onNumberChange('letterSpacing', $event)" />
-        </label>
-
-        <label class="property-field property-field--inline">
-          <span class="property-label">Line height</span>
-          <input
-            type="number"
-            min="0.8"
-            step="0.01"
-            [value]="toDisplayNumber(element.lineHeight ?? 1.2)"
-            (input)="onNumberChange('lineHeight', $event)" />
-        </label>
-      </div>
-    </section>
-
+      <!-- ── Image ── -->
       <section class="properties-section" *ngIf="isImage(element.type)">
         <p class="properties-section-title">Image</p>
-        <label class="property-field">
-          <span>Source URL</span>
-          <input
-            type="text"
-            [value]="element.imageUrl || ''"
-            (input)="onTextChange('imageUrl', $event)"
-            placeholder="https://example.com/image.png" />
-        </label>
+        <input
+          type="text"
+          class="pp-full-input"
+          [value]="element.imageUrl || ''"
+          (input)="onTextChange('imageUrl', $event)"
+          placeholder="https://example.com/image.png" />
       </section>
+
     </ng-container>
   </ng-container>
 
+  <!-- ── Prototype Tab ────────────────────────────────────── -->
   <ng-template #prototypeTab>
-    <section class="properties-section">
-      <p class="properties-section-title">IR Builder</p>
 
-      <label class="property-field">
-        <span>Framework</span>
+    <section class="properties-section">
+      <p class="properties-section-title">Framework</p>
+      <div class="pp-field">
         <select [value]="selectedFramework" (change)="onFrameworkChange($event)">
-          <option value="html">HTML</option>
+          <option value="html">HTML / CSS</option>
           <option value="react">React</option>
           <option value="angular">Angular</option>
         </select>
-      </label>
+      </div>
+    </section>
 
-      <div class="prototype-actions">
-        <button type="button" (click)="validateRequested.emit()" [disabled]="isValidating || isGenerating">
-          {{ isValidating ? 'Validating...' : 'Validate IR' }}
+    <section class="properties-section">
+      <p class="properties-section-title">IR Builder</p>
+
+      <div class="pp-proto-actions">
+        <button type="button" class="pp-proto-btn" (click)="validateRequested.emit()" [disabled]="isValidating || isGenerating">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M2 6.5 5 9.5l6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          {{ isValidating ? 'Validating\u2026' : 'Validate IR' }}
         </button>
-        <button type="button" (click)="generateRequested.emit()" [disabled]="isGenerating || isValidating">
-          {{ isGenerating ? 'Generating...' : 'Generate Code' }}
+        <button type="button" class="pp-proto-btn pp-proto-btn--primary" (click)="generateRequested.emit()" [disabled]="isGenerating || isValidating">
+          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+            <path d="M4 3.5 7.5 6.5 4 9.5M8 9.5h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          {{ isGenerating ? 'Generating\u2026' : 'Generate Code' }}
         </button>
       </div>
 
-      <p class="prototype-status prototype-status--ok" *ngIf="validationResult === true">IR is valid.</p>
-      <p class="prototype-status prototype-status--error" *ngIf="validationResult === false">IR is not valid.</p>
+      <p class="prototype-status prototype-status--ok" *ngIf="validationResult === true">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6 4.5 8.5 10 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        IR is valid
+      </p>
+      <p class="prototype-status prototype-status--error" *ngIf="validationResult === false">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        IR is not valid
+      </p>
       <p class="prototype-status prototype-status--error" *ngIf="apiError">{{ apiError }}</p>
     </section>
 
@@ -316,5 +444,7 @@
       <p class="properties-section-title">Generated CSS</p>
       <pre>{{ generatedCss }}</pre>
     </section>
+
   </ng-template>
+
 </aside>

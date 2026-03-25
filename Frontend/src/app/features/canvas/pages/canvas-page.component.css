@@ -256,15 +256,6 @@ app-header-bar {
     background-color: var(--color-zinc-300);
   }
 
-  &.circle {
-    background-color: var(--color-zinc-300);
-    border-radius: 50%;
-
-    .selection-outline {
-      border-radius: 50%;
-    }
-  }
-
   &.text {
     display: flex;
     align-items: flex-start;
@@ -382,10 +373,6 @@ app-header-bar {
   border: 2px solid var(--color-brand-primary);
   pointer-events: auto;
   z-index: 10;
-}
-
-.selection-outline.is-circle {
-  border-radius: 50%;
 }
 
 .corner-radius-handle {
@@ -530,8 +517,4 @@ app-header-bar {
   pointer-events: none;
   border: 2px solid var(--color-brand-primary);
   z-index: 9;
-}
-
-.overlay-hover-outline.is-circle {
-  border-radius: 50%;
 }

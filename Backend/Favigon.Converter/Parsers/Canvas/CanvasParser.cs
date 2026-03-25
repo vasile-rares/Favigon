@@ -87,9 +87,6 @@ public sealed class CanvasParser
       };
     }
 
-    if (string.Equals(element.Type, "circle", StringComparison.OrdinalIgnoreCase))
-      style.BorderRadius = new IRLength { Value = Math.Max(0, Math.Min(element.Width, element.Height)) / 2d };
-
     return new IRNode
     {
       Id = string.IsNullOrWhiteSpace(element.Id) ? Guid.NewGuid().ToString("N") : element.Id,

@@ -20,7 +20,6 @@ const TOOL_HOTKEYS: Record<string, CanvasElementType | 'select'> = {
   v: 'select',
   f: 'frame',
   r: 'rectangle',
-  o: 'circle',
   t: 'text',
   i: 'image',
 };

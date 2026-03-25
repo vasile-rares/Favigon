@@ -2,7 +2,9 @@ import { Injectable, signal } from '@angular/core';
 import {
   CanvasElement,
   CanvasElementType,
+  CanvasOverflowMode,
   CanvasPageModel,
+  CanvasShadowPreset,
 } from '../../../core/models/canvas.models';
 import {
   clamp,
@@ -19,13 +21,19 @@ const DEFAULT_FRAME_FILL = '#ffffff';
 const DEFAULT_ELEMENT_FILL = '#e0e0e0';
 const MIN_ELEMENT_SIZE = 24;
 const FRAME_INSERT_GAP = 48;
+const SHADOW_MAP: Record<CanvasShadowPreset, string> = {
+  none: 'none',
+  sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+  md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+  lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
+  xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+};
 
 const DEFAULT_ELEMENT_DIMENSIONS: Record<CanvasElementType, { width: number; height: number }> = {
   frame: { width: 390, height: 844 },
   text: { width: 150, height: 40 },
   image: { width: 180, height: 120 },
   rectangle: { width: 100, height: 100 },
-  circle: { width: 100, height: 100 },
 };
 
 @Injectable()
@@ -375,9 +383,21 @@ export class CanvasElementService {
     return `rotate(${rotation}deg)`;
   }
 
+  getElementBoxShadow(element: CanvasElement): string {
+    return SHADOW_MAP[element.shadow ?? 'none'] ?? SHADOW_MAP.none;
+  }
+
+  getElementOverflowMode(element: CanvasElement): CanvasOverflowMode {
+    return element.overflow ?? 'clip';
+  }
+
   getElementClipPath(element: CanvasElement, elements: CanvasElement[]): string {
     const parent = this.findElementById(element.parentId ?? null, elements);
     if (!parent) {
+      return 'none';
+    }
+
+    if (this.getElementOverflowMode(parent) !== 'clip') {
       return 'none';
     }
 
@@ -404,6 +424,10 @@ export class CanvasElementService {
       return false;
     }
 
+    if (this.getElementOverflowMode(parent) !== 'clip') {
+      return false;
+    }
+
     const bounds = this.getAbsoluteBounds(element, elements);
     const parentBounds = this.getAbsoluteBounds(parent, elements);
     const intersectionWidth =
@@ -417,7 +441,7 @@ export class CanvasElementService {
   }
 
   supportsCornerRadius(element: CanvasElement): boolean {
-    return element.type !== 'circle' && element.type !== 'text' && element.type !== 'frame';
+    return element.type !== 'text' && element.type !== 'frame';
   }
 
   getCornerRadiusHandleInset(element: CanvasElement): number {

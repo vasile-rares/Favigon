@@ -62,7 +62,6 @@
           *ngFor="let el of visibleElements(); trackBy: trackByElementId"
           class="preview-element"
           [class.frame]="el.type === 'frame'"
-          [class.circle]="el.type === 'circle'"
           [class.text]="el.type === 'text'"
           [class.image]="el.type === 'image'"
           [style.left.px]="getRenderedX(el)"
@@ -72,9 +71,10 @@
           [style.transform]="getElementTransform(el)"
           [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
           [style.border]="getElementBorderStyle(el)"
+          [style.box-shadow]="getElementBoxShadow(el)"
           [style.opacity]="el.opacity ?? 1"
           [style.clip-path]="getElementClipPath(el)"
-          [style.border-radius.px]="el.type === 'circle' ? null : (el.cornerRadius ?? (el.type === 'image' ? 6 : 0))">
+          [style.border-radius.px]="el.cornerRadius ?? (el.type === 'image' ? 6 : 0)">
 
           <ng-container *ngIf="el.type === 'text'">
             <div

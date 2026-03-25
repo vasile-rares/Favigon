@@ -19,6 +19,7 @@ interface LayerEntry {
 }
 
 type LayerDropPosition = 'before' | 'after' | 'inside';
+type PageRenameSource = 'pages' | 'layers';
 
 @Component({
   selector: 'app-project-panel',
@@ -56,6 +57,7 @@ export class ProjectPanelComponent implements OnChanges {
   editingLayerId: string | null = null;
   editingPageId: string | null = null;
   private editingPageName = '';
+  private editingPageSource: PageRenameSource | null = null;
 
   get layerEntries(): LayerEntry[] {
     return this.cachedLayerEntries;
@@ -78,15 +80,22 @@ export class ProjectPanelComponent implements OnChanges {
     this.pageSelected.emit(pageId);
   }
 
-  startPageRename(pageId: string, event: MouseEvent): void {
+  startPageRename(pageId: string, event: MouseEvent, source: PageRenameSource = 'pages'): void {
     event.stopPropagation();
     const page = this.pages.find((p) => p.id === pageId);
     this.editingPageName = page?.name ?? '';
     this.editingPageId = pageId;
+    this.editingPageSource = source;
     setTimeout(() => {
-      const input = document.querySelector<HTMLInputElement>(`[data-page-name-id="${pageId}"]`);
+      const input = document.querySelector<HTMLInputElement>(
+        `[data-page-name-id="${source}-${pageId}"]`,
+      );
       input?.select();
     });
+  }
+
+  isPageRenameActive(pageId: string, source: PageRenameSource): boolean {
+    return this.editingPageId === pageId && this.editingPageSource === source;
   }
 
   stopPageRename(pageId: string): void {
@@ -97,6 +106,7 @@ export class ProjectPanelComponent implements OnChanges {
       }
       this.editingPageId = null;
       this.editingPageName = '';
+      this.editingPageSource = null;
     }
   }
 
@@ -110,6 +120,7 @@ export class ProjectPanelComponent implements OnChanges {
     } else if (event.key === 'Escape') {
       this.editingPageId = null;
       this.editingPageName = '';
+      this.editingPageSource = null;
     }
   }
 
@@ -271,10 +282,6 @@ export class ProjectPanelComponent implements OnChanges {
 
   isRectangle(type: CanvasElementType): boolean {
     return type === 'rectangle';
-  }
-
-  isCircle(type: CanvasElementType): boolean {
-    return type === 'circle';
   }
 
   isText(type: CanvasElementType): boolean {

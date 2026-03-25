@@ -84,6 +84,7 @@ public class IRStyle
   public IRLength? BorderRadius { get; set; }
   public IRBorder? Border { get; set; }
 
+  public string? Overflow { get; set; }
   public string? Shadow { get; set; }
 
   public double? Opacity { get; set; }
