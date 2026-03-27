@@ -1,30 +1,30 @@
 <ng-container *ngIf="showAddButton; else triggerField">
-  <button type="button" class="spf-add-btn" (click)="onTriggerClick($event)">Add...</button>
+  <button type="button" class="style-popup-field__add-btn" (click)="onTriggerClick($event)">Add...</button>
 </ng-container>
 
 <ng-template #triggerField>
-  <div class="spf-trigger" [class.is-active]="isOpen" [class.spf-trigger--color]="kind !== 'shadow'">
-    <button type="button" class="spf-trigger__main" (click)="onTriggerClick($event)">
+  <div class="style-popup-field__trigger" [class.is-active]="isOpen" [class.style-popup-field__trigger--color]="kind !== 'shadow'">
+    <button type="button" class="style-popup-field__trigger-main" (click)="onTriggerClick($event)">
       <ng-container [ngSwitch]="kind">
         <span
           *ngSwitchCase="'fill'"
-          class="spf-color-swatch"
-          [class.spf-color-swatch--transparent]="isTransparent"
+          class="style-popup-field__color-swatch"
+          [class.style-popup-field__color-swatch--transparent]="isTransparent"
           [style.background]="isTransparent ? null : swatchColor">
         </span>
         <span
           *ngSwitchCase="'stroke'"
-          class="spf-color-swatch"
+          class="style-popup-field__color-swatch"
           [style.background]="swatchColor">
         </span>
-        <span *ngSwitchCase="'shadow'" class="spf-shadow-preview spf-shadow-preview--{{ shadowPreview }}"></span>
+        <span *ngSwitchCase="'shadow'" class="style-popup-field__shadow-preview style-popup-field__shadow-preview--{{ shadowPreview }}"></span>
       </ng-container>
-      <span class="spf-trigger__text">{{ triggerText }}</span>
+      <span class="style-popup-field__trigger-text">{{ triggerText }}</span>
     </button>
     <button
       *ngIf="showClearButton"
       type="button"
-      class="spf-trigger__clear"
+      class="style-popup-field__trigger-clear"
       [title]="clearButtonTitle"
       [attr.aria-label]="clearButtonTitle"
       (click)="onClearClick($event)">×</button>
@@ -41,74 +41,74 @@
   [title]="popupTitle"
   (closeRequested)="onPopupCloseClick()">
   <ng-container [ngSwitch]="kind">
-    <div class="spf-popup__section" *ngSwitchCase="'fill'">
-      <div class="spf-color-picker">
+    <div class="style-popup-field__popup-section" *ngSwitchCase="'fill'">
+      <div class="style-popup-field__color-picker">
         <div
-          class="spf-color-picker__surface"
+          class="style-popup-field__color-picker-surface"
           [style.background-color]="pickerHueColor()"
           (pointerdown)="onColorSurfacePointerDown($event)">
           <div
-            class="spf-color-picker__surface-handle"
+            class="style-popup-field__color-picker-surface-handle"
             [style.left.%]="pickerSaturationPercent()"
             [style.top.%]="pickerValuePercent()">
           </div>
         </div>
 
-        <div class="spf-color-picker__footer">
-          <div class="spf-color-picker__preview" [class.spf-color-picker__preview--transparent]="pickerAlpha <= 0.001" [style.background]="pickerColorValue()"></div>
-          <div class="spf-color-picker__hue">
-            <div class="spf-color-picker__hue-track" (pointerdown)="onHueSliderPointerDown($event)">
-              <div class="spf-color-picker__hue-handle" [style.left.%]="pickerHuePercent()"></div>
+        <div class="style-popup-field__color-picker-footer">
+          <div class="style-popup-field__color-picker-preview" [class.style-popup-field__color-picker-preview--transparent]="pickerAlpha <= 0.001" [style.background]="pickerColorValue()"></div>
+          <div class="style-popup-field__color-picker-hue">
+            <div class="style-popup-field__color-picker-hue-track" (pointerdown)="onHueSliderPointerDown($event)">
+              <div class="style-popup-field__color-picker-hue-handle" [style.left.%]="pickerHuePercent()"></div>
             </div>
-            <div class="spf-color-picker__alpha-track" (pointerdown)="onAlphaSliderPointerDown($event)">
-              <div class="spf-color-picker__alpha-fill" [style.background]="alphaTrackBackground()"></div>
-              <div class="spf-color-picker__alpha-handle" [style.left.%]="pickerAlphaPercent()"></div>
+            <div class="style-popup-field__color-picker-alpha-track" (pointerdown)="onAlphaSliderPointerDown($event)">
+              <div class="style-popup-field__color-picker-alpha-fill" [style.background]="alphaTrackBackground()"></div>
+              <div class="style-popup-field__color-picker-alpha-handle" [style.left.%]="pickerAlphaPercent()"></div>
             </div>
           </div>
         </div>
       </div>
 
-      <label class="spf-popup__field-label">Color</label>
-      <div class="spf-popup__text-input-shell">
-        <input class="spf-popup__text-input" type="text" [value]="pickerColorValue()" (change)="onColorTextChange($event)" />
+      <label class="style-popup-field__popup-field-label">Color</label>
+      <div class="style-popup-field__popup-text-input-shell">
+        <input class="style-popup-field__popup-text-input" type="text" [value]="pickerColorValue()" (change)="onColorTextChange($event)" />
       </div>
     </div>
 
-    <div class="spf-popup__section" *ngSwitchCase="'stroke'">
-      <div class="spf-color-picker">
+    <div class="style-popup-field__popup-section" *ngSwitchCase="'stroke'">
+      <div class="style-popup-field__color-picker">
         <div
-          class="spf-color-picker__surface"
+          class="style-popup-field__color-picker-surface"
           [style.background-color]="pickerHueColor()"
           (pointerdown)="onColorSurfacePointerDown($event)">
           <div
-            class="spf-color-picker__surface-handle"
+            class="style-popup-field__color-picker-surface-handle"
             [style.left.%]="pickerSaturationPercent()"
             [style.top.%]="pickerValuePercent()">
           </div>
         </div>
 
-        <div class="spf-color-picker__footer">
-          <div class="spf-color-picker__preview" [class.spf-color-picker__preview--transparent]="pickerAlpha <= 0.001" [style.background]="pickerColorValue()"></div>
-          <div class="spf-color-picker__hue">
-            <div class="spf-color-picker__hue-track" (pointerdown)="onHueSliderPointerDown($event)">
-              <div class="spf-color-picker__hue-handle" [style.left.%]="pickerHuePercent()"></div>
+        <div class="style-popup-field__color-picker-footer">
+          <div class="style-popup-field__color-picker-preview" [class.style-popup-field__color-picker-preview--transparent]="pickerAlpha <= 0.001" [style.background]="pickerColorValue()"></div>
+          <div class="style-popup-field__color-picker-hue">
+            <div class="style-popup-field__color-picker-hue-track" (pointerdown)="onHueSliderPointerDown($event)">
+              <div class="style-popup-field__color-picker-hue-handle" [style.left.%]="pickerHuePercent()"></div>
             </div>
-            <div class="spf-color-picker__alpha-track" (pointerdown)="onAlphaSliderPointerDown($event)">
-              <div class="spf-color-picker__alpha-fill" [style.background]="alphaTrackBackground()"></div>
-              <div class="spf-color-picker__alpha-handle" [style.left.%]="pickerAlphaPercent()"></div>
+            <div class="style-popup-field__color-picker-alpha-track" (pointerdown)="onAlphaSliderPointerDown($event)">
+              <div class="style-popup-field__color-picker-alpha-fill" [style.background]="alphaTrackBackground()"></div>
+              <div class="style-popup-field__color-picker-alpha-handle" [style.left.%]="pickerAlphaPercent()"></div>
             </div>
           </div>
         </div>
       </div>
 
-      <label class="spf-popup__field-label">Color</label>
-      <div class="spf-popup__text-input-shell">
-        <input class="spf-popup__text-input" type="text" [value]="pickerColorValue()" (change)="onColorTextChange($event)" />
+      <label class="style-popup-field__popup-field-label">Color</label>
+      <div class="style-popup-field__popup-text-input-shell">
+        <input class="style-popup-field__popup-text-input" type="text" [value]="pickerColorValue()" (change)="onColorTextChange($event)" />
       </div>
 
-      <div class="spf-popup__grid">
+      <div class="style-popup-field__popup-grid">
         <div>
-          <label class="spf-popup__field-label">Weight</label>
+          <label class="style-popup-field__popup-field-label">Weight</label>
           <app-number-input
             appearance="popup"
             ariaLabel="Stroke width"
@@ -120,9 +120,9 @@
             (valueChange)="onStrokeWidthChange($event)" />
         </div>
         <div>
-          <label class="spf-popup__field-label">Style</label>
+          <label class="style-popup-field__popup-field-label">Style</label>
           <app-dropdown-select
-            class="spf-popup__dropdown"
+            class="style-popup-field__popup-dropdown"
             [enableSearch]="false"
             [placeholder]="'Select style'"
             [options]="strokeStyleDropdownOptions"
@@ -132,15 +132,15 @@
       </div>
     </div>
 
-    <div class="spf-popup__section" *ngSwitchCase="'shadow'">
-      <div class="spf-shadow-list">
+    <div class="style-popup-field__popup-section" *ngSwitchCase="'shadow'">
+      <div class="style-popup-field__shadow-list">
         <button
           type="button"
-          class="spf-shadow-option"
+          class="style-popup-field__shadow-option"
           *ngFor="let option of shadowOptions"
           [class.active]="shadowPreview === option"
           (click)="onShadowSelected(option)">
-          <span class="spf-shadow-preview spf-shadow-preview--{{ option }}"></span>
+          <span class="style-popup-field__shadow-preview style-popup-field__shadow-preview--{{ option }}"></span>
           <span>{{ option | uppercase }}</span>
         </button>
       </div>

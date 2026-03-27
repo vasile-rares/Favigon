@@ -1,15 +1,15 @@
 <div
   #popoverElement
-  class="spo-popup"
+  class="style-popup-overlay"
   popover="manual"
   [style.top.px]="top"
   [style.bottom.px]="bottom"
   [style.left.px]="left"
   [style.width.px]="width"
   (pointerdown)="$event.stopPropagation()">
-  <div class="spo-popup__header">
-    <p class="spo-popup__title">{{ title }}</p>
-    <button type="button" class="spo-popup__close" (click)="onCloseClick()">×</button>
+  <div class="style-popup-overlay__header">
+    <p class="style-popup-overlay__title">{{ title }}</p>
+    <button type="button" class="style-popup-overlay__close" (click)="onCloseClick()">×</button>
   </div>
 
   <ng-content></ng-content>

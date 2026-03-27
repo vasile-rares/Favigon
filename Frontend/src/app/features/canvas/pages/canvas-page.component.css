@@ -9,7 +9,7 @@
   overflow: hidden;
 }
 
-app-header-bar {
+.canvas-header {
   position: absolute;
   top: 0;
   left: 0;
@@ -60,12 +60,6 @@ app-header-bar {
   * {
     cursor: inherit;
   }
-}
-
-.canvas-container.pan-ready {
-  cursor:
-    url('/cursor-canvas.svg') 4 2,
-    default;
 }
 
 .canvas-container.panning {

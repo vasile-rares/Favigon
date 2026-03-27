@@ -1,6 +1,6 @@
-﻿<aside class="properties-panel">
+﻿<aside class="properties-panel glass-panel">
 
-  <!-- ── Header ──────────────────────────────────────────── -->
+  <!-- -- Header -------------------------------------------- -->
   <div class="properties-panel-header">
     <div class="pp-header-top">
       <h3>Properties</h3>
@@ -12,7 +12,7 @@
     </div>
   </div>
 
-  <!-- ── Design Tab ─────────────────────────────────────── -->
+  <!-- -- Design Tab --------------------------------------- -->
   <ng-container *ngIf="isTabActive('design'); else prototypeTab">
 
     <!-- Frame templates -->
@@ -44,10 +44,10 @@
       <p>Select an element to edit its properties.</p>
     </div>
 
-    <!-- ── Element properties ─────────────────────────── -->
+    <!-- -- Element properties --------------------------- -->
     <ng-container *ngIf="selectedElement as element">
 
-      <!-- ── Dimensions ── -->
+      <!-- -- Dimensions -- -->
       <section class="properties-section">
         <p class="properties-section-title">Dimensions</p>
         <div class="pp-metric-list">
@@ -84,7 +84,7 @@
         </div>
       </section>
 
-      <!-- ── Style ── -->
+      <!-- -- Style -- -->
       <section class="properties-section">
         <p class="properties-section-title">Style</p>
 
@@ -124,7 +124,7 @@
 
         <div class="pp-style-row" *ngIf="hasFill(element.type)">
           <span class="pp-row-label">Fill</span>
-          <div class="pp-style-control pp-style-control--trigger">
+          <div class="pp-style-control pp-style-control--popup">
             <app-style-popup-field
               kind="fill"
               [triggerText]="fillLabel(element)"
@@ -143,7 +143,7 @@
         <div class="pp-style-row" *ngIf="supportsOverflow(element.type)">
           <span class="pp-row-label">Overflow</span>
           <div class="pp-style-control">
-            <select class="pp-inline-select" [value]="overflowValue(element)" (change)="onOverflowChange($event)">
+            <select class="pp-select" [value]="overflowValue(element)" (change)="onOverflowChange($event)">
               <option *ngFor="let option of overflowOptions" [value]="option">{{ option | titlecase }}</option>
             </select>
           </div>
@@ -174,7 +174,7 @@
         <ng-container *ngIf="hasStroke(element.type)">
           <div class="pp-style-row">
             <span class="pp-row-label">Stroke</span>
-            <div class="pp-style-control pp-style-control--trigger">
+            <div class="pp-style-control pp-style-control--popup">
               <app-style-popup-field
                 kind="stroke"
                 [hasValue]="hasActiveBorder(element)"
@@ -197,7 +197,7 @@
 
         <div class="pp-style-row" *ngIf="supportsShadow(element.type)">
           <span class="pp-row-label">Shadows</span>
-          <div class="pp-style-control pp-style-control--trigger">
+          <div class="pp-style-control pp-style-control--popup">
             <app-style-popup-field
               kind="shadow"
               [hasValue]="hasActiveShadow(element)"
@@ -213,12 +213,12 @@
 
       </section>
 
-      <!-- ── Text ── -->
+      <!-- -- Text -- -->
       <section class="properties-section" *ngIf="isText(element.type)">
         <p class="properties-section-title">Text</p>
         <input
           type="text"
-          class="pp-full-input"
+          class="pp-text-input"
           [value]="element.text || ''"
           (input)="onTextChange('text', $event)"
           placeholder="Text content" />
@@ -269,7 +269,7 @@
         </div>
 
         <!-- Horizontal align -->
-        <div class="pp-row">
+        <div class="pp-style-row">
           <span class="pp-row-label">Align</span>
           <div class="pp-icon-group">
             <button type="button" class="pp-icon-btn" [class.active]="textAlignValue(element) === 'left'" (click)="setTextAlign('left')" title="Left">
@@ -297,7 +297,7 @@
         </div>
 
         <!-- Vertical align -->
-        <div class="pp-row">
+        <div class="pp-style-row">
           <span class="pp-row-label">Vertical</span>
           <div class="pp-icon-group">
             <button type="button" class="pp-icon-btn" [class.active]="textVerticalAlignValue(element) === 'top'" (click)="setTextVerticalAlign('top')" title="Top">
@@ -362,12 +362,12 @@
 
       </section>
 
-      <!-- ── Image ── -->
+      <!-- -- Image -- -->
       <section class="properties-section" *ngIf="isImage(element.type)">
         <p class="properties-section-title">Image</p>
         <input
           type="text"
-          class="pp-full-input"
+          class="pp-text-input"
           [value]="element.imageUrl || ''"
           (input)="onTextChange('imageUrl', $event)"
           placeholder="https://example.com/image.png" />
@@ -376,7 +376,7 @@
     </ng-container>
   </ng-container>
 
-  <!-- ── Prototype Tab ────────────────────────────────────── -->
+  <!-- -- Prototype Tab -------------------------------------- -->
   <ng-template #prototypeTab>
 
     <section class="properties-section">

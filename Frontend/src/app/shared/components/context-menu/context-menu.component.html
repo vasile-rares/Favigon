@@ -1,5 +1,5 @@
 <div
-  class="context-menu__panel"
+  class="context-menu__panel glass-panel"
   role="menu"
   [style.left.px]="adjustedX"
   [style.top.px]="adjustedY"
@@ -21,7 +21,7 @@
         <span class="context-menu__item-arrow">›</span>
 
         @if (openSubmenuId === item.id) {
-          <div class="context-menu__submenu" role="menu">
+          <div class="context-menu__submenu glass-panel" role="menu">
             @for (child of item.children; track child.id) {
               <button
                 type="button"

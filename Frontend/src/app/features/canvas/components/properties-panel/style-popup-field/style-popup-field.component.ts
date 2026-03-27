@@ -409,7 +409,7 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
 
   private updateColorFromSurfaceCoordinates(clientX: number, clientY: number): void {
     const target = this.hostRef.nativeElement.querySelector(
-      '.spf-color-picker__surface',
+      '.style-popup-field__color-picker-surface',
     ) as HTMLElement | null;
     if (!target) {
       return;
@@ -423,7 +423,7 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
 
   private updateColorFromHueCoordinates(clientX: number): void {
     const target = this.hostRef.nativeElement.querySelector(
-      '.spf-color-picker__hue-track',
+      '.style-popup-field__color-picker-hue-track',
     ) as HTMLElement | null;
     if (!target) {
       return;
@@ -437,7 +437,7 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
 
   private updateColorFromAlphaCoordinates(clientX: number): void {
     const target = this.hostRef.nativeElement.querySelector(
-      '.spf-color-picker__alpha-track',
+      '.style-popup-field__color-picker-alpha-track',
     ) as HTMLElement | null;
     if (!target) {
       return;
