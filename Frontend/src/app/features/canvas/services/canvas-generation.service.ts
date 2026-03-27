@@ -4,7 +4,7 @@ import { ConverterRequest, ConverterResponse } from '../../../core/models/conver
 import { IRNode } from '../../../core/models/ir.models';
 import { ConverterService } from '../../../core/services/converter.service';
 
-@Injectable({ providedIn: 'root' })
+@Injectable()
 export class CanvasGenerationService {
   private readonly converterService = inject(ConverterService);
 

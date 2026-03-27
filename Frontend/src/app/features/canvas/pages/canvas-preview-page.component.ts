@@ -24,7 +24,7 @@ const PREVIEW_DEVICE_OPTIONS: PreviewDeviceOption[] = [
   selector: 'app-canvas-preview-page',
   standalone: true,
   imports: [CommonModule],
-  providers: [CanvasElementService],
+  providers: [CanvasElementService, CanvasPersistenceService],
   templateUrl: './canvas-preview-page.component.html',
   styleUrl: './canvas-preview-page.component.css',
 })

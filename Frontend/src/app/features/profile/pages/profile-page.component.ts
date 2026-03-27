@@ -7,6 +7,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
 import { ProjectService } from '../../../core/services/project.service';
 import { UserService } from '../../../core/services/user.service';
+import { CurrentUserService } from '../../../core/services/current-user.service';
 import { UserProfile } from '../../../core/models/user.models';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
 import { ActionButtonComponent } from '../../../shared/components/action-button/action-button.component';
@@ -42,6 +43,7 @@ export class ProfilePage implements OnInit {
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
   private readonly userService = inject(UserService);
+  private readonly currentUser = inject(CurrentUserService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
 
@@ -87,7 +89,7 @@ export class ProfilePage implements OnInit {
           this.errorMessage.set(null);
           return forkJoin({
             profileUser: this.userService.getByUsername(username),
-            currentUser: this.userService.getMe(),
+            currentUser: this.currentUser.load(),
           });
         }),
         takeUntilDestroyed(this.destroyRef),
@@ -95,7 +97,7 @@ export class ProfilePage implements OnInit {
       .subscribe({
         next: ({ profileUser, currentUser }) => {
           this.profile.set(profileUser);
-          const own = currentUser.username === profileUser.username;
+          const own = currentUser !== null && currentUser.username === profileUser.username;
           this.isOwnProfile.set(own);
           this.loadProjects(profileUser, own);
         },

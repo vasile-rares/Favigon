@@ -11,6 +11,7 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { UserService } from '../../../core/services/user.service';
+import { CurrentUserService } from '../../../core/services/current-user.service';
 import { environment } from '../../../../environments/environment';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
 import { TextInputComponent } from '../../../shared/components/text-input/text-input.component';
@@ -46,6 +47,7 @@ function passwordStrengthValidator(): ValidatorFn {
 export class AuthPage implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly userService = inject(UserService);
+  private readonly currentUser = inject(CurrentUserService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -199,6 +201,7 @@ export class AuthPage implements OnInit {
       this.handleRememberMe(email.trim(), rememberMe);
       this.statusMessage.set({ type: 'success', text: response.message || 'Login successful.' });
       const user = await firstValueFrom(this.userService.getMe());
+      this.currentUser.set(user);
       await this.navigateAfterLogin(user.username);
     } catch (error: any) {
       this.handleError(error, 'Could not log in.');
@@ -373,6 +376,7 @@ export class AuthPage implements OnInit {
       }
 
       const user = await firstValueFrom(this.userService.getMe());
+      this.currentUser.set(user);
       await this.navigateAfterLogin(user.username);
     } catch (error: any) {
       this.handleError(

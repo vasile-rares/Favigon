@@ -9,7 +9,7 @@ import { ProjectDesignResponse } from '../../../core/models/project.models';
 import { ProjectService } from '../../../core/services/project.service';
 import { withRoundedPrecision } from '../utils/canvas-interaction.util';
 
-@Injectable({ providedIn: 'root' })
+@Injectable()
 export class CanvasPersistenceService {
   private readonly projectService = inject(ProjectService);
 

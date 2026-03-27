@@ -15,6 +15,7 @@ import { environment } from '../../../../environments/environment';
 import { AuthService } from '../../../core/services/auth.service';
 import { ProjectService } from '../../../core/services/project.service';
 import { UserService } from '../../../core/services/user.service';
+import { CurrentUserService } from '../../../core/services/current-user.service';
 import { UserSearchResult } from '../../../core/models/user.models';
 import { UserMenuDropdownComponent } from '../user-menu-dropdown/user-menu-dropdown.component';
 import { DIALOG_BOX_IMPORTS } from '../dialog-box/dialog-box.component';
@@ -61,6 +62,7 @@ export class HeaderBarComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly projectService = inject(ProjectService);
   private readonly userService = inject(UserService);
+  private readonly currentUser = inject(CurrentUserService);
   private readonly fb = inject(FormBuilder);
   private readonly fallbackAvatarUrl = 'https://github.com/shadcn.png';
   private static cachedProfile: HeaderUserProfile | null | undefined;
@@ -298,6 +300,7 @@ export class HeaderBarComponent implements OnInit {
   onLogout() {
     this.isUserMenuOpen = false;
     HeaderBarComponent.cachedProfile = undefined;
+    this.currentUser.invalidate();
     this.authService.logout().subscribe();
     void this.router.navigate(['/login'], { replaceUrl: true });
   }

@@ -51,6 +51,11 @@ import {
   CornerRadiusState,
   HistorySnapshot,
   SnapLine,
+  ViewportPresetOption,
+  PageCanvasLayout,
+  PageDragState,
+  DeviceFramePreset,
+  VIEWPORT_PRESET_OPTIONS,
 } from '../canvas.types';
 import { CanvasViewportService } from '../services/canvas-viewport.service';
 import { CanvasHistoryService } from '../services/canvas-history.service';
@@ -64,43 +69,9 @@ import {
   CanvasContextMenuService,
   ContextMenuActionCallbacks,
 } from '../services/canvas-context-menu.service';
+import { CanvasEditorStateService } from '../services/canvas-editor-state.service';
 
-interface ViewportPresetOption {
-  id: CanvasPageViewportPreset;
-  label: string;
-  width: number;
-  height: number;
-}
-
-interface PageCanvasLayout {
-  pageId: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-interface PageDragState {
-  pageId: string;
-  pointerX: number;
-  pointerY: number;
-  startX: number;
-  startY: number;
-}
-
-type DeviceFramePreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
-
-const VIEWPORT_PRESET_OPTIONS: ViewportPresetOption[] = [
-  { id: 'desktop', label: 'Desktop', width: 1280, height: 720 },
-  { id: 'tablet', label: 'Tablet', width: 800, height: 1100 },
-  { id: 'mobile', label: 'Mobile', width: 375, height: 812 },
-];
-
-const DEVICE_FRAME_OPTIONS: ViewportPresetOption[] = [
-  { id: 'desktop', label: 'Desktop', width: 1280, height: 720 },
-  { id: 'tablet', label: 'Tablet', width: 800, height: 1100 },
-  { id: 'mobile', label: 'Mobile', width: 375, height: 812 },
-];
+const DEVICE_FRAME_OPTIONS = VIEWPORT_PRESET_OPTIONS;
 
 const MIN_CUSTOM_VIEWPORT_SIZE = 100;
 const PAGE_CANVAS_GAP = 120;
@@ -127,12 +98,15 @@ const FRAME_TITLE_MIN_ZOOM = 0.62;
     DialogBoxComponent,
   ],
   providers: [
+    CanvasEditorStateService,
     CanvasViewportService,
     CanvasHistoryService,
     CanvasClipboardService,
     CanvasElementService,
     CanvasKeyboardService,
     CanvasContextMenuService,
+    CanvasPersistenceService,
+    CanvasGenerationService,
   ],
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
@@ -149,16 +123,17 @@ export class ProjectPage implements OnDestroy {
   readonly el = inject(CanvasElementService);
   private readonly keyboard = inject(CanvasKeyboardService);
   readonly contextMenu = inject(CanvasContextMenuService);
+  readonly editorState = inject(CanvasEditorStateService);
   private isPropertyNumberGestureActive = false;
 
   // ── Core State ────────────────────────────────────────────
 
-  readonly pages = signal<CanvasPageModel[]>([]);
-  readonly currentPageId = signal<string | null>(null);
+  readonly pages = this.editorState.pages;
+  readonly currentPageId = this.editorState.currentPageId;
   readonly editingCanvasHeaderPageId = signal<string | null>(null);
-  readonly selectedElementId = signal<string | null>(null);
-  readonly editingTextElementId = signal<string | null>(null);
-  readonly currentTool = signal<CanvasElementType | 'select'>('select');
+  readonly selectedElementId = this.editorState.selectedElementId;
+  readonly editingTextElementId = this.editorState.editingTextElementId;
+  readonly currentTool = this.editorState.currentTool;
   readonly layersFocusedPageId = signal<string | null>(null);
   readonly isViewportMenuOpen = signal(false);
   readonly isDeviceMenuOpen = signal(false);
@@ -186,23 +161,9 @@ export class ProjectPage implements OnDestroy {
 
   // ── Computed Signals ──────────────────────────────────────
 
-  readonly currentPage = computed<CanvasPageModel | null>(() => {
-    const activePageId = this.currentPageId();
-    if (!activePageId) {
-      return this.pages()[0] ?? null;
-    }
-    return this.pages().find((page) => page.id === activePageId) ?? this.pages()[0] ?? null;
-  });
-
-  readonly elements = computed<CanvasElement[]>(() => this.currentPage()?.elements ?? []);
-
-  readonly selectedElement = computed<CanvasElement | null>(() => {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) {
-      return null;
-    }
-    return this.elements().find((element) => element.id === selectedId) ?? null;
-  });
+  readonly currentPage = this.editorState.currentPage;
+  readonly elements = this.editorState.elements;
+  readonly selectedElement = this.editorState.selectedElement;
 
   readonly visibleElements = computed<CanvasElement[]>(() =>
     this.elements().filter((element) =>
@@ -1840,15 +1801,15 @@ export class ProjectPage implements OnDestroy {
   // ── Zoom Toolbar Delegates ────────────────────────────────
 
   zoomIn(): void {
-    this.viewport.zoomIn();
+    this.viewport.zoomIn(this.getCanvasElement());
   }
 
   zoomOut(): void {
-    this.viewport.zoomOut();
+    this.viewport.zoomOut(this.getCanvasElement());
   }
 
   resetZoom(): void {
-    this.viewport.resetZoom();
+    this.viewport.resetZoom(this.getCanvasElement());
   }
 
   zoomPercentage(): number {
@@ -3165,20 +3126,13 @@ export class ProjectPage implements OnDestroy {
       onSelectTool: (tool) => this.onToolbarToolSelected(tool),
       onSpaceDown: () => this.viewport.isSpacePressed.set(true),
       onSpaceUp: () => this.viewport.isSpacePressed.set(false),
-      onZoomIn: () => this.viewport.zoomIn(),
-      onZoomOut: () => this.viewport.zoomOut(),
-      getEditingTextElementId: () => this.editingTextElementId(),
-      getSelectedElementId: () => this.selectedElementId(),
+      onZoomIn: () => this.viewport.zoomIn(this.getCanvasElement()),
+      onZoomOut: () => this.viewport.zoomOut(this.getCanvasElement()),
     };
   }
 
   private buildContextMenuCallbacks(): ContextMenuActionCallbacks {
     return {
-      getSelectedElementId: () => this.selectedElementId(),
-      getSelectedElement: () => this.selectedElement(),
-      getPages: () => this.pages(),
-      getCurrentPageId: () => this.currentPageId(),
-      getElements: () => this.elements(),
       onCopy: () => this.copySelectedElement(),
       onPaste: () => this.pasteClipboard(),
       onDelete: (id) => {

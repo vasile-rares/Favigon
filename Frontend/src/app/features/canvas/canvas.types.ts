@@ -1,9 +1,43 @@
-import { CanvasElement, CanvasPageModel } from '../../core/models/canvas.models';
+import {
+  CanvasElement,
+  CanvasPageModel,
+  CanvasPageViewportPreset,
+} from '../../core/models/canvas.models';
 
 export type SupportedFramework = 'html' | 'react' | 'angular';
 export type HandlePosition = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
 export type CornerHandle = 'nw' | 'ne' | 'sw' | 'se';
 export type EdgeHandle = 'n' | 's' | 'e' | 'w';
+export type DeviceFramePreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
+
+export interface ViewportPresetOption {
+  id: CanvasPageViewportPreset;
+  label: string;
+  width: number;
+  height: number;
+}
+
+export interface PageCanvasLayout {
+  pageId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PageDragState {
+  pageId: string;
+  pointerX: number;
+  pointerY: number;
+  startX: number;
+  startY: number;
+}
+
+export const VIEWPORT_PRESET_OPTIONS: ViewportPresetOption[] = [
+  { id: 'desktop', label: 'Desktop', width: 1280, height: 720 },
+  { id: 'tablet', label: 'Tablet', width: 800, height: 1100 },
+  { id: 'mobile', label: 'Mobile', width: 375, height: 812 },
+];
 
 export interface FrameTemplateSelection {
   name: string;

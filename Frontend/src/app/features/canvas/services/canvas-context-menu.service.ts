@@ -1,13 +1,9 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { CanvasElement, CanvasPageModel } from '../../../core/models/canvas.models';
 import { ContextMenuItem } from '../../../shared/components/context-menu/context-menu.component';
+import { CanvasEditorStateService } from './canvas-editor-state.service';
 
 export interface ContextMenuActionCallbacks {
-  getSelectedElementId: () => string | null;
-  getSelectedElement: () => CanvasElement | null;
-  getPages: () => CanvasPageModel[];
-  getCurrentPageId: () => string | null;
-  getElements: () => CanvasElement[];
   onCopy: () => void;
   onPaste: () => void;
   onDelete: (elementId: string) => void;
@@ -23,6 +19,8 @@ export interface ContextMenuActionCallbacks {
 
 @Injectable()
 export class CanvasContextMenuService {
+  private readonly editorState = inject(CanvasEditorStateService);
+
   readonly isOpen = signal(false);
   readonly positionX = signal(0);
   readonly positionY = signal(0);
@@ -43,17 +41,17 @@ export class CanvasContextMenuService {
   // ── Private Item Building ────────────────────────────────
 
   private buildItems(callbacks: ContextMenuActionCallbacks): ContextMenuItem[] {
-    const element = callbacks.getSelectedElement();
+    const element = this.editorState.selectedElement();
     const hasElement = !!element;
     const isVisible = element?.visible !== false;
     const isRootFrame = element?.type === 'frame' && !element.parentId;
-    const otherPages = callbacks
-      .getPages()
-      .filter((page) => page.id !== callbacks.getCurrentPageId());
+    const otherPages = this.editorState
+      .pages()
+      .filter((page) => page.id !== this.editorState.currentPageId());
 
     const guardAction = (action: (id: string) => void): (() => void) => {
       return () => {
-        const id = callbacks.getSelectedElementId();
+        const id = this.editorState.selectedElementId();
         if (id) {
           action(id);
         }

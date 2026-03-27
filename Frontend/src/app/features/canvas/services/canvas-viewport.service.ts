@@ -25,16 +25,16 @@ export class CanvasViewportService {
 
   // ── Zoom ──────────────────────────────────────────────────
 
-  zoomIn(): void {
-    this.setZoom(this.zoomLevel() * ZOOM_FACTOR, this.getCanvasScreenCenter());
+  zoomIn(canvasElement: HTMLElement | null): void {
+    this.setZoom(this.zoomLevel() * ZOOM_FACTOR, this.getCanvasScreenCenter(canvasElement));
   }
 
-  zoomOut(): void {
-    this.setZoom(this.zoomLevel() / ZOOM_FACTOR, this.getCanvasScreenCenter());
+  zoomOut(canvasElement: HTMLElement | null): void {
+    this.setZoom(this.zoomLevel() / ZOOM_FACTOR, this.getCanvasScreenCenter(canvasElement));
   }
 
-  resetZoom(): void {
-    this.setZoom(1, this.getCanvasScreenCenter());
+  resetZoom(canvasElement: HTMLElement | null): void {
+    this.setZoom(1, this.getCanvasScreenCenter(canvasElement));
   }
 
   zoomPercentage(): number {
@@ -194,11 +194,10 @@ export class CanvasViewportService {
 
   // ── Private Helpers ───────────────────────────────────────
 
-  private getCanvasScreenCenter(): Point {
-    const canvas = document.querySelector('.canvas-container') as HTMLElement | null;
-    if (!canvas) {
+  private getCanvasScreenCenter(canvasElement: HTMLElement | null): Point {
+    if (!canvasElement) {
       return { x: 400, y: 300 };
     }
-    return { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 };
+    return { x: canvasElement.clientWidth / 2, y: canvasElement.clientHeight / 2 };
   }
 }

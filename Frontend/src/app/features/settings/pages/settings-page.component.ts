@@ -8,6 +8,7 @@ import { TextInputComponent } from '../../../shared/components/text-input/text-i
 import { ActionButtonComponent } from '../../../shared/components/action-button/action-button.component';
 import { DIALOG_BOX_IMPORTS } from '../../../shared/components/dialog-box/dialog-box.component';
 import { UserService } from '../../../core/services/user.service';
+import { CurrentUserService } from '../../../core/services/current-user.service';
 import { UserMe } from '../../../core/models/user.models';
 import { environment } from '../../../../environments/environment';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
@@ -28,6 +29,7 @@ import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
 })
 export class SettingsPage implements OnInit {
   private readonly userService = inject(UserService);
+  private readonly currentUser = inject(CurrentUserService);
   private readonly router = inject(Router);
 
   activeTab: 'account' | 'password' | 'linked-accounts' = 'account';
@@ -53,8 +55,8 @@ export class SettingsPage implements OnInit {
   async ngOnInit() {
     this.isLoading.set(true);
     try {
-      const me = await firstValueFrom(this.userService.getMe());
-      this.populateForm(me);
+      const me = await firstValueFrom(this.currentUser.load());
+      if (me) this.populateForm(me);
     } catch {
       // auth guard should handle unauthenticated state
     } finally {
@@ -78,6 +80,7 @@ export class SettingsPage implements OnInit {
           bio: this.bio.trim() || null,
         }),
       );
+      this.currentUser.set(updated);
       this.populateForm(updated);
       this.statusMessage.set({ type: 'success', text: 'Profile updated successfully.' });
     } catch (error: unknown) {

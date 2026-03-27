@@ -1,5 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { CanvasElementType } from '../../../core/models/canvas.models';
+import { CanvasEditorStateService } from './canvas-editor-state.service';
 
 export interface KeyboardActionCallbacks {
   onCopy: () => void;
@@ -12,8 +13,6 @@ export interface KeyboardActionCallbacks {
   onSpaceUp: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
-  getEditingTextElementId: () => string | null;
-  getSelectedElementId: () => string | null;
 }
 
 const TOOL_HOTKEYS: Record<string, CanvasElementType | 'select'> = {
@@ -26,6 +25,8 @@ const TOOL_HOTKEYS: Record<string, CanvasElementType | 'select'> = {
 
 @Injectable()
 export class CanvasKeyboardService {
+  private readonly editorState = inject(CanvasEditorStateService);
+
   handleKeyDown(event: KeyboardEvent, callbacks: KeyboardActionCallbacks): void {
     if (event.defaultPrevented) {
       return;
@@ -75,7 +76,7 @@ export class CanvasKeyboardService {
       }
     }
 
-    if (callbacks.getEditingTextElementId()) {
+    if (this.editorState.editingTextElementId()) {
       return;
     }
 
@@ -96,7 +97,7 @@ export class CanvasKeyboardService {
     }
 
     if (event.key === 'Delete' || event.key === 'Backspace') {
-      if (!callbacks.getSelectedElementId()) {
+      if (!this.editorState.selectedElementId()) {
         return;
       }
       callbacks.onDelete();
@@ -112,7 +113,7 @@ export class CanvasKeyboardService {
   // ── Private Helpers ───────────────────────────────────────
 
   private isTypingContext(event: KeyboardEvent): boolean {
-    return this.isTypingTarget(event.target) || this.isTypingTarget(document.activeElement);
+    return this.isTypingTarget(event.target);
   }
 
   private isTypingTarget(target: EventTarget | null): boolean {
