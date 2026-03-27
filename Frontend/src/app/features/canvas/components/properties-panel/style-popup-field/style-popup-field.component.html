@@ -69,7 +69,9 @@
       </div>
 
       <label class="spf-popup__field-label">Color</label>
-      <input class="spf-popup__input" type="text" [value]="pickerColorValue()" (change)="onColorTextChange($event)" />
+      <div class="spf-popup__text-input-shell">
+        <input class="spf-popup__text-input" type="text" [value]="pickerColorValue()" (change)="onColorTextChange($event)" />
+      </div>
     </div>
 
     <div class="spf-popup__section" *ngSwitchCase="'stroke'">
@@ -100,7 +102,9 @@
       </div>
 
       <label class="spf-popup__field-label">Color</label>
-      <input class="spf-popup__input" type="text" [value]="pickerColorValue()" (change)="onColorTextChange($event)" />
+      <div class="spf-popup__text-input-shell">
+        <input class="spf-popup__text-input" type="text" [value]="pickerColorValue()" (change)="onColorTextChange($event)" />
+      </div>
 
       <div class="spf-popup__grid">
         <div>
@@ -117,9 +121,13 @@
         </div>
         <div>
           <label class="spf-popup__field-label">Style</label>
-          <select class="spf-popup__input" [value]="strokeStyle" (change)="onStrokeStyleChange($event)">
-            <option *ngFor="let option of borderStyleOptions" [value]="option">{{ option }}</option>
-          </select>
+          <app-dropdown-select
+            class="spf-popup__dropdown"
+            [enableSearch]="false"
+            [placeholder]="'Select style'"
+            [options]="strokeStyleDropdownOptions"
+            [ngModel]="selectedStrokeStyleOption"
+            (ngModelChange)="onStrokeStyleValueChange($event)"></app-dropdown-select>
         </div>
       </div>
     </div>

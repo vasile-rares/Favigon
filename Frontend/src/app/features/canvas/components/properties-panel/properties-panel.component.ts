@@ -12,6 +12,7 @@ import {
 import { IRNode } from '../../../../core/models/ir.models';
 import { NumberInputComponent } from './number-input/number-input.component';
 import { StylePopupFieldComponent } from './style-popup-field/style-popup-field.component';
+import { ToggleGroupComponent, ToggleGroupOption } from './toggle-group/toggle-group.component';
 import { formatCanvasElementTypeLabel } from '../../utils/canvas-label.util';
 import { roundToTwoDecimals } from '../../utils/canvas-interaction.util';
 import { SupportedFramework } from '../../canvas.types';
@@ -22,7 +23,6 @@ type EditableNumericField =
   | 'y'
   | 'width'
   | 'height'
-  | 'rotation'
   | 'fontSize'
   | 'letterSpacing'
   | 'lineHeight'
@@ -47,7 +47,7 @@ interface FrameTemplate {
 @Component({
   selector: 'app-properties-panel',
   standalone: true,
-  imports: [CommonModule, NumberInputComponent, StylePopupFieldComponent],
+  imports: [CommonModule, NumberInputComponent, StylePopupFieldComponent, ToggleGroupComponent],
   templateUrl: './properties-panel.component.html',
   styleUrl: './properties-panel.component.css',
 })
@@ -88,6 +88,10 @@ export class PropertiesPanelComponent {
   readonly textVerticalAlignOptions: CanvasTextVerticalAlign[] = ['top', 'middle', 'bottom'];
   readonly overflowOptions: CanvasOverflowMode[] = ['clip', 'visible'];
   readonly shadowOptions: CanvasShadowPreset[] = ['sm', 'md', 'lg', 'xl'];
+  readonly visibleOptions: readonly ToggleGroupOption[] = [
+    { label: 'Yes', value: true },
+    { label: 'No', value: false },
+  ];
 
   readonly frameTemplates: FrameTemplate[] = [
     {
@@ -200,6 +204,11 @@ export class PropertiesPanelComponent {
     this.numberInputGestureCommitted.emit();
   }
 
+  opacitySliderPercent(element: CanvasElement): string {
+    const value = Number.isFinite(element.opacity ?? Number.NaN) ? (element.opacity as number) : 1;
+    return `${Math.max(0, Math.min(100, Math.round(value * 100)))}%`;
+  }
+
   onOverflowChange(event: Event): void {
     const overflow = (event.target as HTMLSelectElement).value as CanvasOverflowMode;
     this.emitPatch({ overflow });
@@ -293,7 +302,7 @@ export class PropertiesPanelComponent {
   }
 
   borderSummary(element: CanvasElement): string {
-    return `${this.toDisplayInt(element.strokeWidth ?? 1)}px ${this.borderStyleValue(element)}`;
+    return this.borderStyleValue(element);
   }
 
   shadowSummary(element: CanvasElement): string {

@@ -148,6 +148,92 @@
   }
 }
 
+.spf-popup__text-input-shell {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 8px;
+  padding: 0.5rem 0.55rem;
+
+  &:focus-within {
+    border-color: var(--color-brand-primary-30);
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.spf-popup__text-input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-zinc-100);
+  font-size: 0.8rem;
+  padding: 0;
+  outline: none;
+  cursor: text;
+  text-align: left;
+}
+
+.spf-popup__dropdown {
+  display: block;
+}
+
+.spf-popup__dropdown ::ng-deep .dropdown-select {
+  gap: 0;
+}
+
+.spf-popup__dropdown ::ng-deep .dropdown-select__trigger {
+  width: 100%;
+  min-height: 34px;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: none;
+  padding: 0.38rem 0.55rem;
+  font-size: 0.8rem;
+  color: var(--color-zinc-100);
+}
+
+.spf-popup__dropdown ::ng-deep .dropdown-select__trigger:hover:not(:disabled),
+.spf-popup__dropdown ::ng-deep .dropdown-select__trigger:focus,
+.spf-popup__dropdown ::ng-deep .dropdown-select__trigger:focus-visible,
+.spf-popup__dropdown ::ng-deep .dropdown-select__trigger[aria-expanded='true'] {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--color-brand-primary-30);
+  box-shadow: none;
+}
+
+.spf-popup__dropdown ::ng-deep .dropdown-select__trigger-text,
+.spf-popup__dropdown ::ng-deep .dropdown-select__trigger-text--placeholder {
+  color: var(--color-zinc-100);
+  font-size: 0.8rem;
+}
+
+.spf-popup__dropdown ::ng-deep .dropdown-select__trigger-icon {
+  color: var(--color-zinc-400);
+  padding: 0;
+}
+
+.spf-popup__dropdown ::ng-deep .dropdown-select__panel {
+  top: auto;
+  bottom: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  border-radius: 12px;
+  transform-origin: bottom center;
+  z-index: 80;
+}
+
+.spf-popup__dropdown ::ng-deep .dropdown-select__list {
+  max-height: 180px;
+}
+
 .spf-popup__grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

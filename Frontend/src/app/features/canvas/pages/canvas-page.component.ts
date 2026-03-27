@@ -2810,7 +2810,7 @@ export class ProjectPage implements OnDestroy {
     if (this.viewport.isSpacePressed()) {
       return true;
     }
-    return this.currentTool() === 'select' && this.isCanvasBackgroundTarget(target);
+    return false;
   }
 
   private isCanvasBackgroundTarget(target: HTMLElement): boolean {

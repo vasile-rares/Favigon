@@ -1,0 +1,22 @@
+<div
+  class="toggle-group"
+  role="group"
+  [attr.aria-label]="ariaLabel"
+  [class.toggle-group--stretch]="stretch"
+  [style.min-width]="minWidth"
+  [style.--toggle-group-count]="options.length"
+  [style.--toggle-group-active-index]="activeIndex">
+  <div class="toggle-group__indicator" [class.toggle-group__indicator--hidden]="!hasActiveOption"></div>
+
+  <button
+    type="button"
+    class="toggle-group__button"
+    *ngFor="let option of options"
+    [class.is-active]="isActive(option)"
+    [attr.aria-pressed]="isActive(option)"
+    [attr.aria-label]="option.ariaLabel ?? option.label"
+    [title]="option.title ?? option.label"
+    (click)="onOptionClick(option)">
+    {{ option.label }}
+  </button>
+</div>

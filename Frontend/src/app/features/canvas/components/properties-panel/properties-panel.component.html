@@ -81,21 +81,6 @@
             </div>
           </div>
 
-          <div class="pp-style-row pp-style-row--metric">
-            <span class="pp-row-label">Rotation</span>
-            <div class="pp-style-control pp-style-control--metric">
-              <app-number-input
-                appearance="boxed"
-                ariaLabel="Rotation"
-                [value]="element.rotation ?? 0"
-                [min]="0"
-                [max]="360"
-                [step]="1"
-                (gestureStarted)="onNumberInputGestureStarted()"
-                (gestureCommitted)="onNumberInputGestureCommitted()"
-                (valueChange)="onNumberChange('rotation', $event)" />
-            </div>
-          </div>
         </div>
       </section>
 
@@ -112,6 +97,7 @@
               min="0"
               max="1"
               step="0.01"
+              [style.--pp-slider-value]="opacitySliderPercent(element)"
               [value]="element.opacity ?? 1"
               (input)="onNumberChange('opacity', $event)" />
             <app-number-input
@@ -129,10 +115,11 @@
 
         <div class="pp-style-row">
           <span class="pp-row-label">Visible</span>
-          <div class="pp-toggle-group">
-            <button type="button" class="pp-toggle-btn" [class.active]="isVisible(element)" (click)="setVisible(true)">Yes</button>
-            <button type="button" class="pp-toggle-btn" [class.active]="!isVisible(element)" (click)="setVisible(false)">No</button>
-          </div>
+          <app-toggle-group
+            [ariaLabel]="'Visibility toggle'"
+            [options]="visibleOptions"
+            [value]="isVisible(element)"
+            (valueChange)="setVisible($event === true)"></app-toggle-group>
         </div>
 
         <div class="pp-style-row" *ngIf="hasFill(element.type)">
@@ -146,7 +133,9 @@
               [colorValue]="fillInputValue(element)"
               [pickerColor]="fillPickerValue(element)"
               [clearPatch]="{ fill: 'transparent' }"
-              (patchRequested)="elementPatch.emit($event)">
+              (patchRequested)="elementPatch.emit($event)"
+              (numberGestureStarted)="onNumberInputGestureStarted()"
+              (numberGestureCommitted)="onNumberInputGestureCommitted()">
             </app-style-popup-field>
           </div>
         </div>

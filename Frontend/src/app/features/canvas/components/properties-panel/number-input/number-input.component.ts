@@ -20,6 +20,8 @@ interface StepperDragState {
   initialDirection: 1 | -1;
 }
 
+const DRAG_PIXELS_PER_STEP = 4;
+
 @Component({
   selector: 'app-number-input',
   standalone: true,
@@ -112,7 +114,7 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
     }
 
     event.preventDefault();
-    const dragDelta = Math.trunc((this.activeDrag.startY - event.clientY) / 8);
+    const dragDelta = Math.trunc((this.activeDrag.startY - event.clientY) / DRAG_PIXELS_PER_STEP);
     const nextValue =
       this.activeDrag.startValue + (this.activeDrag.initialDirection + dragDelta) * this.step;
     this.commitValue(nextValue);

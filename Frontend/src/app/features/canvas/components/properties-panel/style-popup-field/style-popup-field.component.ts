@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import {
   Component,
   ElementRef,
@@ -13,6 +14,10 @@ import {
 } from '@angular/core';
 import { CanvasElement, CanvasShadowPreset } from '../../../../../core/models/canvas.models';
 import { roundToTwoDecimals } from '../../../utils/canvas-interaction.util';
+import {
+  DropdownSelectComponent,
+  DropdownSelectOption,
+} from '../../../../../shared/components/dropdown-select/dropdown-select.component';
 import { NumberInputComponent } from '../number-input/number-input.component';
 import { StylePopupOverlayComponent } from '../style-popup-overlay/style-popup-overlay.component';
 
@@ -22,7 +27,13 @@ type ColorPickerDragTarget = 'surface' | 'hue' | 'alpha' | null;
 @Component({
   selector: 'app-style-popup-field',
   standalone: true,
-  imports: [CommonModule, NumberInputComponent, StylePopupOverlayComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    NumberInputComponent,
+    StylePopupOverlayComponent,
+    DropdownSelectComponent,
+  ],
   templateUrl: './style-popup-field.component.html',
   styleUrl: './style-popup-field.component.css',
 })
@@ -59,9 +70,11 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
   pickerSaturation = 0;
   pickerValue = 0;
   pickerAlpha = 1;
+  selectedStrokeStyleOption: string | null = null;
 
   private colorPickerDragTarget: ColorPickerDragTarget = null;
   private activePopupAnchor: HTMLElement | null = null;
+  private isColorGestureActive = false;
   private readonly onGlobalScroll = (): void => {
     if (!this.isOpen || !this.activePopupAnchor) {
       return;
@@ -82,6 +95,10 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
       !this.colorPickerDragTarget
     ) {
       this.syncPickerFromColor(this.getInitialPickerColor());
+    }
+
+    if (changes['strokeStyle']) {
+      this.selectedStrokeStyleOption = this.strokeStyle;
     }
   }
 
@@ -172,9 +189,15 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
 
   @HostListener('document:pointerup')
   onDocumentPointerUp(): void {
+    const hadActiveColorGesture = !!this.colorPickerDragTarget;
     this.colorPickerDragTarget = null;
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
+
+    if (hadActiveColorGesture && this.isColorGestureActive) {
+      this.isColorGestureActive = false;
+      this.numberGestureCommitted.emit();
+    }
   }
 
   onTriggerClick(event: MouseEvent): void {
@@ -245,6 +268,7 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
 
     event.preventDefault();
     event.stopPropagation();
+    this.beginColorGesture();
     this.colorPickerDragTarget = 'surface';
     document.body.style.userSelect = 'none';
     this.updateColorFromSurfaceCoordinates(event.clientX, event.clientY);
@@ -257,6 +281,7 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
 
     event.preventDefault();
     event.stopPropagation();
+    this.beginColorGesture();
     this.colorPickerDragTarget = 'hue';
     document.body.style.userSelect = 'none';
     this.updateColorFromHueCoordinates(event.clientX);
@@ -269,6 +294,7 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
 
     event.preventDefault();
     event.stopPropagation();
+    this.beginColorGesture();
     this.colorPickerDragTarget = 'alpha';
     document.body.style.userSelect = 'none';
     this.updateColorFromAlphaCoordinates(event.clientX);
@@ -278,8 +304,13 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     this.patchRequested.emit({ strokeWidth: value });
   }
 
-  onStrokeStyleChange(event: Event): void {
-    this.patchRequested.emit({ strokeStyle: (event.target as HTMLSelectElement).value });
+  onStrokeStyleValueChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    this.selectedStrokeStyleOption = value;
+    this.patchRequested.emit({ strokeStyle: value });
   }
 
   onShadowSelected(value: CanvasShadowPreset): void {
@@ -329,6 +360,10 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     return this.pickerAlpha * 100;
   }
 
+  get strokeStyleDropdownOptions(): DropdownSelectOption[] {
+    return this.borderStyleOptions.map((option) => ({ label: option, value: option }));
+  }
+
   alphaTrackBackground(): string {
     const { r, g, b } = hsvToRgb(this.pickerHue, this.pickerSaturation, this.pickerValue);
     return `linear-gradient(90deg, rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 0) 0%, rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 1) 100%)`;
@@ -338,7 +373,21 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     return this.kind === 'fill' || this.kind === 'stroke';
   }
 
+  private beginColorGesture(): void {
+    if (this.isColorGestureActive) {
+      return;
+    }
+
+    this.isColorGestureActive = true;
+    this.numberGestureStarted.emit();
+  }
+
   private closePopup(): void {
+    if (this.isColorGestureActive) {
+      this.isColorGestureActive = false;
+      this.numberGestureCommitted.emit();
+    }
+
     this.isOpen = false;
     this.colorPickerDragTarget = null;
     this.activePopupAnchor = null;
