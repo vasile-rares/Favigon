@@ -1,4 +1,5 @@
 import { CanvasElement } from '../../../core/models/canvas.models';
+import { clamp, roundToTwoDecimals } from './canvas-math.util';
 
 const MIN_SIZE = 24;
 
@@ -9,14 +10,6 @@ export function isPointInsideElement(x: number, y: number, element: CanvasElemen
     y >= element.y &&
     y <= element.y + element.height
   );
-}
-
-export function clamp(value: number, min: number, max: number): number {
-  return roundToTwoDecimals(Math.min(Math.max(value, min), max));
-}
-
-export function roundToTwoDecimals(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 export function withRoundedPrecision(element: CanvasElement): CanvasElement {
@@ -39,7 +32,8 @@ export function withRoundedPrecision(element: CanvasElement): CanvasElement {
   };
 }
 
-export function normalizeElementInPlace(element: CanvasElement, elements: CanvasElement[]): void {
+/** Mutates `element` in place to enforce minimum sizes, valid ranges, and frame constraints. */
+export function mutateNormalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
   element.width = Math.max(MIN_SIZE, element.width);
   element.height = Math.max(MIN_SIZE, element.height);
 
@@ -123,33 +117,6 @@ export function getStrokeWidth(element: CanvasElement): number {
   return 1;
 }
 
-export function collectDescendantIds(elements: CanvasElement[], rootId: string): Set<string> {
-  const descendants = new Set<string>();
-  let added = true;
-
-  while (added) {
-    added = false;
-    for (const element of elements) {
-      if (!element.parentId) {
-        continue;
-      }
-
-      const isDirectChild = element.parentId === rootId;
-      const isNestedChild = descendants.has(element.parentId);
-
-      if ((isDirectChild || isNestedChild) && !descendants.has(element.id)) {
-        descendants.add(element.id);
-        added = true;
-      }
-    }
-  }
-
-  return descendants;
-}
-
-export function removeWithChildren(elements: CanvasElement[], rootId: string): CanvasElement[] {
-  const idsToRemove = collectDescendantIds(elements, rootId);
-  idsToRemove.add(rootId);
-
-  return elements.filter((element) => !idsToRemove.has(element.id));
-}
+// Re-exports for backward compatibility with existing imports
+export { clamp, roundToTwoDecimals } from './canvas-math.util';
+export { getAbsolutePos, collectSubtreeIds, removeWithChildren } from './canvas-tree.util';

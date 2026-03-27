@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable } from '@angular/core';
 import {
   CanvasElement,
   CanvasElementType,
@@ -10,8 +10,9 @@ import {
   clamp,
   roundToTwoDecimals,
   getStrokeWidth,
-  normalizeElementInPlace,
+  mutateNormalizeElement,
   removeWithChildren,
+  collectSubtreeIds,
 } from '../utils/canvas-interaction.util';
 import { formatCanvasElementTypeLabel } from '../utils/canvas-label.util';
 import { Bounds, Point } from '../canvas.types';
@@ -277,8 +278,8 @@ export class CanvasElementService {
       return elements;
     }
 
-    const draggedSubtreeIds = new Set(this.collectSubtreeIds(elements, draggedId));
-    const targetSubtreeIds = this.collectSubtreeIds(elements, targetId);
+    const draggedSubtreeIds = new Set(collectSubtreeIds(elements, draggedId));
+    const targetSubtreeIds = collectSubtreeIds(elements, targetId);
     if (targetSubtreeIds.includes(draggedId)) {
       return elements;
     }
@@ -330,21 +331,6 @@ export class CanvasElementService {
     }
 
     return [...remaining.slice(0, insertIndex), ...draggedSubtree, ...remaining.slice(insertIndex)];
-  }
-
-  collectSubtreeIds(elements: CanvasElement[], rootId: string): string[] {
-    const collected: string[] = [];
-
-    const visit = (currentId: string): void => {
-      collected.push(currentId);
-      const children = elements.filter((element) => (element.parentId ?? null) === currentId);
-      for (const child of children) {
-        visit(child.id);
-      }
-    };
-
-    visit(rootId);
-    return collected;
   }
 
   // ── Element Update Helper ────────────────────────────────
@@ -515,7 +501,7 @@ export class CanvasElementService {
   // ── Normalize / Remove Delegates ─────────────────────────
 
   normalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
-    normalizeElementInPlace(element, elements);
+    mutateNormalizeElement(element, elements);
   }
 
   removeElementWithChildren(elements: CanvasElement[], rootId: string): CanvasElement[] {

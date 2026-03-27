@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HistorySnapshot } from '../canvas.types';
 
-const MAX_HISTORY_STEPS = 10;
+const MAX_HISTORY_STEPS = 50;
 
 @Injectable()
 export class CanvasHistoryService {
@@ -17,10 +17,7 @@ export class CanvasHistoryService {
 
   // ── Atomic History ────────────────────────────────────────
 
-  runWithHistory(
-    createSnapshot: () => HistorySnapshot,
-    action: () => void,
-  ): void {
+  runWithHistory(createSnapshot: () => HistorySnapshot, action: () => void): void {
     if (this.isApplying) {
       action();
       return;

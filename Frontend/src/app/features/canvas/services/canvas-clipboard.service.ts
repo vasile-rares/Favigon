@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { CanvasElement } from '../../../core/models/canvas.models';
-import { roundToTwoDecimals, clamp } from '../utils/canvas-interaction.util';
+import { roundToTwoDecimals, clamp, collectSubtreeIds } from '../utils/canvas-interaction.util';
 import { CanvasClipboardSnapshot, Bounds } from '../canvas.types';
 
 const PASTE_OFFSET = 24;
@@ -15,12 +15,8 @@ export class CanvasClipboardService {
 
   // ── Copy ──────────────────────────────────────────────────
 
-  copySubtree(
-    selectedId: string,
-    elements: CanvasElement[],
-    currentPageId: string | null,
-  ): void {
-    const subtreeIds = new Set(this.collectSubtreeIds(elements, selectedId));
+  copySubtree(selectedId: string, elements: CanvasElement[], currentPageId: string | null): void {
+    const subtreeIds = new Set(collectSubtreeIds(elements, selectedId));
     const copiedElements = elements
       .filter((element) => subtreeIds.has(element.id))
       .map((element) => structuredClone(element));
@@ -39,27 +35,18 @@ export class CanvasClipboardService {
 
   // ── Paste ─────────────────────────────────────────────────
 
-  paste(
-    currentElements: CanvasElement[],
-    targetParentId: string | null,
-  ): CanvasElement[] | null {
+  paste(currentElements: CanvasElement[], targetParentId: string | null): CanvasElement[] | null {
     const clipboard = this.snapshot;
     if (!clipboard) {
       return null;
     }
 
-    const rootElement = clipboard.elements.find(
-      (element) => element.id === clipboard.rootId,
-    );
+    const rootElement = clipboard.elements.find((element) => element.id === clipboard.rootId);
     if (!rootElement) {
       return null;
     }
 
-    const pastedElements = this.createPastedElements(
-      clipboard,
-      currentElements,
-      targetParentId,
-    );
+    const pastedElements = this.createPastedElements(clipboard, currentElements, targetParentId);
     if (pastedElements.length === 0) {
       return null;
     }
@@ -81,9 +68,7 @@ export class CanvasClipboardService {
       return { parentId: null, error: null };
     }
 
-    const rootElement = clipboard.elements.find(
-      (element) => element.id === clipboard.rootId,
-    );
+    const rootElement = clipboard.elements.find((element) => element.id === clipboard.rootId);
     if (!rootElement) {
       return { parentId: null, error: null };
     }
@@ -95,9 +80,7 @@ export class CanvasClipboardService {
     const originalParentId = rootElement.parentId ?? null;
     if (
       originalParentId &&
-      currentElements.some(
-        (element) => element.id === originalParentId && element.type === 'frame',
-      )
+      currentElements.some((element) => element.id === originalParentId && element.type === 'frame')
     ) {
       return { parentId: originalParentId, error: null };
     }
@@ -112,25 +95,6 @@ export class CanvasClipboardService {
     };
   }
 
-  // ── Subtree Collection (shared utility) ───────────────────
-
-  collectSubtreeIds(elements: CanvasElement[], rootId: string): string[] {
-    const collected: string[] = [];
-
-    const visit = (currentId: string): void => {
-      collected.push(currentId);
-      const children = elements.filter(
-        (element) => (element.parentId ?? null) === currentId,
-      );
-      for (const child of children) {
-        visit(child.id);
-      }
-    };
-
-    visit(rootId);
-    return collected;
-  }
-
   // ── Private ───────────────────────────────────────────────
 
   private createPastedElements(
@@ -138,16 +102,12 @@ export class CanvasClipboardService {
     currentElements: CanvasElement[],
     targetParentId: string | null,
   ): CanvasElement[] {
-    const rootElement = clipboard.elements.find(
-      (element) => element.id === clipboard.rootId,
-    );
+    const rootElement = clipboard.elements.find((element) => element.id === clipboard.rootId);
     if (!rootElement) {
       return [];
     }
 
-    const idMap = new Map(
-      clipboard.elements.map((element) => [element.id, crypto.randomUUID()]),
-    );
+    const idMap = new Map(clipboard.elements.map((element) => [element.id, crypto.randomUUID()]));
     const targetParent = targetParentId
       ? (currentElements.find((element) => element.id === targetParentId) ?? null)
       : null;
@@ -171,9 +131,7 @@ export class CanvasClipboardService {
         return cloned;
       }
 
-      cloned.parentId = element.parentId
-        ? (idMap.get(element.parentId) ?? null)
-        : null;
+      cloned.parentId = element.parentId ? (idMap.get(element.parentId) ?? null) : null;
       return cloned;
     });
   }

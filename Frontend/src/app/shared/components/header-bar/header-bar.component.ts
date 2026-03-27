@@ -8,10 +8,8 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { environment } from '../../../../environments/environment';
 import { AuthService } from '../../../core/services/auth.service';
 import { ProjectService } from '../../../core/services/project.service';
 import { UserService } from '../../../core/services/user.service';
@@ -55,7 +53,6 @@ interface HeaderUserProfile {
   styleUrl: './header-bar.component.css',
 })
 export class HeaderBarComponent implements OnInit {
-  private readonly http = inject(HttpClient);
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly activatedRoute = inject(ActivatedRoute);
@@ -65,7 +62,6 @@ export class HeaderBarComponent implements OnInit {
   private readonly currentUser = inject(CurrentUserService);
   private readonly fb = inject(FormBuilder);
   private readonly fallbackAvatarUrl = 'https://github.com/shadcn.png';
-  private static cachedProfile: HeaderUserProfile | null | undefined;
 
   profilePictureUrl: string | null = null;
   displayName = '';
@@ -122,38 +118,24 @@ export class HeaderBarComponent implements OnInit {
 
     this.syncRouteContext(this.getProjectIdFromRoute());
 
-    if (HeaderBarComponent.cachedProfile) {
-      this.applyProfile(HeaderBarComponent.cachedProfile);
-    } else {
-      this.http
-        .get<{
-          displayName?: string | null;
-          username?: string | null;
-          email?: string | null;
-          profilePictureUrl?: string | null;
-        }>(`${environment.apiBaseUrl}/users/me`)
-        .subscribe({
-          next: (response) => {
-            const username = response.username?.trim() || '';
-            const email = response.email?.trim() || '';
-            const displayName = response.displayName?.trim() || username || email;
-
-            const profile: HeaderUserProfile = {
-              displayName,
-              username,
-              email,
-              profilePictureUrl: response.profilePictureUrl ?? null,
-            };
-
-            this.applyProfile(profile);
-            HeaderBarComponent.cachedProfile = profile;
-          },
-          error: () => {
+    this.currentUser
+      .load()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (user) => {
+          if (user) {
+            this.applyProfile({
+              displayName: user.displayName,
+              username: user.username,
+              email: user.email,
+              profilePictureUrl: user.profilePictureUrl,
+            });
+          } else {
             this.resetIdentity();
-            HeaderBarComponent.cachedProfile = undefined;
-          },
-        });
-    }
+          }
+        },
+        error: () => this.resetIdentity(),
+      });
 
     // Search with debounce
     this.searchSubject
@@ -299,7 +281,6 @@ export class HeaderBarComponent implements OnInit {
 
   onLogout() {
     this.isUserMenuOpen = false;
-    HeaderBarComponent.cachedProfile = undefined;
     this.currentUser.invalidate();
     this.authService.logout().subscribe();
     void this.router.navigate(['/login'], { replaceUrl: true });

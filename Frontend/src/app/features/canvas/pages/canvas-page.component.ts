@@ -22,14 +22,19 @@ import { ProjectPanelComponent } from '../components/project-panel/project-panel
 import { PropertiesPanelComponent } from '../components/properties-panel/properties-panel.component';
 import { IRNode } from '../../../core/models/ir.models';
 import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
-import { clamp, roundToTwoDecimals, getStrokeWidth } from '../utils/canvas-interaction.util';
+import {
+  clamp,
+  roundToTwoDecimals,
+  getStrokeWidth,
+  collectSubtreeIds,
+} from '../utils/canvas-interaction.util';
 import {
   buildSnapCandidates,
   computeSnappedPosition,
   SNAP_THRESHOLD,
 } from '../utils/canvas-snap.util';
 import { generateThumbnail } from '../utils/canvas-thumbnail.util';
-import { CanvasGenerationService } from '../services/canvas-generation.service';
+import { ConverterService } from '../../../core/services/converter.service';
 import { CanvasPersistenceService } from '../services/canvas-persistence.service';
 import {
   ContextMenuComponent,
@@ -106,7 +111,6 @@ const FRAME_TITLE_MIN_ZOOM = 0.62;
     CanvasKeyboardService,
     CanvasContextMenuService,
     CanvasPersistenceService,
-    CanvasGenerationService,
   ],
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
@@ -114,7 +118,7 @@ const FRAME_TITLE_MIN_ZOOM = 0.62;
 export class ProjectPage implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly canvasGenerationService = inject(CanvasGenerationService);
+  private readonly converterService = inject(ConverterService);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
 
   readonly viewport = inject(CanvasViewportService);
@@ -2095,16 +2099,18 @@ export class ProjectPage implements OnDestroy {
     this.validationResult.set(null);
     this.isValidating.set(true);
 
-    this.canvasGenerationService.validate(this.selectedFramework(), this.irPreview()).subscribe({
-      next: (response) => {
-        this.validationResult.set(response.isValid);
-        this.isValidating.set(false);
-      },
-      error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-        this.apiError.set(extractApiErrorMessage(error, 'IR validation failed.'));
-        this.isValidating.set(false);
-      },
-    });
+    this.converterService
+      .validate({ framework: this.selectedFramework(), ir: this.irPreview() })
+      .subscribe({
+        next: (response) => {
+          this.validationResult.set(response.isValid);
+          this.isValidating.set(false);
+        },
+        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+          this.apiError.set(extractApiErrorMessage(error, 'IR validation failed.'));
+          this.isValidating.set(false);
+        },
+      });
   }
 
   generateCode(): void {
@@ -2113,18 +2119,20 @@ export class ProjectPage implements OnDestroy {
     this.generatedCss.set('');
     this.isGenerating.set(true);
 
-    this.canvasGenerationService.generate(this.selectedFramework(), this.irPreview()).subscribe({
-      next: (response) => {
-        this.generatedHtml.set(response.html);
-        this.generatedCss.set(response.css);
-        this.validationResult.set(response.isValid);
-        this.isGenerating.set(false);
-      },
-      error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-        this.apiError.set(extractApiErrorMessage(error, 'Code generation failed.'));
-        this.isGenerating.set(false);
-      },
-    });
+    this.converterService
+      .generate({ framework: this.selectedFramework(), ir: this.irPreview() })
+      .subscribe({
+        next: (response) => {
+          this.generatedHtml.set(response.html);
+          this.generatedCss.set(response.css);
+          this.validationResult.set(response.isValid);
+          this.isGenerating.set(false);
+        },
+        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+          this.apiError.set(extractApiErrorMessage(error, 'Code generation failed.'));
+          this.isGenerating.set(false);
+        },
+      });
   }
 
   // ── Private: Persistence ──────────────────────────────────
@@ -3065,7 +3073,7 @@ export class ProjectPage implements OnDestroy {
   }
 
   private moveToPage(elementId: string, targetPageId: string): void {
-    const subtreeIds = new Set(this.clipboard.collectSubtreeIds(this.elements(), elementId));
+    const subtreeIds = new Set(collectSubtreeIds(this.elements(), elementId));
     const elementsToMove = this.elements().filter((el) => subtreeIds.has(el.id));
     if (elementsToMove.length === 0) return;
 

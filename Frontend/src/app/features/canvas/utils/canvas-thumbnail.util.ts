@@ -1,30 +1,9 @@
 import { CanvasElement, CanvasPageModel } from '../../../core/models/canvas.models';
+import { getAbsolutePos } from './canvas-interaction.util';
 
 const THUMB_W = 300;
 const THUMB_H = 168;
 const PADDING = 16;
-
-interface AbsolutePos {
-  x: number;
-  y: number;
-}
-
-function getAbsolutePos(element: CanvasElement, elements: CanvasElement[]): AbsolutePos {
-  if (!element.parentId || element.type === 'frame') {
-    return { x: element.x, y: element.y };
-  }
-
-  const parent = elements.find((e) => e.id === element.parentId);
-  if (!parent) {
-    return { x: element.x, y: element.y };
-  }
-
-  const parentPos = getAbsolutePos(parent, elements);
-  return {
-    x: parentPos.x + element.x,
-    y: parentPos.y + element.y,
-  };
-}
 
 export function generateThumbnail(page: CanvasPageModel | null): string | null {
   if (!page || page.elements.length === 0) {
