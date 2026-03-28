@@ -139,6 +139,12 @@ export class ProjectPage implements OnDestroy {
   readonly editingTextElementId = this.editorState.editingTextElementId;
   readonly currentTool = this.editorState.currentTool;
   readonly layersFocusedPageId = signal<string | null>(null);
+  readonly selectedPageLayerId = signal<string | null>(null);
+  readonly copiedPageSnapshot = signal<CanvasPageModel | null>(null);
+  readonly selectedCanvasPageId = computed<string | null>(
+    () => this.layersFocusedPageId() ?? this.selectedPageLayerId(),
+  );
+  readonly hasCopiedPage = computed(() => this.copiedPageSnapshot() !== null);
   readonly isViewportMenuOpen = signal(false);
   readonly isDeviceMenuOpen = signal(false);
   readonly deviceMenuX = signal(0);
@@ -404,22 +410,145 @@ export class ProjectPage implements OnDestroy {
     });
   }
 
+  duplicatePage(pageId: string): void {
+    const sourcePage = this.getPageById(pageId);
+    if (!sourcePage) {
+      return;
+    }
+
+    this.apiError.set(null);
+    this.runWithHistory(() => {
+      const position = this.getNextPageCanvasPosition();
+      const duplicatedPage: CanvasPageModel = {
+        ...sourcePage,
+        id: crypto.randomUUID(),
+        name: this.getNextDuplicatedPageName(sourcePage.name),
+        canvasX: position.x,
+        canvasY: position.y,
+        elements: this.clonePageElements(sourcePage.elements),
+      };
+
+      this.pages.update((pages) => {
+        const sourceIndex = pages.findIndex((entry) => entry.id === pageId);
+        if (sourceIndex === -1) {
+          return [...pages, duplicatedPage];
+        }
+
+        const nextPages = [...pages];
+        nextPages.splice(sourceIndex + 1, 0, duplicatedPage);
+        return nextPages;
+      });
+
+      this.currentPageId.set(duplicatedPage.id);
+      this.layersFocusedPageId.set(duplicatedPage.id);
+      this.selectedElementId.set(null);
+      this.currentTool.set('select');
+    });
+  }
+
+  copyPage(pageId: string): void {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return;
+    }
+
+    this.copiedPageSnapshot.set(structuredClone(page));
+    this.apiError.set(null);
+  }
+
+  pastePage(targetPageId: string): void {
+    const sourcePage = this.copiedPageSnapshot();
+    if (!sourcePage) {
+      return;
+    }
+
+    this.apiError.set(null);
+    this.runWithHistory(() => {
+      const position = this.getNextPageCanvasPosition();
+      const pastedPage: CanvasPageModel = {
+        ...structuredClone(sourcePage),
+        id: crypto.randomUUID(),
+        name: this.getNextDuplicatedPageName(sourcePage.name),
+        canvasX: position.x,
+        canvasY: position.y,
+        elements: this.clonePageElements(sourcePage.elements),
+      };
+
+      this.pages.update((pages) => {
+        const targetIndex = pages.findIndex((entry) => entry.id === targetPageId);
+        if (targetIndex === -1) {
+          return [...pages, pastedPage];
+        }
+
+        const nextPages = [...pages];
+        nextPages.splice(targetIndex + 1, 0, pastedPage);
+        return nextPages;
+      });
+
+      const shouldPreserveAllPagesView = this.layersFocusedPageId() === null;
+      this.currentPageId.set(pastedPage.id);
+
+      if (shouldPreserveAllPagesView) {
+        this.selectedPageLayerId.set(pastedPage.id);
+      } else {
+        this.layersFocusedPageId.set(pastedPage.id);
+        this.clearSelectedPageLayer();
+      }
+
+      this.selectedElementId.set(null);
+      this.currentTool.set('select');
+    });
+  }
+
   selectPage(pageId: string): void {
+    this.applyPageSelection(pageId, true);
+  }
+
+  selectPageWithoutFocus(pageId: string): void {
+    if (this.layersFocusedPageId() === null) {
+      if (pageId !== this.currentPageId()) {
+        this.currentPageId.set(pageId);
+      }
+
+      this.selectedPageLayerId.set(pageId);
+      this.closeViewportMenu();
+      this.closeDeviceFrameMenu();
+      this.selectedElementId.set(null);
+      this.currentTool.set('select');
+      return;
+    }
+
+    this.clearSelectedPageLayer();
+    this.applyPageSelection(pageId, false);
+  }
+
+  private applyPageSelection(pageId: string, shouldFocus: boolean): void {
     if (pageId !== this.currentPageId()) {
       this.currentPageId.set(pageId);
     }
 
+    this.clearSelectedPageLayer();
     this.closeViewportMenu();
     this.closeDeviceFrameMenu();
     this.layersFocusedPageId.set(pageId);
     this.selectedElementId.set(null);
     this.currentTool.set('select');
-    this.focusPageSmooth(pageId);
+
+    if (shouldFocus) {
+      this.focusPageSmooth(pageId);
+    }
   }
 
   onActivePageShellClick(pageId: string): void {
+    this.clearSelectedPageLayer();
     this.layersFocusedPageId.set(pageId);
     this.selectedElementId.set(null);
+  }
+
+  private clearSelectedPageLayer(): void {
+    if (this.selectedPageLayerId() !== null) {
+      this.selectedPageLayerId.set(null);
+    }
   }
 
   onInactivePageShellClick(pageId: string): void {
@@ -459,6 +588,14 @@ export class ProjectPage implements OnDestroy {
       this.pages.set(nextPages);
       if (this.currentPageId() === pageId) {
         this.currentPageId.set(fallbackPage?.id ?? null);
+      }
+
+      if (this.layersFocusedPageId() === pageId) {
+        this.layersFocusedPageId.set(fallbackPage?.id ?? null);
+      }
+
+      if (this.selectedPageLayerId() === pageId) {
+        this.selectedPageLayerId.set(fallbackPage?.id ?? null);
       }
 
       this.selectedElementId.set(null);
@@ -970,6 +1107,7 @@ export class ProjectPage implements OnDestroy {
   onCanvasPointerDown(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     if (this.isCanvasBackgroundTarget(target)) {
+      this.clearSelectedPageLayer();
       this.layersFocusedPageId.set(null);
     }
     if (!this.shouldStartPanning(event, target)) {
@@ -1001,12 +1139,14 @@ export class ProjectPage implements OnDestroy {
           this.history.commitTextEditHistory(() => this.createHistorySnapshot());
           this.editingTextElementId.set(null);
         }
+        this.clearSelectedPageLayer();
         this.selectedElementId.set(null);
         this.layersFocusedPageId.set(null);
       }
       return;
     }
 
+    this.clearSelectedPageLayer();
     this.layersFocusedPageId.set(this.currentPageId());
 
     const pointer = this.getActivePageCanvasPoint(event);
@@ -1077,6 +1217,8 @@ export class ProjectPage implements OnDestroy {
 
     const elementForTypeCheck = this.el.findElementById(id, this.elements());
 
+    this.clearSelectedPageLayer();
+
     if (elementForTypeCheck?.type === 'frame' && this.selectedElementId() !== id) {
       event.preventDefault();
       event.stopPropagation();
@@ -1139,6 +1281,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
+    this.clearSelectedPageLayer();
     this.selectedElementId.set(id);
     this.layersFocusedPageId.set(this.currentPageId());
 
@@ -1170,6 +1313,7 @@ export class ProjectPage implements OnDestroy {
     if (element?.type !== 'text') {
       return;
     }
+    this.clearSelectedPageLayer();
     this.layersFocusedPageId.set(this.currentPageId());
     this.selectedElementId.set(id);
     this.editingTextElementId.set(id);
@@ -1424,9 +1568,19 @@ export class ProjectPage implements OnDestroy {
     this.history.commitGestureHistory(() => this.createHistorySnapshot());
   }
 
-  onLayerSelected(elementId: string): void {
-    this.layersFocusedPageId.set(this.currentPageId());
-    this.selectedElementId.set(elementId);
+  onLayerSelected(event: { pageId: string; id: string }): void {
+    const shouldPreserveAllPagesView = this.layersFocusedPageId() === null;
+
+    if (event.pageId !== this.currentPageId()) {
+      this.currentPageId.set(event.pageId);
+    }
+
+    if (!shouldPreserveAllPagesView) {
+      this.layersFocusedPageId.set(event.pageId);
+    }
+
+    this.clearSelectedPageLayer();
+    this.selectedElementId.set(event.id);
     this.currentTool.set('select');
   }
 
@@ -1443,9 +1597,9 @@ export class ProjectPage implements OnDestroy {
     }
   }
 
-  onLayerNameChanged(change: { id: string; name: string }): void {
+  onLayerNameChanged(change: { pageId: string; id: string; name: string }): void {
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => {
+      this.updatePageElements(change.pageId, (elements) => {
         const updated = elements.map((element) =>
           element.id === change.id ? { ...element, name: change.name } : element,
         );
@@ -1458,29 +1612,30 @@ export class ProjectPage implements OnDestroy {
     });
   }
 
-  onLayerVisibilityToggled(elementId: string): void {
+  onLayerVisibilityToggled(change: { pageId: string; id: string }): void {
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => {
-        const el = elements.find((e) => e.id === elementId);
+      this.updatePageElements(change.pageId, (elements) => {
+        const el = elements.find((e) => e.id === change.id);
         const newVisible = el?.visible === false;
         const updated = elements.map((element) =>
-          element.id === elementId ? { ...element, visible: element.visible === false } : element,
+          element.id === change.id ? { ...element, visible: element.visible === false } : element,
         );
         if (el?.primarySyncId) {
-          return updated.map((e) => (e.id === elementId ? { ...e, primarySyncId: undefined } : e));
+          return updated.map((e) => (e.id === change.id ? { ...e, primarySyncId: undefined } : e));
         }
-        return this.syncElementPatchToPrimary(elementId, { visible: newVisible }, updated);
+        return this.syncElementPatchToPrimary(change.id, { visible: newVisible }, updated);
       });
     });
   }
 
   onLayerMoved(change: {
+    pageId: string;
     draggedId: string;
     targetId: string;
     position: 'before' | 'after' | 'inside';
   }): void {
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) =>
+      this.updatePageElements(change.pageId, (elements) =>
         this.el.reorderLayerElements(elements, change.draggedId, change.targetId, change.position),
       );
     });
@@ -1529,11 +1684,23 @@ export class ProjectPage implements OnDestroy {
   onElementContextMenu(event: MouseEvent, id: string): void {
     event.preventDefault();
     event.stopPropagation();
+    this.clearSelectedPageLayer();
     this.selectedElementId.set(id);
     this.contextMenu.open(event.clientX, event.clientY, this.buildContextMenuCallbacks());
   }
 
-  onLayerContextMenuRequested(event: { id: string; x: number; y: number }): void {
+  onLayerContextMenuRequested(event: { pageId: string; id: string; x: number; y: number }): void {
+    const shouldPreserveAllPagesView = this.layersFocusedPageId() === null;
+
+    if (event.pageId !== this.currentPageId()) {
+      this.currentPageId.set(event.pageId);
+    }
+
+    if (!shouldPreserveAllPagesView) {
+      this.layersFocusedPageId.set(event.pageId);
+    }
+
+    this.clearSelectedPageLayer();
     this.selectedElementId.set(event.id);
     this.contextMenu.open(event.x, event.y, this.buildContextMenuCallbacks());
   }
@@ -2532,7 +2699,14 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    this.pages.update((pages) => this.el.updatePageElements(pages, currentPageId, updater));
+    this.updatePageElements(currentPageId, updater);
+  }
+
+  private updatePageElements(
+    pageId: string,
+    updater: (elements: CanvasElement[]) => CanvasElement[],
+  ): void {
+    this.pages.update((pages) => this.el.updatePageElements(pages, pageId, updater));
   }
 
   private updateCurrentPage(updater: (page: CanvasPageModel) => CanvasPageModel): void {
@@ -2591,6 +2765,37 @@ export class ProjectPage implements OnDestroy {
       x: Math.round(rightMost.x + rightMost.width + PAGE_CANVAS_GAP),
       y: Math.round(rightMost.y),
     };
+  }
+
+  private clonePageElements(elements: CanvasElement[]): CanvasElement[] {
+    const idMap = new Map<string, string>();
+    for (const element of elements) {
+      idMap.set(element.id, crypto.randomUUID());
+    }
+
+    return elements.map((element) => ({
+      ...element,
+      id: idMap.get(element.id) ?? crypto.randomUUID(),
+      parentId: element.parentId ? (idMap.get(element.parentId) ?? null) : null,
+      primarySyncId: element.primarySyncId ? idMap.get(element.primarySyncId) : undefined,
+    }));
+  }
+
+  private getNextDuplicatedPageName(sourceName: string): string {
+    const trimmed = sourceName.trim() || 'Page';
+    const baseName = `${trimmed} Copy`;
+    const names = new Set(this.pages().map((page) => page.name.trim().toLowerCase()));
+
+    if (!names.has(baseName.toLowerCase())) {
+      return baseName;
+    }
+
+    let suffix = 2;
+    while (names.has(`${baseName} ${suffix}`.toLowerCase())) {
+      suffix += 1;
+    }
+
+    return `${baseName} ${suffix}`;
   }
 
   getPageShellSelectionLeft(pageId: string): number {
@@ -3160,7 +3365,14 @@ export class ProjectPage implements OnDestroy {
       onRename: (id) => {
         window.dispatchEvent(new CustomEvent('canvas:rename-request', { detail: { id } }));
       },
-      onToggleVisibility: (id) => this.onLayerVisibilityToggled(id),
+      onToggleVisibility: (id) => {
+        const pageId = this.currentPageId();
+        if (!pageId) {
+          return;
+        }
+
+        this.onLayerVisibilityToggled({ pageId, id });
+      },
       onSetAsPrimary: (id) => this.setPrimaryFrame(id),
     };
   }

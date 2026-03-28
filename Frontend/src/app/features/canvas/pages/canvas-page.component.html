@@ -6,10 +6,16 @@
       [pages]="pages()"
       [currentPageId]="currentPageId()"
       [focusedPageId]="layersFocusedPageId()"
+      [selectedPageLayerId]="selectedPageLayerId()"
+      [canPastePage]="hasCopiedPage()"
       [elements]="elements()"
       [selectedElementId]="selectedElementId()"
       (pageSelected)="selectPage($event)"
+      (pageLayerSelected)="selectPageWithoutFocus($event)"
       (pageCreateRequested)="addPage()"
+      (pageCopyRequested)="copyPage($event)"
+      (pagePasteRequested)="pastePage($event)"
+      (pageDuplicateRequested)="duplicatePage($event)"
       (pageDeleteRequested)="deletePage($event)"
       (layerSelected)="onLayerSelected($event)"
       (layerNameChanged)="onLayerNameChanged($event)"
@@ -263,12 +269,12 @@
 
         <!-- Page shell selection outline (no resize handles) -->
         <div
-          *ngIf="layersFocusedPageId() && !selectedElementId() && !isDraggingEl()"
+          *ngIf="selectedCanvasPageId() && !selectedElementId() && !isDraggingEl()"
           class="page-shell-selection-outline"
-          [style.left.px]="getPageShellSelectionLeft(layersFocusedPageId()!)"
-          [style.top.px]="getPageShellSelectionTop(layersFocusedPageId()!)"
-          [style.width.px]="getPageShellSelectionWidth(layersFocusedPageId()!)"
-          [style.height.px]="getPageShellSelectionHeight(layersFocusedPageId()!)"></div>
+          [style.left.px]="getPageShellSelectionLeft(selectedCanvasPageId()!)"
+          [style.top.px]="getPageShellSelectionTop(selectedCanvasPageId()!)"
+          [style.width.px]="getPageShellSelectionWidth(selectedCanvasPageId()!)"
+          [style.height.px]="getPageShellSelectionHeight(selectedCanvasPageId()!)"></div>
 
         <!-- Selection UI overlay — lives in .canvas-viewport (pans with content)
              but NOT in .canvas-scene, so no scale() transform applies.

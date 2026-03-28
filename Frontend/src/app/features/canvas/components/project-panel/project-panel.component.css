@@ -16,19 +16,48 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 1rem;
-  overflow: auto;
+  gap: 0.6rem;
+  padding: 0.85rem;
+  overflow-y: auto;
   pointer-events: all;
   border-radius: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-zinc-700) transparent;
 
-  h3,
-  h4 {
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--color-zinc-700);
+    border-radius: 99px;
+  }
+
+  h3 {
     margin: 0;
     color: var(--color-zinc-100);
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 600;
   }
+}
+
+.project-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 30px;
+  padding-bottom: 0.1rem;
+}
+
+.project-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding: 0.15rem 0 0;
 }
 
 .project-section-header {
@@ -38,40 +67,35 @@
   gap: 0.5rem;
 }
 
-.project-pages,
-.project-layers {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  padding: 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  background-color: var(--color-surface-transparent);
+.project-layers .project-section-header {
+  margin-bottom: 0.35rem;
+}
 
-  h4 {
-    font-size: 0.86rem;
-  }
+.project-section-title {
+  margin: 0;
+  color: var(--color-zinc-500);
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
 }
 
 .project-page-add {
-  width: 26px;
-  height: 26px;
-  border: 1px solid var(--color-border);
-  background-color: var(--color-zinc-900);
-  color: var(--color-zinc-200);
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 400;
-  line-height: 1;
+  width: 1.8rem;
+  height: 1.8rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-zinc-400);
+  border-radius: 8px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: color 0.15s ease;
 
   &:hover {
-    border-color: var(--color-brand-primary-30);
-    background-color: var(--color-zinc-700);
+    color: var(--color-zinc-100);
   }
 }
 
@@ -79,26 +103,49 @@
 .project-layers-list {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.2rem;
 }
 
 .project-page-item {
+  position: relative;
   border: 1px solid transparent;
-  background-color: var(--color-zinc-900);
+  background: transparent;
+  width: 100%;
   color: var(--color-zinc-200);
-  border-radius: 6px;
+  border-radius: 10px;
+  padding: 0.08rem 0.2rem 0.08rem calc(0.2rem + var(--layer-indent, 0px));
   display: flex;
   align-items: center;
-  padding: 0.2rem;
+  gap: 0.45rem;
+  padding: 0.15rem 0.1rem;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 0.4rem;
+    top: 0.45rem;
+    bottom: 0.45rem;
+    width: 2px;
+    border-radius: 999px;
+    background: transparent;
+    transition: background-color 0.18s ease;
+  }
 
   &:hover {
-    border-color: var(--color-border);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   &.active {
-    border-color: var(--color-brand-primary-30);
-    background-color: var(--color-brand-primary-10);
     color: var(--color-zinc-100);
+
+    &::before {
+      background: var(--color-brand-primary);
+    }
   }
 }
 
@@ -107,17 +154,19 @@
   border: none;
   background: transparent;
   color: inherit;
-  padding: 0.35rem 0.45rem;
+  padding: 0.42rem 0.5rem 0.42rem 0.85rem;
   text-align: left;
   font: inherit;
   cursor: pointer;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.12rem;
   min-width: 0;
 }
 
 .project-page-name {
-  font-size: 0.78rem;
+  font-size: 0.79rem;
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -126,71 +175,77 @@
 }
 
 .project-page-name-input {
-  font-size: 0.78rem;
+  font-size: 0.79rem;
   font-weight: 600;
-  background: transparent;
-  border: none;
-  outline: 1px solid var(--color-brand-primary-30);
-  border-radius: 3px;
-  color: inherit;
-  padding: 0 2px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-brand-primary-30);
+  outline: none;
+  border-radius: 7px;
+  color: var(--color-zinc-100);
+  padding: 0.4rem 0.55rem;
   width: 100%;
   min-width: 0;
   font-family: inherit;
 }
 
-.project-page-delete,
+.project-page-menu-trigger,
 .project-layer-visibility {
-  border: none;
-  background-color: transparent;
+  border: 1px solid transparent;
+  background: transparent;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
 }
 
-.project-page-delete {
-  width: 28px;
-  height: 28px;
+.project-page-menu-trigger {
+  width: 30px;
+  height: 30px;
   color: var(--color-zinc-500);
-  border-radius: 5px;
+  border-radius: 8px;
+  flex-shrink: 0;
 
-  &:hover:not(:disabled) {
-    color: #fca5a5;
-    background-color: rgba(239, 68, 68, 0.08);
-  }
-
-  &:disabled {
-    opacity: 0.45;
+  &:hover,
+  &.is-open {
+    color: var(--color-zinc-100);
   }
 }
 
 .project-layers-empty {
   margin: 0;
-  color: var(--color-zinc-400);
-  font-size: 0.78rem;
+  color: var(--color-zinc-500);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  text-align: center;
+  padding: 0.85rem 0.35rem;
 }
 
 .project-layer-item {
   display: flex;
   align-items: center;
-  padding: 0.4rem 0.7rem;
-  border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background-color: #09090b;
+  width: 100%;
+  min-height: 34px;
+  padding: 0.08rem 0.2rem 0.08rem calc(0.2rem + var(--layer-indent, 0px));
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
   position: relative;
   transition:
     border-color 0.18s ease,
     background-color 0.18s ease,
+    box-shadow 0.18s ease,
     opacity 0.18s ease;
 
   &:hover {
-    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.04);
   }
 
   &.active {
-    border-color: rgba(59, 130, 246, 0.36);
-    background-color: rgba(14, 19, 30, 0.96);
+    background: rgba(13, 153, 255, 0.09);
   }
 
   &.hidden {
@@ -221,7 +276,7 @@
   }
 
   &.is-drop-inside {
-    border-color: rgba(59, 130, 246, 0.36);
+    border-color: var(--color-brand-primary-30);
     box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.9);
   }
 
@@ -241,21 +296,23 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
-  border: none;
+  width: 18px;
+  height: 18px;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--color-zinc-500);
   cursor: pointer;
   padding: 0;
-  border-radius: 3px;
-  margin-right: 0.15rem;
+  border-radius: 6px;
+  margin-left: 0.15rem;
   transition:
     transform 0.15s ease,
+    border-color 0.15s ease,
+    background-color 0.15s ease,
     color 0.15s ease;
 
   &:hover {
-    color: var(--color-zinc-300);
+    color: var(--color-zinc-200);
   }
 
   &.is-collapsed svg {
@@ -264,7 +321,9 @@
 }
 
 .project-layer-icon {
-  width: 1.85rem;
+  width: 1.5rem;
+  height: 1.45rem;
+  margin-right: 0.35rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -272,28 +331,42 @@
   color: var(--color-zinc-300);
 }
 
+.project-layer-icon.is-hidden {
+  color: var(--color-zinc-500);
+}
+
 .project-layer-body {
   min-width: 0;
   flex: 1;
   display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
+  align-items: center;
 }
 
-.project-layer-name {
+.project-layer-title {
+  display: block;
   min-width: 0;
   width: 100%;
-  border: none;
-  background: transparent;
   color: var(--color-zinc-100);
-  padding: 0;
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 600;
   line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+}
 
-  &[readonly] {
-    cursor: default;
-  }
+.project-layer-input {
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--color-brand-primary-30);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-zinc-100);
+  padding: 0.26rem 0.45rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.2;
+  border-radius: 7px;
 
   &:focus-visible {
     outline: none;
@@ -305,12 +378,14 @@
 }
 
 .project-layer-visibility {
-  padding: 0.25rem;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   flex-shrink: 0;
-  border-radius: var(--radius-md);
-  color: var(--color-text-light);
+  border-radius: 8px;
+  color: var(--color-zinc-300);
 
   &:hover {
-    background-color: var(--color-btn-tertiary-hover);
+    color: var(--color-zinc-100);
   }
 }

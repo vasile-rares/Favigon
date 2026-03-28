@@ -5,9 +5,14 @@ import {
   CanvasElementType,
   CanvasPageModel,
 } from '../../../../core/models/canvas.models';
+import {
+  ContextMenuComponent,
+  ContextMenuItem,
+} from '../../../../shared/components/context-menu/context-menu.component';
 import { formatCanvasElementTypeLabel } from '../../utils/canvas-label.util';
 
 interface LayerEntry {
+  pageId: string;
   id: string;
   depth: number;
   type: CanvasElementType;
@@ -20,11 +25,12 @@ interface LayerEntry {
 
 type LayerDropPosition = 'before' | 'after' | 'inside';
 type PageRenameSource = 'pages' | 'layers';
+type PageMenuContext = 'pages' | 'layers';
 
 @Component({
   selector: 'app-project-panel',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ContextMenuComponent],
   templateUrl: './project-panel.component.html',
   styleUrl: './project-panel.component.css',
 })
@@ -32,35 +38,56 @@ export class ProjectPanelComponent implements OnChanges {
   @Input() pages: CanvasPageModel[] = [];
   @Input() currentPageId: string | null = null;
   @Input() focusedPageId: string | null = null;
+  @Input() selectedPageLayerId: string | null = null;
+  @Input() canPastePage = false;
   @Input() elements: CanvasElement[] = [];
   @Input() selectedElementId: string | null = null;
 
   @Output() pageSelected = new EventEmitter<string>();
+  @Output() pageLayerSelected = new EventEmitter<string>();
   @Output() pageCreateRequested = new EventEmitter<void>();
+  @Output() pageCopyRequested = new EventEmitter<string>();
+  @Output() pagePasteRequested = new EventEmitter<string>();
+  @Output() pageDuplicateRequested = new EventEmitter<string>();
   @Output() pageDeleteRequested = new EventEmitter<string>();
   @Output() pageNameChanged = new EventEmitter<{ id: string; name: string }>();
-  @Output() layerSelected = new EventEmitter<string>();
-  @Output() layerNameChanged = new EventEmitter<{ id: string; name: string }>();
-  @Output() layerVisibilityToggled = new EventEmitter<string>();
+  @Output() layerSelected = new EventEmitter<{ pageId: string; id: string }>();
+  @Output() layerNameChanged = new EventEmitter<{ pageId: string; id: string; name: string }>();
+  @Output() layerVisibilityToggled = new EventEmitter<{ pageId: string; id: string }>();
   @Output() layerMoved = new EventEmitter<{
+    pageId: string;
     draggedId: string;
     targetId: string;
     position: LayerDropPosition;
   }>();
-  @Output() layerContextMenuRequested = new EventEmitter<{ id: string; x: number; y: number }>();
+  @Output() layerContextMenuRequested = new EventEmitter<{
+    pageId: string;
+    id: string;
+    x: number;
+    y: number;
+  }>();
 
-  private cachedLayerEntries: LayerEntry[] = [];
+  private cachedLayerEntriesByPage = new Map<string, LayerEntry[]>();
   private draggedLayerId: string | null = null;
+  private draggedLayerPageId: string | null = null;
   private dragOverLayerId: string | null = null;
+  private dragOverLayerPageId: string | null = null;
   private dragOverPosition: LayerDropPosition = 'before';
   private collapsedLayers = new Set<string>();
+  private collapsedPageLayers = new Set<string>();
   editingLayerId: string | null = null;
   editingPageId: string | null = null;
+  pageMenuPageId: string | null = null;
+  pageMenuItems: ContextMenuItem[] = [];
+  pageMenuX = 0;
+  pageMenuY = 0;
+  private pageMenuContext: PageMenuContext | null = null;
   private editingPageName = '';
   private editingPageSource: PageRenameSource | null = null;
 
   get layerEntries(): LayerEntry[] {
-    return this.cachedLayerEntries;
+    const focusedPageId = this.focusedPageId;
+    return focusedPageId ? this.getLayerEntriesForPage(focusedPageId) : [];
   }
 
   get visiblePageLayers(): CanvasPageModel[] {
@@ -71,17 +98,24 @@ export class ProjectPanelComponent implements OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['elements']) {
-      this.cachedLayerEntries = this.buildLayerEntries(this.elements);
+    if (changes['pages'] || changes['elements']) {
+      this.rebuildLayerEntriesByPage();
     }
   }
 
   onPageSelect(pageId: string): void {
+    this.closePageMenu();
     this.pageSelected.emit(pageId);
   }
 
-  startPageRename(pageId: string, event: MouseEvent, source: PageRenameSource = 'pages'): void {
-    event.stopPropagation();
+  onLayerPageSelect(pageId: string): void {
+    this.closePageMenu();
+    this.pageLayerSelected.emit(pageId);
+  }
+
+  startPageRename(pageId: string, event?: MouseEvent, source: PageRenameSource = 'pages'): void {
+    event?.stopPropagation();
+    this.closePageMenu();
     const page = this.pages.find((p) => p.id === pageId);
     this.editingPageName = page?.name ?? '';
     this.editingPageId = pageId;
@@ -125,11 +159,119 @@ export class ProjectPanelComponent implements OnChanges {
   }
 
   onPageCreate(): void {
+    this.closePageMenu();
     this.pageCreateRequested.emit();
   }
 
-  onPageDelete(pageId: string, event: MouseEvent): void {
+  togglePageMenu(pageId: string, event: MouseEvent): void {
     event.stopPropagation();
+
+    if (this.pageMenuPageId === pageId && this.pageMenuContext === 'pages') {
+      this.closePageMenu();
+      return;
+    }
+
+    const trigger = event.currentTarget as HTMLElement;
+    const rect = trigger.getBoundingClientRect();
+
+    this.openPageMenu(pageId, rect.right, rect.bottom + 6, 'pages');
+  }
+
+  onLayerPageContextMenu(pageId: string, event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.onLayerPageSelect(pageId);
+    this.openPageMenu(pageId, event.clientX, event.clientY, 'layers');
+  }
+
+  private openPageMenu(pageId: string, x: number, y: number, context: PageMenuContext): void {
+    const renameSource: PageRenameSource = context === 'layers' ? 'layers' : 'pages';
+
+    this.pageMenuPageId = pageId;
+    this.pageMenuContext = context;
+    this.pageMenuX = x;
+    this.pageMenuY = y;
+    this.pageMenuItems =
+      context === 'layers'
+        ? [
+            {
+              id: 'copy',
+              label: 'Copy',
+              shortcut: 'Ctrl+C',
+              action: () => this.onPageCopy(pageId),
+            },
+            {
+              id: 'paste',
+              label: 'Paste',
+              shortcut: 'Ctrl+V',
+              disabled: !this.canPastePage,
+              action: () => this.onPagePaste(pageId),
+            },
+            {
+              id: 'rename',
+              label: 'Rename',
+              separator: true,
+              action: () => this.startPageRename(pageId, undefined, renameSource),
+            },
+            {
+              id: 'delete',
+              label: 'Delete',
+              variant: 'danger',
+              disabled: !this.canDeletePage(),
+              action: () => this.onPageDelete(pageId),
+            },
+          ]
+        : [
+            {
+              id: 'rename',
+              label: 'Rename',
+              action: () => this.startPageRename(pageId, undefined, renameSource),
+            },
+            {
+              id: 'duplicate',
+              label: 'Duplicate',
+              action: () => this.onPageDuplicate(pageId),
+            },
+            {
+              id: 'delete',
+              label: 'Delete',
+              variant: 'danger',
+              separator: true,
+              disabled: !this.canDeletePage(),
+              action: () => this.onPageDelete(pageId),
+            },
+          ];
+  }
+
+  closePageMenu(): void {
+    this.pageMenuPageId = null;
+    this.pageMenuContext = null;
+    this.pageMenuItems = [];
+  }
+
+  isPageMenuOpenFor(pageId: string): boolean {
+    return this.pageMenuContext === 'pages' && this.pageMenuPageId === pageId;
+  }
+
+  onPageCopy(pageId: string): void {
+    this.closePageMenu();
+    this.pageCopyRequested.emit(pageId);
+  }
+
+  onPagePaste(pageId: string): void {
+    this.closePageMenu();
+    this.pagePasteRequested.emit(pageId);
+  }
+
+  onPageDuplicate(pageId: string): void {
+    this.closePageMenu();
+    this.pageDuplicateRequested.emit(pageId);
+  }
+
+  onPageDelete(pageId: string, event?: MouseEvent): void {
+    event?.stopPropagation();
+    this.closePageMenu();
 
     if (this.pages.length <= 1) {
       return;
@@ -138,19 +280,20 @@ export class ProjectPanelComponent implements OnChanges {
     this.pageDeleteRequested.emit(pageId);
   }
 
-  onLayerSelected(id: string): void {
-    this.layerSelected.emit(id);
+  onLayerSelected(pageId: string, id: string): void {
+    this.closePageMenu();
+    this.layerSelected.emit({ pageId, id });
   }
 
-  onLayerNameInput(id: string, event: Event): void {
+  onLayerNameInput(pageId: string, id: string, event: Event): void {
     const name = (event.target as HTMLInputElement).value;
-    this.layerNameChanged.emit({ id, name });
+    this.layerNameChanged.emit({ pageId, id, name });
   }
 
-  onLayerNameClick(id: string, event: MouseEvent): void {
+  onLayerNameClick(pageId: string, id: string, event: MouseEvent): void {
     event.stopPropagation();
     if (this.editingLayerId !== id) {
-      this.layerSelected.emit(id);
+      this.layerSelected.emit({ pageId, id });
     }
   }
 
@@ -169,42 +312,50 @@ export class ProjectPanelComponent implements OnChanges {
     }
   }
 
-  onLayerVisibilityToggle(id: string, event: MouseEvent): void {
+  onLayerVisibilityToggle(pageId: string, id: string, event: MouseEvent): void {
     event.stopPropagation();
-    this.layerVisibilityToggled.emit(id);
+    this.layerVisibilityToggled.emit({ pageId, id });
   }
 
-  onLayerContextMenu(id: string, event: MouseEvent): void {
+  onLayerContextMenu(pageId: string, id: string, event: MouseEvent): void {
     event.preventDefault();
     event.stopPropagation();
-    this.layerContextMenuRequested.emit({ id, x: event.clientX, y: event.clientY });
+    this.layerContextMenuRequested.emit({ pageId, id, x: event.clientX, y: event.clientY });
   }
 
-  onLayerDragStart(id: string, event: DragEvent): void {
+  onLayerDragStart(pageId: string, id: string, event: DragEvent): void {
     this.draggedLayerId = id;
+    this.draggedLayerPageId = pageId;
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', id);
     }
   }
 
-  onLayerDragOver(layer: LayerEntry, event: DragEvent): void {
-    if (!this.draggedLayerId || this.draggedLayerId === layer.id) {
+  onLayerDragOver(pageId: string, layer: LayerEntry, event: DragEvent): void {
+    if (
+      !this.draggedLayerId ||
+      this.draggedLayerId === layer.id ||
+      this.draggedLayerPageId !== pageId
+    ) {
       return;
     }
 
-    const currentDraggedLayer = this.layerEntries.find((entry) => entry.id === this.draggedLayerId);
-    if (!currentDraggedLayer || this.isInvalidLayerDrop(currentDraggedLayer, layer)) {
+    const currentDraggedLayer = this.getLayerEntriesForPage(pageId).find(
+      (entry) => entry.id === this.draggedLayerId,
+    );
+    if (!currentDraggedLayer || this.isInvalidLayerDrop(pageId, currentDraggedLayer, layer)) {
       return;
     }
 
     event.preventDefault();
     const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
     this.dragOverLayerId = layer.id;
+    this.dragOverLayerPageId = pageId;
     const relativeY = event.clientY - bounds.top;
     const sameParent = currentDraggedLayer.parentId === layer.parentId;
 
-    if (this.canDropInside(currentDraggedLayer, layer)) {
+    if (this.canDropInside(pageId, currentDraggedLayer, layer)) {
       if (!sameParent) {
         this.dragOverPosition = 'inside';
         return;
@@ -227,21 +378,28 @@ export class ProjectPanelComponent implements OnChanges {
     this.dragOverPosition = relativeY < bounds.height / 2 ? 'before' : 'after';
   }
 
-  onLayerDrop(layer: LayerEntry, event: DragEvent): void {
+  onLayerDrop(pageId: string, layer: LayerEntry, event: DragEvent): void {
     event.preventDefault();
 
-    if (!this.draggedLayerId || this.draggedLayerId === layer.id) {
+    if (
+      !this.draggedLayerId ||
+      this.draggedLayerId === layer.id ||
+      this.draggedLayerPageId !== pageId
+    ) {
       this.clearDragState();
       return;
     }
 
-    const currentDraggedLayer = this.layerEntries.find((entry) => entry.id === this.draggedLayerId);
-    if (!currentDraggedLayer || this.isInvalidLayerDrop(currentDraggedLayer, layer)) {
+    const currentDraggedLayer = this.getLayerEntriesForPage(pageId).find(
+      (entry) => entry.id === this.draggedLayerId,
+    );
+    if (!currentDraggedLayer || this.isInvalidLayerDrop(pageId, currentDraggedLayer, layer)) {
       this.clearDragState();
       return;
     }
 
     this.layerMoved.emit({
+      pageId,
       draggedId: this.draggedLayerId,
       targetId: layer.id,
       position: this.dragOverPosition,
@@ -258,6 +416,27 @@ export class ProjectPanelComponent implements OnChanges {
     return this.collapsedLayers.has(id);
   }
 
+  pageLayerHasChildren(pageId: string): boolean {
+    return this.getLayerEntriesForPage(pageId).length > 0;
+  }
+
+  isPageLayerCollapsed(pageId: string): boolean {
+    return this.collapsedPageLayers.has(pageId);
+  }
+
+  shouldShowPageLayerEntries(pageId: string): boolean {
+    return this.getLayerEntriesForPage(pageId).length > 0 && !this.isPageLayerCollapsed(pageId);
+  }
+
+  togglePageLayerCollapse(pageId: string, event: MouseEvent): void {
+    event.stopPropagation();
+    if (this.collapsedPageLayers.has(pageId)) {
+      this.collapsedPageLayers.delete(pageId);
+    } else {
+      this.collapsedPageLayers.add(pageId);
+    }
+  }
+
   toggleLayerCollapse(id: string, event: MouseEvent): void {
     event.stopPropagation();
     if (this.collapsedLayers.has(id)) {
@@ -265,15 +444,23 @@ export class ProjectPanelComponent implements OnChanges {
     } else {
       this.collapsedLayers.add(id);
     }
-    this.cachedLayerEntries = this.buildLayerEntries(this.elements);
+    this.rebuildLayerEntriesByPage();
   }
 
-  isLayerDragging(id: string): boolean {
-    return this.draggedLayerId === id;
+  isLayerDragging(pageId: string, id: string): boolean {
+    return this.draggedLayerPageId === pageId && this.draggedLayerId === id;
   }
 
-  isLayerDropTarget(id: string, position: LayerDropPosition): boolean {
-    return this.dragOverLayerId === id && this.dragOverPosition === position;
+  isLayerDropTarget(pageId: string, id: string, position: LayerDropPosition): boolean {
+    return (
+      this.dragOverLayerPageId === pageId &&
+      this.dragOverLayerId === id &&
+      this.dragOverPosition === position
+    );
+  }
+
+  getLayerEntriesForPage(pageId: string): LayerEntry[] {
+    return this.cachedLayerEntriesByPage.get(pageId) ?? [];
   }
 
   isFrame(type: CanvasElementType): boolean {
@@ -323,7 +510,13 @@ export class ProjectPanelComponent implements OnChanges {
     return this.pages.length > 1;
   }
 
-  private buildLayerEntries(elements: CanvasElement[]): LayerEntry[] {
+  private rebuildLayerEntriesByPage(): void {
+    this.cachedLayerEntriesByPage = new Map(
+      this.pages.map((page) => [page.id, this.buildLayerEntries(page.elements, page.id)]),
+    );
+  }
+
+  private buildLayerEntries(elements: CanvasElement[], pageId: string): LayerEntry[] {
     if (elements.length === 0) {
       return [];
     }
@@ -361,6 +554,7 @@ export class ProjectPanelComponent implements OnChanges {
         const fallbackName = `${typeLabel} ${nextTypeCount}`;
 
         entries.push({
+          pageId,
           id: child.id,
           depth,
           type: child.type,
@@ -383,25 +577,27 @@ export class ProjectPanelComponent implements OnChanges {
 
   private clearDragState(): void {
     this.draggedLayerId = null;
+    this.draggedLayerPageId = null;
     this.dragOverLayerId = null;
+    this.dragOverLayerPageId = null;
     this.dragOverPosition = 'before';
   }
 
-  private canDropInside(dragged: LayerEntry, target: LayerEntry): boolean {
+  private canDropInside(pageId: string, dragged: LayerEntry, target: LayerEntry): boolean {
     return (
       target.type === 'frame' &&
       dragged.type !== 'frame' &&
-      !this.isDescendantOf(dragged.id, target.id)
+      !this.isDescendantOf(pageId, dragged.id, target.id)
     );
   }
 
-  private isInvalidLayerDrop(dragged: LayerEntry, target: LayerEntry): boolean {
-    return dragged.id === target.id || this.isDescendantOf(dragged.id, target.id);
+  private isInvalidLayerDrop(pageId: string, dragged: LayerEntry, target: LayerEntry): boolean {
+    return dragged.id === target.id || this.isDescendantOf(pageId, dragged.id, target.id);
   }
 
-  private isDescendantOf(ancestorId: string, elementId: string): boolean {
+  private isDescendantOf(pageId: string, ancestorId: string, elementId: string): boolean {
     const parentById = new Map(
-      this.elements.map((element) => [element.id, element.parentId ?? null]),
+      this.getPageElements(pageId).map((element) => [element.id, element.parentId ?? null]),
     );
     let currentParentId = parentById.get(elementId) ?? null;
 
@@ -414,5 +610,9 @@ export class ProjectPanelComponent implements OnChanges {
     }
 
     return false;
+  }
+
+  private getPageElements(pageId: string): CanvasElement[] {
+    return this.pages.find((page) => page.id === pageId)?.elements ?? [];
   }
 }

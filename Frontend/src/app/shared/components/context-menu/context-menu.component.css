@@ -9,6 +9,7 @@
   min-width: 120px;
   border-radius: 12px;
   padding: 0.3rem;
+  pointer-events: auto;
   user-select: none;
   animation: context-menu-in 100ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   transform-origin: top left;
@@ -104,6 +105,7 @@
   min-width: 160px;
   border-radius: 12px;
   padding: 0.3rem;
+  pointer-events: auto;
   z-index: 1;
   animation: context-menu-in 100ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 
