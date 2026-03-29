@@ -1,11 +1,23 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import {
+  DropdownSelectComponent,
+  DropdownSelectOption,
+} from '../../../../shared/components/dropdown-select/dropdown-select.component';
+import {
+  CanvasAlignItems,
+  CanvasDisplayMode,
   CanvasElement,
   CanvasElementType,
   CanvasFontStyle,
+  CanvasFlexDirection,
+  CanvasFlexWrap,
+  CanvasJustifyContent,
   CanvasOverflowMode,
+  CanvasPositionMode,
   CanvasShadowPreset,
+  CanvasSpacing,
   CanvasTextAlign,
   CanvasTextVerticalAlign,
 } from '../../../../core/models/canvas.models';
@@ -28,7 +40,8 @@ type EditableNumericField =
   | 'lineHeight'
   | 'strokeWidth'
   | 'opacity'
-  | 'cornerRadius';
+  | 'cornerRadius'
+  | 'gap';
 
 type EditableTypographyField =
   | 'fontFamily'
@@ -47,7 +60,14 @@ interface FrameTemplate {
 @Component({
   selector: 'app-properties-panel',
   standalone: true,
-  imports: [CommonModule, NumberInputComponent, StylePopupFieldComponent, ToggleGroupComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    DropdownSelectComponent,
+    NumberInputComponent,
+    StylePopupFieldComponent,
+    ToggleGroupComponent,
+  ],
   templateUrl: './properties-panel.component.html',
   styleUrl: './properties-panel.component.css',
 })
@@ -91,6 +111,91 @@ export class PropertiesPanelComponent {
   readonly visibleOptions: readonly ToggleGroupOption[] = [
     { label: 'Yes', value: true },
     { label: 'No', value: false },
+  ];
+  readonly wrapOptions: readonly ToggleGroupOption[] = [
+    { label: 'Yes', value: true },
+    { label: 'No', value: false },
+  ];
+  readonly layoutDirectionOptions: readonly ToggleGroupOption[] = [
+    {
+      label: '',
+      value: 'row',
+      icon: 'direction-horizontal',
+      ariaLabel: 'Horizontal layout direction',
+      title: 'Horizontal',
+    },
+    {
+      label: '',
+      value: 'column',
+      icon: 'direction-vertical',
+      ariaLabel: 'Vertical layout direction',
+      title: 'Vertical',
+    },
+  ];
+  readonly layoutDisplayOptions: readonly ToggleGroupOption[] = [
+    { label: 'Flex', value: 'flex' },
+    { label: 'Grid', value: 'grid' },
+  ];
+  readonly justifyContentOptions: DropdownSelectOption[] = [
+    { label: 'Start', value: 'flex-start' },
+    { label: 'End', value: 'flex-end' },
+    { label: 'Center', value: 'center' },
+    { label: 'Space Between', value: 'space-between' },
+    { label: 'Space Around', value: 'space-around' },
+    { label: 'Space Evenly', value: 'space-evenly' },
+  ];
+  readonly alignItemsHorizontalOptions: readonly ToggleGroupOption[] = [
+    {
+      label: '',
+      value: 'flex-start',
+      icon: 'align-horizontal-start',
+      ariaLabel: 'Align start',
+      title: 'Start',
+    },
+    {
+      label: '',
+      value: 'center',
+      icon: 'align-horizontal-center',
+      ariaLabel: 'Align center',
+      title: 'Center',
+    },
+    {
+      label: '',
+      value: 'flex-end',
+      icon: 'align-horizontal-end',
+      ariaLabel: 'Align end',
+      title: 'End',
+    },
+  ];
+  readonly alignItemsVerticalOptions: readonly ToggleGroupOption[] = [
+    {
+      label: '',
+      value: 'flex-start',
+      icon: 'align-vertical-start',
+      ariaLabel: 'Align start',
+      title: 'Start',
+    },
+    {
+      label: '',
+      value: 'center',
+      icon: 'align-vertical-center',
+      ariaLabel: 'Align center',
+      title: 'Center',
+    },
+    {
+      label: '',
+      value: 'flex-end',
+      icon: 'align-vertical-end',
+      ariaLabel: 'Align end',
+      title: 'End',
+    },
+  ];
+  readonly positionOptions: DropdownSelectOption[] = [
+    { label: 'Static', value: 'static' },
+    { label: 'Relative', value: 'relative' },
+    { label: 'Absolute', value: 'absolute' },
+    { label: 'Fixed', value: 'fixed' },
+    { label: 'Sticky', value: 'sticky' },
   ];
 
   readonly frameTemplates: FrameTemplate[] = [
@@ -324,6 +429,141 @@ export class PropertiesPanelComponent {
 
   setVisible(visible: boolean): void {
     this.emitPatch({ visible });
+  }
+
+  supportsLayout(type: CanvasElementType): boolean {
+    return type === 'frame' || type === 'rectangle';
+  }
+
+  hasLayout(element: CanvasElement): boolean {
+    return !!element.display;
+  }
+
+  supportsPosition(type: CanvasElementType): boolean {
+    return type !== 'frame';
+  }
+
+  isFlex(element: CanvasElement): boolean {
+    return this.displayValue(element) === 'flex';
+  }
+
+  isGrid(element: CanvasElement): boolean {
+    return this.displayValue(element) === 'grid';
+  }
+
+  displayValue(element: CanvasElement): 'flex' | 'grid' {
+    return element.display === 'grid' ? 'grid' : 'flex';
+  }
+
+  positionValue(element: CanvasElement): CanvasPositionMode {
+    return element.position ?? 'static';
+  }
+
+  flexDirectionValue(element: CanvasElement): 'row' | 'column' {
+    return element.flexDirection === 'column' || element.flexDirection === 'column-reverse'
+      ? 'column'
+      : 'row';
+  }
+
+  flexWrapValue(element: CanvasElement): boolean {
+    return element.flexWrap === 'wrap';
+  }
+
+  justifyContentValue(element: CanvasElement): CanvasJustifyContent {
+    return element.justifyContent ?? 'flex-start';
+  }
+
+  alignItemsOptions(element: CanvasElement): readonly ToggleGroupOption[] {
+    return this.flexDirectionValue(element) === 'column'
+      ? this.alignItemsHorizontalOptions
+      : this.alignItemsVerticalOptions;
+  }
+
+  alignItemsValue(element: CanvasElement): CanvasAlignItems {
+    return element.alignItems === 'center' || element.alignItems === 'flex-end'
+      ? element.alignItems
+      : 'flex-start';
+  }
+
+  spacingValue(element: CanvasElement, type: 'padding' | 'margin', side: keyof CanvasSpacing): number {
+    return element[type]?.[side] ?? 0;
+  }
+
+  addLayout(): void {
+    this.emitPatch({ display: 'flex' });
+  }
+
+  removeLayout(): void {
+    this.emitPatch({
+      display: undefined,
+      flexDirection: undefined,
+      flexWrap: undefined,
+      justifyContent: undefined,
+      alignItems: undefined,
+      gap: undefined,
+      gridTemplateColumns: undefined,
+      gridTemplateRows: undefined,
+      padding: undefined,
+    });
+  }
+
+  onDisplayChange(value: string | number | boolean): void {
+    if (value !== 'flex' && value !== 'grid') {
+      return;
+    }
+
+    this.emitPatch({ display: value as CanvasDisplayMode });
+  }
+
+  onPositionChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    this.emitPatch({
+      position: value === 'static' ? undefined : (value as CanvasPositionMode),
+    });
+  }
+
+  onFlexDirectionChange(value: string | number | boolean): void {
+    if (value !== 'row' && value !== 'column') {
+      return;
+    }
+
+    this.emitPatch({ flexDirection: value });
+  }
+
+  onFlexWrapToggle(wrap: boolean): void {
+    this.emitPatch({ flexWrap: wrap ? 'wrap' : 'nowrap' } as Partial<CanvasElement>);
+  }
+
+  onJustifyContentChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    this.emitPatch({ justifyContent: value as CanvasJustifyContent });
+  }
+
+  onAlignItemsChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    this.emitPatch({ alignItems: value as CanvasAlignItems });
+  }
+
+  onGridTemplateChange(field: 'gridTemplateColumns' | 'gridTemplateRows', event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.emitPatch({ [field]: value.trim() || undefined } as Partial<CanvasElement>);
+  }
+
+  onSpacingChange(type: 'padding' | 'margin', side: keyof CanvasSpacing, value: number): void {
+    if (!Number.isFinite(value)) return;
+    const element = this.selectedElement;
+    if (!element) return;
+    const current: CanvasSpacing = element[type] ?? { top: 0, right: 0, bottom: 0, left: 0 };
+    this.emitPatch({ [type]: { ...current, [side]: value } } as Partial<CanvasElement>);
   }
 
   setFontStyle(style: CanvasFontStyle): void {

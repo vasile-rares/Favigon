@@ -43,7 +43,71 @@
       (wheel)="onCanvasWheel($event)"
       (contextmenu)="onCanvasContextMenu($event)">
       <div class="canvas-viewport" [style.transform]="canvasViewportTransform()">
-        <div class="canvas-scene" [style.transform]="canvasSceneTransform()">
+        <div class="canvas-scene" #canvasScene [style.transform]="canvasSceneTransform()">
+          <ng-template
+            #previewElementTpl
+            let-previewEl="element"
+            let-previewPageId="pageId"
+            let-isNested="isNested">
+            <div
+              class="canvas-element canvas-element-preview"
+              [class.layout-child]="isNested"
+              [class.flow-child]="isNested && isChildInFlow(previewEl)"
+              [class.frame]="previewEl.type === 'frame'"
+              [class.rectangle]="previewEl.type === 'rectangle'"
+              [class.text]="previewEl.type === 'text'"
+              [class.image]="previewEl.type === 'image'"
+              [class.layout-container]="isLayoutContainer(previewEl)"
+              [style.left.px]="isNested ? getPreviewNestedX(previewEl) : getRenderedXForPage(previewEl, previewPageId)"
+              [style.top.px]="isNested ? getPreviewNestedY(previewEl) : getRenderedYForPage(previewEl, previewPageId)"
+              [style.width.px]="previewEl.width"
+              [style.height.px]="previewEl.height"
+              [style.transform]="getElementTransform(previewEl)"
+              [style.position]="isNested ? getPreviewNestedPositionStyle(previewEl) : null"
+              [style.display]="getElementLayoutDisplay(previewEl)"
+              [style.flex-direction]="getElementLayoutFlexDirection(previewEl)"
+              [style.flex-wrap]="getElementLayoutFlexWrap(previewEl)"
+              [style.justify-content]="getElementLayoutJustifyContent(previewEl)"
+              [style.align-items]="getElementLayoutAlignItems(previewEl)"
+              [style.gap]="getElementLayoutGap(previewEl)"
+              [style.grid-template-columns]="getElementLayoutGridTemplateColumns(previewEl)"
+              [style.grid-template-rows]="getElementLayoutGridTemplateRows(previewEl)"
+              [style.padding]="getElementLayoutPadding(previewEl)"
+              [style.background-color]="previewEl.type !== 'text' && previewEl.type !== 'image' ? previewEl.fill : 'transparent'"
+              [style.color]="previewEl.type === 'text' ? previewEl.fill : null"
+              [style.border]="getElementBorderStyle(previewEl)"
+              [style.opacity]="previewEl.opacity ?? 1"
+              [style.clip-path]="isNested ? null : getElementClipPathForPage(previewEl, previewPageId)"
+              [style.visibility]="!isNested && isElementClippedOutForPage(previewEl, previewPageId) ? 'hidden' : 'visible'"
+              [style.border-radius.px]="previewEl.cornerRadius ?? (previewEl.type === 'image' ? 6 : 0)">
+
+              <ng-container *ngIf="previewEl.type === 'text'">
+                <div
+                  class="text-content"
+                  [style.font-size.px]="previewEl.fontSize"
+                  [style.font-family]="getTextFontFamily(previewEl)"
+                  [style.font-weight]="getTextFontWeight(previewEl)"
+                  [style.font-style]="getTextFontStyle(previewEl)"
+                  [style.line-height]="getTextLineHeight(previewEl)"
+                  [style.letter-spacing]="getTextLetterSpacing(previewEl)"
+                  [style.text-align]="getTextAlignValue(previewEl)">
+                  <span>{{ previewEl.text }}</span>
+                </div>
+              </ng-container>
+
+              <ng-container *ngIf="previewEl.type === 'image'">
+                <img [src]="previewEl.imageUrl" alt="Canvas image" draggable="false" />
+              </ng-container>
+
+              <ng-container *ngIf="isLayoutContainer(previewEl)">
+                <ng-container *ngFor="let child of getLayoutChildrenForPage(previewEl, previewPageId); trackBy: trackByElementId">
+                  <ng-container
+                    *ngTemplateOutlet="previewElementTpl; context: { element: child, pageId: previewPageId, isNested: true }"></ng-container>
+                </ng-container>
+              </ng-container>
+            </div>
+          </ng-template>
+
           <ng-container *ngFor="let layout of inactivePageLayouts()">
             <div
               class="page-shell page-shell--inactive"
@@ -57,44 +121,10 @@
               (click)="onInactivePageShellClick(layout.pageId)">
             </div>
 
-            <div
-              *ngFor="let pageElement of getVisibleElementsForPage(layout.pageId); trackBy: trackByElementId"
-              class="canvas-element canvas-element-preview"
-              [class.frame]="pageElement.type === 'frame'"
-              [class.rectangle]="pageElement.type === 'rectangle'"
-              [class.text]="pageElement.type === 'text'"
-              [class.image]="pageElement.type === 'image'"
-              [style.left.px]="getRenderedXForPage(pageElement, layout.pageId)"
-              [style.top.px]="getRenderedYForPage(pageElement, layout.pageId)"
-              [style.width.px]="pageElement.width"
-              [style.height.px]="pageElement.height"
-              [style.transform]="getElementTransform(pageElement)"
-              [style.background-color]="pageElement.type !== 'text' && pageElement.type !== 'image' ? pageElement.fill : 'transparent'"
-              [style.color]="pageElement.type === 'text' ? pageElement.fill : null"
-              [style.border]="getElementBorderStyle(pageElement)"
-              [style.opacity]="pageElement.opacity ?? 1"
-              [style.clip-path]="getElementClipPathForPage(pageElement, layout.pageId)"
-              [style.visibility]="isElementClippedOutForPage(pageElement, layout.pageId) ? 'hidden' : 'visible'"
-              [style.border-radius.px]="pageElement.cornerRadius ?? (pageElement.type === 'image' ? 6 : 0)">
-
-              <ng-container *ngIf="pageElement.type === 'text'">
-                <div
-                  class="text-content"
-                  [style.font-size.px]="pageElement.fontSize"
-                  [style.font-family]="getTextFontFamily(pageElement)"
-                  [style.font-weight]="getTextFontWeight(pageElement)"
-                  [style.font-style]="getTextFontStyle(pageElement)"
-                  [style.line-height]="getTextLineHeight(pageElement)"
-                  [style.letter-spacing]="getTextLetterSpacing(pageElement)"
-                  [style.text-align]="getTextAlignValue(pageElement)">
-                  <span>{{ pageElement.text }}</span>
-                </div>
-              </ng-container>
-
-              <ng-container *ngIf="pageElement.type === 'image'">
-                <img [src]="pageElement.imageUrl" alt="Canvas image" draggable="false" />
-              </ng-container>
-            </div>
+            <ng-container *ngFor="let pageElement of getTopLevelVisibleElementsForPage(layout.pageId); trackBy: trackByElementId">
+              <ng-container
+                *ngTemplateOutlet="previewElementTpl; context: { element: pageElement, pageId: layout.pageId, isNested: false }"></ng-container>
+            </ng-container>
           </ng-container>
 
           <ng-container *ngIf="activePageLayout() as activeLayout">
@@ -111,47 +141,16 @@
 
           </ng-container>
 
-          <div
-            *ngFor="let el of visibleElements(); trackBy: trackByElementId"
-            class="canvas-element"
-            [class.selected]="selectedElementId() === el.id"
-            [class.editing]="isTextEditing(el.id)"
-            [class.has-text]="el.type === 'text' && !!el.text"
-            [class.frame]="el.type === 'frame'"
-            [class.frame-hovered]="el.type === 'frame' && hoveredElementId() === el.id && !isDraggingEl()"
-            [class.frame-selected-body]="el.type === 'frame' && selectedElementId() === el.id"
-            [class.frame-reorder-animating]="isRootFrame(el) && isFrameReorderAnimating() && selectedElementId() !== el.id"
-            [class.frame-reorder-live]="isRootFrame(el) && isDraggingEl() && selectedElementId() !== el.id"
-            [class.rectangle]="el.type === 'rectangle'"
-            [class.text]="el.type === 'text'"
-            [class.image]="el.type === 'image'"
-            [style.left.px]="getRenderedX(el)"
-            [style.top.px]="getRenderedY(el)"
-            [style.width.px]="el.width"
-            [style.height.px]="el.height"
-            [style.transform]="getElementTransform(el)"
-            [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
-            [style.color]="el.type === 'text' ? el.fill : null"
-            [style.border]="getElementBorderStyle(el)"
-            [style.box-shadow]="getElementBoxShadow(el)"
-            [style.outline]="getElementOutlineStyle(el)"
-            [style.outline-offset.px]="getElementOutlineOffset(el)"
-            [style.opacity]="el.opacity ?? 1"
-            [style.clip-path]="getElementClipPath(el)"
-            [style.visibility]="isElementClippedOut(el) ? 'hidden' : 'visible'"
-            [style.border-radius.px]="el.cornerRadius ?? (el.type === 'image' ? 6 : 0)"
-            (pointerdown)="onElementPointerDown($event, el.id)"
-            (pointerenter)="hoveredElementId.set(el.id)"
-            (pointerleave)="hoveredElementId.set(null)"
-            (dblclick)="onElementDoubleClick($event, el.id)"
-            (contextmenu)="onElementContextMenu($event, el.id)">
-
+          <!-- Recursive element template -->
+          <ng-template #elementTpl let-el="element" let-isNested="isNested" let-isFlow="isFlow">
             <div
               class="frame-title"
-              *ngIf="el.type === 'frame' && !isFrameTitleHiddenByHeader(el)"
+              *ngIf="el.type === 'frame' && !isNested && !isFrameTitleHiddenByHeader(el)"
               [class.frame-title-hovered]="hoveredFrameTitleId() === el.id && !isDraggingEl()"
               [class.frame-title-selected]="selectedElementId() === el.id"
-              [style.top.px]="getFrameTitleOffset()"
+              [style.left.px]="getRenderedX(el)"
+              [style.top.px]="getRenderedY(el) + getFrameTitleOffset()"
+              [style.width.px]="el.width"
               [style.font-size.px]="getFrameTitleFontSize()"
               (pointerenter)="hoveredFrameTitleId.set(el.id)"
               (pointerleave)="hoveredFrameTitleId.set(null)"
@@ -159,44 +158,117 @@
               <span class="frame-title-text">{{ getFrameTitle(el) }}</span>
             </div>
 
-            <ng-container *ngIf="el.type === 'text'">
-              <ng-container *ngIf="!isTextEditing(el.id); else textEditor">
-                <div
-                  class="text-content"
-                  [style.font-size.px]="el.fontSize"
-                  [style.font-family]="getTextFontFamily(el)"
-                  [style.font-weight]="getTextFontWeight(el)"
-                  [style.font-style]="getTextFontStyle(el)"
-                  [style.line-height]="getTextLineHeight(el)"
-                  [style.letter-spacing]="getTextLetterSpacing(el)"
-                  [style.text-align]="getTextAlignValue(el)">
-                  <span>{{ el.text }}</span>
-                </div>
+            <div
+              class="canvas-element"
+              [class.layout-child]="isNested"
+              [class.flow-child]="isFlow"
+              [class.selected]="selectedElementId() === el.id"
+              [class.editing]="isTextEditing(el.id)"
+              [class.has-text]="el.type === 'text' && !!el.text"
+              [class.frame]="el.type === 'frame'"
+              [class.frame-hovered]="el.type === 'frame' && hoveredElementId() === el.id && !isDraggingEl()"
+              [class.frame-selected-body]="el.type === 'frame' && selectedElementId() === el.id"
+              [class.frame-reorder-animating]="!isNested && isRootFrame(el) && isFrameReorderAnimating() && selectedElementId() !== el.id"
+              [class.frame-reorder-live]="!isNested && isRootFrame(el) && isDraggingEl() && selectedElementId() !== el.id"
+              [class.rectangle]="el.type === 'rectangle'"
+              [class.text]="el.type === 'text'"
+              [class.image]="el.type === 'image'"
+              [class.layout-container]="isLayoutContainer(el)"
+              [class.dragging-flow-child]="isFlowChildDragging(el)"
+              [attr.data-element-id]="el.id"
+              [attr.data-flow-child]="isFlow || null"
+              [style.left.px]="isNested ? getNestedX(el) : getRenderedX(el)"
+              [style.top.px]="isNested ? getNestedY(el) : getRenderedY(el)"
+              [style.width.px]="el.width"
+              [style.height.px]="el.height"
+              [style.transform]="getElementTransform(el)"
+              [style.position]="isNested ? getNestedPositionStyle(el) : null"
+              [style.display]="getElementLayoutDisplay(el)"
+              [style.flex-direction]="getElementLayoutFlexDirection(el)"
+              [style.flex-wrap]="getElementLayoutFlexWrap(el)"
+              [style.justify-content]="getElementLayoutJustifyContent(el)"
+              [style.align-items]="getElementLayoutAlignItems(el)"
+              [style.gap]="getElementLayoutGap(el)"
+              [style.grid-template-columns]="getElementLayoutGridTemplateColumns(el)"
+              [style.grid-template-rows]="getElementLayoutGridTemplateRows(el)"
+              [style.padding]="getElementLayoutPadding(el)"
+              [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
+              [style.color]="el.type === 'text' ? el.fill : null"
+              [style.border]="getElementBorderStyle(el)"
+              [style.box-shadow]="isNested ? null : getElementBoxShadow(el)"
+              [style.outline]="isNested ? null : getElementOutlineStyle(el)"
+              [style.outline-offset.px]="isNested ? null : getElementOutlineOffset(el)"
+              [style.opacity]="el.opacity ?? 1"
+              [style.clip-path]="isNested ? null : getElementClipPath(el)"
+              [style.visibility]="!isNested && isElementClippedOut(el) ? 'hidden' : 'visible'"
+              [style.border-radius.px]="el.cornerRadius ?? (el.type === 'image' ? 6 : 0)"
+              (pointerdown)="onElementPointerDown($event, el.id)"
+              (pointerenter)="hoveredElementId.set(el.id)"
+              (pointerleave)="hoveredElementId.set(null)"
+              (dblclick)="onElementDoubleClick($event, el.id)"
+              (contextmenu)="onElementContextMenu($event, el.id)">
+
+              <ng-container *ngIf="el.type === 'text'">
+                <ng-container *ngIf="!isTextEditing(el.id); else textEditor">
+                  <div
+                    class="text-content"
+                    [style.font-size.px]="el.fontSize"
+                    [style.font-family]="getTextFontFamily(el)"
+                    [style.font-weight]="getTextFontWeight(el)"
+                    [style.font-style]="getTextFontStyle(el)"
+                    [style.line-height]="getTextLineHeight(el)"
+                    [style.letter-spacing]="getTextLetterSpacing(el)"
+                    [style.text-align]="getTextAlignValue(el)">
+                    <span>{{ el.text }}</span>
+                  </div>
+                </ng-container>
+
+                <ng-template #textEditor>
+                  <textarea
+                    class="text-inline-editor"
+                    [attr.data-text-editor-id]="el.id"
+                    [value]="el.text || ''"
+                    [style.font-size.px]="el.fontSize"
+                    [style.font-family]="getTextFontFamily(el)"
+                    [style.font-weight]="getTextFontWeight(el)"
+                    [style.font-style]="getTextFontStyle(el)"
+                    [style.line-height]="getTextLineHeight(el)"
+                    [style.letter-spacing]="getTextLetterSpacing(el)"
+                    [style.text-align]="getTextAlignValue(el)"
+                    (pointerdown)="onTextEditorPointerDown($event)"
+                    (input)="onTextEditorInput(el.id, $event)"
+                    (blur)="onTextEditorBlur(el.id)"
+                    (keydown)="onTextEditorKeyDown($event, el.id)"></textarea>
+                </ng-template>
               </ng-container>
 
-              <ng-template #textEditor>
-                <textarea
-                  class="text-inline-editor"
-                  [attr.data-text-editor-id]="el.id"
-                  [value]="el.text || ''"
-                  [style.font-size.px]="el.fontSize"
-                  [style.font-family]="getTextFontFamily(el)"
-                  [style.font-weight]="getTextFontWeight(el)"
-                  [style.font-style]="getTextFontStyle(el)"
-                  [style.line-height]="getTextLineHeight(el)"
-                  [style.letter-spacing]="getTextLetterSpacing(el)"
-                  [style.text-align]="getTextAlignValue(el)"
-                  (pointerdown)="onTextEditorPointerDown($event)"
-                  (input)="onTextEditorInput(el.id, $event)"
-                  (blur)="onTextEditorBlur(el.id)"
-                  (keydown)="onTextEditorKeyDown($event, el.id)"></textarea>
-              </ng-template>
-            </ng-container>
+              <ng-container *ngIf="el.type === 'image'">
+                <img [src]="el.imageUrl" alt="Canvas image" draggable="false" />
+              </ng-container>
 
-            <ng-container *ngIf="el.type === 'image'">
-              <img [src]="el.imageUrl" alt="Canvas image" draggable="false" />
-            </ng-container>
+              <!-- Nested children for layout containers -->
+              <ng-container *ngIf="isLayoutContainer(el)">
+                <ng-container *ngFor="let child of getLayoutChildren(el); trackBy: trackByElementId">
+                  <ng-container *ngTemplateOutlet="elementTpl; context: { element: child, isNested: true, isFlow: isChildInFlow(child) }"></ng-container>
+                </ng-container>
+              </ng-container>
 
+            </div>
+          </ng-template>
+
+          <!-- Render top-level elements -->
+          <ng-container *ngFor="let el of topLevelVisibleElements(); trackBy: trackByElementId">
+            <ng-container *ngTemplateOutlet="elementTpl; context: { element: el, isNested: false, isFlow: false }"></ng-container>
+          </ng-container>
+
+          <!-- Layout drop indicator -->
+          <div
+            *ngIf="layoutDropTarget()"
+            class="layout-drop-indicator"
+            [style.left.px]="getDropIndicatorLeft()"
+            [style.top.px]="getDropIndicatorTop()"
+            [style.width.px]="getDropIndicatorWidth()"
+            [style.height.px]="getDropIndicatorHeight()">
           </div>
 
           <ng-container *ngFor="let line of snapLines()">

@@ -43,6 +43,8 @@ public class IRLayout
   // Grid
   public int? Columns { get; set; }
   public int? Rows { get; set; }
+  public string? GridTemplateColumns { get; set; }
+  public string? GridTemplateRows { get; set; }
 }
 
 public class IRPosition
@@ -140,6 +142,7 @@ public class IRMeta
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum LayoutMode
 {
+  Block,
   Flex,
   Grid
 }
@@ -148,14 +151,19 @@ public enum LayoutMode
 public enum PositionMode
 {
   Flow,
-  Absolute
+  Relative,
+  Absolute,
+  Fixed,
+  Sticky
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum FlexDirection
 {
   Row,
-  Column
+  Column,
+  RowReverse,
+  ColumnReverse
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -164,7 +172,8 @@ public enum AlignItems
   Start,
   Center,
   End,
-  Stretch
+  Stretch,
+  Baseline
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
@@ -174,7 +183,8 @@ public enum JustifyContent
   Center,
   End,
   SpaceBetween,
-  SpaceAround
+  SpaceAround,
+  SpaceEvenly
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

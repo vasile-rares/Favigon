@@ -1,9 +1,11 @@
 :host {
+  --pp-control-height: 36px;
   display: block;
   min-width: 0;
 }
 
 input[type='number'] {
+  appearance: textfield;
   -moz-appearance: textfield;
 }
 
@@ -18,54 +20,65 @@ input[type='number']::-webkit-inner-spin-button {
   width: 100%;
   min-width: 0;
   display: flex;
-  align-items: stretch;
-  min-height: 34px;
+  align-items: center;
+  min-height: var(--pp-control-height);
+  height: var(--pp-control-height);
+}
+
+.number-input--boxed,
+.number-input--compact,
+.number-input--popup {
+  box-sizing: border-box;
+  height: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  &:hover:not(:focus-within) {
+    background: rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  &:focus-within {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.45);
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.05),
+      inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
 }
 
 .number-input--boxed {
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
-  padding: 0.38rem 0.55rem;
-
-  &:focus-within {
-    border-color: var(--color-accent-border);
-  }
+  padding: 0 0.55rem;
 }
 
 .number-input--compact {
   width: 72px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
-  padding: 0.38rem 0.55rem;
-
-  &:focus-within {
-    border-color: var(--color-brand-primary-30);
-    background: rgba(255, 255, 255, 0.07);
-  }
+  padding: 0 0.55rem;
 }
 
 .number-input--popup {
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 8px;
-  padding: 0.5rem 0.55rem;
-
-  &:focus-within {
-    border-color: var(--color-brand-primary-30);
-    background: rgba(255, 255, 255, 0.07);
-  }
+  padding: 0 0.55rem;
 }
 
 .number-input__field {
   width: 100%;
+  height: auto;
   min-width: 0;
   border: none;
   background: transparent;
   color: var(--color-zinc-100);
-  font-size: 0.8rem;
+  font-size: 0.84rem;
+  line-height: 1.2;
   padding: 0 18px 0 0;
+  margin: 0;
   outline: none;
   appearance: none;
   -webkit-appearance: none;
@@ -78,7 +91,7 @@ input[type='number']::-webkit-inner-spin-button {
   top: 50%;
   right: 0.35rem;
   width: 12px;
-  height: calc(100% - 6px);
+  height: calc(100% - 8px);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -103,12 +116,17 @@ input[type='number']::-webkit-inner-spin-button {
   padding: 0;
   border: none;
   background: transparent;
-  color: rgba(244, 244, 245, 0.9);
+  color: var(--color-zinc-400);
   cursor: ns-resize;
   min-height: 8px;
+  border-radius: 4px;
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease;
 
   &:hover {
     color: var(--color-zinc-100);
+    background: rgba(255, 255, 255, 0.06);
   }
 }
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { CanvasElement } from '../../../core/models/canvas.models';
+import { CanvasElement, CanvasElementType } from '../../../core/models/canvas.models';
 import { roundToTwoDecimals, clamp, collectSubtreeIds } from '../utils/canvas-interaction.util';
 import { CanvasClipboardSnapshot, Bounds } from '../canvas.types';
 
@@ -80,7 +80,10 @@ export class CanvasClipboardService {
     const originalParentId = rootElement.parentId ?? null;
     if (
       originalParentId &&
-      currentElements.some((element) => element.id === originalParentId && element.type === 'frame')
+      currentElements.some(
+        (element) =>
+          element.id === originalParentId && this.canContainPastedChildren(element.type),
+      )
     ) {
       return { parentId: originalParentId, error: null };
     }
@@ -91,7 +94,7 @@ export class CanvasClipboardService {
 
     return {
       parentId: null,
-      error: 'Select a destination frame before pasting this element.',
+      error: 'Select a destination frame or container before pasting this element.',
     };
   }
 
@@ -134,5 +137,9 @@ export class CanvasClipboardService {
       cloned.parentId = element.parentId ? (idMap.get(element.parentId) ?? null) : null;
       return cloned;
     });
+  }
+
+  private canContainPastedChildren(type: CanvasElementType): boolean {
+    return type === 'frame' || type === 'rectangle';
   }
 }

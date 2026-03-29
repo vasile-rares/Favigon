@@ -13,10 +13,61 @@
     class="toggle-group__button"
     *ngFor="let option of options"
     [class.is-active]="isActive(option)"
+    [class.toggle-group__button--icon-only]="!!option.icon && !option.label"
     [attr.aria-pressed]="isActive(option)"
     [attr.aria-label]="option.ariaLabel ?? option.label"
     [title]="option.title ?? option.label"
     (click)="onOptionClick(option)">
-    {{ option.label }}
+    <span class="toggle-group__button-content" [class.toggle-group__button-content--icon-only]="!!option.icon && !option.label">
+      <span *ngIf="option.icon" class="toggle-group__icon" aria-hidden="true">
+        <svg *ngIf="option.icon === 'direction-horizontal'" class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 8H14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          <path d="M4.75 5.25L2 8L4.75 10.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M11.25 5.25L14 8L11.25 10.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <svg *ngIf="option.icon === 'direction-vertical'" class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M8 2V14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          <path d="M5.25 4.75L8 2L10.75 4.75" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M5.25 11.25L8 14L10.75 11.25" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+        <svg *ngIf="option.icon === 'align-horizontal-start'" class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2.5" y="2.5" width="11" height="11" rx="2.25" stroke="currentColor" stroke-opacity="0.28" />
+          <rect x="4" y="3.75" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="4" y="6.9" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="4" y="10.05" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+        </svg>
+        <svg *ngIf="option.icon === 'align-horizontal-center'" class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2.5" y="2.5" width="11" height="11" rx="2.25" stroke="currentColor" stroke-opacity="0.28" />
+          <rect x="6.9" y="3.75" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="6.9" y="6.9" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="6.9" y="10.05" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+        </svg>
+        <svg *ngIf="option.icon === 'align-horizontal-end'" class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2.5" y="2.5" width="11" height="11" rx="2.25" stroke="currentColor" stroke-opacity="0.28" />
+          <rect x="9.8" y="3.75" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="9.8" y="6.9" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="9.8" y="10.05" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+        </svg>
+        <svg *ngIf="option.icon === 'align-vertical-start'" class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2.5" y="2.5" width="11" height="11" rx="2.25" stroke="currentColor" stroke-opacity="0.28" />
+          <rect x="3.75" y="4" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="6.9" y="4" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="10.05" y="4" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+        </svg>
+        <svg *ngIf="option.icon === 'align-vertical-center'" class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2.5" y="2.5" width="11" height="11" rx="2.25" stroke="currentColor" stroke-opacity="0.28" />
+          <rect x="3.75" y="6.9" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="6.9" y="6.9" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="10.05" y="6.9" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+        </svg>
+        <svg *ngIf="option.icon === 'align-vertical-end'" class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2.5" y="2.5" width="11" height="11" rx="2.25" stroke="currentColor" stroke-opacity="0.28" />
+          <rect x="3.75" y="9.8" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="6.9" y="9.8" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+          <rect x="10.05" y="9.8" width="2.2" height="2.2" rx="0.7" fill="currentColor" />
+        </svg>
+      </span>
+      <span *ngIf="option.label" class="toggle-group__label">{{ option.label }}</span>
+    </span>
   </button>
 </div>

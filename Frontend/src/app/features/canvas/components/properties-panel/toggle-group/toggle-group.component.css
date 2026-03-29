@@ -1,14 +1,42 @@
+:host {
+  --pp-control-height: 36px;
+  display: block;
+}
+
 .toggle-group {
   position: relative;
+  box-sizing: border-box;
   display: inline-grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   align-items: center;
-  padding: 0.2rem;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  min-height: var(--pp-control-height);
+  height: var(--pp-control-height);
+  padding: 0.25rem;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.05);
   isolation: isolate;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  &:hover:not(:focus-within) {
+    background: rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  &:focus-within {
+    background: rgba(0, 0, 0, 0.45);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.05),
+      inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
 }
 
 .toggle-group--stretch {
@@ -18,13 +46,15 @@
 
 .toggle-group__indicator {
   position: absolute;
-  top: 0.2rem;
-  bottom: 0.2rem;
-  left: 0.2rem;
-  width: calc((100% - 0.4rem) / var(--toggle-group-count));
-  border-radius: 6px;
+  top: 0.25rem;
+  bottom: 0.25rem;
+  left: 0.25rem;
+  width: calc((100% - 0.5rem) / var(--toggle-group-count));
+  border-radius: 8px;
   background: rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.45),
+    0 1px 0 rgba(255, 255, 255, 0.05);
   transform: translateX(calc(var(--toggle-group-active-index) * 100%));
   transition:
     transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -38,16 +68,63 @@
 
 .toggle-group__button {
   position: relative;
+  min-height: 100%;
   z-index: 1;
   border: none;
   background: transparent;
-  color: var(--color-zinc-500);
-  padding: 0.3rem 0.75rem;
-  border-radius: 6px;
-  font-size: 0.76rem;
+  color: var(--color-zinc-400);
+  padding: 0.42rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
-  transition: color 120ms ease;
+  transition:
+    color 120ms ease,
+    background-color 120ms ease;
+
+  &:hover {
+    color: var(--color-zinc-200);
+  }
+}
+
+.toggle-group__button--icon-only {
+  min-width: 54px;
+  min-height: 100%;
+  padding: 0.5rem 0.95rem;
+}
+
+.toggle-group__button-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  width: 100%;
+}
+
+.toggle-group__button-content--icon-only {
+  gap: 0;
+  min-height: 100%;
+}
+
+.toggle-group__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  line-height: 0;
+  transform: translateY(0.5px);
+}
+
+.toggle-group__icon-svg {
+  display: block;
+  width: 18px;
+  height: 18px;
+  overflow: visible;
+}
+
+.toggle-group__label {
+  line-height: 1;
 }
 
 .toggle-group__button.is-active {

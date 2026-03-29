@@ -19,6 +19,8 @@ export interface IRLayout {
   wrap?: boolean;
   columns?: number;
   rows?: number;
+  gridTemplateColumns?: string;
+  gridTemplateRows?: string;
 }
 
 export interface IRPosition {
@@ -103,11 +105,11 @@ export interface IRVariant {
 }
 
 // Must match C# enum names exactly (JsonStringEnumConverter uses PascalCase names)
-export type LayoutMode = 'Flex' | 'Grid';
-export type PositionMode = 'Flow' | 'Absolute';
-export type FlexDirection = 'Row' | 'Column';
-export type AlignItems = 'Start' | 'Center' | 'End' | 'Stretch';
-export type JustifyContent = 'Start' | 'Center' | 'End' | 'SpaceBetween' | 'SpaceAround';
+export type LayoutMode = 'Block' | 'Flex' | 'Grid';
+export type PositionMode = 'Flow' | 'Relative' | 'Absolute' | 'Fixed' | 'Sticky';
+export type FlexDirection = 'Row' | 'Column' | 'RowReverse' | 'ColumnReverse';
+export type AlignItems = 'Start' | 'Center' | 'End' | 'Stretch' | 'Baseline';
+export type JustifyContent = 'Start' | 'Center' | 'End' | 'SpaceBetween' | 'SpaceAround' | 'SpaceEvenly';
 export type BorderStyle = 'Solid' | 'Dashed' | 'Dotted' | 'Double' | 'None';
 
 // Helper to create a pixel IRLength

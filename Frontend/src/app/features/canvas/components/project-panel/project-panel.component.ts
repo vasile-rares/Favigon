@@ -1,5 +1,16 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  HostBinding,
+  HostListener,
+  Input,
+  OnChanges,
+  OnDestroy,
+  OnInit,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import {
   CanvasElement,
   CanvasElementType,
@@ -20,12 +31,19 @@ interface LayerEntry {
   parentId: string | null;
   name: string;
   visible: boolean;
+  isEffectivelyHidden: boolean;
   hasChildren: boolean;
+  hasLayout: boolean;
 }
 
 type LayerDropPosition = 'before' | 'after' | 'inside';
 type PageRenameSource = 'pages' | 'layers';
 type PageMenuContext = 'pages' | 'layers';
+
+const DEFAULT_PANEL_WIDTH = 280;
+const MIN_PANEL_WIDTH = 280;
+const MAX_PANEL_WIDTH = 560;
+const PANEL_VIEWPORT_GUTTER = 240;
 
 @Component({
   selector: 'app-project-panel',
@@ -34,7 +52,10 @@ type PageMenuContext = 'pages' | 'layers';
   templateUrl: './project-panel.component.html',
   styleUrl: './project-panel.component.css',
 })
-export class ProjectPanelComponent implements OnChanges {
+export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
+  @HostBinding('style.width.px') panelWidth = DEFAULT_PANEL_WIDTH;
+  @HostBinding('class.is-resizing') isResizingPanel = false;
+
   @Input() pages: CanvasPageModel[] = [];
   @Input() currentPageId: string | null = null;
   @Input() focusedPageId: string | null = null;
@@ -57,7 +78,7 @@ export class ProjectPanelComponent implements OnChanges {
   @Output() layerMoved = new EventEmitter<{
     pageId: string;
     draggedId: string;
-    targetId: string;
+    targetId: string | null;
     position: LayerDropPosition;
   }>();
   @Output() layerContextMenuRequested = new EventEmitter<{
@@ -76,6 +97,7 @@ export class ProjectPanelComponent implements OnChanges {
   private collapsedLayers = new Set<string>();
   private collapsedPageLayers = new Set<string>();
   editingLayerId: string | null = null;
+  editingLayerName = '';
   editingPageId: string | null = null;
   pageMenuPageId: string | null = null;
   pageMenuItems: ContextMenuItem[] = [];
@@ -84,6 +106,17 @@ export class ProjectPanelComponent implements OnChanges {
   private pageMenuContext: PageMenuContext | null = null;
   private editingPageName = '';
   private editingPageSource: PageRenameSource | null = null;
+  private resizeStartX = 0;
+  private resizeStartWidth = DEFAULT_PANEL_WIDTH;
+  private readonly renameRequestListener: EventListener = (event) => {
+    const renameEvent = event as CustomEvent<{ id?: string }>;
+    const layerId = renameEvent.detail?.id;
+    if (!layerId || !this.findLayerEntryById(layerId)) {
+      return;
+    }
+
+    this.startRename(layerId);
+  };
 
   get layerEntries(): LayerEntry[] {
     const focusedPageId = this.focusedPageId;
@@ -103,6 +136,31 @@ export class ProjectPanelComponent implements OnChanges {
     }
   }
 
+  ngOnInit(): void {
+    window.addEventListener('canvas:rename-request', this.renameRequestListener);
+  }
+
+  ngOnDestroy(): void {
+    window.removeEventListener('canvas:rename-request', this.renameRequestListener);
+    this.stopPanelResize();
+  }
+
+  @HostListener('window:pointermove', ['$event'])
+  onWindowPointerMove(event: PointerEvent): void {
+    if (!this.isResizingPanel) {
+      return;
+    }
+
+    event.preventDefault();
+    const deltaX = event.clientX - this.resizeStartX;
+    this.panelWidth = this.clampPanelWidth(this.resizeStartWidth + deltaX);
+  }
+
+  @HostListener('window:pointerup')
+  onWindowPointerUp(): void {
+    this.stopPanelResize();
+  }
+
   onPageSelect(pageId: string): void {
     this.closePageMenu();
     this.pageSelected.emit(pageId);
@@ -111,6 +169,17 @@ export class ProjectPanelComponent implements OnChanges {
   onLayerPageSelect(pageId: string): void {
     this.closePageMenu();
     this.pageLayerSelected.emit(pageId);
+  }
+
+  onResizeHandlePointerDown(event: PointerEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.isResizingPanel = true;
+    this.resizeStartX = event.clientX;
+    this.resizeStartWidth = this.panelWidth;
+    document.body.style.cursor = 'ew-resize';
+    document.body.style.userSelect = 'none';
   }
 
   startPageRename(pageId: string, event?: MouseEvent, source: PageRenameSource = 'pages'): void {
@@ -285,9 +354,8 @@ export class ProjectPanelComponent implements OnChanges {
     this.layerSelected.emit({ pageId, id });
   }
 
-  onLayerNameInput(pageId: string, id: string, event: Event): void {
-    const name = (event.target as HTMLInputElement).value;
-    this.layerNameChanged.emit({ pageId, id, name });
+  onLayerNameInput(event: Event): void {
+    this.editingLayerName = (event.target as HTMLInputElement).value;
   }
 
   onLayerNameClick(pageId: string, id: string, event: MouseEvent): void {
@@ -297,8 +365,9 @@ export class ProjectPanelComponent implements OnChanges {
     }
   }
 
-  startRename(id: string, event: MouseEvent): void {
-    event.stopPropagation();
+  startRename(id: string, event?: MouseEvent): void {
+    event?.stopPropagation();
+    this.editingLayerName = this.findLayerEntryById(id)?.name ?? '';
     this.editingLayerId = id;
     setTimeout(() => {
       const input = document.querySelector<HTMLInputElement>(`[data-layer-name-id="${id}"]`);
@@ -306,9 +375,29 @@ export class ProjectPanelComponent implements OnChanges {
     });
   }
 
-  stopRename(id: string): void {
-    if (this.editingLayerId === id) {
-      this.editingLayerId = null;
+  stopRename(pageId: string, id: string): void {
+    if (this.editingLayerId !== id) {
+      return;
+    }
+
+    const trimmed = this.editingLayerName.trim();
+    if (trimmed) {
+      this.layerNameChanged.emit({ pageId, id, name: trimmed });
+    }
+
+    this.clearLayerRename();
+  }
+
+  onLayerNameKeyDown(id: string, event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      (event.target as HTMLInputElement).blur();
+      return;
+    }
+
+    if (event.key === 'Escape' && this.editingLayerId === id) {
+      event.preventDefault();
+      this.clearLayerRename();
     }
   }
 
@@ -321,6 +410,41 @@ export class ProjectPanelComponent implements OnChanges {
     event.preventDefault();
     event.stopPropagation();
     this.layerContextMenuRequested.emit({ pageId, id, x: event.clientX, y: event.clientY });
+  }
+
+  private clearLayerRename(): void {
+    this.editingLayerId = null;
+    this.editingLayerName = '';
+  }
+
+  private stopPanelResize(): void {
+    if (!this.isResizingPanel) {
+      return;
+    }
+
+    this.isResizingPanel = false;
+    document.body.style.removeProperty('cursor');
+    document.body.style.removeProperty('user-select');
+  }
+
+  private clampPanelWidth(width: number): number {
+    const maxWidth = Math.max(
+      MIN_PANEL_WIDTH,
+      Math.min(MAX_PANEL_WIDTH, window.innerWidth - PANEL_VIEWPORT_GUTTER),
+    );
+
+    return Math.min(Math.max(width, MIN_PANEL_WIDTH), maxWidth);
+  }
+
+  private findLayerEntryById(id: string): LayerEntry | null {
+    for (const entries of this.cachedLayerEntriesByPage.values()) {
+      const match = entries.find((entry) => entry.id === id);
+      if (match) {
+        return match;
+      }
+    }
+
+    return null;
   }
 
   onLayerDragStart(pageId: string, id: string, event: DragEvent): void {
@@ -353,14 +477,8 @@ export class ProjectPanelComponent implements OnChanges {
     this.dragOverLayerId = layer.id;
     this.dragOverLayerPageId = pageId;
     const relativeY = event.clientY - bounds.top;
-    const sameParent = currentDraggedLayer.parentId === layer.parentId;
 
     if (this.canDropInside(pageId, currentDraggedLayer, layer)) {
-      if (!sameParent) {
-        this.dragOverPosition = 'inside';
-        return;
-      }
-
       const upperThreshold = bounds.height * 0.3;
       const lowerThreshold = bounds.height * 0.7;
 
@@ -412,6 +530,35 @@ export class ProjectPanelComponent implements OnChanges {
     this.clearDragState();
   }
 
+  onPageLayerDragOver(pageId: string, event: DragEvent): void {
+    if (!this.draggedLayerId || this.draggedLayerPageId !== pageId) {
+      return;
+    }
+
+    event.preventDefault();
+    this.dragOverLayerId = null;
+    this.dragOverLayerPageId = pageId;
+    this.dragOverPosition = 'inside';
+  }
+
+  onPageLayerDrop(pageId: string, event: DragEvent): void {
+    event.preventDefault();
+
+    if (!this.draggedLayerId || this.draggedLayerPageId !== pageId) {
+      this.clearDragState();
+      return;
+    }
+
+    this.layerMoved.emit({
+      pageId,
+      draggedId: this.draggedLayerId,
+      targetId: null,
+      position: 'inside',
+    });
+
+    this.clearDragState();
+  }
+
   isLayerCollapsed(id: string): boolean {
     return this.collapsedLayers.has(id);
   }
@@ -456,6 +603,14 @@ export class ProjectPanelComponent implements OnChanges {
       this.dragOverLayerPageId === pageId &&
       this.dragOverLayerId === id &&
       this.dragOverPosition === position
+    );
+  }
+
+  isPageRootDropTarget(pageId: string): boolean {
+    return (
+      this.dragOverLayerPageId === pageId &&
+      this.dragOverLayerId === null &&
+      this.dragOverPosition === 'inside'
     );
   }
 
@@ -539,7 +694,7 @@ export class ProjectPanelComponent implements OnChanges {
     const seen = new Set<string>();
     const typeCounters = new Map<CanvasElementType, number>();
 
-    const walk = (parentId: string | null, depth: number) => {
+    const walk = (parentId: string | null, depth: number, isAncestorHidden: boolean) => {
       const children = childrenByParent.get(parentId) ?? [];
       for (const child of children) {
         if (seen.has(child.id)) {
@@ -551,7 +706,16 @@ export class ProjectPanelComponent implements OnChanges {
         typeCounters.set(child.type, nextTypeCount);
 
         const typeLabel = formatCanvasElementTypeLabel(child.type);
-        const fallbackName = `${typeLabel} ${nextTypeCount}`;
+        const fallbackName =
+          child.type === 'rectangle' ||
+          child.type === 'text' ||
+          child.type === 'image' ||
+          child.type === 'frame'
+            ? typeLabel
+            : `${typeLabel} ${nextTypeCount}`;
+
+        const isVisible = child.visible !== false;
+        const isEffectivelyHidden = isAncestorHidden || !isVisible;
 
         entries.push({
           pageId,
@@ -561,17 +725,19 @@ export class ProjectPanelComponent implements OnChanges {
           typeLabel,
           parentId: child.parentId ?? null,
           name: typeof child.name === 'string' ? child.name : fallbackName,
-          visible: child.visible !== false,
+          visible: isVisible,
+          isEffectivelyHidden,
           hasChildren: (childrenByParent.get(child.id)?.length ?? 0) > 0,
+          hasLayout: !!child.display,
         });
 
         if (!this.collapsedLayers.has(child.id)) {
-          walk(child.id, depth + 1);
+          walk(child.id, depth + 1, isEffectivelyHidden);
         }
       }
     };
 
-    walk(null, 0);
+    walk(null, 0, false);
     return entries;
   }
 
@@ -585,10 +751,14 @@ export class ProjectPanelComponent implements OnChanges {
 
   private canDropInside(pageId: string, dragged: LayerEntry, target: LayerEntry): boolean {
     return (
-      target.type === 'frame' &&
+      this.canContainLayers(target) &&
       dragged.type !== 'frame' &&
       !this.isDescendantOf(pageId, dragged.id, target.id)
     );
+  }
+
+  private canContainLayers(layer: LayerEntry): boolean {
+    return layer.type === 'frame' || layer.type === 'rectangle';
   }
 
   private isInvalidLayerDrop(pageId: string, dragged: LayerEntry, target: LayerEntry): boolean {

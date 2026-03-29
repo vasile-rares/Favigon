@@ -65,8 +65,15 @@ public static class StyleTransformer
 
     if (position is not null)
     {
-      if (position.Mode == PositionMode.Absolute)
-        merged["position"] = "absolute";
+      var positionCss = position.Mode switch
+      {
+        PositionMode.Relative => "relative",
+        PositionMode.Absolute => "absolute",
+        PositionMode.Fixed => "fixed",
+        PositionMode.Sticky => "sticky",
+        _ => null,
+      };
+      if (positionCss is not null) merged["position"] = positionCss;
 
       if (position.X is not null) merged["left"] = position.X.ToString();
       if (position.Y is not null) merged["top"] = position.Y.ToString();

@@ -2,12 +2,22 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 export type ToggleGroupValue = string | number | boolean;
+export type ToggleGroupIcon =
+  | 'direction-horizontal'
+  | 'direction-vertical'
+  | 'align-horizontal-start'
+  | 'align-horizontal-center'
+  | 'align-horizontal-end'
+  | 'align-vertical-start'
+  | 'align-vertical-center'
+  | 'align-vertical-end';
 
 export interface ToggleGroupOption {
   label: string;
   value: ToggleGroupValue;
   ariaLabel?: string;
   title?: string;
+  icon?: ToggleGroupIcon;
 }
 
 @Component({

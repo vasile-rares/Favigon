@@ -8,6 +8,20 @@ export type CanvasOverflowMode = 'clip' | 'visible';
 export type CanvasShadowPreset = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 export type CanvasPageViewportPreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
 
+export type CanvasDisplayMode = 'block' | 'flex' | 'grid';
+export type CanvasPositionMode = 'static' | 'relative' | 'absolute' | 'fixed' | 'sticky';
+export type CanvasFlexDirection = 'row' | 'column' | 'row-reverse' | 'column-reverse';
+export type CanvasFlexWrap = 'nowrap' | 'wrap';
+export type CanvasJustifyContent = 'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly';
+export type CanvasAlignItems = 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
+
+export interface CanvasSpacing {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface CanvasElementIrMeta {
   type?: string;
   props?: Record<string, unknown>;
@@ -42,6 +56,19 @@ export interface CanvasElement {
   letterSpacing?: number;
   lineHeight?: number;
   imageUrl?: string;
+  // Layout (frame + rectangle)
+  display?: CanvasDisplayMode;
+  flexDirection?: CanvasFlexDirection;
+  flexWrap?: CanvasFlexWrap;
+  justifyContent?: CanvasJustifyContent;
+  alignItems?: CanvasAlignItems;
+  gap?: number;
+  gridTemplateColumns?: string;
+  gridTemplateRows?: string;
+  padding?: CanvasSpacing;
+  // Position (not for frame)
+  position?: CanvasPositionMode;
+  margin?: CanvasSpacing;
   parentId?: string | null;
   isPrimary?: boolean;
   primarySyncId?: string;

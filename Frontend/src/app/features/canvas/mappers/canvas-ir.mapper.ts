@@ -1,17 +1,27 @@
 ﻿import {
+  CanvasAlignItems,
+  CanvasDisplayMode,
   CanvasElement,
+  CanvasFlexDirection,
+  CanvasJustifyContent,
   CanvasPageModel,
+  CanvasPositionMode,
   CanvasProjectDocument,
+  CanvasSpacing,
 } from '../../../core/models/canvas.models';
 import {
+  AlignItems,
   BorderStyle,
+  FlexDirection,
   IRBorder,
   IRLayout,
   IRLength,
   IRMeta,
   IRNode,
   IRPosition,
+  IRSpacing,
   IRStyle,
+  JustifyContent,
   LayoutMode,
   PositionMode,
   px,
@@ -229,7 +239,7 @@ function mapCanvasElementToIR(element: CanvasElement): IRNode {
     id: element.id,
     type: primitiveType,
     props: buildNodeProps(element, primitiveType),
-    layout: buildNodeLayout(),
+    layout: buildNodeLayout(element),
     style: buildNodeStyle(element),
     position: buildNodePosition(element),
     meta: buildNodeMeta(element),
@@ -238,18 +248,39 @@ function mapCanvasElementToIR(element: CanvasElement): IRNode {
   };
 }
 
-function buildNodeLayout(): IRLayout {
-  return {
-    mode: 'Flex' satisfies LayoutMode,
-  };
+function buildNodeLayout(element: CanvasElement): IRLayout | undefined {
+  if (!element.display) return undefined;
+  const mode = mapDisplayMode(element.display);
+  const layout: IRLayout = { mode };
+  if (element.display === 'flex') {
+    if (element.flexDirection) layout.direction = mapFlexDirection(element.flexDirection);
+    if (element.flexWrap !== undefined) layout.wrap = element.flexWrap === 'wrap';
+    if (element.justifyContent) layout.justify = mapJustifyContent(element.justifyContent);
+    if (element.alignItems) layout.align = mapAlignItems(element.alignItems);
+    if (typeof element.gap === 'number') layout.gap = px(element.gap);
+  }
+  if (element.display === 'grid') {
+    if (element.gridTemplateColumns) layout.gridTemplateColumns = element.gridTemplateColumns;
+    if (element.gridTemplateRows) layout.gridTemplateRows = element.gridTemplateRows;
+    if (typeof element.gap === 'number') layout.gap = px(element.gap);
+  }
+  return layout;
 }
 
 function buildNodePosition(element: CanvasElement): IRPosition {
-  return {
-    mode: 'Absolute' satisfies PositionMode,
-    x: px(element.x),
-    y: px(element.y),
-  };
+  if (!element.position) {
+    return { mode: 'Absolute', x: px(element.x), y: px(element.y) };
+  }
+  const mode = mapPositionMode(element.position);
+  const pos: IRPosition = { mode };
+  if (element.position === 'absolute' || element.position === 'fixed') {
+    pos.x = px(element.x);
+    pos.y = px(element.y);
+  }
+  if (element.position === 'sticky') {
+    pos.y = px(element.y);
+  }
+  return pos;
 }
 
 function buildNodeMeta(element: CanvasElement): IRMeta {
@@ -327,6 +358,9 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     }
   }
 
+  if (element.padding) style.padding = buildIRSpacing(element.padding);
+  if (element.margin) style.margin = buildIRSpacing(element.margin);
+
   return style;
 }
 
@@ -375,6 +409,58 @@ function mapElementType(type: CanvasElement['type']): string {
       return 'Image';
     default:
       return 'Frame';
+  }
+}
+
+function buildIRSpacing(s: CanvasSpacing): IRSpacing {
+  return { top: px(s.top), right: px(s.right), bottom: px(s.bottom), left: px(s.left) };
+}
+
+function mapDisplayMode(display: CanvasDisplayMode): LayoutMode {
+  switch (display) {
+    case 'block': return 'Block';
+    case 'flex': return 'Flex';
+    case 'grid': return 'Grid';
+  }
+}
+
+function mapFlexDirection(dir: CanvasFlexDirection): FlexDirection {
+  switch (dir) {
+    case 'row': return 'Row';
+    case 'column': return 'Column';
+    case 'row-reverse': return 'RowReverse';
+    case 'column-reverse': return 'ColumnReverse';
+  }
+}
+
+function mapJustifyContent(jc: CanvasJustifyContent): JustifyContent {
+  switch (jc) {
+    case 'flex-start': return 'Start';
+    case 'flex-end': return 'End';
+    case 'center': return 'Center';
+    case 'space-between': return 'SpaceBetween';
+    case 'space-around': return 'SpaceAround';
+    case 'space-evenly': return 'SpaceEvenly';
+  }
+}
+
+function mapAlignItems(ai: CanvasAlignItems): AlignItems {
+  switch (ai) {
+    case 'flex-start': return 'Start';
+    case 'flex-end': return 'End';
+    case 'center': return 'Center';
+    case 'stretch': return 'Stretch';
+    case 'baseline': return 'Baseline';
+  }
+}
+
+function mapPositionMode(pos: CanvasPositionMode): PositionMode {
+  switch (pos) {
+    case 'static': return 'Flow';
+    case 'relative': return 'Relative';
+    case 'absolute': return 'Absolute';
+    case 'fixed': return 'Fixed';
+    case 'sticky': return 'Sticky';
   }
 }
 

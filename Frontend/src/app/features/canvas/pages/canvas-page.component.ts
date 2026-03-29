@@ -1,7 +1,11 @@
 import {
+  AfterViewChecked,
   Component,
+  ElementRef,
   HostListener,
+  NgZone,
   OnDestroy,
+  ViewChild,
   computed,
   effect,
   inject,
@@ -89,6 +93,7 @@ const PAGE_SHELL_HEADER_TO_FRAME_TITLE_GAP = 52;
 const PAGE_FRAME_TITLE_OFFSET = 24;
 const PAGE_SHELL_HEADER_HORIZONTAL_INSET = 8;
 const FRAME_TITLE_MIN_ZOOM = 0.62;
+const ELEMENT_DRAG_START_THRESHOLD = 3;
 
 @Component({
   selector: 'app-canvas-page',
@@ -115,11 +120,12 @@ const FRAME_TITLE_MIN_ZOOM = 0.62;
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
 })
-export class ProjectPage implements OnDestroy {
+export class ProjectPage implements OnDestroy, AfterViewChecked {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly converterService = inject(ConverterService);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
+  private readonly zone = inject(NgZone);
 
   readonly viewport = inject(CanvasViewportService);
   private readonly history = inject(CanvasHistoryService);
@@ -129,6 +135,11 @@ export class ProjectPage implements OnDestroy {
   readonly contextMenu = inject(CanvasContextMenuService);
   readonly editorState = inject(CanvasEditorStateService);
   private isPropertyNumberGestureActive = false;
+
+  @ViewChild('canvasScene', { static: false }) canvasSceneRef?: ElementRef<HTMLElement>;
+  private flowBoundsCache = new Map<string, Bounds>();
+  private flowBoundsDirty = true;
+  private readonly flowCacheVersion = signal(0);
 
   // ── Core State ────────────────────────────────────────────
 
@@ -180,6 +191,12 @@ export class ProjectPage implements OnDestroy {
       this.el.isElementEffectivelyVisible(element.id, this.elements()),
     ),
   );
+
+  /** Elements rendered at the top level (flat). Excludes children of layout containers. */
+  readonly topLevelVisibleElements = computed<CanvasElement[]>(() => {
+    const all = this.visibleElements();
+    return all.filter((el) => !this.hasLayoutAncestor(el, all));
+  });
 
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
   readonly editingCanvasHeaderPageName = signal('');
@@ -273,6 +290,9 @@ export class ProjectPage implements OnDestroy {
   readonly hoveredFrameTitleId = signal<string | null>(null);
   readonly snapLines = signal<SnapLine[]>([]);
   readonly isFrameReorderAnimating = signal(false);
+  readonly draggingFlowChildId = signal<string | null>(null);
+  readonly layoutDropTarget = signal<{ containerId: string; index: number } | null>(null);
+  private hasMovedElementDuringDrag = false;
   private isResizing = false;
   private isRotating = false;
   private isAdjustingCornerRadius = false;
@@ -332,6 +352,24 @@ export class ProjectPage implements OnDestroy {
 
       this.scheduleDesignSave();
     });
+
+    // Invalidate flow bounds cache whenever elements change so the selection
+    // overlay stays accurate for flow children (flex/grid layout containers).
+    effect(() => {
+      this.elements();
+      this.flowBoundsCache = new Map();
+      this.flowBoundsDirty = true;
+    });
+  }
+
+  ngAfterViewChecked(): void {
+    if (this.flowBoundsDirty) {
+      this.flowBoundsDirty = false;
+      this.zone.runOutsideAngular(() => this.updateFlowBoundsCache());
+      // Defer the version bump to the next microtask so the template re-evaluates
+      // after the DOM measurements are done, without writing a signal mid-check.
+      Promise.resolve().then(() => this.flowCacheVersion.update((v) => v + 1));
+    }
   }
 
   ngOnDestroy(): void {
@@ -943,6 +981,28 @@ export class ProjectPage implements OnDestroy {
     );
   }
 
+  getTopLevelVisibleElementsForPage(pageId: string): CanvasElement[] {
+    const all = this.getVisibleElementsForPage(pageId);
+    return all.filter((el) => !this.hasLayoutAncestor(el, all));
+  }
+
+  getLayoutChildrenForPage(element: CanvasElement, pageId: string): CanvasElement[] {
+    return this.getVisibleElementsForPage(pageId).filter((el) => el.parentId === element.id);
+  }
+
+  getPreviewNestedX(element: CanvasElement): number | null {
+    return this.isChildInFlow(element) ? null : element.x;
+  }
+
+  getPreviewNestedY(element: CanvasElement): number | null {
+    return this.isChildInFlow(element) ? null : element.y;
+  }
+
+  getPreviewNestedPositionStyle(element: CanvasElement): string | null {
+    if (this.isChildInFlow(element)) return null;
+    return element.position ?? 'absolute';
+  }
+
   getPageShellLeft(pageId: string): number {
     const layout = this.getPageLayoutById(pageId);
     if (!layout) {
@@ -1223,6 +1283,7 @@ export class ProjectPage implements OnDestroy {
       event.preventDefault();
       event.stopPropagation();
       this.layersFocusedPageId.set(this.currentPageId());
+      this.selectedElementId.set(null);
       return;
     }
 
@@ -1259,8 +1320,26 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const bounds = this.el.getAbsoluteBounds(element, this.elements());
+    let bounds = this.el.getAbsoluteBounds(element, this.elements());
+
+    // Detect flow child inside layout container — use visual position from cache
+    const parent = this.el.findElementById(element.parentId ?? null, this.elements());
+    if (parent && this.isLayoutContainer(parent) && this.isChildInFlow(element)) {
+      this.draggingFlowChildId.set(element.id);
+      const cached = this.flowBoundsCache.get(element.id);
+      const layout = this.activePageLayout();
+      if (cached) {
+        bounds = {
+          x: cached.x - (layout?.x ?? 0),
+          y: cached.y - (layout?.y ?? 0),
+          width: cached.width,
+          height: cached.height,
+        };
+      }
+    }
+
     this.beginGestureHistory();
+    this.hasMovedElementDuringDrag = false;
     this.isDragging = true;
     this.dragOffset = {
       x: pointer.x - bounds.x,
@@ -1302,6 +1381,7 @@ export class ProjectPage implements OnDestroy {
 
     const bounds = this.el.getAbsoluteBounds(element, this.elements());
     this.beginGestureHistory();
+    this.hasMovedElementDuringDrag = false;
     this.isDragging = true;
     this.dragOffset = { x: pointer.x - bounds.x, y: pointer.y - bounds.y };
     this.dragStartAbsolute = { x: bounds.x, y: bounds.y };
@@ -1496,7 +1576,7 @@ export class ProjectPage implements OnDestroy {
       return;
     }
 
-    const bounds = this.el.getAbsoluteBounds(element, this.elements());
+    const bounds = this.getLiveElementCanvasBounds(element) ?? this.el.getAbsoluteBounds(element, this.elements());
     this.selectedElementId.set(id);
     this.beginGestureHistory();
     this.isDragging = false;
@@ -1506,8 +1586,8 @@ export class ProjectPage implements OnDestroy {
     this.cornerRadiusStart = {
       absoluteX: bounds.x,
       absoluteY: bounds.y,
-      width: element.width,
-      height: element.height,
+      width: bounds.width,
+      height: bounds.height,
       elementId: id,
     };
   }
@@ -1631,7 +1711,7 @@ export class ProjectPage implements OnDestroy {
   onLayerMoved(change: {
     pageId: string;
     draggedId: string;
-    targetId: string;
+    targetId: string | null;
     position: 'before' | 'after' | 'inside';
   }): void {
     this.runWithHistory(() => {
@@ -1788,6 +1868,17 @@ export class ProjectPage implements OnDestroy {
 
     let absoluteX = pointer.x - this.dragOffset.x;
     let absoluteY = pointer.y - this.dragOffset.y;
+    const dragDistance = Math.hypot(
+      absoluteX - this.dragStartAbsolute.x,
+      absoluteY - this.dragStartAbsolute.y,
+    );
+
+    if (!this.hasMovedElementDuringDrag) {
+      if (dragDistance < ELEMENT_DRAG_START_THRESHOLD) {
+        return;
+      }
+      this.hasMovedElementDuringDrag = true;
+    }
 
     if (event.shiftKey) {
       const dx = Math.abs(absoluteX - this.dragStartAbsolute.x);
@@ -1797,6 +1888,12 @@ export class ProjectPage implements OnDestroy {
       } else {
         absoluteX = this.dragStartAbsolute.x;
       }
+    }
+
+    // ── Flow child drag (reorder within layout container) ──
+    if (this.draggingFlowChildId()) {
+      this.handleFlowChildDragMove(dragged, absoluteX, absoluteY, elements);
+      return;
     }
 
     const { xCandidates, yCandidates } = buildSnapCandidates(selectedId, elements, (el, els) =>
@@ -1909,8 +2006,13 @@ export class ProjectPage implements OnDestroy {
       this.isAdjustingCornerRadius ||
       this.isDraggingPage;
 
-    if (this.isDragging) {
-      this.autoGroupOnDrop();
+    if (this.isDragging && this.hasMovedElementDuringDrag) {
+      // ── Flow child drop (reorder or detach) ──
+      if (this.draggingFlowChildId()) {
+        this.commitFlowChildDrop();
+      } else {
+        this.autoGroupOnDrop();
+      }
       if (selectedOnDrop?.type === 'frame' && !selectedOnDrop.parentId) {
         this.alignRootFramesOnDrop();
       }
@@ -1921,7 +2023,7 @@ export class ProjectPage implements OnDestroy {
       }
     }
 
-    if ((this.isDragging || this.isResizing) && selectedOnDrop) {
+    if ((this.isResizing || (this.isDragging && this.hasMovedElementDuringDrag)) && selectedOnDrop) {
       this.updateCurrentPageElements((elements) => {
         const freshEl = elements.find((e) => e.id === selectedOnDrop.id) ?? null;
         if (freshEl?.primarySyncId) {
@@ -1950,8 +2052,11 @@ export class ProjectPage implements OnDestroy {
     this.isRotating = false;
     this.isAdjustingCornerRadius = false;
     this.isDraggingPage = false;
+    this.hasMovedElementDuringDrag = false;
     this.hasMovedPageDuringDrag = false;
     this.snapLines.set([]);
+    this.draggingFlowChildId.set(null);
+    this.layoutDropTarget.set(null);
 
     if (shouldCommitGestureHistory) {
       this.history.commitGestureHistory(() => this.createHistorySnapshot());
@@ -2035,11 +2140,17 @@ export class ProjectPage implements OnDestroy {
   }
 
   getRenderedX(element: CanvasElement): number {
+    void this.flowCacheVersion(); // track for overlay reactivity
+    const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
+    if (cached) return cached.x;
     const layout = this.activePageLayout();
     return this.el.getAbsoluteBounds(element, this.elements()).x + (layout?.x ?? 0);
   }
 
   getRenderedY(element: CanvasElement): number {
+    void this.flowCacheVersion(); // track for overlay reactivity
+    const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
+    if (cached) return cached.y;
     const layout = this.activePageLayout();
     return this.el.getAbsoluteBounds(element, this.elements()).y + (layout?.y ?? 0);
   }
@@ -2050,6 +2161,396 @@ export class ProjectPage implements OnDestroy {
 
   isRootFrame(element: CanvasElement): boolean {
     return element.type === 'frame' && !element.parentId;
+  }
+
+  // ── Layout helpers ────────────────────────────────────────
+
+  isLayoutContainer(element: CanvasElement): boolean {
+    return !!element.display && (element.type === 'frame' || element.type === 'rectangle');
+  }
+
+  /** True if this is a flow child (parent has layout, element not absolute/fixed). */
+  isChildInFlow(element: CanvasElement): boolean {
+    const pos = element.position;
+    return !pos || pos === 'static' || pos === 'relative' || pos === 'sticky';
+  }
+
+  /** True if this element or any ancestor is a child of a layout container. */
+  private hasLayoutAncestor(element: CanvasElement, elements: CanvasElement[]): boolean {
+    if (!element.parentId) return false;
+    const parent = this.el.findElementById(element.parentId, elements);
+    if (!parent) return false;
+    if (this.isLayoutContainer(parent)) return true;
+    return this.hasLayoutAncestor(parent, elements);
+  }
+
+  /** Direct children of a layout container, visible only. */
+  getLayoutChildren(element: CanvasElement): CanvasElement[] {
+    return this.visibleElements().filter((el) => el.parentId === element.id);
+  }
+
+  /** X position for a nested child: no left for flow children, relative x for absolute. */
+  getNestedX(element: CanvasElement): number | null {
+    if (this.isFlowChildDragging(element)) return element.x;
+    return this.isChildInFlow(element) ? null : element.x;
+  }
+
+  getNestedY(element: CanvasElement): number | null {
+    if (this.isFlowChildDragging(element)) return element.y;
+    return this.isChildInFlow(element) ? null : element.y;
+  }
+
+  getElementLayoutDisplay(element: CanvasElement): string | null {
+    if (!element.display) return null;
+    return element.display;
+  }
+
+  getElementLayoutFlexDirection(element: CanvasElement): string | null {
+    if (element.display !== 'flex') return null;
+    return element.flexDirection ?? null;
+  }
+
+  getElementLayoutFlexWrap(element: CanvasElement): string | null {
+    if (element.display !== 'flex') return null;
+    return element.flexWrap ?? null;
+  }
+
+  getElementLayoutJustifyContent(element: CanvasElement): string | null {
+    if (element.display !== 'flex') return null;
+    return element.justifyContent ?? null;
+  }
+
+  getElementLayoutAlignItems(element: CanvasElement): string | null {
+    if (element.display !== 'flex') return null;
+    return element.alignItems ?? null;
+  }
+
+  getElementLayoutGap(element: CanvasElement): string | null {
+    if (!element.display || element.display === 'block') return null;
+    return typeof element.gap === 'number' ? `${element.gap}px` : null;
+  }
+
+  getElementLayoutGridTemplateColumns(element: CanvasElement): string | null {
+    if (element.display !== 'grid') return null;
+    return element.gridTemplateColumns ?? null;
+  }
+
+  getElementLayoutGridTemplateRows(element: CanvasElement): string | null {
+    if (element.display !== 'grid') return null;
+    return element.gridTemplateRows ?? null;
+  }
+
+  getElementLayoutPadding(element: CanvasElement): string | null {
+    if (!element.padding) return null;
+    const p = element.padding;
+    return `${p.top}px ${p.right}px ${p.bottom}px ${p.left}px`;
+  }
+
+  getNestedPositionStyle(element: CanvasElement): string | null {
+    if (this.isFlowChildDragging(element)) return 'absolute';
+    if (this.isChildInFlow(element)) return null;
+    return element.position ?? 'absolute';
+  }
+
+  isFlowChildDragging(element: CanvasElement): boolean {
+    return this.draggingFlowChildId() === element.id && this.hasMovedElementDuringDrag;
+  }
+
+  markFlowBoundsDirty(): void {
+    this.flowBoundsDirty = true;
+  }
+
+  private updateFlowBoundsCache(): void {
+    const sceneEl = this.canvasSceneRef?.nativeElement;
+    if (!sceneEl) return;
+    const zoom = this.viewport.zoomLevel();
+    const sceneRect = sceneEl.getBoundingClientRect();
+    const flowEls = sceneEl.querySelectorAll<HTMLElement>('[data-flow-child="true"]');
+    const newCache = new Map<string, Bounds>();
+    for (const domEl of flowEls) {
+      const id = domEl.getAttribute('data-element-id');
+      if (!id) continue;
+      const rect = domEl.getBoundingClientRect();
+      newCache.set(id, {
+        x: roundToTwoDecimals((rect.left - sceneRect.left) / zoom),
+        y: roundToTwoDecimals((rect.top - sceneRect.top) / zoom),
+        width: roundToTwoDecimals(rect.width / zoom),
+        height: roundToTwoDecimals(rect.height / zoom),
+      });
+    }
+    this.flowBoundsCache = newCache;
+  }
+
+  // ── Flow child drag helpers ───────────────────────────────
+
+  private handleFlowChildDragMove(
+    dragged: CanvasElement,
+    absoluteX: number,
+    absoluteY: number,
+    elements: CanvasElement[],
+  ): void {
+    const parent = this.el.findElementById(dragged.parentId ?? null, elements);
+    if (!parent) return;
+
+    const parentBounds = this.el.getAbsoluteBounds(parent, elements);
+    const relX = absoluteX - parentBounds.x;
+    const relY = absoluteY - parentBounds.y;
+
+    // Check if element center is still inside the parent container
+    const centerX = absoluteX + dragged.width / 2;
+    const centerY = absoluteY + dragged.height / 2;
+    const insideParent =
+      centerX >= parentBounds.x &&
+      centerX <= parentBounds.x + parentBounds.width &&
+      centerY >= parentBounds.y &&
+      centerY <= parentBounds.y + parentBounds.height;
+
+    if (insideParent) {
+      const dropIndex = this.computeLayoutDropIndex(parent, absoluteX, absoluteY, elements);
+      this.layoutDropTarget.set({ containerId: parent.id, index: dropIndex });
+    } else {
+      this.layoutDropTarget.set(null);
+    }
+
+    // Update element x/y for visual tracking (position: absolute override)
+    this.updateCurrentPageElements((els) =>
+      els.map((el) =>
+        el.id === dragged.id
+          ? { ...el, x: roundToTwoDecimals(relX), y: roundToTwoDecimals(relY) }
+          : el,
+      ),
+    );
+    this.snapLines.set([]);
+  }
+
+  private computeLayoutDropIndex(
+    container: CanvasElement,
+    absoluteX: number,
+    absoluteY: number,
+    elements: CanvasElement[],
+  ): number {
+    const isRow =
+      container.display === 'flex' &&
+      (!container.flexDirection ||
+        container.flexDirection === 'row' ||
+        container.flexDirection === 'row-reverse');
+
+    const draggedId = this.draggingFlowChildId();
+    const siblings = elements.filter(
+      (el) => el.parentId === container.id && el.id !== draggedId && this.isChildInFlow(el),
+    );
+
+    const layout = this.activePageLayout();
+    const offsetX = layout?.x ?? 0;
+    const offsetY = layout?.y ?? 0;
+
+    for (let i = 0; i < siblings.length; i++) {
+      const cached = this.flowBoundsCache.get(siblings[i].id);
+      if (!cached) continue;
+      const sibAbsX = cached.x - offsetX;
+      const sibAbsY = cached.y - offsetY;
+
+      if (isRow) {
+        if (absoluteX < sibAbsX + cached.width / 2) return i;
+      } else {
+        if (absoluteY < sibAbsY + cached.height / 2) return i;
+      }
+    }
+
+    return siblings.length;
+  }
+
+  private commitFlowChildDrop(): void {
+    const draggedId = this.draggingFlowChildId();
+    if (!draggedId) return;
+
+    const target = this.layoutDropTarget();
+    if (target) {
+      this.commitFlowChildReorder(draggedId, target.containerId, target.index);
+    } else {
+      const dragged = this.el.findElementById(draggedId, this.elements());
+      const parent = dragged
+        ? this.el.findElementById(dragged.parentId ?? null, this.elements())
+        : null;
+
+      if (parent?.type === 'frame') {
+        this.detachFlowChild(draggedId);
+      } else {
+        this.restoreFlowChildToContainer(draggedId);
+      }
+    }
+  }
+
+  private commitFlowChildReorder(
+    draggedId: string,
+    containerId: string,
+    dropIndex: number,
+  ): void {
+    this.updateCurrentPageElements((elements) => {
+      const dragged = elements.find((el) => el.id === draggedId);
+      if (!dragged) return elements;
+
+      const flowSiblings = elements.filter(
+        (el) => el.parentId === containerId && el.id !== draggedId && this.isChildInFlow(el),
+      );
+
+      const rest = elements.filter((el) => el.id !== draggedId);
+      const updatedDragged = { ...dragged, x: 0, y: 0 };
+
+      const insertBeforeId = dropIndex < flowSiblings.length ? flowSiblings[dropIndex].id : null;
+
+      if (insertBeforeId) {
+        const idx = rest.findIndex((el) => el.id === insertBeforeId);
+        return [...rest.slice(0, idx), updatedDragged, ...rest.slice(idx)];
+      }
+
+      // Append after the last child of this container
+      let lastChildIdx = -1;
+      for (let i = rest.length - 1; i >= 0; i--) {
+        if (rest[i].parentId === containerId) {
+          lastChildIdx = i;
+          break;
+        }
+      }
+      if (lastChildIdx === -1) {
+        const containerIdx = rest.findIndex((el) => el.id === containerId);
+        return [
+          ...rest.slice(0, containerIdx + 1),
+          updatedDragged,
+          ...rest.slice(containerIdx + 1),
+        ];
+      }
+      return [
+        ...rest.slice(0, lastChildIdx + 1),
+        updatedDragged,
+        ...rest.slice(lastChildIdx + 1),
+      ];
+    });
+  }
+
+  private detachFlowChild(draggedId: string): void {
+    this.updateCurrentPageElements((elements) => {
+      const dragged = elements.find((el) => el.id === draggedId);
+      if (!dragged) return elements;
+
+      const absBounds = this.el.getAbsoluteBounds(dragged, elements);
+      return elements.map((el) =>
+        el.id === draggedId
+          ? {
+              ...el,
+              parentId: null,
+              x: roundToTwoDecimals(absBounds.x),
+              y: roundToTwoDecimals(absBounds.y),
+              position: undefined,
+            }
+          : el,
+      );
+    });
+  }
+
+  private restoreFlowChildToContainer(draggedId: string): void {
+    this.updateCurrentPageElements((elements) =>
+      elements.map((el) =>
+        el.id === draggedId
+          ? {
+              ...el,
+              x: 0,
+              y: 0,
+            }
+          : el,
+      ),
+    );
+  }
+
+  // ── Drop indicator helpers ────────────────────────────────
+
+  getDropIndicatorLeft(): number | null {
+    return this.getDropIndicatorBounds()?.x ?? null;
+  }
+
+  getDropIndicatorTop(): number | null {
+    return this.getDropIndicatorBounds()?.y ?? null;
+  }
+
+  getDropIndicatorWidth(): number | null {
+    return this.getDropIndicatorBounds()?.width ?? null;
+  }
+
+  getDropIndicatorHeight(): number | null {
+    return this.getDropIndicatorBounds()?.height ?? null;
+  }
+
+  private getDropIndicatorBounds(): Bounds | null {
+    const target = this.layoutDropTarget();
+    if (!target) return null;
+
+    const elements = this.elements();
+    const container = this.el.findElementById(target.containerId, elements);
+    if (!container) return null;
+
+    const containerBounds = this.el.getAbsoluteBounds(container, elements);
+    const layout = this.activePageLayout();
+    const offsetX = layout?.x ?? 0;
+    const offsetY = layout?.y ?? 0;
+
+    const isRow =
+      container.display === 'flex' &&
+      (!container.flexDirection ||
+        container.flexDirection === 'row' ||
+        container.flexDirection === 'row-reverse');
+
+    const draggedId = this.draggingFlowChildId();
+    const siblings = elements.filter(
+      (el) => el.parentId === target.containerId && el.id !== draggedId && this.isChildInFlow(el),
+    );
+
+    if (isRow) {
+      let indicatorX: number;
+      if (siblings.length === 0) {
+        indicatorX = containerBounds.x + (container.padding?.left ?? 0) + offsetX;
+      } else if (target.index >= siblings.length) {
+        const last = siblings[siblings.length - 1];
+        const cached = this.flowBoundsCache.get(last.id);
+        indicatorX = cached
+          ? cached.x + cached.width
+          : containerBounds.x + containerBounds.width - (container.padding?.right ?? 0) + offsetX;
+      } else {
+        const sib = siblings[target.index];
+        const cached = this.flowBoundsCache.get(sib.id);
+        indicatorX = cached
+          ? cached.x
+          : containerBounds.x + (container.padding?.left ?? 0) + offsetX;
+      }
+      return {
+        x: indicatorX,
+        y: containerBounds.y + offsetY,
+        width: 2,
+        height: containerBounds.height,
+      };
+    } else {
+      let indicatorY: number;
+      if (siblings.length === 0) {
+        indicatorY = containerBounds.y + (container.padding?.top ?? 0) + offsetY;
+      } else if (target.index >= siblings.length) {
+        const last = siblings[siblings.length - 1];
+        const cached = this.flowBoundsCache.get(last.id);
+        indicatorY = cached
+          ? cached.y + cached.height
+          : containerBounds.y + containerBounds.height - (container.padding?.bottom ?? 0) + offsetY;
+      } else {
+        const sib = siblings[target.index];
+        const cached = this.flowBoundsCache.get(sib.id);
+        indicatorY = cached
+          ? cached.y
+          : containerBounds.y + (container.padding?.top ?? 0) + offsetY;
+      }
+      return {
+        x: containerBounds.x + offsetX,
+        y: indicatorY,
+        width: containerBounds.width,
+        height: 2,
+      };
+    }
   }
 
   getFrameTitleFontSize(): number {
@@ -2097,19 +2598,87 @@ export class ProjectPage implements OnDestroy {
   // With global box-sizing: border-box, the 2px border is drawn INSIDE the div's width/height.
   // To place ring fully OUTSIDE the element: left/top -= 2, width/height += 4 (2px each side).
   getSelectionLeft(el: CanvasElement): number {
-    return roundToTwoDecimals(this.getRenderedX(el) * this.viewport.zoomLevel() - 2);
+    const bounds = this.getLiveOverlaySceneBounds(el) ?? this.getCachedOverlaySceneBounds(el);
+    return roundToTwoDecimals(bounds.x * this.viewport.zoomLevel() - 2);
   }
 
   getSelectionTop(el: CanvasElement): number {
-    return roundToTwoDecimals(this.getRenderedY(el) * this.viewport.zoomLevel() - 2);
+    const bounds = this.getLiveOverlaySceneBounds(el) ?? this.getCachedOverlaySceneBounds(el);
+    return roundToTwoDecimals(bounds.y * this.viewport.zoomLevel() - 2);
   }
 
   getSelectionWidth(el: CanvasElement): number {
-    return roundToTwoDecimals(el.width * this.viewport.zoomLevel() + 4);
+    const bounds = this.getLiveOverlaySceneBounds(el) ?? this.getCachedOverlaySceneBounds(el);
+    return roundToTwoDecimals(bounds.width * this.viewport.zoomLevel() + 4);
   }
 
   getSelectionHeight(el: CanvasElement): number {
-    return roundToTwoDecimals(el.height * this.viewport.zoomLevel() + 4);
+    const bounds = this.getLiveOverlaySceneBounds(el) ?? this.getCachedOverlaySceneBounds(el);
+    return roundToTwoDecimals(bounds.height * this.viewport.zoomLevel() + 4);
+  }
+
+  private getLiveOverlaySceneBounds(element: CanvasElement): Bounds | null {
+    void this.flowCacheVersion(); // track for overlay reactivity
+
+    const sceneEl = this.canvasSceneRef?.nativeElement;
+    if (!sceneEl) {
+      return null;
+    }
+
+    const domEl = sceneEl.querySelector<HTMLElement>(`[data-element-id="${element.id}"]`);
+    if (!domEl) {
+      return null;
+    }
+
+    let left = domEl.offsetLeft;
+    let top = domEl.offsetTop;
+    let current = domEl.offsetParent as HTMLElement | null;
+
+    while (current && current !== sceneEl) {
+      left += current.offsetLeft;
+      top += current.offsetTop;
+      current = current.offsetParent as HTMLElement | null;
+    }
+
+    return {
+      x: roundToTwoDecimals(left),
+      y: roundToTwoDecimals(top),
+      width: roundToTwoDecimals(domEl.offsetWidth),
+      height: roundToTwoDecimals(domEl.offsetHeight),
+    };
+  }
+
+  private getCachedOverlaySceneBounds(element: CanvasElement): Bounds {
+    void this.flowCacheVersion(); // track for overlay reactivity
+
+    const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
+    if (cached) {
+      return cached;
+    }
+
+    const layout = this.activePageLayout();
+    const absolute = this.el.getAbsoluteBounds(element, this.elements());
+    return {
+      x: roundToTwoDecimals(absolute.x + (layout?.x ?? 0)),
+      y: roundToTwoDecimals(absolute.y + (layout?.y ?? 0)),
+      width: roundToTwoDecimals(element.width),
+      height: roundToTwoDecimals(element.height),
+    };
+  }
+
+  private getLiveElementCanvasBounds(element: CanvasElement): Bounds | null {
+    const sceneBounds = this.getLiveOverlaySceneBounds(element);
+    if (!sceneBounds) {
+      return null;
+    }
+
+    const layout = this.activePageLayout();
+    return {
+      x: roundToTwoDecimals(sceneBounds.x - (layout?.x ?? 0)),
+      y: roundToTwoDecimals(sceneBounds.y - (layout?.y ?? 0)),
+      width: sceneBounds.width,
+      height: sceneBounds.height,
+    };
   }
 
   getOverlayCornerRadiusInset(el: CanvasElement): number {
@@ -2119,12 +2688,18 @@ export class ProjectPage implements OnDestroy {
         ? 6
         : 0;
     const zoom = this.viewport.zoomLevel();
+    const liveBounds = this.getLiveOverlaySceneBounds(el);
+    const renderedWidth = liveBounds?.width ?? el.width;
+    const renderedHeight = liveBounds?.height ?? el.height;
     const handleRadius = 6; // half of 12px handle size
     // Compute screen-space inset directly: handle center should be at (radius * zoom) px
     // from the element corner in screen space, so CSS top/right = radius*zoom - handleRadius.
     // minScreenInset keeps the handle visibly inside the corner even at radius=0.
     const minScreenInset = 8;
-    const maxScreenInset = Math.max(0, (Math.min(el.width, el.height) * zoom) / 2 - handleRadius);
+    const maxScreenInset = Math.max(
+      0,
+      (Math.min(renderedWidth, renderedHeight) * zoom) / 2 - handleRadius,
+    );
     return roundToTwoDecimals(clamp(radius * zoom - handleRadius, minScreenInset, maxScreenInset));
   }
 
@@ -3000,18 +3575,58 @@ export class ProjectPage implements OnDestroy {
   }
 
   /** Returns the id of the topmost non-frame element whose bounds contain (x, y)
-   *  in canvas (world) coordinates, or null if none. */
+   *  in active-page coordinates, preferring deeper nested children over parents. */
   private getTopElementIdAtPoint(x: number, y: number): string | null {
     const elements = this.visibleElements();
+    let bestId: string | null = null;
+    let bestDepth = -1;
+
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
       if (el.type === 'frame') continue;
-      const b = this.el.getAbsoluteBounds(el, this.elements());
+      const b = this.getElementHitTestBounds(el);
       if (x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height) {
-        return el.id;
+        const depth = this.getElementNestingDepth(el, elements);
+        if (depth > bestDepth) {
+          bestId = el.id;
+          bestDepth = depth;
+        }
       }
     }
-    return null;
+
+    return bestId;
+  }
+
+  private getElementHitTestBounds(element: CanvasElement): Bounds {
+    const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
+    if (cached) {
+      const layout = this.activePageLayout();
+      return {
+        x: roundToTwoDecimals(cached.x - (layout?.x ?? 0)),
+        y: roundToTwoDecimals(cached.y - (layout?.y ?? 0)),
+        width: cached.width,
+        height: cached.height,
+      };
+    }
+
+    return this.el.getAbsoluteBounds(element, this.elements());
+  }
+
+  private getElementNestingDepth(element: CanvasElement, elements: CanvasElement[]): number {
+    let depth = 0;
+    let currentParentId = element.parentId ?? null;
+
+    while (currentParentId) {
+      const parent = this.el.findElementById(currentParentId, elements);
+      if (!parent) {
+        break;
+      }
+
+      depth += 1;
+      currentParentId = parent.parentId ?? null;
+    }
+
+    return depth;
   }
 
   private commitCanvasHeaderPageRename(pageId: string): void {
@@ -3070,36 +3685,38 @@ export class ProjectPage implements OnDestroy {
     const centerX = elementBounds.x + elementBounds.width / 2;
     const centerY = elementBounds.y + elementBounds.height / 2;
 
-    // Find all frames whose bounds contain the element's center and that are
-    // strictly larger than the element in both dimensions.
-    const candidateFrames = elements.filter((el) => {
-      if (el.type !== 'frame') return false;
+    // Find all containers (frames or layout rectangles) whose bounds contain
+    // the element's center and that are strictly larger in both dimensions.
+    const candidateContainers = elements.filter((el) => {
+      if (el.id === id) return false;
+      if (el.type !== 'frame' && !this.isLayoutContainer(el)) return false;
       const fb = this.el.getAbsoluteBounds(el, elements);
       const centerInside =
         centerX >= fb.x &&
         centerX <= fb.x + fb.width &&
         centerY >= fb.y &&
         centerY <= fb.y + fb.height;
-      const frameLarger = el.width > element.width && el.height > element.height;
-      return centerInside && frameLarger;
+      const containerLarger = el.width > element.width && el.height > element.height;
+      return centerInside && containerLarger;
     });
 
-    if (candidateFrames.length === 0) return;
+    if (candidateContainers.length === 0) return;
 
-    // Pick the smallest qualifying frame (the most specific container).
-    const targetFrame = candidateFrames.reduce((best, current) =>
+    // Pick the smallest qualifying container (the most specific).
+    const target = candidateContainers.reduce((best, current) =>
       current.width * current.height < best.width * best.height ? current : best,
     );
 
-    const fb = this.el.getAbsoluteBounds(targetFrame, elements);
+    const fb = this.el.getAbsoluteBounds(target, elements);
+    const isTargetLayout = this.isLayoutContainer(target);
     this.updateCurrentPageElements((els) =>
       els.map((el) =>
         el.id === id
           ? {
               ...el,
-              parentId: targetFrame.id,
-              x: clamp(elementBounds.x - fb.x, 0, targetFrame.width - element.width),
-              y: clamp(elementBounds.y - fb.y, 0, targetFrame.height - element.height),
+              parentId: target.id,
+              x: isTargetLayout ? 0 : clamp(elementBounds.x - fb.x, 0, target.width - element.width),
+              y: isTargetLayout ? 0 : clamp(elementBounds.y - fb.y, 0, target.height - element.height),
             }
           : el,
       ),

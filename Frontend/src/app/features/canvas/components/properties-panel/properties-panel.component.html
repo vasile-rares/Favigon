@@ -47,6 +47,23 @@
     <!-- -- Element properties --------------------------- -->
     <ng-container *ngIf="selectedElement as element">
 
+      <!-- -- Position -- -->
+      <section class="properties-section" *ngIf="supportsPosition(element.type)">
+        <p class="properties-section-title">Position</p>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Type</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <app-dropdown-select
+              [enableSearch]="false"
+              [placeholder]="'Select position type'"
+              [options]="positionOptions"
+              [ngModel]="positionValue(element)"
+              (ngModelChange)="onPositionChange($event)"></app-dropdown-select>
+          </div>
+        </div>
+      </section>
+
       <!-- -- Dimensions -- -->
       <section class="properties-section">
         <p class="properties-section-title">Dimensions</p>
@@ -213,6 +230,149 @@
 
       </section>
 
+      <!-- -- Layout -- -->
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasLayout(element)"
+        *ngIf="supportsLayout(element.type)">
+        <div class="properties-section-header">
+          <p class="properties-section-title">Layout</p>
+          <button
+            type="button"
+            class="pp-section-toggle"
+            [attr.aria-label]="hasLayout(element) ? 'Remove layout' : 'Add layout'"
+            [title]="hasLayout(element) ? 'Remove layout' : 'Add layout'"
+            (click)="hasLayout(element) ? removeLayout() : addLayout()">
+            {{ hasLayout(element) ? '−' : '+' }}
+          </button>
+        </div>
+
+        <ng-container *ngIf="hasLayout(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Display</span>
+            <div class="pp-style-control">
+              <app-toggle-group
+                [ariaLabel]="'Layout display mode'"
+                [options]="layoutDisplayOptions"
+                [value]="displayValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onDisplayChange($event)"></app-toggle-group>
+            </div>
+          </div>
+
+          <ng-container *ngIf="isFlex(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Direction</span>
+            <div class="pp-style-control">
+              <app-toggle-group
+                [ariaLabel]="'Layout direction'"
+                [options]="layoutDirectionOptions"
+                [value]="flexDirectionValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onFlexDirectionChange($event)"></app-toggle-group>
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Justify</span>
+            <div class="pp-style-control">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="'Select justification'"
+                [options]="justifyContentOptions"
+                [ngModel]="justifyContentValue(element)"
+                (ngModelChange)="onJustifyContentChange($event)"></app-dropdown-select>
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Align</span>
+            <div class="pp-style-control">
+              <app-toggle-group
+                [ariaLabel]="'Align items'"
+                [options]="alignItemsOptions(element)"
+                [value]="alignItemsValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onAlignItemsChange($event)"></app-toggle-group>
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Wrap</span>
+            <app-toggle-group
+              [ariaLabel]="'Flex wrap'"
+              [options]="wrapOptions"
+              [value]="flexWrapValue(element)"
+              (valueChange)="onFlexWrapToggle($event === true)">
+            </app-toggle-group>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Gap</span>
+            <div class="pp-style-control pp-style-control--metric">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Gap"
+                [value]="element.gap ?? 0"
+                [min]="0"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onNumberChange('gap', $event)" />
+            </div>
+          </div>
+          </ng-container>
+
+          <ng-container *ngIf="isGrid(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Columns</span>
+            <div class="pp-style-control">
+              <input type="text" class="pp-text-input" [value]="element.gridTemplateColumns || ''" (input)="onGridTemplateChange('gridTemplateColumns', $event)" placeholder="1fr 1fr" />
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Rows</span>
+            <div class="pp-style-control">
+              <input type="text" class="pp-text-input" [value]="element.gridTemplateRows || ''" (input)="onGridTemplateChange('gridTemplateRows', $event)" placeholder="auto" />
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Gap</span>
+            <div class="pp-style-control pp-style-control--metric">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Gap"
+                [value]="element.gap ?? 0"
+                [min]="0"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onNumberChange('gap', $event)" />
+            </div>
+          </div>
+          </ng-container>
+
+          <p class="pp-spacing-sub-title">Padding</p>
+          <div class="pp-spacing-grid">
+            <div class="pp-spacing-field">
+              <span class="pp-spacing-side-label">T</span>
+              <app-number-input ariaLabel="Padding top" [value]="spacingValue(element, 'padding', 'top')" [min]="0" [step]="1" (gestureStarted)="onNumberInputGestureStarted()" (gestureCommitted)="onNumberInputGestureCommitted()" (valueChange)="onSpacingChange('padding', 'top', $event)" />
+            </div>
+            <div class="pp-spacing-field">
+              <span class="pp-spacing-side-label">R</span>
+              <app-number-input ariaLabel="Padding right" [value]="spacingValue(element, 'padding', 'right')" [min]="0" [step]="1" (gestureStarted)="onNumberInputGestureStarted()" (gestureCommitted)="onNumberInputGestureCommitted()" (valueChange)="onSpacingChange('padding', 'right', $event)" />
+            </div>
+            <div class="pp-spacing-field">
+              <span class="pp-spacing-side-label">B</span>
+              <app-number-input ariaLabel="Padding bottom" [value]="spacingValue(element, 'padding', 'bottom')" [min]="0" [step]="1" (gestureStarted)="onNumberInputGestureStarted()" (gestureCommitted)="onNumberInputGestureCommitted()" (valueChange)="onSpacingChange('padding', 'bottom', $event)" />
+            </div>
+            <div class="pp-spacing-field">
+              <span class="pp-spacing-side-label">L</span>
+              <app-number-input ariaLabel="Padding left" [value]="spacingValue(element, 'padding', 'left')" [min]="0" [step]="1" (gestureStarted)="onNumberInputGestureStarted()" (gestureCommitted)="onNumberInputGestureCommitted()" (valueChange)="onSpacingChange('padding', 'left', $event)" />
+            </div>
+          </div>
+        </ng-container>
+
+      </section>
       <!-- -- Text -- -->
       <section class="properties-section" *ngIf="isText(element.type)">
         <p class="properties-section-title">Text</p>

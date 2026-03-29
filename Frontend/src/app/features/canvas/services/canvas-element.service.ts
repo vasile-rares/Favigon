@@ -177,13 +177,16 @@ export class CanvasElementService {
   }
 
   getNextElementName(type: CanvasElementType, elements: CanvasElement[]): string {
+    if (type === 'rectangle' || type === 'text' || type === 'image' || type === 'frame') {
+      return formatCanvasElementTypeLabel(type);
+    }
+
     const index = elements.filter((element) => element.type === type).length + 1;
     return `${formatCanvasElementTypeLabel(type)} ${index}`;
   }
 
   getNextFrameName(templateName: string, elements: CanvasElement[]): string {
-    const frameIndex = elements.filter((element) => element.type === 'frame').length + 1;
-    return `${templateName} ${frameIndex}`;
+    return templateName;
   }
 
   // ── Tree Queries ──────────────────────────────────────────
@@ -261,7 +264,7 @@ export class CanvasElementService {
   reorderLayerElements(
     elements: CanvasElement[],
     draggedId: string,
-    targetId: string,
+    targetId: string | null,
     position: 'before' | 'after' | 'inside',
   ): CanvasElement[] {
     if (draggedId === targetId) {
@@ -269,18 +272,21 @@ export class CanvasElementService {
     }
 
     const dragged = elements.find((element) => element.id === draggedId);
-    const target = elements.find((element) => element.id === targetId);
-    if (!dragged || !target) {
+    const target = targetId ? (elements.find((element) => element.id === targetId) ?? null) : null;
+    if (!dragged || (targetId && !target)) {
       return elements;
     }
 
-    if (position === 'inside' && (target.type !== 'frame' || dragged.type === 'frame')) {
+    if (
+      position === 'inside' &&
+      targetId !== null &&
+      (!this.canContainChildren(target!) || dragged.type === 'frame')
+    ) {
       return elements;
     }
 
     const draggedSubtreeIds = new Set(collectSubtreeIds(elements, draggedId));
-    const targetSubtreeIds = collectSubtreeIds(elements, targetId);
-    if (targetSubtreeIds.includes(draggedId)) {
+    if (targetId !== null && draggedSubtreeIds.has(targetId)) {
       return elements;
     }
 
@@ -292,18 +298,25 @@ export class CanvasElementService {
     }
 
     const draggedBounds = this.getAbsoluteBounds(dragged, elements);
-    const targetIndex = remaining.findIndex((element) => element.id === targetId);
-    if (targetIndex === -1) {
+    const targetIndex = targetId
+      ? remaining.findIndex((element) => element.id === targetId)
+      : remaining.length;
+    if (targetId && targetIndex === -1) {
       return elements;
     }
+
+    const targetSubtreeIds = targetId ? collectSubtreeIds(remaining, targetId) : [];
 
     let nextParentId = dragged.parentId ?? null;
     let insertIndex = targetIndex;
 
     if (position === 'inside') {
-      nextParentId = target.id;
-      insertIndex = targetIndex + targetSubtreeIds.length;
+      nextParentId = target?.id ?? null;
+      insertIndex = target ? targetIndex + targetSubtreeIds.length : remaining.length;
     } else {
+      if (!target) {
+        return elements;
+      }
       nextParentId = target.parentId ?? null;
       insertIndex = position === 'after' ? targetIndex + targetSubtreeIds.length : targetIndex;
     }
@@ -331,6 +344,10 @@ export class CanvasElementService {
     }
 
     return [...remaining.slice(0, insertIndex), ...draggedSubtree, ...remaining.slice(insertIndex)];
+  }
+
+  private canContainChildren(element: CanvasElement): boolean {
+    return element.type === 'frame' || element.type === 'rectangle';
   }
 
   // ── Element Update Helper ────────────────────────────────
