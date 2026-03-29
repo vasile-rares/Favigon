@@ -81,8 +81,7 @@ export class CanvasClipboardService {
     if (
       originalParentId &&
       currentElements.some(
-        (element) =>
-          element.id === originalParentId && this.canContainPastedChildren(element.type),
+        (element) => element.id === originalParentId && this.canContainPastedChildren(element.type),
       )
     ) {
       return { parentId: originalParentId, error: null };

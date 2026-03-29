@@ -485,7 +485,11 @@ export class PropertiesPanelComponent {
       : 'flex-start';
   }
 
-  spacingValue(element: CanvasElement, type: 'padding' | 'margin', side: keyof CanvasSpacing): number {
+  spacingValue(
+    element: CanvasElement,
+    type: 'padding' | 'margin',
+    side: keyof CanvasSpacing,
+  ): number {
     return element[type]?.[side] ?? 0;
   }
 

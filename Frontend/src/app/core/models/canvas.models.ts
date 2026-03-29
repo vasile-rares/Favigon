@@ -12,7 +12,13 @@ export type CanvasDisplayMode = 'block' | 'flex' | 'grid';
 export type CanvasPositionMode = 'static' | 'relative' | 'absolute' | 'fixed' | 'sticky';
 export type CanvasFlexDirection = 'row' | 'column' | 'row-reverse' | 'column-reverse';
 export type CanvasFlexWrap = 'nowrap' | 'wrap';
-export type CanvasJustifyContent = 'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly';
+export type CanvasJustifyContent =
+  | 'flex-start'
+  | 'flex-end'
+  | 'center'
+  | 'space-between'
+  | 'space-around'
+  | 'space-evenly';
 export type CanvasAlignItems = 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
 
 export interface CanvasSpacing {

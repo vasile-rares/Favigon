@@ -1576,7 +1576,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const bounds = this.getLiveElementCanvasBounds(element) ?? this.el.getAbsoluteBounds(element, this.elements());
+    const bounds =
+      this.getLiveElementCanvasBounds(element) ??
+      this.el.getAbsoluteBounds(element, this.elements());
     this.selectedElementId.set(id);
     this.beginGestureHistory();
     this.isDragging = false;
@@ -2023,7 +2025,10 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       }
     }
 
-    if ((this.isResizing || (this.isDragging && this.hasMovedElementDuringDrag)) && selectedOnDrop) {
+    if (
+      (this.isResizing || (this.isDragging && this.hasMovedElementDuringDrag)) &&
+      selectedOnDrop
+    ) {
       this.updateCurrentPageElements((elements) => {
         const freshEl = elements.find((e) => e.id === selectedOnDrop.id) ?? null;
         if (freshEl?.primarySyncId) {
@@ -2381,11 +2386,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
   }
 
-  private commitFlowChildReorder(
-    draggedId: string,
-    containerId: string,
-    dropIndex: number,
-  ): void {
+  private commitFlowChildReorder(draggedId: string, containerId: string, dropIndex: number): void {
     this.updateCurrentPageElements((elements) => {
       const dragged = elements.find((el) => el.id === draggedId);
       if (!dragged) return elements;
@@ -2420,11 +2421,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
           ...rest.slice(containerIdx + 1),
         ];
       }
-      return [
-        ...rest.slice(0, lastChildIdx + 1),
-        updatedDragged,
-        ...rest.slice(lastChildIdx + 1),
-      ];
+      return [...rest.slice(0, lastChildIdx + 1), updatedDragged, ...rest.slice(lastChildIdx + 1)];
     });
   }
 
@@ -3715,8 +3712,12 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
           ? {
               ...el,
               parentId: target.id,
-              x: isTargetLayout ? 0 : clamp(elementBounds.x - fb.x, 0, target.width - element.width),
-              y: isTargetLayout ? 0 : clamp(elementBounds.y - fb.y, 0, target.height - element.height),
+              x: isTargetLayout
+                ? 0
+                : clamp(elementBounds.x - fb.x, 0, target.width - element.width),
+              y: isTargetLayout
+                ? 0
+                : clamp(elementBounds.y - fb.y, 0, target.height - element.height),
             }
           : el,
       ),

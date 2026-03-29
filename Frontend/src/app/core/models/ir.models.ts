@@ -109,7 +109,13 @@ export type LayoutMode = 'Block' | 'Flex' | 'Grid';
 export type PositionMode = 'Flow' | 'Relative' | 'Absolute' | 'Fixed' | 'Sticky';
 export type FlexDirection = 'Row' | 'Column' | 'RowReverse' | 'ColumnReverse';
 export type AlignItems = 'Start' | 'Center' | 'End' | 'Stretch' | 'Baseline';
-export type JustifyContent = 'Start' | 'Center' | 'End' | 'SpaceBetween' | 'SpaceAround' | 'SpaceEvenly';
+export type JustifyContent =
+  | 'Start'
+  | 'Center'
+  | 'End'
+  | 'SpaceBetween'
+  | 'SpaceAround'
+  | 'SpaceEvenly';
 export type BorderStyle = 'Solid' | 'Dashed' | 'Dotted' | 'Double' | 'None';
 
 // Helper to create a pixel IRLength

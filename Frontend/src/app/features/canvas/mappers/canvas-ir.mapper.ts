@@ -418,49 +418,72 @@ function buildIRSpacing(s: CanvasSpacing): IRSpacing {
 
 function mapDisplayMode(display: CanvasDisplayMode): LayoutMode {
   switch (display) {
-    case 'block': return 'Block';
-    case 'flex': return 'Flex';
-    case 'grid': return 'Grid';
+    case 'block':
+      return 'Block';
+    case 'flex':
+      return 'Flex';
+    case 'grid':
+      return 'Grid';
   }
 }
 
 function mapFlexDirection(dir: CanvasFlexDirection): FlexDirection {
   switch (dir) {
-    case 'row': return 'Row';
-    case 'column': return 'Column';
-    case 'row-reverse': return 'RowReverse';
-    case 'column-reverse': return 'ColumnReverse';
+    case 'row':
+      return 'Row';
+    case 'column':
+      return 'Column';
+    case 'row-reverse':
+      return 'RowReverse';
+    case 'column-reverse':
+      return 'ColumnReverse';
   }
 }
 
 function mapJustifyContent(jc: CanvasJustifyContent): JustifyContent {
   switch (jc) {
-    case 'flex-start': return 'Start';
-    case 'flex-end': return 'End';
-    case 'center': return 'Center';
-    case 'space-between': return 'SpaceBetween';
-    case 'space-around': return 'SpaceAround';
-    case 'space-evenly': return 'SpaceEvenly';
+    case 'flex-start':
+      return 'Start';
+    case 'flex-end':
+      return 'End';
+    case 'center':
+      return 'Center';
+    case 'space-between':
+      return 'SpaceBetween';
+    case 'space-around':
+      return 'SpaceAround';
+    case 'space-evenly':
+      return 'SpaceEvenly';
   }
 }
 
 function mapAlignItems(ai: CanvasAlignItems): AlignItems {
   switch (ai) {
-    case 'flex-start': return 'Start';
-    case 'flex-end': return 'End';
-    case 'center': return 'Center';
-    case 'stretch': return 'Stretch';
-    case 'baseline': return 'Baseline';
+    case 'flex-start':
+      return 'Start';
+    case 'flex-end':
+      return 'End';
+    case 'center':
+      return 'Center';
+    case 'stretch':
+      return 'Stretch';
+    case 'baseline':
+      return 'Baseline';
   }
 }
 
 function mapPositionMode(pos: CanvasPositionMode): PositionMode {
   switch (pos) {
-    case 'static': return 'Flow';
-    case 'relative': return 'Relative';
-    case 'absolute': return 'Absolute';
-    case 'fixed': return 'Fixed';
-    case 'sticky': return 'Sticky';
+    case 'static':
+      return 'Flow';
+    case 'relative':
+      return 'Relative';
+    case 'absolute':
+      return 'Absolute';
+    case 'fixed':
+      return 'Fixed';
+    case 'sticky':
+      return 'Sticky';
   }
 }
 
