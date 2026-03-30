@@ -2724,7 +2724,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     return this.el.getTextFontStyle(element);
   }
 
-  getTextLineHeight(element: CanvasElement): number {
+  getTextFontSize(element: CanvasElement): string {
+    return this.el.getTextFontSize(element);
+  }
+
+  getTextLineHeight(element: CanvasElement): string {
     return this.el.getTextLineHeight(element);
   }
 
@@ -3748,7 +3752,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       'visibility:hidden',
       'white-space:pre',
       'display:inline-block',
-      `font-size:${element.fontSize ?? 16}px`,
+      `font-size:${this.el.getTextFontSize(element)}`,
       `font-family:${this.el.getTextFontFamily(element)}`,
       `font-weight:${this.el.getTextFontWeight(element)}`,
       `font-style:${this.el.getTextFontStyle(element)}`,

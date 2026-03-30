@@ -1,9 +1,11 @@
 import { IRStyle } from './ir.models';
 
 export type CanvasElementType = 'frame' | 'rectangle' | 'text' | 'image';
-export type CanvasTextAlign = 'left' | 'center' | 'right';
+export type CanvasTextAlign = 'left' | 'center' | 'right' | 'justify';
 export type CanvasTextVerticalAlign = 'top' | 'middle' | 'bottom';
 export type CanvasFontStyle = 'normal' | 'italic';
+export type CanvasFontSizeUnit = 'px' | 'rem';
+export type CanvasTextSpacingUnit = 'px' | 'em';
 export type CanvasOverflowMode = 'clip' | 'visible';
 export type CanvasShadowPreset = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 export type CanvasPageViewportPreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
@@ -54,13 +56,16 @@ export interface CanvasElement {
   shadow?: CanvasShadowPreset;
   text?: string;
   fontSize?: number;
+  fontSizeUnit?: CanvasFontSizeUnit;
   fontFamily?: string;
   fontWeight?: number;
   fontStyle?: CanvasFontStyle;
   textAlign?: CanvasTextAlign;
   textVerticalAlign?: CanvasTextVerticalAlign;
   letterSpacing?: number;
+  letterSpacingUnit?: CanvasTextSpacingUnit;
   lineHeight?: number;
+  lineHeightUnit?: CanvasTextSpacingUnit;
   imageUrl?: string;
   // Layout (frame + rectangle)
   display?: CanvasDisplayMode;

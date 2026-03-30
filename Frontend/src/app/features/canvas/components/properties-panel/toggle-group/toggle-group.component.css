@@ -1,6 +1,7 @@
 :host {
   --pp-control-height: 36px;
   display: block;
+  min-width: 0;
 }
 
 .toggle-group {
@@ -10,6 +11,8 @@
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   align-items: center;
+  min-width: 0;
+  max-width: 100%;
   min-height: var(--pp-control-height);
   height: var(--pp-control-height);
   padding: 0.25rem;
@@ -68,6 +71,8 @@
 
 .toggle-group__button {
   position: relative;
+  box-sizing: border-box;
+  min-width: 0;
   min-height: 100%;
   z-index: 1;
   border: none;
@@ -88,9 +93,9 @@
 }
 
 .toggle-group__button--icon-only {
-  min-width: 54px;
+  min-width: min(54px, calc((100% - 0.5rem) / var(--toggle-group-count)));
   min-height: 100%;
-  padding: 0.5rem 0.95rem;
+  padding: 0.5rem clamp(0.35rem, 2vw, 0.95rem);
 }
 
 .toggle-group__button-content {

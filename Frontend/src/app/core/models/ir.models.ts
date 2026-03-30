@@ -122,3 +122,7 @@ export type BorderStyle = 'Solid' | 'Dashed' | 'Dotted' | 'Double' | 'None';
 export function px(value: number): IRLength {
   return { value, unit: 'px' };
 }
+
+export function length(value: number, unit: string): IRLength {
+  return { value, unit };
+}

@@ -139,7 +139,7 @@ function drawText(
 ): void {
   if (!el.text) return;
 
-  const fontSize = Math.max(Math.round((el.fontSize ?? 14) * scale), 6);
+  const fontSize = Math.max(Math.round(resolveTextFontSizeInPixels(el) * scale), 6);
   const fontStyle = el.fontStyle === 'italic' ? 'italic' : 'normal';
   const fontWeight = el.fontWeight ?? 400;
   const fontFamily = el.fontFamily ?? 'Inter, Arial, sans-serif';
@@ -147,7 +147,8 @@ function drawText(
   ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.fillStyle = el.fill ?? '#ffffff';
   ctx.textBaseline = 'middle';
-  ctx.textAlign = (el.textAlign as CanvasTextAlign | undefined) ?? 'left';
+  ctx.textAlign =
+    el.textAlign === 'center' || el.textAlign === 'right' ? el.textAlign : 'left';
 
   const textX = el.textAlign === 'center' ? x + w / 2 : el.textAlign === 'right' ? x + w : x;
   const textY = y + h / 2;
@@ -157,6 +158,11 @@ function drawText(
   ctx.clip();
   ctx.fillText(el.text, textX, textY, w);
   ctx.restore();
+}
+
+function resolveTextFontSizeInPixels(el: CanvasElement): number {
+  const fontSize = el.fontSize ?? 14;
+  return (el.fontSizeUnit ?? 'px') === 'rem' ? fontSize * 16 : fontSize;
 }
 
 function drawImagePlaceholder(

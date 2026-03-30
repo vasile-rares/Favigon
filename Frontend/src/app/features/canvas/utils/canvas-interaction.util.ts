@@ -38,20 +38,33 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
   element.height = Math.max(MIN_SIZE, element.height);
 
   if (element.type === 'text') {
-    element.fontSize = Math.max(8, element.fontSize ?? 16);
+    element.fontSizeUnit = element.fontSizeUnit === 'rem' ? 'rem' : 'px';
+    element.letterSpacingUnit = element.letterSpacingUnit === 'em' ? 'em' : 'px';
+    element.lineHeightUnit = element.lineHeightUnit === 'px' ? 'px' : 'em';
+    element.fontSize = Math.max(
+      element.fontSizeUnit === 'rem' ? 0.1 : 8,
+      roundToTwoDecimals(element.fontSize ?? (element.fontSizeUnit === 'rem' ? 1 : 16)),
+    );
     element.fontFamily = element.fontFamily?.trim() || 'Inter';
     element.fontWeight = [300, 400, 500, 600, 700].includes(element.fontWeight ?? 400)
       ? (element.fontWeight ?? 400)
       : 400;
     element.fontStyle = element.fontStyle === 'italic' ? 'italic' : 'normal';
     element.textAlign =
-      element.textAlign === 'left' || element.textAlign === 'right' ? element.textAlign : 'center';
+      element.textAlign === 'left' ||
+      element.textAlign === 'right' ||
+      element.textAlign === 'justify'
+        ? element.textAlign
+        : 'center';
     element.textVerticalAlign =
       element.textVerticalAlign === 'top' || element.textVerticalAlign === 'bottom'
         ? element.textVerticalAlign
         : 'middle';
     element.letterSpacing = roundToTwoDecimals(element.letterSpacing ?? 0);
-    element.lineHeight = Math.max(0.8, roundToTwoDecimals(element.lineHeight ?? 1.2));
+    element.lineHeight = Math.max(
+      element.lineHeightUnit === 'em' ? 0.8 : 1,
+      roundToTwoDecimals(element.lineHeight ?? 1.2),
+    );
   }
 
   const normalizedOpacity = Number.isFinite(element.opacity ?? Number.NaN)

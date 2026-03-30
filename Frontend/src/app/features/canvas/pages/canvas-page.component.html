@@ -84,7 +84,7 @@
               <ng-container *ngIf="previewEl.type === 'text'">
                 <div
                   class="text-content"
-                  [style.font-size.px]="previewEl.fontSize"
+                  [style.font-size]="getTextFontSize(previewEl)"
                   [style.font-family]="getTextFontFamily(previewEl)"
                   [style.font-weight]="getTextFontWeight(previewEl)"
                   [style.font-style]="getTextFontStyle(previewEl)"
@@ -212,7 +212,7 @@
                 <ng-container *ngIf="!isTextEditing(el.id); else textEditor">
                   <div
                     class="text-content"
-                    [style.font-size.px]="el.fontSize"
+                    [style.font-size]="getTextFontSize(el)"
                     [style.font-family]="getTextFontFamily(el)"
                     [style.font-weight]="getTextFontWeight(el)"
                     [style.font-style]="getTextFontStyle(el)"
@@ -228,7 +228,7 @@
                     class="text-inline-editor"
                     [attr.data-text-editor-id]="el.id"
                     [value]="el.text || ''"
-                    [style.font-size.px]="el.fontSize"
+                    [style.font-size]="getTextFontSize(el)"
                     [style.font-family]="getTextFontFamily(el)"
                     [style.font-weight]="getTextFontWeight(el)"
                     [style.font-style]="getTextFontStyle(el)"

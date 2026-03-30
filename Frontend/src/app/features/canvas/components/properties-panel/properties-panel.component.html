@@ -276,7 +276,7 @@
           </div>
           <div class="pp-style-row">
             <span class="pp-row-label">Justify</span>
-            <div class="pp-style-control">
+            <div class="pp-style-control pp-style-control--dropdown">
               <app-dropdown-select
                 [enableSearch]="false"
                 [placeholder]="'Select justification'"
@@ -374,149 +374,150 @@
 
       </section>
       <!-- -- Text -- -->
-      <section class="properties-section" *ngIf="isText(element.type)">
+      <section class="properties-section properties-section--text" *ngIf="isText(element.type)">
         <p class="properties-section-title">Text</p>
-        <input
-          type="text"
-          class="pp-text-input"
-          [value]="element.text || ''"
-          (input)="onTextChange('text', $event)"
-          placeholder="Text content" />
-
-        <!-- Font family + size -->
-        <div class="pp-typo-row">
-          <div class="pp-field pp-field--grow">
-            <span class="pp-field-label pp-field-label--icon">
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <path d="M2 10.5 5.5 3h1L10 10.5" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M3.5 7.5h5.5" stroke="currentColor" stroke-width="1.35" stroke-linecap="round"/>
-              </svg>
-            </span>
-            <select [value]="fontFamilyValue(element)" (change)="onTypographySelectChange('fontFamily', $event)">
-              <option *ngFor="let font of fontFamilyOptions" [value]="font">{{ font }}</option>
-            </select>
+        <div class="pp-style-row">
+          <span class="pp-row-label">Content</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <input
+              type="text"
+              class="pp-text-input pp-text-input--boxed"
+              [value]="element.text || ''"
+              (input)="onTextChange('text', $event)"
+              placeholder="Text content" />
           </div>
-          <div class="pp-field pp-field--size">
-            <span class="pp-field-label">px</span>
+        </div>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Font</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <app-dropdown-select
+              [enableSearch]="false"
+              [placeholder]="'Select font'"
+              [options]="fontFamilyOptions"
+              [ngModel]="fontFamilyValue(element)"
+              (ngModelChange)="onTypographySelectChange('fontFamily', $event)"></app-dropdown-select>
+          </div>
+        </div>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Weight</span>
+          <div class="pp-style-control pp-style-control--text-style">
+            <app-dropdown-select
+              [enableSearch]="false"
+              [placeholder]="'Select weight'"
+              [options]="fontWeightOptions"
+              [ngModel]="fontWeightValue(element)"
+              (ngModelChange)="onTypographySelectChange('fontWeight', $event)"></app-dropdown-select>
+            <div class="pp-icon-group pp-icon-group--compact">
+              <button
+                type="button"
+                class="pp-icon-btn pp-italic-btn"
+                [class.active]="fontStyleValue(element) === 'italic'"
+                (click)="setFontStyle(fontStyleValue(element) === 'italic' ? 'normal' : 'italic')"
+                title="Italic">
+                <em>I</em>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Color</span>
+          <div class="pp-style-control pp-style-control--popup">
+            <app-style-popup-field
+              kind="fill"
+              [triggerText]="fillLabel(element)"
+              [swatchColor]="fillSwatchBackground(element)"
+              [isTransparent]="isTransparentFill(element)"
+              [colorValue]="fillInputValue(element)"
+              [pickerColor]="fillPickerValue(element)"
+              [clearPatch]="{ fill: 'transparent' }"
+              (patchRequested)="elementPatch.emit($event)"
+              (numberGestureStarted)="onNumberInputGestureStarted()"
+              (numberGestureCommitted)="onNumberInputGestureCommitted()">
+            </app-style-popup-field>
+          </div>
+        </div>
+
+        <div class="pp-style-row pp-style-row--metric">
+          <span class="pp-row-label">Size</span>
+          <div class="pp-style-control pp-style-control--text-metric">
             <app-number-input
+              appearance="compact"
               ariaLabel="Font size"
               [value]="element.fontSize || 16"
-              [min]="8"
-              [step]="1"
+              [min]="fontSizeUnitValue(element) === 'rem' ? 0.1 : 8"
+              [step]="fontSizeUnitValue(element) === 'rem' ? 0.01 : 1"
               (gestureStarted)="onNumberInputGestureStarted()"
               (gestureCommitted)="onNumberInputGestureCommitted()"
               (valueChange)="onNumberChange('fontSize', $event)" />
+            <div class="pp-text-unit-control">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="'Unit'"
+                [options]="fontSizeUnitOptions"
+                [ngModel]="fontSizeUnitValue(element)"
+                (ngModelChange)="onTextMetricUnitChange('fontSizeUnit', $event)"></app-dropdown-select>
+            </div>
           </div>
         </div>
 
-        <!-- Weight + italic toggle -->
-        <div class="pp-typo-row">
-          <div class="pp-field pp-field--grow">
-            <select [value]="fontWeightValue(element)" (change)="onTypographySelectChange('fontWeight', $event)">
-              <option *ngFor="let weight of fontWeightOptions" [value]="weight">{{ weight }}</option>
-            </select>
-          </div>
-          <div class="pp-icon-group">
-            <button
-              type="button"
-              class="pp-icon-btn pp-italic-btn"
-              [class.active]="fontStyleValue(element) === 'italic'"
-              (click)="setFontStyle(fontStyleValue(element) === 'italic' ? 'normal' : 'italic')"
-              title="Italic">
-              <em>I</em>
-            </button>
-          </div>
-        </div>
-
-        <!-- Horizontal align -->
-        <div class="pp-style-row">
-          <span class="pp-row-label">Align</span>
-          <div class="pp-icon-group">
-            <button type="button" class="pp-icon-btn" [class.active]="textAlignValue(element) === 'left'" (click)="setTextAlign('left')" title="Left">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="2" width="12" height="1.6" rx="0.8" fill="currentColor"/>
-                <rect x="1" y="6.2" width="7.5" height="1.6" rx="0.8" fill="currentColor"/>
-                <rect x="1" y="10.4" width="10" height="1.6" rx="0.8" fill="currentColor"/>
-              </svg>
-            </button>
-            <button type="button" class="pp-icon-btn" [class.active]="textAlignValue(element) === 'center'" (click)="setTextAlign('center')" title="Center">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="2" width="12" height="1.6" rx="0.8" fill="currentColor"/>
-                <rect x="3.25" y="6.2" width="7.5" height="1.6" rx="0.8" fill="currentColor"/>
-                <rect x="2" y="10.4" width="10" height="1.6" rx="0.8" fill="currentColor"/>
-              </svg>
-            </button>
-            <button type="button" class="pp-icon-btn" [class.active]="textAlignValue(element) === 'right'" (click)="setTextAlign('right')" title="Right">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="2" width="12" height="1.6" rx="0.8" fill="currentColor"/>
-                <rect x="5.5" y="6.2" width="7.5" height="1.6" rx="0.8" fill="currentColor"/>
-                <rect x="3" y="10.4" width="10" height="1.6" rx="0.8" fill="currentColor"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Vertical align -->
-        <div class="pp-style-row">
-          <span class="pp-row-label">Vertical</span>
-          <div class="pp-icon-group">
-            <button type="button" class="pp-icon-btn" [class.active]="textVerticalAlignValue(element) === 'top'" (click)="setTextVerticalAlign('top')" title="Top">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="1.5" width="12" height="1.5" rx="0.75" fill="currentColor"/>
-                <path d="M4 3.5v8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                <path d="M7 3.5v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                <path d="M10 3.5v7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-              </svg>
-            </button>
-            <button type="button" class="pp-icon-btn" [class.active]="textVerticalAlignValue(element) === 'middle'" (click)="setTextVerticalAlign('middle')" title="Middle">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="6.25" width="12" height="1.5" rx="0.75" fill="currentColor"/>
-                <path d="M4 2v10" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                <path d="M7 4v6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                <path d="M10 3v8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-              </svg>
-            </button>
-            <button type="button" class="pp-icon-btn" [class.active]="textVerticalAlignValue(element) === 'bottom'" (click)="setTextVerticalAlign('bottom')" title="Bottom">
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <rect x="1" y="11" width="12" height="1.5" rx="0.75" fill="currentColor"/>
-                <path d="M4 2v9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                <path d="M7 4.5v7" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-                <path d="M10 3v8.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Letter spacing + Line height -->
-        <div class="pp-grid-2">
-          <div class="pp-field">
-            <span class="pp-field-label pp-field-label--icon" title="Letter spacing">
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <path d="M1 6.5h11M3 3.5 1 6.5l2 3M10 3.5l2 3-2 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
+        <div class="pp-style-row pp-style-row--metric">
+          <span class="pp-row-label">Letter</span>
+          <div class="pp-style-control pp-style-control--text-metric">
             <app-number-input
+              appearance="compact"
               ariaLabel="Letter spacing"
               [value]="element.letterSpacing ?? 0"
               [step]="0.01"
               (gestureStarted)="onNumberInputGestureStarted()"
               (gestureCommitted)="onNumberInputGestureCommitted()"
               (valueChange)="onNumberChange('letterSpacing', $event)" />
+            <div class="pp-text-unit-control">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="'Unit'"
+                [options]="textSpacingUnitOptions"
+                [ngModel]="letterSpacingUnitValue(element)"
+                (ngModelChange)="onTextMetricUnitChange('letterSpacingUnit', $event)"></app-dropdown-select>
+            </div>
           </div>
-          <div class="pp-field">
-            <span class="pp-field-label pp-field-label--icon" title="Line height">
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                <path d="M1 3h11M1 10h11M4.5 1 3 3l1.5 2M4.5 12 3 10l1.5-2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </span>
+        </div>
+
+        <div class="pp-style-row pp-style-row--metric">
+          <span class="pp-row-label">Line</span>
+          <div class="pp-style-control pp-style-control--text-metric">
             <app-number-input
+              appearance="compact"
               ariaLabel="Line height"
               [value]="element.lineHeight ?? 1.2"
-              [min]="0.8"
+              [min]="lineHeightUnitValue(element) === 'em' ? 0.8 : 1"
               [step]="0.01"
               (gestureStarted)="onNumberInputGestureStarted()"
               (gestureCommitted)="onNumberInputGestureCommitted()"
               (valueChange)="onNumberChange('lineHeight', $event)" />
+            <div class="pp-text-unit-control">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="'Unit'"
+                [options]="textSpacingUnitOptions"
+                [ngModel]="lineHeightUnitValue(element)"
+                (ngModelChange)="onTextMetricUnitChange('lineHeightUnit', $event)"></app-dropdown-select>
+            </div>
+          </div>
+        </div>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Align</span>
+          <div class="pp-style-control pp-style-control--text-align">
+            <app-toggle-group
+              [ariaLabel]="'Text alignment'"
+              [options]="textAlignToggleOptions"
+              [value]="textAlignValue(element)"
+              [stretch]="true"
+              [minWidth]="null"
+              (valueChange)="onTextAlignChange($event)"></app-toggle-group>
           </div>
         </div>
 

@@ -2,12 +2,14 @@
   CanvasAlignItems,
   CanvasDisplayMode,
   CanvasElement,
+  CanvasFontSizeUnit,
   CanvasFlexDirection,
   CanvasJustifyContent,
   CanvasPageModel,
   CanvasPositionMode,
   CanvasProjectDocument,
   CanvasSpacing,
+  CanvasTextSpacingUnit,
 } from '../../../core/models/canvas.models';
 import {
   AlignItems,
@@ -23,6 +25,7 @@ import {
   IRStyle,
   JustifyContent,
   LayoutMode,
+  length,
   PositionMode,
   px,
 } from '../../../core/models/ir.models';
@@ -334,7 +337,7 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
 
   if (element.type === 'text') {
     if (element.fontSize) {
-      style.fontSize = px(element.fontSize);
+      style.fontSize = length(element.fontSize, element.fontSizeUnit ?? 'px');
     }
 
     if (element.fontFamily) {
@@ -350,11 +353,11 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     }
 
     if (typeof element.lineHeight === 'number') {
-      style.lineHeight = px(element.lineHeight);
+      style.lineHeight = length(element.lineHeight, element.lineHeightUnit ?? 'em');
     }
 
     if (typeof element.letterSpacing === 'number') {
-      style.letterSpacing = px(element.letterSpacing);
+      style.letterSpacing = length(element.letterSpacing, element.letterSpacingUnit ?? 'px');
     }
   }
 
@@ -524,6 +527,10 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     shadow: readShadow(node.style?.shadow, 'none'),
     text: mappedType === 'text' ? readStringProp(node.props, 'content', 'New text') : undefined,
     fontSize: mappedType === 'text' ? readLength(node.style?.fontSize, 16) : undefined,
+    fontSizeUnit:
+      mappedType === 'text'
+        ? readLengthUnit<CanvasFontSizeUnit>(node.style?.fontSize, 'px', ['px', 'rem'])
+        : undefined,
     fontFamily:
       mappedType === 'text'
         ? (readOptionalStringStyle(node.style, 'fontFamily') ?? 'Inter')
@@ -534,7 +541,15 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     textVerticalAlign:
       mappedType === 'text' ? readTextVerticalAlignFromProps(node.props, 'middle') : undefined,
     letterSpacing: mappedType === 'text' ? readLength(node.style?.letterSpacing, 0) : undefined,
+    letterSpacingUnit:
+      mappedType === 'text'
+        ? readLengthUnit<CanvasTextSpacingUnit>(node.style?.letterSpacing, 'px', ['px', 'em'])
+        : undefined,
     lineHeight: mappedType === 'text' ? readLength(node.style?.lineHeight, 1.2) : undefined,
+    lineHeightUnit:
+      mappedType === 'text'
+        ? readLengthUnit<CanvasTextSpacingUnit>(node.style?.lineHeight, 'em', ['px', 'em'])
+        : undefined,
     imageUrl: mappedType === 'image' ? readStringProp(node.props, 'src', '') : undefined,
     irMeta: {
       type: node.type,
@@ -684,6 +699,18 @@ function readLength(len: IRLength | undefined, fallback: number): number {
   return Number.isFinite(len.value) ? len.value : fallback;
 }
 
+function readLengthUnit<TUnit extends string>(
+  len: IRLength | undefined,
+  fallback: TUnit,
+  allowedUnits: readonly TUnit[],
+): TUnit {
+  if (!len || typeof len.unit !== 'string') {
+    return fallback;
+  }
+
+  return allowedUnits.includes(len.unit as TUnit) ? (len.unit as TUnit) : fallback;
+}
+
 function readOptionalStringStyle(
   style: IRStyle | undefined,
   key: keyof IRStyle,
@@ -702,9 +729,11 @@ function readFontStyleFromProps(
 
 function readTextAlign(
   value: unknown,
-  fallback: 'left' | 'center' | 'right',
-): 'left' | 'center' | 'right' {
-  return value === 'left' || value === 'center' || value === 'right' ? value : fallback;
+  fallback: 'left' | 'center' | 'right' | 'justify',
+): 'left' | 'center' | 'right' | 'justify' {
+  return value === 'left' || value === 'center' || value === 'right' || value === 'justify'
+    ? value
+    : fallback;
 }
 
 function readTextVerticalAlignFromProps(

@@ -145,7 +145,11 @@ export class CanvasPreviewPage {
     return this.el.getTextFontStyle(element);
   }
 
-  getTextLineHeight(element: CanvasElement): number {
+  getTextFontSize(element: CanvasElement): string {
+    return this.el.getTextFontSize(element);
+  }
+
+  getTextLineHeight(element: CanvasElement): string {
     return this.el.getTextLineHeight(element);
   }
 

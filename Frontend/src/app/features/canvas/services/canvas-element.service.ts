@@ -20,6 +20,8 @@ import { Bounds, Point } from '../canvas.types';
 const IMAGE_PLACEHOLDER_URL = 'https://placehold.co/300x200?text=Image';
 const DEFAULT_FRAME_FILL = '#ffffff';
 const DEFAULT_ELEMENT_FILL = '#e0e0e0';
+const DEFAULT_TEXT_FONT_SIZE = 16;
+const ROOT_FONT_SIZE_PX = 16;
 const MIN_ELEMENT_SIZE = 24;
 const FRAME_INSERT_GAP = 48;
 const SHADOW_MAP: Record<CanvasShadowPreset, string> = {
@@ -116,13 +118,16 @@ export class CanvasElementService {
         cornerRadius: tool === 'image' ? 6 : 0,
         text: tool === 'text' ? '' : undefined,
         fontSize: tool === 'text' ? 16 : undefined,
+        fontSizeUnit: tool === 'text' ? 'px' : undefined,
         fontFamily: tool === 'text' ? 'Inter' : undefined,
         fontWeight: tool === 'text' ? 400 : undefined,
         fontStyle: tool === 'text' ? 'normal' : undefined,
         textAlign: tool === 'text' ? 'center' : undefined,
         textVerticalAlign: tool === 'text' ? 'middle' : undefined,
         letterSpacing: tool === 'text' ? 0 : undefined,
+        letterSpacingUnit: tool === 'text' ? 'px' : undefined,
         lineHeight: tool === 'text' ? 1.2 : undefined,
+        lineHeightUnit: tool === 'text' ? 'em' : undefined,
         imageUrl: tool === 'image' ? IMAGE_PLACEHOLDER_URL : undefined,
         parentId,
       },
@@ -475,12 +480,28 @@ export class CanvasElementService {
     return element.fontStyle ?? 'normal';
   }
 
-  getTextLineHeight(element: CanvasElement): number {
-    return element.lineHeight ?? 1.2;
+  getTextFontSize(element: CanvasElement): string {
+    return formatTextMetricValue(
+      element.fontSize,
+      element.fontSizeUnit ?? 'px',
+      DEFAULT_TEXT_FONT_SIZE,
+    );
+  }
+
+  getTextLineHeight(element: CanvasElement): string {
+    return formatTextMetricValue(element.lineHeight, element.lineHeightUnit ?? 'em', 1.2);
   }
 
   getTextLetterSpacing(element: CanvasElement): string {
-    return `${element.letterSpacing ?? 0}px`;
+    return formatTextMetricValue(element.letterSpacing, element.letterSpacingUnit ?? 'px', 0);
+  }
+
+  getTextFontSizeInPixels(element: CanvasElement): number {
+    const fontSize = Number.isFinite(element.fontSize ?? Number.NaN)
+      ? (element.fontSize as number)
+      : DEFAULT_TEXT_FONT_SIZE;
+
+    return (element.fontSizeUnit ?? 'px') === 'rem' ? fontSize * ROOT_FONT_SIZE_PX : fontSize;
   }
 
   getTextJustifyContent(element: CanvasElement): string {
@@ -524,4 +545,13 @@ export class CanvasElementService {
   removeElementWithChildren(elements: CanvasElement[], rootId: string): CanvasElement[] {
     return removeWithChildren(elements, rootId);
   }
+}
+
+function formatTextMetricValue(
+  value: number | undefined,
+  unit: 'px' | 'rem' | 'em',
+  fallback: number,
+): string {
+  const normalizedValue = Number.isFinite(value ?? Number.NaN) ? (value as number) : fallback;
+  return `${normalizedValue}${unit}`;
 }

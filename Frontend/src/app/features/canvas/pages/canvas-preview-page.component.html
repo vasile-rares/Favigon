@@ -79,7 +79,7 @@
           <ng-container *ngIf="el.type === 'text'">
             <div
               class="preview-text"
-              [style.font-size.px]="el.fontSize"
+              [style.font-size]="getTextFontSize(el)"
               [style.font-family]="getTextFontFamily(el)"
               [style.font-weight]="getTextFontWeight(el)"
               [style.font-style]="getTextFontStyle(el)"

@@ -10,6 +10,7 @@ import {
   CanvasDisplayMode,
   CanvasElement,
   CanvasElementType,
+  CanvasFontSizeUnit,
   CanvasFontStyle,
   CanvasFlexDirection,
   CanvasFlexWrap,
@@ -18,6 +19,7 @@ import {
   CanvasPositionMode,
   CanvasShadowPreset,
   CanvasSpacing,
+  CanvasTextSpacingUnit,
   CanvasTextAlign,
   CanvasTextVerticalAlign,
 } from '../../../../core/models/canvas.models';
@@ -49,6 +51,8 @@ type EditableTypographyField =
   | 'fontStyle'
   | 'textAlign'
   | 'textVerticalAlign';
+
+type EditableTextMetricUnitField = 'fontSizeUnit' | 'letterSpacingUnit' | 'lineHeightUnit';
 
 interface FrameTemplate {
   name: string;
@@ -94,18 +98,59 @@ export class PropertiesPanelComponent {
   activeTab: PropertiesTab = 'design';
 
   readonly borderStyleOptions = ['Solid', 'Dashed', 'Dotted', 'Double'];
-  readonly fontFamilyOptions = [
-    'Inter',
-    'Poppins',
-    'Montserrat',
-    'Space Grotesk',
-    'Georgia',
-    'Arial',
+  readonly fontFamilyOptions: DropdownSelectOption[] = [
+    { label: 'Inter', value: 'Inter' },
+    { label: 'Poppins', value: 'Poppins' },
+    { label: 'Montserrat', value: 'Montserrat' },
+    { label: 'Space Grotesk', value: 'Space Grotesk' },
+    { label: 'Georgia', value: 'Georgia' },
+    { label: 'Arial', value: 'Arial' },
   ];
-  readonly fontWeightOptions = [300, 400, 500, 600, 700];
-  readonly fontStyleOptions: CanvasFontStyle[] = ['normal', 'italic'];
-  readonly textAlignOptions: CanvasTextAlign[] = ['left', 'center', 'right'];
-  readonly textVerticalAlignOptions: CanvasTextVerticalAlign[] = ['top', 'middle', 'bottom'];
+  readonly fontWeightOptions: DropdownSelectOption[] = [
+    { label: 'Light', value: 300 },
+    { label: 'Regular', value: 400 },
+    { label: 'Medium', value: 500 },
+    { label: 'Semibold', value: 600 },
+    { label: 'Bold', value: 700 },
+  ];
+  readonly fontSizeUnitOptions: DropdownSelectOption[] = [
+    { label: 'Px', value: 'px' },
+    { label: 'Rem', value: 'rem' },
+  ];
+  readonly textSpacingUnitOptions: DropdownSelectOption[] = [
+    { label: 'Px', value: 'px' },
+    { label: 'Em', value: 'em' },
+  ];
+  readonly textAlignToggleOptions: readonly ToggleGroupOption[] = [
+    {
+      label: '',
+      value: 'left',
+      icon: 'text-align-left',
+      ariaLabel: 'Align text left',
+      title: 'Left',
+    },
+    {
+      label: '',
+      value: 'center',
+      icon: 'text-align-center',
+      ariaLabel: 'Align text center',
+      title: 'Center',
+    },
+    {
+      label: '',
+      value: 'right',
+      icon: 'text-align-right',
+      ariaLabel: 'Align text right',
+      title: 'Right',
+    },
+    {
+      label: '',
+      value: 'justify',
+      icon: 'text-align-justify',
+      ariaLabel: 'Justify text',
+      title: 'Justify',
+    },
+  ];
   readonly overflowOptions: CanvasOverflowMode[] = ['clip', 'visible'];
   readonly shadowOptions: CanvasShadowPreset[] = ['sm', 'md', 'lg', 'xl'];
   readonly visibleOptions: readonly ToggleGroupOption[] = [
@@ -319,11 +364,20 @@ export class PropertiesPanelComponent {
     this.emitPatch({ overflow });
   }
 
-  onTypographySelectChange(field: EditableTypographyField, event: Event): void {
-    const value = (event.target as HTMLSelectElement).value;
-
+  onTypographySelectChange(
+    field: EditableTypographyField,
+    value: string | number | boolean | null,
+  ): void {
     if (field === 'fontWeight') {
-      this.emitPatch({ fontWeight: Number(value) });
+      if (typeof value !== 'number') {
+        return;
+      }
+
+      this.emitPatch({ fontWeight: value });
+      return;
+    }
+
+    if (typeof value !== 'string') {
       return;
     }
 
@@ -389,8 +443,20 @@ export class PropertiesPanelComponent {
     return element.fontWeight ?? 400;
   }
 
+  fontSizeUnitValue(element: CanvasElement): CanvasFontSizeUnit {
+    return element.fontSizeUnit === 'rem' ? 'rem' : 'px';
+  }
+
   fontStyleValue(element: CanvasElement): CanvasFontStyle {
     return element.fontStyle ?? 'normal';
+  }
+
+  letterSpacingUnitValue(element: CanvasElement): CanvasTextSpacingUnit {
+    return element.letterSpacingUnit === 'em' ? 'em' : 'px';
+  }
+
+  lineHeightUnitValue(element: CanvasElement): CanvasTextSpacingUnit {
+    return element.lineHeightUnit === 'px' ? 'px' : 'em';
   }
 
   textAlignValue(element: CanvasElement): CanvasTextAlign {
@@ -557,6 +623,62 @@ export class PropertiesPanelComponent {
     this.emitPatch({ alignItems: value as CanvasAlignItems });
   }
 
+  onTextMetricUnitChange(
+    field: EditableTextMetricUnitField,
+    value: string | number | boolean | null,
+  ): void {
+    const element = this.selectedElement;
+    if (!element || typeof value !== 'string') {
+      return;
+    }
+
+    if (field === 'fontSizeUnit') {
+      if (value !== 'px' && value !== 'rem') {
+        return;
+      }
+
+      const currentUnit = this.fontSizeUnitValue(element);
+      if (currentUnit === value) {
+        return;
+      }
+
+      const currentValue = element.fontSize ?? 16;
+      const nextValue =
+        currentUnit === 'px'
+          ? roundToTwoDecimals(currentValue / 16)
+          : roundToTwoDecimals(currentValue * 16);
+
+      this.emitPatch({ fontSize: nextValue, fontSizeUnit: value });
+      return;
+    }
+
+    if (value !== 'px' && value !== 'em') {
+      return;
+    }
+
+    const currentValue = field === 'lineHeightUnit' ? (element.lineHeight ?? 1.2) : (element.letterSpacing ?? 0);
+    const currentUnit =
+      field === 'lineHeightUnit'
+        ? this.lineHeightUnitValue(element)
+        : this.letterSpacingUnitValue(element);
+
+    if (currentUnit === value) {
+      return;
+    }
+
+    const fontSizeInPixels = this.fontSizeInPixels(element);
+    const nextValue =
+      currentUnit === 'px'
+        ? roundToTwoDecimals(currentValue / fontSizeInPixels)
+        : roundToTwoDecimals(currentValue * fontSizeInPixels);
+
+    this.emitPatch(
+      field === 'lineHeightUnit'
+        ? { lineHeight: nextValue, lineHeightUnit: value }
+        : { letterSpacing: nextValue, letterSpacingUnit: value },
+    );
+  }
+
   onGridTemplateChange(field: 'gridTemplateColumns' | 'gridTemplateRows', event: Event): void {
     const value = (event.target as HTMLInputElement).value;
     this.emitPatch({ [field]: value.trim() || undefined } as Partial<CanvasElement>);
@@ -578,12 +700,23 @@ export class PropertiesPanelComponent {
     this.emitPatch({ textAlign: align });
   }
 
+  onTextAlignChange(value: string | number | boolean | null): void {
+    if (value === 'left' || value === 'center' || value === 'right' || value === 'justify') {
+      this.setTextAlign(value);
+    }
+  }
+
   setTextVerticalAlign(align: CanvasTextVerticalAlign): void {
     this.emitPatch({ textVerticalAlign: align });
   }
 
   private emitPatch(patch: Partial<CanvasElement>): void {
     this.elementPatch.emit(patch);
+  }
+
+  private fontSizeInPixels(element: CanvasElement): number {
+    const fontSize = element.fontSize ?? 16;
+    return this.fontSizeUnitValue(element) === 'rem' ? fontSize * 16 : fontSize;
   }
 
   private toHexColorOrFallback(value: string | undefined, fallback: string): string {

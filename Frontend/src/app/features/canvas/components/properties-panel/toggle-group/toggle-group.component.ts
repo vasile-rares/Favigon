@@ -10,7 +10,11 @@ export type ToggleGroupIcon =
   | 'align-horizontal-end'
   | 'align-vertical-start'
   | 'align-vertical-center'
-  | 'align-vertical-end';
+  | 'align-vertical-end'
+  | 'text-align-left'
+  | 'text-align-center'
+  | 'text-align-right'
+  | 'text-align-justify';
 
 export interface ToggleGroupOption {
   label: string;
