@@ -6,6 +6,7 @@ using Favigon.Application.Mappings;
 using Favigon.Application.Services;
 using Favigon.Converter.Abstractions;
 using Favigon.Domain.Entities;
+using System.Text.Json;
 
 namespace Favigon.Tests.Services;
 
@@ -191,6 +192,75 @@ public class ProjectServiceTests
     // Assert
     Assert.NotNull(result);
     Assert.Equal("{}", result.DesignJson);
+  }
+
+  [Fact]
+  public async Task SaveDesign_WithTransformOptionsArray_NormalizesWithoutJsonNodeParentErrors()
+  {
+    // Arrange
+    var project = new Project { Id = 1, UserId = 5, Name = "P" };
+    _projectRepo.Setup(r => r.GetByIdAsync(1, 5)).ReturnsAsync(project);
+
+    var request = new ProjectDesignSaveRequest
+    {
+      DesignJson =
+        """
+        {
+          "id": "canvas-1",
+          "type": "Container",
+          "props": {
+            "favigonCanvasDocument": {
+              "version": "2.0",
+              "projectId": "proj-1",
+              "activePageId": "page-1",
+              "pages": [
+                {
+                  "id": "page-1",
+                  "name": "Page 1",
+                  "elements": [
+                    {
+                      "id": "element-1",
+                      "type": "rectangle",
+                      "x": 12.345,
+                      "y": 45.678,
+                      "width": 100,
+                      "height": 100,
+                      "transformOptions": ["scale", "rotate"],
+                      "scaleX": 1.234,
+                      "scaleY": 1.234,
+                      "rotation": 33.335,
+                      "visible": true
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "children": [],
+          "variants": {}
+        }
+        """
+    };
+
+    // Act
+    var result = await _sut.SaveDesignAsync(1, 5, request);
+
+    // Assert
+    Assert.NotNull(result);
+
+    using var json = JsonDocument.Parse(result.DesignJson);
+    var element = json.RootElement
+      .GetProperty("props")
+      .GetProperty("favigonCanvasDocument")
+      .GetProperty("pages")[0]
+      .GetProperty("elements")[0];
+
+    Assert.Equal("scale", element.GetProperty("transformOptions")[0].GetString());
+    Assert.Equal("rotate", element.GetProperty("transformOptions")[1].GetString());
+    Assert.Equal(12.35m, element.GetProperty("x").GetDecimal());
+    Assert.Equal(45.68m, element.GetProperty("y").GetDecimal());
+    Assert.Equal(1.23m, element.GetProperty("scaleX").GetDecimal());
+    Assert.Equal(33.34m, element.GetProperty("rotation").GetDecimal());
   }
 
   // --- GetDesign ---

@@ -36,6 +36,10 @@ export interface IRPosition {
 export interface IRStyle {
   color?: string;
   background?: string;
+  transform?: string;
+  transformOrigin?: string;
+  backfaceVisibility?: string;
+  transformStyle?: string;
 
   width?: IRLength;
   height?: IRLength;
@@ -56,6 +60,10 @@ export interface IRStyle {
   textAlign?: string;
 
   borderRadius?: IRLength;
+  borderTopLeftRadius?: IRLength;
+  borderTopRightRadius?: IRLength;
+  borderBottomRightRadius?: IRLength;
+  borderBottomLeftRadius?: IRLength;
   border?: IRBorder;
 
   overflow?: 'clip' | 'visible';

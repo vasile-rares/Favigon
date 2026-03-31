@@ -86,6 +86,16 @@
           <rect x="2" y="7.2" width="12" height="1.6" rx="0.8" fill="currentColor" />
           <rect x="2" y="11.9" width="12" height="1.6" rx="0.8" fill="currentColor" />
         </svg>
+        <svg *ngIf="option.icon === 'radius-full'" class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="3" y="3" width="10" height="10" rx="2.75" stroke="currentColor" stroke-width="1.5" />
+        </svg>
+        <svg *ngIf="option.icon === 'radius-corners'" class="toggle-group__icon-svg toggle-group__icon-svg--radius-corners" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M5.75 3H3V5.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M10.25 3H13V5.75" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M13 10.25V13H10.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M5.75 13H3V10.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="8" cy="8" r="1.15" fill="currentColor" />
+        </svg>
       </span>
       <span *ngIf="option.label" class="toggle-group__label">{{ option.label }}</span>
     </span>

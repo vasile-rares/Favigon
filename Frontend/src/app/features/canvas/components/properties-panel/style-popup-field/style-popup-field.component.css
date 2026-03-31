@@ -1,5 +1,7 @@
 :host {
-  --pp-control-height: 36px;
+  --pp-control-height: var(--canvas-panel-control-height, 36px);
+  --pp-control-radius: var(--canvas-panel-control-radius, 10px);
+  --pp-control-padding-x: var(--canvas-panel-control-padding-x, 0.55rem);
   display: block;
   width: 100%;
   min-width: 0;
@@ -14,11 +16,11 @@
   gap: 0.45rem;
   border: 1px solid rgba(255, 255, 255, 0.05);
   background: rgba(0, 0, 0, 0.25);
-  color: var(--color-zinc-200);
-  border-radius: 10px;
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-200));
+  border-radius: var(--pp-control-radius);
   height: var(--pp-control-height);
   min-height: var(--pp-control-height);
-  padding: 0 0.55rem;
+  padding: 0 var(--pp-control-padding-x);
   cursor: pointer;
   box-shadow:
     inset 0 2px 5px rgba(0, 0, 0, 0.3),
@@ -67,7 +69,7 @@
   overflow: visible;
   text-overflow: clip;
   white-space: nowrap;
-  font-size: 0.84rem;
+  font-size: var(--canvas-panel-font-size, 0.84rem);
   text-align: left;
 }
 
@@ -80,12 +82,12 @@
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: var(--color-zinc-500);
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-500));
   cursor: pointer;
   flex-shrink: 0;
   padding: 0;
   margin-left: 0.2rem;
-  font-size: 0.95rem;
+  font-size: var(--canvas-panel-font-size, 0.95rem);
   line-height: 1;
   transition:
     color 0.18s ease,
@@ -104,12 +106,12 @@
   text-align: left;
   border: 1px solid rgba(255, 255, 255, 0.05);
   background: rgba(0, 0, 0, 0.25);
-  color: var(--color-zinc-300);
-  border-radius: 10px;
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-300));
+  border-radius: var(--pp-control-radius);
   height: var(--pp-control-height);
   min-height: var(--pp-control-height);
-  padding: 0 0.65rem;
-  font-size: 0.84rem;
+  padding: 0 var(--canvas-panel-control-padding-x-wide, 0.65rem);
+  font-size: var(--canvas-panel-font-size, 0.84rem);
   cursor: pointer;
   box-shadow:
     inset 0 2px 5px rgba(0, 0, 0, 0.3),
@@ -158,8 +160,8 @@
 }
 
 .style-popup-field__popup-field-label {
-  color: var(--color-zinc-500);
-  font-size: 0.68rem;
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-500));
+  font-size: var(--canvas-panel-font-size, 0.68rem);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -169,10 +171,10 @@
   width: 100%;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(0, 0, 0, 0.32);
-  color: var(--color-zinc-100);
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-100));
   border-radius: 8px;
   padding: 0.45rem 0.55rem;
-  font-size: 0.78rem;
+  font-size: var(--canvas-panel-font-size, 0.78rem);
   outline: none;
 
   &:focus {
@@ -213,8 +215,8 @@
   min-width: 0;
   border: none;
   background: transparent;
-  color: var(--color-zinc-100);
-  font-size: 0.8rem;
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-100));
+  font-size: var(--canvas-panel-font-size, 0.8rem);
   padding: 0;
   outline: none;
   cursor: text;
@@ -240,8 +242,8 @@
     inset 0 2px 5px rgba(0, 0, 0, 0.3),
     0 1px 0 rgba(255, 255, 255, 0.05);
   padding: 0.38rem 0.55rem;
-  font-size: 0.8rem;
-  color: var(--color-zinc-100);
+  font-size: var(--canvas-panel-font-size, 0.8rem);
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-100));
 }
 
 .style-popup-field__popup-dropdown ::ng-deep .dropdown-select__trigger:hover:not(:disabled),
@@ -257,12 +259,12 @@
 
 .style-popup-field__popup-dropdown ::ng-deep .dropdown-select__trigger-text,
 .style-popup-field__popup-dropdown ::ng-deep .dropdown-select__trigger-text--placeholder {
-  color: var(--color-zinc-100);
-  font-size: 0.8rem;
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-100));
+  font-size: var(--canvas-panel-font-size, 0.8rem);
 }
 
 .style-popup-field__popup-dropdown ::ng-deep .dropdown-select__trigger-icon {
-  color: var(--color-zinc-400);
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-400));
   padding: 0;
 }
 

@@ -86,6 +86,10 @@ public static class IrValidator
     ValidateColor(style.Background, path, "background", errors);
 
     ValidateOptionalLength(style.BorderRadius, path, "borderRadius", errors, allowNegative: false);
+    ValidateOptionalLength(style.BorderTopLeftRadius, path, "borderTopLeftRadius", errors, allowNegative: false);
+    ValidateOptionalLength(style.BorderTopRightRadius, path, "borderTopRightRadius", errors, allowNegative: false);
+    ValidateOptionalLength(style.BorderBottomRightRadius, path, "borderBottomRightRadius", errors, allowNegative: false);
+    ValidateOptionalLength(style.BorderBottomLeftRadius, path, "borderBottomLeftRadius", errors, allowNegative: false);
     if (style.Border is not null) ValidateBorder(style.Border, $"{path}.border", errors);
     ValidateOptionalLength(style.FontSize, path, "fontSize", errors, allowNegative: false);
 

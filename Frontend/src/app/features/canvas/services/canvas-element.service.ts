@@ -4,17 +4,27 @@ import {
   CanvasElementType,
   CanvasOverflowMode,
   CanvasPageModel,
+  CanvasPositionMode,
   CanvasShadowPreset,
 } from '../../../core/models/canvas.models';
 import {
   clamp,
   roundToTwoDecimals,
+  getDefaultCornerRadius,
+  getElementBorderRadiusCss,
   getStrokeWidth,
+  hasPerCornerRadius,
   mutateNormalizeElement,
   removeWithChildren,
   collectSubtreeIds,
 } from '../utils/canvas-interaction.util';
 import { formatCanvasElementTypeLabel } from '../utils/canvas-label.util';
+import {
+  buildCanvasElementBackfaceVisibility,
+  buildCanvasElementTransform,
+  buildCanvasElementTransformOrigin,
+  buildCanvasElementTransformStyle,
+} from '../utils/canvas-transform.util';
 import { Bounds, Point } from '../canvas.types';
 
 const IMAGE_PLACEHOLDER_URL = 'https://placehold.co/300x200?text=Image';
@@ -129,6 +139,7 @@ export class CanvasElementService {
         lineHeight: tool === 'text' ? 1.2 : undefined,
         lineHeightUnit: tool === 'text' ? 'em' : undefined,
         imageUrl: tool === 'image' ? IMAGE_PLACEHOLDER_URL : undefined,
+        position: this.getDefaultPositionForPlacement(tool, selectedContainer),
         parentId,
       },
       error: null,
@@ -240,6 +251,21 @@ export class CanvasElementService {
     return !!element && (element.type === 'frame' || element.type === 'rectangle');
   }
 
+  isLayoutContainerElement(element: CanvasElement | null | undefined): element is CanvasElement {
+    return !!element && this.isContainerElement(element) && !!element.display;
+  }
+
+  getDefaultPositionForPlacement(
+    type: CanvasElementType,
+    parent: CanvasElement | null | undefined,
+  ): CanvasPositionMode | undefined {
+    if (type === 'frame') {
+      return undefined;
+    }
+
+    return this.isLayoutContainerElement(parent) ? 'relative' : 'absolute';
+  }
+
   getSelectedContainer(selectedElement: CanvasElement | null): CanvasElement | null {
     return this.isContainerElement(selectedElement) ? selectedElement : null;
   }
@@ -335,6 +361,7 @@ export class CanvasElementService {
       : null;
 
     draggedRoot.parentId = nextParentId;
+    draggedRoot.position = this.getDefaultPositionForPlacement(draggedRoot.type, nextParent);
     if (nextParent) {
       const parentBounds = this.getAbsoluteBounds(nextParent, remaining);
       draggedRoot.x = clamp(
@@ -388,11 +415,19 @@ export class CanvasElementService {
   }
 
   getElementTransform(element: CanvasElement): string | null {
-    const rotation = element.rotation ?? 0;
-    if (rotation === 0) {
-      return null;
-    }
-    return `rotate(${rotation}deg)`;
+    return buildCanvasElementTransform(element);
+  }
+
+  getElementTransformOrigin(element: CanvasElement): string | null {
+    return buildCanvasElementTransformOrigin(element);
+  }
+
+  getElementBackfaceVisibility(element: CanvasElement): string | null {
+    return buildCanvasElementBackfaceVisibility(element);
+  }
+
+  getElementTransformStyle(element: CanvasElement): string | null {
+    return buildCanvasElementTransformStyle(element);
   }
 
   getElementBoxShadow(element: CanvasElement): string {
@@ -453,15 +488,15 @@ export class CanvasElementService {
   }
 
   supportsCornerRadius(element: CanvasElement): boolean {
-    return element.type !== 'text' && element.type !== 'frame';
+    return element.type !== 'text' && element.type !== 'frame' && !hasPerCornerRadius(element);
+  }
+
+  getElementBorderRadius(element: CanvasElement): string {
+    return getElementBorderRadiusCss(element);
   }
 
   getCornerRadiusHandleInset(element: CanvasElement): number {
-    const radius = Number.isFinite(element.cornerRadius ?? Number.NaN)
-      ? (element.cornerRadius as number)
-      : element.type === 'image'
-        ? 6
-        : 0;
+    const radius = getDefaultCornerRadius(element);
 
     const handleRadius = 6; // half of 12px handle size
     const maxInset = Math.max(0, Math.min(element.width / 2, element.height / 2) - handleRadius);

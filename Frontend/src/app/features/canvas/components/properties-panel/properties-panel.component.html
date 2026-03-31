@@ -2,15 +2,18 @@
 
   <!-- -- Header -------------------------------------------- -->
   <div class="properties-panel-header">
-    <div class="pp-header-top">
-      <h3>Properties</h3>
-      <span class="pp-element-badge" *ngIf="selectedElement">{{ elementTypeLabel }}</span>
-    </div>
     <div class="properties-tabs">
-      <button type="button" class="properties-tab" [class.active]="isTabActive('design')" (click)="selectTab('design')">Design</button>
-      <button type="button" class="properties-tab" [class.active]="isTabActive('prototype')" (click)="selectTab('prototype')">Prototype</button>
+      <app-toggle-group
+        [options]="propertiesTabOptions"
+        [value]="activeTab"
+        [stretch]="true"
+        [minWidth]="null"
+        [ariaLabel]="'Properties tabs'"
+        (valueChange)="onTabValueChange($event)"></app-toggle-group>
     </div>
   </div>
+
+  <div class="properties-panel-content">
 
   <!-- -- Design Tab --------------------------------------- -->
   <ng-container *ngIf="isTabActive('design'); else prototypeTab">
@@ -49,16 +52,23 @@
 
       <section
         class="properties-section properties-section--collapsible"
-        [class.properties-section--compact]="!hasLink(element)">
-        <div class="properties-section-header">
+        [class.properties-section--compact]="!hasLink(element)"
+        [class.properties-section--actionable]="!hasLink(element)"
+        (click)="!hasLink(element) && onLinkSectionHeaderClick()">
+        <div class="properties-section-header properties-section-header--actionable" (click)="onLinkSectionHeaderClick()">
           <p class="properties-section-title">Link</p>
           <button
             type="button"
             class="pp-section-toggle"
+            [class.pp-section-toggle--minus]="hasLink(element)"
+            [class.pp-section-toggle--plus]="!hasLink(element)"
             [attr.aria-label]="hasLink(element) ? 'Remove link' : 'Add link'"
             [title]="hasLink(element) ? 'Remove link' : 'Add link'"
-            (click)="hasLink(element) ? removeLink() : addLink()">
-            {{ hasLink(element) ? '−' : '+' }}
+            (click)="onLinkSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
           </button>
         </div>
 
@@ -229,24 +239,75 @@
           </div>
         </div>
 
-        <div class="pp-style-row" *ngIf="supportsCornerRadius(element.type)">
+        <div class="pp-style-row pp-style-row--corner-radius" *ngIf="supportsCornerRadius(element.type)">
           <span class="pp-row-label">Radius</span>
-          <div class="pp-style-control">
-            <app-number-input
-              appearance="compact"
-              ariaLabel="Corner radius"
-              [value]="element.cornerRadius ?? (element.type === 'image' ? 6 : 0)"
-              [min]="0"
-              [step]="1"
-              (gestureStarted)="onNumberInputGestureStarted()"
-              (gestureCommitted)="onNumberInputGestureCommitted()"
-              (valueChange)="onNumberChange('cornerRadius', $event)" />
-            <div class="pp-icon-group pp-icon-group--compact">
-              <button type="button" class="pp-icon-btn active" title="Uniform radius">
-                <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                  <rect x="2" y="2" width="9" height="9" rx="2.5" stroke="currentColor" stroke-width="1.3"/>
-                </svg>
-              </button>
+          <div class="pp-style-control pp-style-control--corner-radius">
+            <div class="pp-corner-radius-header">
+              <app-number-input
+                appearance="compact"
+                ariaLabel="Corner radius"
+                [value]="fullCornerRadiusInputValue(element)"
+                [min]="0"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onNumberChange('cornerRadius', $event)" />
+
+              <div class="pp-corner-radius-mode">
+                <app-toggle-group
+                  [ariaLabel]="'Corner radius mode'"
+                  [options]="cornerRadiusModeOptions"
+                  [value]="cornerRadiusMode(element)"
+                  [stretch]="true"
+                  [minWidth]="null"
+                  (valueChange)="onCornerRadiusModeChange($event)"></app-toggle-group>
+              </div>
+            </div>
+
+            <div class="pp-corner-radius-grid" *ngIf="cornerRadiusMode(element) === 'per-corner'">
+              <div class="pp-corner-radius-field" *ngFor="let corner of cornerRadiusFields">
+                <div class="pp-corner-radius-input">
+                  <app-number-input
+                    appearance="compact"
+                    [ariaLabel]="corner.ariaLabel"
+                    [value]="cornerRadiusValue(element, corner.key)"
+                    [min]="0"
+                    [step]="1"
+                    (gestureStarted)="onNumberInputGestureStarted()"
+                    (gestureCommitted)="onNumberInputGestureCommitted()"
+                    (valueChange)="onCornerRadiusCornerChange(corner.key, $event)"></app-number-input>
+                  <span class="pp-corner-radius-tag" aria-hidden="true">
+                    <svg
+                      *ngIf="corner.key === 'topLeft'"
+                      class="pp-corner-radius-tag-icon"
+                      viewBox="0 0 12 12"
+                      fill="none">
+                      <path d="M9.5 2H2V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <svg
+                      *ngIf="corner.key === 'topRight'"
+                      class="pp-corner-radius-tag-icon"
+                      viewBox="0 0 12 12"
+                      fill="none">
+                      <path d="M2.5 2H10V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <svg
+                      *ngIf="corner.key === 'bottomRight'"
+                      class="pp-corner-radius-tag-icon"
+                      viewBox="0 0 12 12"
+                      fill="none">
+                      <path d="M2.5 10H10V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <svg
+                      *ngIf="corner.key === 'bottomLeft'"
+                      class="pp-corner-radius-tag-icon"
+                      viewBox="0 0 12 12"
+                      fill="none">
+                      <path d="M9.5 10H2V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -297,16 +358,23 @@
       <section
         class="properties-section properties-section--collapsible"
         [class.properties-section--compact]="!hasLayout(element)"
+        [class.properties-section--actionable]="!hasLayout(element)"
+        (click)="!hasLayout(element) && onLayoutSectionHeaderClick()"
         *ngIf="supportsLayout(element.type)">
-        <div class="properties-section-header">
+        <div class="properties-section-header properties-section-header--actionable" (click)="onLayoutSectionHeaderClick()">
           <p class="properties-section-title">Layout</p>
           <button
             type="button"
             class="pp-section-toggle"
+            [class.pp-section-toggle--minus]="hasLayout(element)"
+            [class.pp-section-toggle--plus]="!hasLayout(element)"
             [attr.aria-label]="hasLayout(element) ? 'Remove layout' : 'Add layout'"
             [title]="hasLayout(element) ? 'Remove layout' : 'Add layout'"
-            (click)="hasLayout(element) ? removeLayout() : addLayout()">
-            {{ hasLayout(element) ? '−' : '+' }}
+            (click)="onLayoutSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
           </button>
         </div>
 
@@ -598,6 +666,204 @@
           placeholder="https://example.com/image.png" />
       </section>
 
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasTransforms(element)"
+        [class.properties-section--actionable]="!hasTransforms(element)"
+        (click)="!hasTransforms(element) && onTransformSectionHeaderClick($event)">
+        <div
+          class="properties-section-header properties-section-header--menu properties-section-header--actionable"
+          (click)="onTransformSectionHeaderClick($event)">
+          <p class="properties-section-title">Transforms</p>
+          <button
+            type="button"
+            class="pp-section-toggle pp-section-toggle--plus"
+            aria-label="Add transform"
+            title="Add transform"
+            (click)="onTransformSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <ng-container *ngIf="hasTransforms(element)">
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'scale')">
+            <span class="pp-row-label">Scale</span>
+            <div class="pp-style-control pp-style-control--transform-scale">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Scale"
+                [value]="transformScaleValue(element)"
+                [min]="0.1"
+                [step]="0.1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onTransformScaleChange($event)"></app-number-input>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'rotate')">
+            <span class="pp-row-label">Rotate</span>
+            <div class="pp-style-control pp-style-control--transform-rotate">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Rotation"
+                [value]="rotationValue(element)"
+                [step]="1"
+                [suffix]="'°'"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onRotationChange($event)"></app-number-input>
+              <app-toggle-group
+                [ariaLabel]="'Rotation mode'"
+                [options]="rotateModeOptions"
+                [value]="rotationModeValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onRotationModeChange($event)"></app-toggle-group>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'skew')">
+            <span class="pp-row-label">Skew</span>
+            <div class="pp-style-control pp-style-control--transform-dual">
+              <div class="pp-transform-axis-field">
+                <app-number-input
+                  appearance="boxed"
+                  ariaLabel="Skew X"
+                  [value]="skewXValue(element)"
+                  [step]="1"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onSkewChange('x', $event)"></app-number-input>
+                <span class="pp-transform-axis-tag">X</span>
+              </div>
+              <div class="pp-transform-axis-field">
+                <app-number-input
+                  appearance="boxed"
+                  ariaLabel="Skew Y"
+                  [value]="skewYValue(element)"
+                  [step]="1"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onSkewChange('y', $event)"></app-number-input>
+                <span class="pp-transform-axis-tag">Y</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'depth')">
+            <span class="pp-row-label">Depth</span>
+            <div class="pp-style-control pp-style-control--transform-slider">
+              <app-number-input
+                appearance="compact"
+                ariaLabel="Depth"
+                [value]="depthValue(element)"
+                [min]="-1000"
+                [max]="1000"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onDepthChange($event)"></app-number-input>
+              <input
+                class="pp-slider"
+                type="range"
+                min="-1000"
+                max="1000"
+                step="1"
+                [style.--pp-slider-value]="transformSliderPercent(depthValue(element), -1000, 1000)"
+                [value]="depthValue(element)"
+                (input)="onDepthChange($any($event.target).valueAsNumber)" />
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'perspective')">
+            <span class="pp-row-label">Perspective</span>
+            <div class="pp-style-control pp-style-control--transform-slider">
+              <app-number-input
+                appearance="compact"
+                ariaLabel="Perspective"
+                [value]="perspectiveValue(element)"
+                [min]="100"
+                [max]="3000"
+                [step]="10"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onPerspectiveChange($event)"></app-number-input>
+              <input
+                class="pp-slider"
+                type="range"
+                min="100"
+                max="3000"
+                step="10"
+                [style.--pp-slider-value]="transformSliderPercent(perspectiveValue(element), 100, 3000)"
+                [value]="perspectiveValue(element)"
+                (input)="onPerspectiveChange($any($event.target).valueAsNumber)" />
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'origin')">
+            <span class="pp-row-label">Origin</span>
+            <div class="pp-style-control pp-style-control--transform-dual">
+              <div class="pp-transform-axis-field pp-transform-axis-field--percent">
+                <app-number-input
+                  appearance="boxed"
+                  ariaLabel="Origin X"
+                  [value]="originXValue(element)"
+                  [min]="0"
+                  [max]="100"
+                  [step]="1"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onOriginChange('x', $event)"></app-number-input>
+                <span class="pp-transform-axis-tag">%</span>
+              </div>
+              <div class="pp-transform-axis-field pp-transform-axis-field--percent">
+                <app-number-input
+                  appearance="boxed"
+                  ariaLabel="Origin Y"
+                  [value]="originYValue(element)"
+                  [min]="0"
+                  [max]="100"
+                  [step]="1"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onOriginChange('y', $event)"></app-number-input>
+                <span class="pp-transform-axis-tag">%</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'backface')">
+            <span class="pp-row-label">Backface</span>
+            <div class="pp-style-control pp-style-control--transform-toggle">
+              <app-toggle-group
+                [ariaLabel]="'Backface visibility'"
+                [options]="backfaceVisibilityOptions"
+                [value]="backfaceVisibilityValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onBackfaceVisibilityChange($event)"></app-toggle-group>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'preserve3d')">
+            <span class="pp-row-label">Preserve 3D</span>
+            <div class="pp-style-control pp-style-control--transform-toggle">
+              <app-toggle-group
+                [ariaLabel]="'Preserve 3D'"
+                [options]="preserve3DOptions"
+                [value]="preserve3DValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onPreserve3DChange($event)"></app-toggle-group>
+            </div>
+          </div>
+        </ng-container>
+      </section>
+
     </ng-container>
   </ng-container>
 
@@ -660,5 +926,13 @@
     </section>
 
   </ng-template>
-
+  </div>
 </aside>
+
+<app-context-menu
+  *ngIf="transformMenuItems.length > 0"
+  [x]="transformMenuX"
+  [y]="transformMenuY"
+  [verticalDirection]="'below'"
+  [items]="transformMenuItems"
+  (closed)="closeTransformMenu()"></app-context-menu>

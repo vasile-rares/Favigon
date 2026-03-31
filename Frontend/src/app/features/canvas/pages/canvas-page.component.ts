@@ -192,10 +192,10 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     ),
   );
 
-  /** Elements rendered at the top level (flat). Excludes children of layout containers. */
+  /** Elements rendered at the top level (flat). Excludes children of any container. */
   readonly topLevelVisibleElements = computed<CanvasElement[]>(() => {
     const all = this.visibleElements();
-    return all.filter((el) => !this.hasLayoutAncestor(el, all));
+    return all.filter((el) => !this.hasContainerAncestor(el, all));
   });
 
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
@@ -983,7 +983,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
   getTopLevelVisibleElementsForPage(pageId: string): CanvasElement[] {
     const all = this.getVisibleElementsForPage(pageId);
-    return all.filter((el) => !this.hasLayoutAncestor(el, all));
+    return all.filter((el) => !this.hasContainerAncestor(el, all));
   }
 
   getLayoutChildrenForPage(element: CanvasElement, pageId: string): CanvasElement[] {
@@ -1605,12 +1605,17 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const applyPatch = (): void => {
       this.updateCurrentPageElements((elements) => {
         let effectivePatch = patch;
+        let layoutTransitionContainerIds: string[] = [];
         const withPatch = elements.map((element) => {
           if (element.id !== selectedId) {
             return element;
           }
           let nextElement: CanvasElement = { ...element, ...patch };
           this.el.normalizeElement(nextElement, elements);
+
+          if (this.didContainerLayoutStateChange(element, nextElement)) {
+            layoutTransitionContainerIds = [element.id];
+          }
 
           const textLayoutPatch = this.getAutoSizedTextLayoutPatch(element, nextElement, patch);
           if (textLayoutPatch) {
@@ -1622,11 +1627,29 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
         });
         const patchedEl = withPatch.find((e) => e.id === selectedId);
         if (patchedEl?.primarySyncId) {
-          return withPatch.map((e) =>
+          const detached = withPatch.map((e) =>
             e.id === selectedId ? { ...e, primarySyncId: undefined } : e,
           );
+          return this.applyLayoutTransitionsForContainers(
+            elements,
+            detached,
+            layoutTransitionContainerIds,
+          );
         }
-        return this.syncElementPatchToPrimary(selectedId, effectivePatch, withPatch);
+
+        const synced = this.syncElementPatchToPrimary(selectedId, effectivePatch, withPatch);
+        if (layoutTransitionContainerIds.length === 0) {
+          return synced;
+        }
+
+        const syncedContainerIds = synced
+          .filter((element) => element.primarySyncId === selectedId)
+          .map((element) => element.id);
+
+        return this.applyLayoutTransitionsForContainers(elements, synced, [
+          ...layoutTransitionContainerIds,
+          ...syncedContainerIds,
+        ]);
       });
     };
 
@@ -2133,6 +2156,10 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     return this.el.getElementStrokeStyle(element);
   }
 
+  getElementBorderRadius(element: CanvasElement): string {
+    return this.el.getElementBorderRadius(element);
+  }
+
   getElementBoxShadow(element: CanvasElement): string {
     return this.el.getElementBoxShadow(element);
   }
@@ -2186,22 +2213,26 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     return !!element.display && (element.type === 'frame' || element.type === 'rectangle');
   }
 
+  isContainerElement(element: CanvasElement): boolean {
+    return this.el.isContainerElement(element);
+  }
+
   /** True if this is a flow child (parent has layout, element not absolute/fixed). */
   isChildInFlow(element: CanvasElement): boolean {
     const pos = element.position;
     return !pos || pos === 'static' || pos === 'relative' || pos === 'sticky';
   }
 
-  /** True if this element or any ancestor is a child of a layout container. */
-  private hasLayoutAncestor(element: CanvasElement, elements: CanvasElement[]): boolean {
+  /** True if this element has any container ancestor and should render inside that subtree. */
+  private hasContainerAncestor(element: CanvasElement, elements: CanvasElement[]): boolean {
     if (!element.parentId) return false;
     const parent = this.el.findElementById(element.parentId, elements);
     if (!parent) return false;
-    if (this.isLayoutContainer(parent)) return true;
-    return this.hasLayoutAncestor(parent, elements);
+    if (this.isContainerElement(parent)) return true;
+    return this.hasContainerAncestor(parent, elements);
   }
 
-  /** Direct children of a layout container, visible only. */
+  /** Direct children of a container, visible only. */
   getLayoutChildren(element: CanvasElement): CanvasElement[] {
     return this.visibleElements().filter((el) => el.parentId === element.id);
   }
@@ -2403,12 +2434,21 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       const dragged = elements.find((el) => el.id === draggedId);
       if (!dragged) return elements;
 
+      const container = this.el.findElementById(containerId, elements);
+      if (!container) return elements;
+
       const flowSiblings = elements.filter(
         (el) => el.parentId === containerId && el.id !== draggedId && this.isChildInFlow(el),
       );
 
       const rest = elements.filter((el) => el.id !== draggedId);
-      const updatedDragged = { ...dragged, x: 0, y: 0 };
+      const updatedDragged = {
+        ...dragged,
+        parentId: container.id,
+        x: 0,
+        y: 0,
+        position: this.el.getDefaultPositionForPlacement(dragged.type, container),
+      };
 
       const insertBeforeId = dropIndex < flowSiblings.length ? flowSiblings[dropIndex].id : null;
 
@@ -2450,7 +2490,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
               parentId: null,
               x: roundToTwoDecimals(absBounds.x),
               y: roundToTwoDecimals(absBounds.y),
-              position: undefined,
+              position: this.el.getDefaultPositionForPlacement(el.type, null),
             }
           : el,
       );
@@ -2458,17 +2498,24 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   private restoreFlowChildToContainer(draggedId: string): void {
-    this.updateCurrentPageElements((elements) =>
-      elements.map((el) =>
+    this.updateCurrentPageElements((elements) => {
+      const dragged = elements.find((el) => el.id === draggedId);
+      if (!dragged) {
+        return elements;
+      }
+
+      const parent = this.el.findElementById(dragged.parentId ?? null, elements);
+      return elements.map((el) =>
         el.id === draggedId
           ? {
               ...el,
               x: 0,
               y: 0,
+              position: this.el.getDefaultPositionForPlacement(el.type, parent),
             }
           : el,
-      ),
-    );
+      );
+    });
   }
 
   // ── Drop indicator helpers ────────────────────────────────
@@ -2821,6 +2868,18 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
   getElementTransform(element: CanvasElement): string | null {
     return this.el.getElementTransform(element);
+  }
+
+  getElementTransformOrigin(element: CanvasElement): string | null {
+    return this.el.getElementTransformOrigin(element);
+  }
+
+  getElementBackfaceVisibility(element: CanvasElement): string | null {
+    return this.el.getElementBackfaceVisibility(element);
+  }
+
+  getElementTransformStyle(element: CanvasElement): string | null {
+    return this.el.getElementTransformStyle(element);
   }
 
   // ── Keyboard ──────────────────────────────────────────────
@@ -3626,6 +3685,101 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     return this.el.getAbsoluteBounds(element, this.elements());
   }
 
+  private didContainerLayoutStateChange(
+    previousElement: CanvasElement,
+    nextElement: CanvasElement,
+  ): boolean {
+    return this.isLayoutContainer(previousElement) !== this.isLayoutContainer(nextElement);
+  }
+
+  private applyLayoutTransitionsForContainers(
+    previousElements: CanvasElement[],
+    nextElements: CanvasElement[],
+    containerIds: readonly string[],
+  ): CanvasElement[] {
+    let updatedElements = nextElements;
+    const seenContainerIds = new Set<string>();
+
+    for (const containerId of containerIds) {
+      if (!containerId || seenContainerIds.has(containerId)) {
+        continue;
+      }
+
+      seenContainerIds.add(containerId);
+      updatedElements = this.applyLayoutTransitionForContainer(
+        previousElements,
+        updatedElements,
+        containerId,
+      );
+    }
+
+    return updatedElements;
+  }
+
+  private applyLayoutTransitionForContainer(
+    previousElements: CanvasElement[],
+    nextElements: CanvasElement[],
+    containerId: string,
+  ): CanvasElement[] {
+    const previousContainer = previousElements.find((element) => element.id === containerId);
+    const nextContainer = nextElements.find((element) => element.id === containerId);
+    if (!previousContainer || !nextContainer) {
+      return nextElements;
+    }
+
+    const hadLayout = this.isLayoutContainer(previousContainer);
+    const hasLayout = this.isLayoutContainer(nextContainer);
+    if (hadLayout === hasLayout) {
+      return nextElements;
+    }
+
+    const previousContainerBounds = this.getFlowAwareBounds(previousContainer, previousElements);
+
+    return nextElements.map((element) => {
+      if (element.parentId !== containerId) {
+        return element;
+      }
+
+      if (hasLayout) {
+        return {
+          ...element,
+          x: 0,
+          y: 0,
+          position: this.el.getDefaultPositionForPlacement(element.type, nextContainer),
+        };
+      }
+
+      const previousChild = previousElements.find((candidate) => candidate.id === element.id) ?? element;
+      const childBounds = this.getFlowAwareBounds(previousChild, previousElements);
+
+      return {
+        ...element,
+        x: roundToTwoDecimals(
+          clamp(childBounds.x - previousContainerBounds.x, 0, nextContainer.width - element.width),
+        ),
+        y: roundToTwoDecimals(
+          clamp(childBounds.y - previousContainerBounds.y, 0, nextContainer.height - element.height),
+        ),
+        position: this.el.getDefaultPositionForPlacement(element.type, nextContainer),
+      };
+    });
+  }
+
+  private getFlowAwareBounds(element: CanvasElement, elements: CanvasElement[]): Bounds {
+    const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
+    if (cached) {
+      const layout = this.activePageLayout();
+      return {
+        x: roundToTwoDecimals(cached.x - (layout?.x ?? 0)),
+        y: roundToTwoDecimals(cached.y - (layout?.y ?? 0)),
+        width: cached.width,
+        height: cached.height,
+      };
+    }
+
+    return this.el.getAbsoluteBounds(element, elements);
+  }
+
   private getElementNestingDepth(element: CanvasElement, elements: CanvasElement[]): number {
     let depth = 0;
     let currentParentId = element.parentId ?? null;
@@ -3732,6 +3886,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
           ? {
               ...el,
               parentId: target.id,
+              position: this.el.getDefaultPositionForPlacement(el.type, target),
               x: isTargetLayout
                 ? 0
                 : clamp(elementBounds.x - fb.x, 0, target.width - element.width),
@@ -4001,8 +4156,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       this.updateCurrentPageElements((elements) =>
         elements.map((el) => {
           if (el.id !== elementId) return el;
-          const currentScale = (el as CanvasElement & { scaleX?: number }).scaleX ?? 1;
-          return { ...el, scaleX: currentScale === -1 ? 1 : -1 } as CanvasElement;
+          const currentScale = el.scaleX ?? 1;
+          return { ...el, scaleX: currentScale === -1 ? 1 : -1 };
         }),
       );
     });
@@ -4013,8 +4168,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       this.updateCurrentPageElements((elements) =>
         elements.map((el) => {
           if (el.id !== elementId) return el;
-          const currentScale = (el as CanvasElement & { scaleY?: number }).scaleY ?? 1;
-          return { ...el, scaleY: currentScale === -1 ? 1 : -1 } as CanvasElement;
+          const currentScale = el.scaleY ?? 1;
+          return { ...el, scaleY: currentScale === -1 ? 1 : -1 };
         }),
       );
     });

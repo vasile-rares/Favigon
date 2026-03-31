@@ -1,5 +1,6 @@
 ﻿import {
   CanvasAlignItems,
+  CanvasCornerRadii,
   CanvasDisplayMode,
   CanvasElement,
   CanvasFontSizeUnit,
@@ -30,6 +31,13 @@ import {
   PositionMode,
   px,
 } from '../../../core/models/ir.models';
+import {
+  buildCanvasElementBackfaceVisibility,
+  buildCanvasElementTransform,
+  buildCanvasElementTransformOrigin,
+  buildCanvasElementTransformStyle,
+  parseCanvasTransformStyle,
+} from '../utils/canvas-transform.util';
 
 const ROOT_ROLE = 'canvas-root';
 const ROOT_TYPE = 'Container';
@@ -340,6 +348,13 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     style.borderRadius = px(element.cornerRadius);
   }
 
+  if (element.cornerRadii) {
+    style.borderTopLeftRadius = px(element.cornerRadii.topLeft);
+    style.borderTopRightRadius = px(element.cornerRadii.topRight);
+    style.borderBottomRightRadius = px(element.cornerRadii.bottomRight);
+    style.borderBottomLeftRadius = px(element.cornerRadii.bottomLeft);
+  }
+
   if (element.type === 'text') {
     if (element.fontSize) {
       style.fontSize = length(element.fontSize, element.fontSizeUnit ?? 'px');
@@ -368,6 +383,26 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
 
   if (element.padding) style.padding = buildIRSpacing(element.padding);
   if (element.margin) style.margin = buildIRSpacing(element.margin);
+
+  const transform = buildCanvasElementTransform(element);
+  if (transform) {
+    style.transform = transform;
+  }
+
+  const transformOrigin = buildCanvasElementTransformOrigin(element);
+  if (transformOrigin) {
+    style.transformOrigin = transformOrigin;
+  }
+
+  const backfaceVisibility = buildCanvasElementBackfaceVisibility(element);
+  if (backfaceVisibility) {
+    style.backfaceVisibility = backfaceVisibility;
+  }
+
+  const transformStyle = buildCanvasElementTransformStyle(element);
+  if (transformStyle) {
+    style.transformStyle = transformStyle;
+  }
 
   return style;
 }
@@ -515,8 +550,18 @@ function mapPositionMode(pos: CanvasPositionMode): PositionMode {
 function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
   const mappedType = mapIRType(node.type);
   const defaults = mappedType === 'text' ? DEFAULT_ELEMENT_SIZE.text : DEFAULT_ELEMENT_SIZE.generic;
+  const defaultCornerRadius = mappedType === 'image' ? DEFAULT_IMAGE_RADIUS : 0;
+  const cornerRadius =
+    mappedType !== 'text'
+      ? resolveImportedCornerRadius(node.style, defaultCornerRadius)
+      : undefined;
+  const cornerRadii =
+    mappedType !== 'text'
+      ? readCornerRadii(node.style, cornerRadius ?? defaultCornerRadius)
+      : undefined;
 
   const preservedProps = removeManagedProps(node.props);
+  const transformFields = parseCanvasTransformStyle(node.style);
 
   return {
     id: node.id,
@@ -538,10 +583,8 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
         : undefined,
     strokeStyle: mappedType !== 'text' ? (node.style?.border?.style ?? 'Solid') : undefined,
     opacity: readNumber(node.style?.opacity, DEFAULT_OPACITY),
-    cornerRadius:
-      mappedType !== 'text'
-        ? readLength(node.style?.borderRadius, mappedType === 'image' ? DEFAULT_IMAGE_RADIUS : 0)
-        : undefined,
+    cornerRadius,
+    cornerRadii,
     overflow:
       mappedType === 'frame'
         ? readOverflow(node.style?.overflow, readOverflowFromProps(node.props, 'clip'))
@@ -576,6 +619,7 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     linkType: readLinkTypeFromProps(node.props),
     linkPageId: readOptionalStringProp(node.props, 'linkPageId') ?? undefined,
     linkUrl: readOptionalStringProp(node.props, 'href') ?? undefined,
+    ...transformFields,
     irMeta: {
       type: node.type,
       props: preservedProps,
@@ -722,6 +766,50 @@ function readLength(len: IRLength | undefined, fallback: number): number {
     return fallback;
   }
   return Number.isFinite(len.value) ? len.value : fallback;
+}
+
+function readCornerRadii(
+  style: IRStyle | undefined,
+  fallback: number,
+): CanvasCornerRadii | undefined {
+  if (!style) {
+    return undefined;
+  }
+
+  const hasSpecificCornerRadius =
+    style.borderTopLeftRadius !== undefined ||
+    style.borderTopRightRadius !== undefined ||
+    style.borderBottomRightRadius !== undefined ||
+    style.borderBottomLeftRadius !== undefined;
+
+  if (!hasSpecificCornerRadius) {
+    return undefined;
+  }
+
+  return {
+    topLeft: readLength(style.borderTopLeftRadius, fallback),
+    topRight: readLength(style.borderTopRightRadius, fallback),
+    bottomRight: readLength(style.borderBottomRightRadius, fallback),
+    bottomLeft: readLength(style.borderBottomLeftRadius, fallback),
+  };
+}
+
+function resolveImportedCornerRadius(style: IRStyle | undefined, fallback: number): number {
+  if (!style) {
+    return fallback;
+  }
+
+  if (style.borderRadius) {
+    return readLength(style.borderRadius, fallback);
+  }
+
+  return readLength(
+    style.borderTopLeftRadius ??
+      style.borderTopRightRadius ??
+      style.borderBottomRightRadius ??
+      style.borderBottomLeftRadius,
+    fallback,
+  );
 }
 
 function readLengthUnit<TUnit extends string>(

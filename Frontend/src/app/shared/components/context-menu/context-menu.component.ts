@@ -15,6 +15,8 @@ import {
 export interface ContextMenuItem {
   id: string;
   label: string;
+  checked?: boolean;
+  showCheckSlot?: boolean;
   shortcut?: string;
   variant?: 'danger';
   disabled?: boolean;
@@ -23,6 +25,8 @@ export interface ContextMenuItem {
   children?: ContextMenuItem[];
   action?: () => void;
 }
+
+export type ContextMenuVerticalDirection = 'below' | 'above';
 
 @Component({
   selector: 'app-context-menu',
@@ -35,16 +39,19 @@ export class ContextMenuComponent implements OnChanges, OnInit, OnDestroy {
   @Input() x = 0;
   @Input() y = 0;
   @Input() items: ContextMenuItem[] = [];
+  @Input() verticalDirection: ContextMenuVerticalDirection = 'below';
 
   @Output() closed = new EventEmitter<void>();
 
   adjustedX = 0;
   adjustedY = 0;
   openSubmenuId: string | null = null;
+  isClosing = false;
+  private closeTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private readonly onDocumentPointerDownCapture = (event: PointerEvent): void => {
     if (!this.el.nativeElement.contains(event.target as Node)) {
-      this.closed.emit();
+      this.requestClose();
     }
   };
 
@@ -56,10 +63,15 @@ export class ContextMenuComponent implements OnChanges, OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     document.removeEventListener('pointerdown', this.onDocumentPointerDownCapture, true);
+    if (this.closeTimeout) {
+      clearTimeout(this.closeTimeout);
+      this.closeTimeout = null;
+    }
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['x'] || changes['y']) {
+    if (changes['x'] || changes['y'] || changes['items'] || changes['verticalDirection']) {
+      this.isClosing = false;
       this.openSubmenuId = null;
       this.adjustPosition();
     }
@@ -77,26 +89,43 @@ export class ContextMenuComponent implements OnChanges, OnInit, OnDestroy {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
+      this.adjustedY =
+        this.verticalDirection === 'above' ? Math.max(8, this.y - rect.height) : this.y;
+
       if (rect.right > vw) this.adjustedX = Math.max(0, this.x - rect.width);
-      if (rect.bottom > vh) this.adjustedY = Math.max(0, this.y - rect.height);
+      if (this.verticalDirection === 'below' && rect.bottom > vh) {
+        this.adjustedY = Math.max(0, this.y - rect.height);
+      }
     });
   }
 
   onItemClick(item: ContextMenuItem): void {
     if (item.disabled || item.children?.length) return;
     item.action?.();
-    this.closed.emit();
+    this.requestClose();
   }
 
   onSubmenuItemClick(item: ContextMenuItem): void {
     if (item.disabled) return;
     item.action?.();
     this.openSubmenuId = null;
-    this.closed.emit();
+    this.requestClose();
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
-    this.closed.emit();
+    this.requestClose();
+  }
+
+  requestClose(): void {
+    if (this.isClosing) {
+      return;
+    }
+
+    this.isClosing = true;
+    this.closeTimeout = setTimeout(() => {
+      this.closeTimeout = null;
+      this.closed.emit();
+    }, 120);
   }
 }

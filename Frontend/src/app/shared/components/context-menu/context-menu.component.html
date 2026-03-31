@@ -1,5 +1,7 @@
 <div
   class="context-menu__panel glass-panel"
+  [class.context-menu__panel--closing]="isClosing"
+  [class.context-menu__panel--above]="verticalDirection === 'above'"
   role="menu"
   [style.left.px]="adjustedX"
   [style.top.px]="adjustedY"
@@ -17,7 +19,16 @@
         role="menuitem"
         [class.context-menu__item--disabled]="item.disabled"
         (mouseenter)="openSubmenuId = item.disabled ? null : item.id">
-        <span class="context-menu__item-label">{{ item.label }}</span>
+        <span class="context-menu__item-main" [class.context-menu__item-main--with-check]="item.showCheckSlot">
+          @if (item.showCheckSlot) {
+            <span class="context-menu__item-check" [class.context-menu__item-check--active]="item.checked" aria-hidden="true">
+              <svg class="context-menu__item-check-icon" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1.5 5L3.8 7.3L8.5 2.6" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+          }
+          <span class="context-menu__item-label">{{ item.label }}</span>
+        </span>
         <span class="context-menu__item-arrow">›</span>
 
         @if (openSubmenuId === item.id) {
@@ -29,7 +40,16 @@
                 role="menuitem"
                 [disabled]="child.disabled"
                 (click)="onSubmenuItemClick(child)">
-                <span class="context-menu__item-label">{{ child.label }}</span>
+                <span class="context-menu__item-main" [class.context-menu__item-main--with-check]="child.showCheckSlot">
+                  @if (child.showCheckSlot) {
+                    <span class="context-menu__item-check" [class.context-menu__item-check--active]="child.checked" aria-hidden="true">
+                      <svg class="context-menu__item-check-icon" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M1.5 5L3.8 7.3L8.5 2.6" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" />
+                      </svg>
+                    </span>
+                  }
+                  <span class="context-menu__item-label">{{ child.label }}</span>
+                </span>
                 @if (child.shortcut) {
                   <span class="context-menu__item-shortcut">{{ child.shortcut }}</span>
                 }
@@ -48,7 +68,16 @@
         [disabled]="item.disabled"
         (mouseenter)="openSubmenuId = null"
         (click)="onItemClick(item)">
-        <span class="context-menu__item-label">{{ item.label }}</span>
+        <span class="context-menu__item-main" [class.context-menu__item-main--with-check]="item.showCheckSlot">
+          @if (item.showCheckSlot) {
+            <span class="context-menu__item-check" [class.context-menu__item-check--active]="item.checked" aria-hidden="true">
+              <svg class="context-menu__item-check-icon" width="10" height="10" viewBox="0 0 10 10" fill="none">
+                <path d="M1.5 5L3.8 7.3L8.5 2.6" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </span>
+          }
+          <span class="context-menu__item-label">{{ item.label }}</span>
+        </span>
         @if (item.shortcut) {
           <span class="context-menu__item-shortcut">{{ item.shortcut }}</span>
         }

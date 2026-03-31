@@ -20,6 +20,11 @@ import {
   ContextMenuComponent,
   ContextMenuItem,
 } from '../../../../shared/components/context-menu/context-menu.component';
+import {
+  ToggleGroupComponent,
+  ToggleGroupOption,
+} from '../../../../shared/components/toggle-group/toggle-group.component';
+import { DeviceFramePreset, VIEWPORT_PRESET_OPTIONS } from '../../canvas.types';
 import { formatCanvasElementTypeLabel } from '../../utils/canvas-label.util';
 
 interface LayerEntry {
@@ -34,21 +39,27 @@ interface LayerEntry {
   isEffectivelyHidden: boolean;
   hasChildren: boolean;
   hasLayout: boolean;
+  devicePreset: Exclude<DeviceFramePreset, 'custom'> | null;
 }
 
 type LayerDropPosition = 'before' | 'after' | 'inside';
 type PageRenameSource = 'pages' | 'layers';
 type PageMenuContext = 'pages' | 'layers';
+type ProjectPanelTab = 'navigator' | 'ai-chat';
 
 const DEFAULT_PANEL_WIDTH = 280;
 const MIN_PANEL_WIDTH = 280;
 const MAX_PANEL_WIDTH = 560;
 const PANEL_VIEWPORT_GUTTER = 240;
+const DEVICE_FRAME_PRESET_OPTIONS = VIEWPORT_PRESET_OPTIONS.filter(
+  (option): option is { id: Exclude<DeviceFramePreset, 'custom'>; label: string; width: number; height: number } =>
+    option.id === 'desktop' || option.id === 'tablet' || option.id === 'mobile',
+);
 
 @Component({
   selector: 'app-project-panel',
   standalone: true,
-  imports: [CommonModule, ContextMenuComponent],
+  imports: [CommonModule, ContextMenuComponent, ToggleGroupComponent],
   templateUrl: './project-panel.component.html',
   styleUrl: './project-panel.component.css',
 })
@@ -103,6 +114,21 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
   pageMenuItems: ContextMenuItem[] = [];
   pageMenuX = 0;
   pageMenuY = 0;
+  activeTab: ProjectPanelTab = 'navigator';
+  readonly panelTabOptions: readonly ToggleGroupOption[] = [
+    {
+      label: 'Navigator',
+      value: 'navigator',
+      ariaLabel: 'Open navigator tab',
+      title: 'Navigator',
+    },
+    {
+      label: 'AI Chat',
+      value: 'ai-chat',
+      ariaLabel: 'Open AI chat tab',
+      title: 'AI Chat',
+    },
+  ];
   private pageMenuContext: PageMenuContext | null = null;
   private editingPageName = '';
   private editingPageSource: PageRenameSource | null = null;
@@ -143,6 +169,13 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
   ngOnDestroy(): void {
     window.removeEventListener('canvas:rename-request', this.renameRequestListener);
     this.stopPanelResize();
+  }
+
+  onTabValueChange(value: string | number | boolean): void {
+    if (value === 'navigator' || value === 'ai-chat') {
+      this.activeTab = value;
+      this.closePageMenu();
+    }
   }
 
   @HostListener('window:pointermove', ['$event'])
@@ -567,6 +600,12 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
     return this.getLayerEntriesForPage(pageId).length > 0;
   }
 
+  pageLayerHasActiveLayout(pageId: string): boolean {
+    return this.getLayerEntriesForPage(pageId).some(
+      (entry) => entry.depth === 0 && entry.hasLayout,
+    );
+  }
+
   isPageLayerCollapsed(pageId: string): boolean {
     return this.collapsedPageLayers.has(pageId);
   }
@@ -729,6 +768,7 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
           isEffectivelyHidden,
           hasChildren: (childrenByParent.get(child.id)?.length ?? 0) > 0,
           hasLayout: !!child.display,
+          devicePreset: this.getDeviceFramePreset(child),
         });
 
         if (!this.collapsedLayers.has(child.id)) {
@@ -739,6 +779,31 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
 
     walk(null, 0, false);
     return entries;
+  }
+
+  private getDeviceFramePreset(
+    element: CanvasElement,
+  ): Exclude<DeviceFramePreset, 'custom'> | null {
+    if (element.type !== 'frame' || element.parentId) {
+      return null;
+    }
+
+    const normalizedName = (element.name ?? '').trim().toLowerCase();
+    if (normalizedName.startsWith('desktop')) {
+      return 'desktop';
+    }
+
+    if (normalizedName.startsWith('tablet')) {
+      return 'tablet';
+    }
+
+    if (normalizedName.startsWith('mobile')) {
+      return 'mobile';
+    }
+
+    const roundedWidth = Math.round(element.width);
+    const matchedPreset = DEVICE_FRAME_PRESET_OPTIONS.find((option) => option.width === roundedWidth);
+    return matchedPreset?.id ?? null;
   }
 
   private clearDragState(): void {

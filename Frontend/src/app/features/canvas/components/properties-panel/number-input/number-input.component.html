@@ -9,6 +9,10 @@
     [step]="step"
     (input)="onInputChange($event)" />
 
+  @if (hasInlineSuffix) {
+    <span class="number-input__suffix" aria-hidden="true">{{ suffix }}</span>
+  }
+
   <div class="number-input__stepper">
     <button type="button" class="number-input__stepper-btn" [attr.aria-label]="'Increase ' + ariaLabel.toLowerCase()" (pointerdown)="onStepperPointerDown(1, $event)">
       <svg class="number-input__stepper-icon" width="8" height="6" viewBox="0 0 8 6" fill="none" aria-hidden="true">

@@ -39,7 +39,7 @@
 .style-popup-overlay__title {
   margin: 0;
   color: var(--color-zinc-100);
-  font-size: 0.84rem;
+  font-size: var(--canvas-panel-font-size, 0.84rem);
   font-weight: 600;
 }
 

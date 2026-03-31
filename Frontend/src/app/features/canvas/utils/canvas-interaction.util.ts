@@ -1,4 +1,4 @@
-import { CanvasElement } from '../../../core/models/canvas.models';
+import { CanvasCornerRadii, CanvasElement } from '../../../core/models/canvas.models';
 import { clamp, roundToTwoDecimals } from './canvas-math.util';
 
 const MIN_SIZE = 24;
@@ -29,7 +29,66 @@ export function withRoundedPrecision(element: CanvasElement): CanvasElement {
         : undefined,
     lineHeight:
       typeof element.lineHeight === 'number' ? roundToTwoDecimals(element.lineHeight) : undefined,
+    cornerRadius:
+      typeof element.cornerRadius === 'number'
+        ? roundToTwoDecimals(element.cornerRadius)
+        : undefined,
+    cornerRadii: element.cornerRadii
+      ? roundCornerRadii(element.cornerRadii)
+      : undefined,
   };
+}
+
+export function getDefaultCornerRadius(element: Pick<CanvasElement, 'type' | 'cornerRadius'>): number {
+  return Number.isFinite(element.cornerRadius ?? Number.NaN)
+    ? roundToTwoDecimals(element.cornerRadius as number)
+    : element.type === 'image'
+      ? 6
+      : 0;
+}
+
+export function buildUniformCornerRadii(radius: number): CanvasCornerRadii {
+  const normalizedRadius = Math.max(0, roundToTwoDecimals(radius));
+  return {
+    topLeft: normalizedRadius,
+    topRight: normalizedRadius,
+    bottomRight: normalizedRadius,
+    bottomLeft: normalizedRadius,
+  };
+}
+
+export function roundCornerRadii(radii: CanvasCornerRadii): CanvasCornerRadii {
+  return {
+    topLeft: Math.max(0, roundToTwoDecimals(radii.topLeft)),
+    topRight: Math.max(0, roundToTwoDecimals(radii.topRight)),
+    bottomRight: Math.max(0, roundToTwoDecimals(radii.bottomRight)),
+    bottomLeft: Math.max(0, roundToTwoDecimals(radii.bottomLeft)),
+  };
+}
+
+export function getResolvedCornerRadii(element: Pick<CanvasElement, 'type' | 'cornerRadius' | 'cornerRadii'>): CanvasCornerRadii {
+  if (element.cornerRadii) {
+    return roundCornerRadii(element.cornerRadii);
+  }
+
+  return buildUniformCornerRadii(getDefaultCornerRadius(element));
+}
+
+export function hasPerCornerRadius(
+  element: Pick<CanvasElement, 'cornerRadii'>,
+): boolean {
+  return !!element.cornerRadii;
+}
+
+export function getElementBorderRadiusCss(
+  element: Pick<CanvasElement, 'type' | 'cornerRadius' | 'cornerRadii'>,
+): string {
+  if (!hasPerCornerRadius(element)) {
+    return `${getDefaultCornerRadius(element)}px`;
+  }
+
+  const radii = getResolvedCornerRadii(element);
+  return `${radii.topLeft}px ${radii.topRight}px ${radii.bottomRight}px ${radii.bottomLeft}px`;
 }
 
 /** Mutates `element` in place to enforce minimum sizes, valid ranges, and frame constraints. */
@@ -73,12 +132,10 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
   element.opacity = clamp(normalizedOpacity, 0, 1);
 
   if (element.type !== 'text') {
-    const normalizedCornerRadius = Number.isFinite(element.cornerRadius ?? Number.NaN)
-      ? (element.cornerRadius as number)
-      : element.type === 'image'
-        ? 6
-        : 0;
-    element.cornerRadius = Math.max(0, roundToTwoDecimals(normalizedCornerRadius));
+    element.cornerRadius = getDefaultCornerRadius(element);
+    element.cornerRadii = element.cornerRadii
+      ? roundCornerRadii(element.cornerRadii)
+      : undefined;
   }
 
   if (element.type !== 'text') {

@@ -1,5 +1,5 @@
 import { CanvasElement, CanvasPageModel } from '../../../core/models/canvas.models';
-import { getAbsolutePos } from './canvas-interaction.util';
+import { getAbsolutePos, getResolvedCornerRadii } from './canvas-interaction.util';
 
 const THUMB_W = 300;
 const THUMB_H = 168;
@@ -90,7 +90,7 @@ function drawElement(
       drawText(ctx, el, x, y, w, h, scale);
       break;
     case 'image':
-      drawImagePlaceholder(ctx, x, y, w, h);
+      drawImagePlaceholder(ctx, el, x, y, w, h, scale);
       break;
     default:
       drawRect(ctx, el, x, y, w, h, scale);
@@ -108,13 +108,8 @@ function drawRect(
   h: number,
   scale: number,
 ): void {
-  const r = Math.min((el.cornerRadius ?? 0) * scale, Math.min(w, h) / 2);
   ctx.beginPath();
-  if (ctx.roundRect) {
-    ctx.roundRect(x, y, w, h, r);
-  } else {
-    ctx.rect(x, y, w, h);
-  }
+  buildRoundedRectPath(ctx, x, y, w, h, getScaledCornerRadii(el, scale, w, h));
 
   if (el.fill && el.fill !== 'transparent') {
     ctx.fillStyle = el.fill;
@@ -167,16 +162,21 @@ function resolveTextFontSizeInPixels(el: CanvasElement): number {
 
 function drawImagePlaceholder(
   ctx: CanvasRenderingContext2D,
+  el: CanvasElement,
   x: number,
   y: number,
   w: number,
   h: number,
+  scale: number,
 ): void {
+  const radii = getScaledCornerRadii(el, scale, w, h);
+
+  ctx.save();
+  ctx.beginPath();
+  buildRoundedRectPath(ctx, x, y, w, h, radii);
+  ctx.clip();
   ctx.fillStyle = '#2a2b2e';
   ctx.fillRect(x, y, w, h);
-  ctx.strokeStyle = '#444';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x, y, w, h);
 
   const iconSize = Math.min(w, h) * 0.3;
   const cx = x + w / 2;
@@ -195,4 +195,55 @@ function drawImagePlaceholder(
   ctx.lineTo(cx + iconSize * 0.2, cy + iconSize * 0.1);
   ctx.lineTo(cx + iconSize / 2, cy - iconSize * 0.2);
   ctx.stroke();
+  ctx.restore();
+
+  ctx.beginPath();
+  buildRoundedRectPath(ctx, x, y, w, h, radii);
+  ctx.strokeStyle = '#444';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function getScaledCornerRadii(
+  el: CanvasElement,
+  scale: number,
+  width: number,
+  height: number,
+): [number, number, number, number] {
+  const radii = getResolvedCornerRadii(el);
+  const maxRadius = Math.min(width, height) / 2;
+
+  return [
+    Math.min(Math.max(0, radii.topLeft * scale), maxRadius),
+    Math.min(Math.max(0, radii.topRight * scale), maxRadius),
+    Math.min(Math.max(0, radii.bottomRight * scale), maxRadius),
+    Math.min(Math.max(0, radii.bottomLeft * scale), maxRadius),
+  ];
+}
+
+function buildRoundedRectPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radii: [number, number, number, number],
+): void {
+  const [topLeft, topRight, bottomRight, bottomLeft] = radii;
+
+  if (ctx.roundRect) {
+    ctx.roundRect(x, y, width, height, radii);
+    return;
+  }
+
+  ctx.moveTo(x + topLeft, y);
+  ctx.lineTo(x + width - topRight, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + topRight);
+  ctx.lineTo(x + width, y + height - bottomRight);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - bottomRight, y + height);
+  ctx.lineTo(x + bottomLeft, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - bottomLeft);
+  ctx.lineTo(x, y + topLeft);
+  ctx.quadraticCurveTo(x, y, x + topLeft, y);
+  ctx.closePath();
 }

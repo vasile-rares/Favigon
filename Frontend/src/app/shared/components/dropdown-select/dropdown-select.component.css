@@ -11,7 +11,7 @@
 
 .dropdown-select__label {
   color: var(--color-text-light);
-  font-size: 0.875rem;
+  font-size: var(--canvas-panel-font-size, 0.875rem);
   font-weight: 500;
 }
 
@@ -21,20 +21,22 @@
 
 .dropdown-select__trigger {
   width: 100%;
-  height: 2.25rem; /* Match text-input height */
-  border-radius: 10px;
+  height: var(--canvas-panel-control-height, 2.25rem); /* Match text-input height */
+  border-radius: var(--canvas-panel-control-radius, 10px);
   border: 1px solid rgba(255, 255, 255, 0.05); /* very subtle top edge */
   background: rgba(0, 0, 0, 0.25); /* carved out */
-  padding: 0.25rem 0.85rem;
-  font-size: 0.875rem;
-  color: var(--color-text-light);
+  padding: var(--canvas-panel-control-padding-y, 0.25rem)
+    var(--canvas-panel-control-padding-x-wide, 0.85rem);
+  padding-right: 0.2rem;
+  font-size: var(--canvas-panel-font-size, 0.875rem);
+  color: var(--canvas-panel-section-body-color, var(--color-text-light));
   display: flex;
   align-items: center;
   justify-content: space-between;
   text-align: left;
   gap: 0.75rem;
   cursor: pointer;
-  box-shadow: 
+  box-shadow:
     inset 0 2px 5px rgba(0, 0, 0, 0.3), /* inner shadow */
     0 1px 0 rgba(255, 255, 255, 0.05); /* bottom highlight */
   transition: all 0.2s ease;
@@ -51,7 +53,7 @@
   outline: none;
   background: rgba(0, 0, 0, 0.45);
   border-color: rgba(255, 255, 255, 0.2);
-  box-shadow: 
+  box-shadow:
     0 0 0 2px rgba(255, 255, 255, 0.05),
     inset 0 1px 2px rgba(0, 0, 0, 0.5);
 }
@@ -71,14 +73,14 @@
 }
 
 .dropdown-select__trigger-text--placeholder {
-  color: var(--color-text-medium);
+  color: var(--canvas-panel-section-muted-color, var(--color-text-medium));
 }
 
 .dropdown-select__trigger-icon {
-  color: var(--color-text-medium);
+  color: var(--canvas-panel-section-muted-color, var(--color-text-medium));
   display: inline-flex;
   border-radius: 0.45rem;
-  padding: 0.2rem;
+  padding: 0.15rem;
   transition:
     transform 0.2s ease,
     background-color 0.2s ease,
@@ -107,7 +109,7 @@
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--color-card-border);
-  box-shadow: 
+  box-shadow:
     0 16px 40px rgba(0, 0, 0, 0.4),
     inset 0 1px 1px 0 rgba(255, 255, 255, .15);
   z-index: 40;
@@ -139,7 +141,7 @@
 .dropdown-select__search-row ::ng-deep .text-input {
   height: 2rem;
   border-radius: 8px;
-  font-size: 0.86rem;
+  font-size: var(--canvas-panel-font-size, 0.86rem);
 }
 
 .dropdown-select__list {
@@ -163,11 +165,11 @@
   width: 100%;
   border: none;
   background: transparent;
-  color: var(--color-text-light);
+  color: var(--canvas-panel-section-body-color, var(--color-text-light));
   border-radius: 8px;
   padding: 0.5rem 0.6rem;
   text-align: left;
-  font-size: 0.875rem;
+  font-size: var(--canvas-panel-font-size, 0.875rem);
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -182,8 +184,8 @@
 }
 
 .dropdown-select__empty {
-  color: var(--color-text-medium);
-  font-size: 0.85rem;
+  color: var(--canvas-panel-section-muted-color, var(--color-text-medium));
+  font-size: var(--canvas-panel-font-size, 0.85rem);
   padding: 0.5rem 0.6rem;
 }
 

@@ -8,6 +8,7 @@ import {
 import {
   CanvasAlignItems,
   CanvasDisplayMode,
+  CanvasCornerRadii,
   CanvasElement,
   CanvasElementType,
   CanvasFontSizeUnit,
@@ -15,12 +16,15 @@ import {
   CanvasFlexDirection,
   CanvasFlexWrap,
   CanvasJustifyContent,
+  CanvasBackfaceVisibility,
   CanvasLinkType,
   CanvasOverflowMode,
   CanvasPageModel,
   CanvasPositionMode,
+  CanvasRotationMode,
   CanvasShadowPreset,
   CanvasSpacing,
+  CanvasTransformOption,
   CanvasTextSpacingUnit,
   CanvasTextAlign,
   CanvasTextVerticalAlign,
@@ -32,10 +36,19 @@ import {
   ToggleGroupComponent,
   ToggleGroupOption,
 } from '../../../../shared/components/toggle-group/toggle-group.component';
-import { formatCanvasElementTypeLabel } from '../../utils/canvas-label.util';
-import { roundToTwoDecimals } from '../../utils/canvas-interaction.util';
+import {
+  ContextMenuComponent,
+  ContextMenuItem,
+} from '../../../../shared/components/context-menu/context-menu.component';
+import {
+  getDefaultCornerRadius,
+  getResolvedCornerRadii,
+  hasPerCornerRadius,
+  roundToTwoDecimals,
+} from '../../utils/canvas-interaction.util';
 import { SupportedFramework } from '../../canvas.types';
 type PropertiesTab = 'design' | 'prototype';
+type CornerRadiusMode = 'full' | 'per-corner';
 
 type EditableNumericField =
   | 'x'
@@ -66,6 +79,41 @@ interface FrameTemplate {
   height: number;
 }
 
+interface TransformOptionDefinition {
+  id: CanvasTransformOption;
+  label: string;
+}
+
+interface CornerRadiusFieldDefinition {
+  key: keyof CanvasCornerRadii;
+  label: string;
+  ariaLabel: string;
+}
+
+const TRANSFORM_OPTION_DEFINITIONS: readonly TransformOptionDefinition[] = [
+  { id: 'scale', label: 'Scale' },
+  { id: 'rotate', label: 'Rotate' },
+  { id: 'skew', label: 'Skew' },
+  { id: 'depth', label: 'Depth' },
+  { id: 'perspective', label: 'Perspective' },
+  { id: 'origin', label: 'Origin' },
+  { id: 'backface', label: 'Backface' },
+  { id: 'preserve3d', label: 'Preserve 3D' },
+] as const;
+
+const CORNER_RADIUS_FIELD_DEFINITIONS: readonly CornerRadiusFieldDefinition[] = [
+  { key: 'topLeft', label: 'TL', ariaLabel: 'Top left corner radius' },
+  { key: 'topRight', label: 'TR', ariaLabel: 'Top right corner radius' },
+  { key: 'bottomLeft', label: 'BL', ariaLabel: 'Bottom left corner radius' },
+  { key: 'bottomRight', label: 'BR', ariaLabel: 'Bottom right corner radius' },
+] as const;
+
+const TRANSFORM_DEPTH_MIN = -1000;
+const TRANSFORM_DEPTH_MAX = 1000;
+const TRANSFORM_PERSPECTIVE_MIN = 100;
+const TRANSFORM_PERSPECTIVE_MAX = 3000;
+const TRANSFORM_SCALE_STEP = 0.1;
+
 @Component({
   selector: 'app-properties-panel',
   standalone: true,
@@ -76,6 +124,7 @@ interface FrameTemplate {
     NumberInputComponent,
     StylePopupFieldComponent,
     ToggleGroupComponent,
+    ContextMenuComponent,
   ],
   templateUrl: './properties-panel.component.html',
   styleUrl: './properties-panel.component.css',
@@ -103,6 +152,23 @@ export class PropertiesPanelComponent {
   @Output() generateRequested = new EventEmitter<void>();
 
   activeTab: PropertiesTab = 'design';
+  transformMenuItems: ContextMenuItem[] = [];
+  transformMenuX = 0;
+  transformMenuY = 0;
+  readonly propertiesTabOptions: readonly ToggleGroupOption[] = [
+    {
+      label: 'Design',
+      value: 'design',
+      ariaLabel: 'Open design tab',
+      title: 'Design',
+    },
+    {
+      label: 'Prototype',
+      value: 'prototype',
+      ariaLabel: 'Open prototype tab',
+      title: 'Prototype',
+    },
+  ];
 
   readonly borderStyleOptions = ['Solid', 'Dashed', 'Dotted', 'Double'];
   readonly fontFamilyOptions: DropdownSelectOption[] = [
@@ -162,12 +228,42 @@ export class PropertiesPanelComponent {
     { label: 'Page', value: 'page' },
     { label: 'URL', value: 'url' },
   ];
+  readonly transformOptionDefinitions = TRANSFORM_OPTION_DEFINITIONS;
+  readonly rotateModeOptions: readonly ToggleGroupOption[] = [
+    { label: '2D', value: '2d' },
+    { label: '3D', value: '3d' },
+  ];
+  readonly backfaceVisibilityOptions: readonly ToggleGroupOption[] = [
+    { label: 'Visible', value: 'visible' },
+    { label: 'Hidden', value: 'hidden' },
+  ];
+  readonly preserve3DOptions: readonly ToggleGroupOption[] = [
+    { label: 'Yes', value: true },
+    { label: 'No', value: false },
+  ];
   readonly overflowOptions: CanvasOverflowMode[] = ['clip', 'visible'];
   readonly shadowOptions: CanvasShadowPreset[] = ['sm', 'md', 'lg', 'xl'];
   readonly visibleOptions: readonly ToggleGroupOption[] = [
     { label: 'Yes', value: true },
     { label: 'No', value: false },
   ];
+  readonly cornerRadiusModeOptions: readonly ToggleGroupOption[] = [
+    {
+      label: '',
+      value: 'full',
+      icon: 'radius-full',
+      ariaLabel: 'Use full corner radius',
+      title: 'Full radius',
+    },
+    {
+      label: '',
+      value: 'per-corner',
+      icon: 'radius-corners',
+      ariaLabel: 'Use per-corner radius',
+      title: 'Per-corner radius',
+    },
+  ];
+  readonly cornerRadiusFields = CORNER_RADIUS_FIELD_DEFINITIONS;
   readonly wrapOptions: readonly ToggleGroupOption[] = [
     { label: 'Yes', value: true },
     { label: 'No', value: false },
@@ -281,6 +377,13 @@ export class PropertiesPanelComponent {
 
   selectTab(tab: PropertiesTab): void {
     this.activeTab = tab;
+    this.closeTransformMenu();
+  }
+
+  onTabValueChange(value: string | number | boolean): void {
+    if (value === 'design' || value === 'prototype') {
+      this.selectTab(value);
+    }
   }
 
   isTabActive(tab: PropertiesTab): boolean {
@@ -300,16 +403,117 @@ export class PropertiesPanelComponent {
     return Math.round(value as number).toString();
   }
 
-  get elementTypeLabel(): string {
-    if (!this.selectedElement) {
-      return '';
-    }
-
-    return formatCanvasElementTypeLabel(this.selectedElement.type);
-  }
-
   hasFill(type: CanvasElementType): boolean {
     return type !== 'text' && type !== 'image';
+  }
+
+  hasTransforms(element: CanvasElement): boolean {
+    return this.activeTransformOptions(element).length > 0;
+  }
+
+  isTransformOptionAdded(element: CanvasElement, option: CanvasTransformOption): boolean {
+    return this.activeTransformOptions(element).includes(option);
+  }
+
+  onLinkSectionHeaderClick(): void {
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    if (this.hasLink(element)) {
+      this.removeLink();
+      return;
+    }
+
+    this.addLink();
+  }
+
+  onLinkSectionToggleClick(event: MouseEvent): void {
+    event.stopPropagation();
+    this.onLinkSectionHeaderClick();
+  }
+
+  onLayoutSectionHeaderClick(): void {
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    if (this.hasLayout(element)) {
+      this.removeLayout();
+      return;
+    }
+
+    this.addLayout();
+  }
+
+  onLayoutSectionToggleClick(event: MouseEvent): void {
+    event.stopPropagation();
+    this.onLayoutSectionHeaderClick();
+  }
+
+  onTransformSectionHeaderClick(event: MouseEvent): void {
+    this.openTransformMenu(event, this.resolveSectionHeaderTrigger(event));
+  }
+
+  onTransformSectionToggleClick(event: MouseEvent): void {
+    event.stopPropagation();
+    this.onTransformSectionHeaderClick(event);
+  }
+
+  private openTransformMenu(event: MouseEvent | null, trigger: HTMLElement | null): void {
+    const element = this.selectedElement;
+    const position = this.resolveTransformMenuPosition(event, trigger);
+    if (!element || !position) {
+      return;
+    }
+
+    if (this.transformMenuItems.length > 0) {
+      return;
+    }
+
+    this.transformMenuItems = this.buildTransformMenuItems(element);
+    this.transformMenuX = position.x;
+    this.transformMenuY = position.y;
+  }
+
+  private resolveTransformMenuPosition(
+    event: MouseEvent | null,
+    trigger: HTMLElement | null,
+  ): { x: number; y: number } | null {
+    if (event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+      return {
+        x: event.clientX,
+        y: event.clientY,
+      };
+    }
+
+    if (!trigger) {
+      return null;
+    }
+
+    const rect = trigger.getBoundingClientRect();
+    return {
+      x: rect.left,
+      y: rect.top - 6,
+    };
+  }
+
+  private resolveSectionHeaderTrigger(event: MouseEvent): HTMLElement | null {
+    const currentTarget = event.currentTarget;
+    if (!(currentTarget instanceof HTMLElement)) {
+      return null;
+    }
+
+    return (
+      (currentTarget.closest('.properties-section-header') as HTMLElement | null) ??
+      (currentTarget.querySelector('.properties-section-header') as HTMLElement | null)
+    );
+  }
+
+  closeTransformMenu(): void {
+    this.transformMenuItems = [];
   }
 
   hasStroke(type: CanvasElementType): boolean {
@@ -318,6 +522,66 @@ export class PropertiesPanelComponent {
 
   supportsCornerRadius(type: CanvasElementType): boolean {
     return type !== 'text';
+  }
+
+  cornerRadiusMode(element: CanvasElement): CornerRadiusMode {
+    return hasPerCornerRadius(element) ? 'per-corner' : 'full';
+  }
+
+  fullCornerRadiusInputValue(element: CanvasElement): number | null {
+    return this.cornerRadiusMode(element) === 'per-corner'
+      ? null
+      : this.uniformCornerRadiusValue(element);
+  }
+
+  uniformCornerRadiusValue(element: CanvasElement): number {
+    return getDefaultCornerRadius(element);
+  }
+
+  cornerRadiusValue(element: CanvasElement, corner: keyof CanvasCornerRadii): number {
+    return getResolvedCornerRadii(element)[corner];
+  }
+
+  onCornerRadiusModeChange(value: string | number | boolean | null): void {
+    if (value !== 'full' && value !== 'per-corner') {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    if (value === 'per-corner') {
+      this.emitPatch({
+        cornerRadius: this.uniformCornerRadiusValue(element),
+        cornerRadii: getResolvedCornerRadii(element),
+      });
+      return;
+    }
+
+    this.emitPatch({
+      cornerRadius: this.uniformCornerRadiusValue(element),
+      cornerRadii: undefined,
+    });
+  }
+
+  onCornerRadiusCornerChange(corner: keyof CanvasCornerRadii, value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const nextRadii = {
+      ...getResolvedCornerRadii(element),
+      [corner]: Math.max(0, roundToTwoDecimals(value)),
+    } satisfies CanvasCornerRadii;
+
+    this.emitPatch({ cornerRadii: nextRadii });
   }
 
   isFrame(type: CanvasElementType): boolean {
@@ -351,6 +615,15 @@ export class PropertiesPanelComponent {
         : Number((valueOrEvent.target as HTMLInputElement).value);
 
     if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (field === 'cornerRadius' && element && this.cornerRadiusMode(element) === 'per-corner') {
+      this.emitPatch({
+        cornerRadius: Math.max(0, roundToTwoDecimals(value)),
+        cornerRadii: undefined,
+      });
       return;
     }
 
@@ -476,6 +749,58 @@ export class PropertiesPanelComponent {
 
   textVerticalAlignValue(element: CanvasElement): CanvasTextVerticalAlign {
     return element.textVerticalAlign ?? 'middle';
+  }
+
+  transformScaleValue(element: CanvasElement): number {
+    const scaleX = Math.abs(element.scaleX ?? 1);
+    const scaleY = Math.abs(element.scaleY ?? 1);
+    return roundToTwoDecimals(Math.max(scaleX, scaleY));
+  }
+
+  rotationValue(element: CanvasElement): number {
+    return element.rotation ?? 0;
+  }
+
+  rotationModeValue(element: CanvasElement): CanvasRotationMode {
+    return element.rotationMode === '3d' ? '3d' : '2d';
+  }
+
+  skewXValue(element: CanvasElement): number {
+    return element.skewX ?? 0;
+  }
+
+  skewYValue(element: CanvasElement): number {
+    return element.skewY ?? 0;
+  }
+
+  depthValue(element: CanvasElement): number {
+    return element.depth ?? 0;
+  }
+
+  perspectiveValue(element: CanvasElement): number {
+    return element.perspective ?? 1200;
+  }
+
+  originXValue(element: CanvasElement): number {
+    return element.transformOriginX ?? 50;
+  }
+
+  originYValue(element: CanvasElement): number {
+    return element.transformOriginY ?? 50;
+  }
+
+  backfaceVisibilityValue(element: CanvasElement): CanvasBackfaceVisibility {
+    return element.backfaceVisibility === 'hidden' ? 'hidden' : 'visible';
+  }
+
+  preserve3DValue(element: CanvasElement): boolean {
+    return element.preserve3D ?? true;
+  }
+
+  transformSliderPercent(value: number, min: number, max: number): string {
+    const clamped = Math.max(min, Math.min(max, value));
+    const ratio = (clamped - min) / Math.max(max - min, 1);
+    return `${Math.round(ratio * 100)}%`;
   }
 
   hasLink(element: CanvasElement): boolean {
@@ -648,6 +973,161 @@ export class PropertiesPanelComponent {
       linkType: undefined,
       linkPageId: undefined,
       linkUrl: undefined,
+    });
+  }
+
+  onTransformScaleChange(value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const magnitude = Math.max(0.1, roundToTwoDecimals(Math.abs(value)));
+    const scaleXSign = (element.scaleX ?? 1) < 0 ? -1 : 1;
+    const scaleYSign = (element.scaleY ?? 1) < 0 ? -1 : 1;
+
+    this.emitPatch({
+      transformOptions: this.mergeTransformOptions(element, 'scale'),
+      scaleX: roundToTwoDecimals(scaleXSign * magnitude),
+      scaleY: roundToTwoDecimals(scaleYSign * magnitude),
+    });
+  }
+
+  onRotationChange(value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    this.emitPatch({
+      transformOptions: this.mergeTransformOptions(element, 'rotate'),
+      rotation: roundToTwoDecimals(value),
+    });
+  }
+
+  onRotationModeChange(value: string | number | boolean | null): void {
+    if (value !== '2d' && value !== '3d') {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    this.emitPatch({
+      transformOptions: this.mergeTransformOptions(element, 'rotate'),
+      rotationMode: value,
+    });
+  }
+
+  onSkewChange(axis: 'x' | 'y', value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    this.emitPatch({
+      transformOptions: this.mergeTransformOptions(element, 'skew'),
+      skewX: axis === 'x' ? roundToTwoDecimals(value) : this.skewXValue(element),
+      skewY: axis === 'y' ? roundToTwoDecimals(value) : this.skewYValue(element),
+    });
+  }
+
+  onDepthChange(value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    this.emitPatch({
+      transformOptions: this.mergeTransformOptions(element, 'depth'),
+      depth: Math.max(TRANSFORM_DEPTH_MIN, Math.min(TRANSFORM_DEPTH_MAX, roundToTwoDecimals(value))),
+    });
+  }
+
+  onPerspectiveChange(value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    this.emitPatch({
+      transformOptions: this.mergeTransformOptions(element, 'perspective'),
+      perspective: Math.max(
+        TRANSFORM_PERSPECTIVE_MIN,
+        Math.min(TRANSFORM_PERSPECTIVE_MAX, roundToTwoDecimals(value)),
+      ),
+    });
+  }
+
+  onOriginChange(axis: 'x' | 'y', value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const normalized = Math.max(0, Math.min(100, roundToTwoDecimals(value)));
+    this.emitPatch({
+      transformOptions: this.mergeTransformOptions(element, 'origin'),
+      transformOriginX: axis === 'x' ? normalized : this.originXValue(element),
+      transformOriginY: axis === 'y' ? normalized : this.originYValue(element),
+    });
+  }
+
+  onBackfaceVisibilityChange(value: string | number | boolean | null): void {
+    if (value !== 'visible' && value !== 'hidden') {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    this.emitPatch({
+      transformOptions: this.mergeTransformOptions(element, 'backface'),
+      backfaceVisibility: value,
+    });
+  }
+
+  onPreserve3DChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'boolean') {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    this.emitPatch({
+      transformOptions: this.mergeTransformOptions(element, 'preserve3d'),
+      preserve3D: value,
     });
   }
 
@@ -826,6 +1306,211 @@ export class PropertiesPanelComponent {
 
   private emitPatch(patch: Partial<CanvasElement>): void {
     this.elementPatch.emit(patch);
+  }
+
+  private buildTransformMenuItems(element: CanvasElement): ContextMenuItem[] {
+    return this.transformOptionDefinitions.map((option) => {
+      const isActive = this.isTransformOptionAdded(element, option.id);
+
+      return {
+        id: option.id,
+        label: option.label,
+        checked: isActive,
+        showCheckSlot: true,
+        action: () => this.toggleTransformOption(option.id),
+      };
+    });
+  }
+
+  private toggleTransformOption(option: CanvasTransformOption): void {
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const patch = this.isTransformOptionAdded(element, option)
+      ? this.buildRemoveTransformOptionPatch(element, option)
+      : this.buildTransformOptionPatch(element, option);
+
+    this.emitPatch(patch);
+    this.closeTransformMenu();
+  }
+
+  private activeTransformOptions(element: CanvasElement): CanvasTransformOption[] {
+    const explicitOptions = Array.isArray(element.transformOptions) ? element.transformOptions : [];
+    const active = new Set<CanvasTransformOption>(explicitOptions);
+
+    if ((element.scaleX ?? 1) !== 1 || (element.scaleY ?? 1) !== 1) {
+      active.add('scale');
+    }
+
+    if ((element.rotation ?? 0) !== 0 || element.rotationMode === '3d') {
+      active.add('rotate');
+    }
+
+    if ((element.skewX ?? 0) !== 0 || (element.skewY ?? 0) !== 0) {
+      active.add('skew');
+    }
+
+    if ((element.depth ?? 0) !== 0) {
+      active.add('depth');
+    }
+
+    if (element.perspective !== undefined) {
+      active.add('perspective');
+    }
+
+    if (element.transformOriginX !== undefined || element.transformOriginY !== undefined) {
+      active.add('origin');
+    }
+
+    if (element.backfaceVisibility !== undefined) {
+      active.add('backface');
+    }
+
+    if (element.preserve3D !== undefined) {
+      active.add('preserve3d');
+    }
+
+    return this.transformOptionDefinitions
+      .map((option) => option.id)
+      .filter((option) => active.has(option));
+  }
+
+  private mergeTransformOptions(
+    element: CanvasElement,
+    ...options: CanvasTransformOption[]
+  ): CanvasTransformOption[] {
+    const next = new Set<CanvasTransformOption>(this.activeTransformOptions(element));
+    for (const option of options) {
+      next.add(option);
+    }
+
+    return this.transformOptionDefinitions
+      .map((option) => option.id)
+      .filter((option) => next.has(option));
+  }
+
+  private removeTransformOptions(
+    element: CanvasElement,
+    ...options: CanvasTransformOption[]
+  ): CanvasTransformOption[] | undefined {
+    const removed = new Set<CanvasTransformOption>(options);
+    const next = this.activeTransformOptions(element).filter((option) => !removed.has(option));
+
+    return next.length > 0 ? next : undefined;
+  }
+
+  private buildTransformOptionPatch(
+    element: CanvasElement,
+    option: CanvasTransformOption,
+  ): Partial<CanvasElement> {
+    const transformOptions = this.mergeTransformOptions(element, option);
+
+    switch (option) {
+      case 'scale':
+        return {
+          transformOptions,
+          scaleX: element.scaleX ?? 1,
+          scaleY: element.scaleY ?? 1,
+        };
+      case 'rotate':
+        return {
+          transformOptions,
+          rotation: element.rotation ?? 0,
+          rotationMode: this.rotationModeValue(element),
+        };
+      case 'skew':
+        return {
+          transformOptions,
+          skewX: element.skewX ?? 0,
+          skewY: element.skewY ?? 0,
+        };
+      case 'depth':
+        return {
+          transformOptions,
+          depth: element.depth ?? 0,
+        };
+      case 'perspective':
+        return {
+          transformOptions,
+          perspective: element.perspective ?? 1200,
+        };
+      case 'origin':
+        return {
+          transformOptions,
+          transformOriginX: element.transformOriginX ?? 50,
+          transformOriginY: element.transformOriginY ?? 50,
+        };
+      case 'backface':
+        return {
+          transformOptions,
+          backfaceVisibility: element.backfaceVisibility ?? 'visible',
+        };
+      case 'preserve3d':
+        return {
+          transformOptions,
+          preserve3D: element.preserve3D ?? true,
+        };
+      default:
+        return { transformOptions };
+    }
+  }
+
+  private buildRemoveTransformOptionPatch(
+    element: CanvasElement,
+    option: CanvasTransformOption,
+  ): Partial<CanvasElement> {
+    const transformOptions = this.removeTransformOptions(element, option);
+
+    switch (option) {
+      case 'scale':
+        return {
+          transformOptions,
+          scaleX: undefined,
+          scaleY: undefined,
+        };
+      case 'rotate':
+        return {
+          transformOptions,
+          rotation: undefined,
+          rotationMode: undefined,
+        };
+      case 'skew':
+        return {
+          transformOptions,
+          skewX: undefined,
+          skewY: undefined,
+        };
+      case 'depth':
+        return {
+          transformOptions,
+          depth: undefined,
+        };
+      case 'perspective':
+        return {
+          transformOptions,
+          perspective: undefined,
+        };
+      case 'origin':
+        return {
+          transformOptions,
+          transformOriginX: undefined,
+          transformOriginY: undefined,
+        };
+      case 'backface':
+        return {
+          transformOptions,
+          backfaceVisibility: undefined,
+        };
+      case 'preserve3d':
+        return {
+          transformOptions,
+          preserve3D: undefined,
+        };
+      default:
+        return { transformOptions };
+    }
   }
 
   private fontSizeInPixels(element: CanvasElement): number {

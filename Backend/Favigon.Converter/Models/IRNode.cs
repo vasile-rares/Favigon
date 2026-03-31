@@ -64,6 +64,10 @@ public class IRStyle
 {
   public string? Color { get; set; }
   public string? Background { get; set; }
+  public string? Transform { get; set; }
+  public string? TransformOrigin { get; set; }
+  public string? BackfaceVisibility { get; set; }
+  public string? TransformStyle { get; set; }
 
   public IRLength? Width { get; set; }
   public IRLength? Height { get; set; }
@@ -84,6 +88,10 @@ public class IRStyle
   public string? TextAlign { get; set; }
 
   public IRLength? BorderRadius { get; set; }
+  public IRLength? BorderTopLeftRadius { get; set; }
+  public IRLength? BorderTopRightRadius { get; set; }
+  public IRLength? BorderBottomRightRadius { get; set; }
+  public IRLength? BorderBottomLeftRadius { get; set; }
   public IRBorder? Border { get; set; }
 
   public string? Overflow { get; set; }

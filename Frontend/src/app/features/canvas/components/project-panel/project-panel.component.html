@@ -1,190 +1,214 @@
 <aside class="project-panel glass-panel">
   <div class="project-panel-header">
-    <h3>Project</h3>
+    <div class="project-tabs">
+      <app-toggle-group
+        [options]="panelTabOptions"
+        [value]="activeTab"
+        [stretch]="true"
+        [minWidth]="null"
+        [ariaLabel]="'Project panel tabs'"
+        (valueChange)="onTabValueChange($event)"></app-toggle-group>
+    </div>
   </div>
 
-  <section class="project-section project-pages">
-    <div class="project-section-header">
-      <p class="project-section-title">Pages</p>
-      <button type="button" class="project-page-add" (click)="onPageCreate()" aria-label="New page" title="New page">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
-            <path d="M12 5v14"></path>
-            <path d="M5 12h14"></path>
-          </svg>
-      </button>
-    </div>
-
-    <div class="project-pages-list">
-      <div
-        class="project-page-item"
-        *ngFor="let page of pages; trackBy: trackByPageId"
-        [class.active]="page.id === focusedPageId || page.id === selectedPageLayerId">
-        <div class="project-page-label" (click)="onPageSelect(page.id)" (dblclick)="startPageRename(page.id, $event, 'pages')">
-          <input
-            *ngIf="isPageRenameActive(page.id, 'pages')"
-            type="text"
-            class="project-page-name-input"
-            [attr.data-page-name-id]="'pages-' + page.id"
-            [value]="page.name"
-            (input)="onPageNameInput(page.id, $event)"
-            (blur)="stopPageRename(page.id)"
-            (keydown)="onPageNameKeyDown(page.id, $event)"
-            (click)="$event.stopPropagation()"
-            (dblclick)="$event.stopPropagation()" />
-          <span *ngIf="!isPageRenameActive(page.id, 'pages')" class="project-page-name">{{ page.name }}</span>
-        </div>
-        <button
-          type="button"
-          class="project-page-menu-trigger"
-          [class.is-open]="isPageMenuOpenFor(page.id)"
-          [attr.aria-label]="'Page actions for ' + page.name"
-          title="Page actions"
-          (click)="togglePageMenu(page.id, $event)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <circle cx="12" cy="5" r="1.75"></circle>
-            <circle cx="12" cy="12" r="1.75"></circle>
-            <circle cx="12" cy="19" r="1.75"></circle>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </section>
-
-  <section class="project-section project-layers">
-    <div class="project-section-header">
-      <p class="project-section-title">Layers</p>
-    </div>
-    <p class="project-layers-empty" *ngIf="visiblePageLayers.length === 0 && layerEntries.length === 0">No elements on canvas yet.</p>
-
-    <div class="project-layers-list" *ngIf="visiblePageLayers.length > 0">
-      <ng-container *ngFor="let page of visiblePageLayers; trackBy: trackByPageId">
-        <div
-          class="project-layer-item project-layer-item--page"
-          [class.active]="page.id === focusedPageId || page.id === selectedPageLayerId"
-          [class.is-drop-inside]="isPageRootDropTarget(page.id)"
-          (dragover)="onPageLayerDragOver(page.id, $event)"
-          (drop)="onPageLayerDrop(page.id, $event)"
-          (click)="onLayerPageSelect(page.id)"
-          (contextmenu)="onLayerPageContextMenu(page.id, $event)"
-          (dblclick)="startPageRename(page.id, $event, 'layers')">
-          <button
-            *ngIf="pageLayerHasChildren(page.id)"
-            type="button"
-            class="project-layer-expand"
-            [class.is-collapsed]="isPageLayerCollapsed(page.id)"
-            (click)="togglePageLayerCollapse(page.id, $event)"
-            aria-label="Toggle page layers">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"/>
+  <div class="project-panel-content">
+    <ng-container *ngIf="activeTab === 'navigator'; else aiChatTab">
+      <section class="project-section project-pages">
+        <div class="project-section-header">
+          <p class="project-section-title">Pages</p>
+          <button type="button" class="project-page-add" (click)="onPageCreate()" aria-label="New page" title="New page">
+            <svg class="project-page-add__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M12 5v14"></path>
+              <path d="M5 12h14"></path>
             </svg>
           </button>
-          <span class="project-layer-icon" aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-          </span>
-          <div class="project-layer-body">
-            <input
-              *ngIf="isPageRenameActive(page.id, 'layers')"
-              type="text"
-              class="project-layer-input"
-              [attr.data-page-name-id]="'layers-' + page.id"
-              [value]="page.name"
-              (input)="onPageNameInput(page.id, $event)"
-              (blur)="stopPageRename(page.id)"
-              (keydown)="onPageNameKeyDown(page.id, $event)"
-              (click)="$event.stopPropagation()"
-              (dblclick)="$event.stopPropagation()"
-              placeholder="Page name" />
-            <span *ngIf="!isPageRenameActive(page.id, 'layers')" class="project-layer-title">{{ page.name }}</span>
-          </div>
         </div>
 
-        <div class="project-layers-list" *ngIf="shouldShowPageLayerEntries(page.id)">
+        <div class="project-pages-list">
           <div
-            class="project-layer-item"
-            *ngFor="let layer of getLayerEntriesForPage(page.id); trackBy: trackByLayerId"
-            [class.active]="selectedElementId === layer.id"
-            [class.hidden]="layer.isEffectivelyHidden"
-            [class.is-dragging]="isLayerDragging(page.id, layer.id)"
-            [class.is-drop-before]="isLayerDropTarget(page.id, layer.id, 'before')"
-            [class.is-drop-after]="isLayerDropTarget(page.id, layer.id, 'after')"
-            [class.is-drop-inside]="isLayerDropTarget(page.id, layer.id, 'inside')"
-            [style.--layer-indent.px]="20 + layer.depth * 20"
-            draggable="true"
-            (dragstart)="onLayerDragStart(page.id, layer.id, $event)"
-            (dragover)="onLayerDragOver(page.id, layer, $event)"
-            (drop)="onLayerDrop(page.id, layer, $event)"
-            (dragend)="onLayerDragEnd()"
-            (click)="onLayerSelected(page.id, layer.id)"
-            (contextmenu)="onLayerContextMenu(page.id, layer.id, $event)">
-            <button
-              *ngIf="layer.hasChildren"
-              type="button"
-              class="project-layer-expand"
-              [class.is-collapsed]="isLayerCollapsed(layer.id)"
-              (click)="toggleLayerCollapse(layer.id, $event)"
-              aria-label="Toggle children">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6 9 12 15 18 9"/>
-              </svg>
-            </button>
-            <span
-              *ngIf="!layer.hasChildren && layer.parentId"
-              class="project-layer-expand-spacer"
-              aria-hidden="true"></span>
-            <span class="project-layer-icon" [class.is-hidden]="layer.isEffectivelyHidden" [class.is-layout-active]="layer.hasLayout" aria-hidden="true">
-              <svg *ngIf="isFrame(layer.type) && !layer.hasLayout" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-              <svg *ngIf="isFrame(layer.type) && layer.hasLayout" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 8h18"/><rect x="6" y="11" width="3" height="7" rx="0.8"/><rect x="10.5" y="11" width="3" height="7" rx="0.8"/><rect x="15" y="11" width="3" height="7" rx="0.8"/></svg>
-              <svg *ngIf="isRectangle(layer.type) && !layer.hasLayout" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
-              <svg *ngIf="isRectangle(layer.type) && layer.hasLayout" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/><path d="M3 12h18"/></svg>
-              <svg *ngIf="isText(layer.type)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>
-              <svg *ngIf="!isFrame(layer.type) && !isRectangle(layer.type) && !isText(layer.type)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
-            </span>
-            <div class="project-layer-body">
+            class="project-page-item"
+            *ngFor="let page of pages; trackBy: trackByPageId"
+            [class.active]="page.id === focusedPageId || page.id === selectedPageLayerId">
+            <div class="project-page-label" (click)="onPageSelect(page.id)" (dblclick)="startPageRename(page.id, $event, 'pages')">
               <input
-                *ngIf="editingLayerId === layer.id; else layerNameLabel"
+                *ngIf="isPageRenameActive(page.id, 'pages')"
                 type="text"
-                class="project-layer-input"
-                [attr.data-layer-name-id]="layer.id"
-                [value]="editingLayerName"
-                (click)="onLayerNameClick(page.id, layer.id, $event)"
-                (dblclick)="startRename(layer.id, $event)"
-                (blur)="stopRename(page.id, layer.id)"
-                (input)="onLayerNameInput($event)"
-                (keydown)="onLayerNameKeyDown(layer.id, $event)"
-                placeholder="Layer name" />
-              <ng-template #layerNameLabel>
-                <span
-                  class="project-layer-title"
-                  (click)="onLayerNameClick(page.id, layer.id, $event)"
-                  (dblclick)="startRename(layer.id, $event)">{{ layer.name }}</span>
-              </ng-template>
+                class="project-page-name-input"
+                [attr.data-page-name-id]="'pages-' + page.id"
+                [value]="page.name"
+                (input)="onPageNameInput(page.id, $event)"
+                (blur)="stopPageRename(page.id)"
+                (keydown)="onPageNameKeyDown(page.id, $event)"
+                (click)="$event.stopPropagation()"
+                (dblclick)="$event.stopPropagation()" />
+              <span *ngIf="!isPageRenameActive(page.id, 'pages')" class="project-page-name">{{ page.name }}</span>
             </div>
             <button
               type="button"
-              class="project-layer-visibility"
-              [attr.aria-label]="layer.visible ? 'Hide element' : 'Show element'"
-              [title]="layer.visible ? 'Hide element' : 'Show element'"
-              (click)="onLayerVisibilityToggle(page.id, layer.id, $event)">
-              <svg *ngIf="layer.visible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
-                <circle cx="12" cy="12" r="3"/>
-              </svg>
-              <svg *ngIf="!layer.visible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m2 2 20 20"/>
-                <path d="M10.58 10.58a2 2 0 1 0 2.83 2.83"/>
-                <path d="M9.88 5.09A10.94 10.94 0 0 1 12 4.91c5.05 0 9.27 3.11 10.67 7.5a10.96 10.96 0 0 1-1.79 3.09"/>
-                <path d="M6.61 6.61A10.95 10.95 0 0 0 1.33 12.4a10.75 10.75 0 0 0 14.2 6.18"/>
+              class="project-page-menu-trigger"
+              [class.is-open]="isPageMenuOpenFor(page.id)"
+              [attr.aria-label]="'Page actions for ' + page.name"
+              title="Page actions"
+              (click)="togglePageMenu(page.id, $event)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="12" cy="5" r="1.75"></circle>
+                <circle cx="12" cy="12" r="1.75"></circle>
+                <circle cx="12" cy="19" r="1.75"></circle>
               </svg>
             </button>
           </div>
         </div>
-      </ng-container>
-    </div>
-  </section>
+      </section>
+
+      <section class="project-section project-layers">
+        <div class="project-section-header">
+          <p class="project-section-title">Layers</p>
+        </div>
+        <p class="project-layers-empty" *ngIf="visiblePageLayers.length === 0 && layerEntries.length === 0">No elements on canvas yet.</p>
+
+        <div class="project-layers-list" *ngIf="visiblePageLayers.length > 0">
+          <ng-container *ngFor="let page of visiblePageLayers; trackBy: trackByPageId">
+            <div
+              class="project-layer-item project-layer-item--page"
+              [class.active]="page.id === focusedPageId || page.id === selectedPageLayerId"
+              [class.is-drop-inside]="isPageRootDropTarget(page.id)"
+              (dragover)="onPageLayerDragOver(page.id, $event)"
+              (drop)="onPageLayerDrop(page.id, $event)"
+              (click)="onLayerPageSelect(page.id)"
+              (contextmenu)="onLayerPageContextMenu(page.id, $event)"
+              (dblclick)="startPageRename(page.id, $event, 'layers')">
+              <button
+                *ngIf="pageLayerHasChildren(page.id)"
+                type="button"
+                class="project-layer-expand"
+                [class.is-collapsed]="isPageLayerCollapsed(page.id)"
+                (click)="togglePageLayerCollapse(page.id, $event)"
+                aria-label="Toggle page layers">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </button>
+              <span class="project-layer-icon" [class.is-layout-active]="pageLayerHasActiveLayout(page.id)" aria-hidden="true">
+                <svg *ngIf="!pageLayerHasActiveLayout(page.id)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                <svg *ngIf="pageLayerHasActiveLayout(page.id)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 8h18"/><rect x="6" y="11" width="4" height="7" rx="0.8"/><rect x="14" y="11" width="4" height="7" rx="0.8"/></svg>
+              </span>
+              <div class="project-layer-body">
+                <input
+                  *ngIf="isPageRenameActive(page.id, 'layers')"
+                  type="text"
+                  class="project-layer-input"
+                  [attr.data-page-name-id]="'layers-' + page.id"
+                  [value]="page.name"
+                  (input)="onPageNameInput(page.id, $event)"
+                  (blur)="stopPageRename(page.id)"
+                  (keydown)="onPageNameKeyDown(page.id, $event)"
+                  (click)="$event.stopPropagation()"
+                  (dblclick)="$event.stopPropagation()"
+                  placeholder="Page name" />
+                <span *ngIf="!isPageRenameActive(page.id, 'layers')" class="project-layer-title">{{ page.name }}</span>
+              </div>
+            </div>
+
+            <div class="project-layers-list" *ngIf="shouldShowPageLayerEntries(page.id)">
+              <div
+                class="project-layer-item"
+                *ngFor="let layer of getLayerEntriesForPage(page.id); trackBy: trackByLayerId"
+                [class.active]="selectedElementId === layer.id"
+                [class.hidden]="layer.isEffectivelyHidden"
+                [class.is-dragging]="isLayerDragging(page.id, layer.id)"
+                [class.is-drop-before]="isLayerDropTarget(page.id, layer.id, 'before')"
+                [class.is-drop-after]="isLayerDropTarget(page.id, layer.id, 'after')"
+                [class.is-drop-inside]="isLayerDropTarget(page.id, layer.id, 'inside')"
+                [style.--layer-indent.px]="20 + layer.depth * 20"
+                draggable="true"
+                (dragstart)="onLayerDragStart(page.id, layer.id, $event)"
+                (dragover)="onLayerDragOver(page.id, layer, $event)"
+                (drop)="onLayerDrop(page.id, layer, $event)"
+                (dragend)="onLayerDragEnd()"
+                (click)="onLayerSelected(page.id, layer.id)"
+                (contextmenu)="onLayerContextMenu(page.id, layer.id, $event)">
+                <button
+                  *ngIf="layer.hasChildren"
+                  type="button"
+                  class="project-layer-expand"
+                  [class.is-collapsed]="isLayerCollapsed(layer.id)"
+                  (click)="toggleLayerCollapse(layer.id, $event)"
+                  aria-label="Toggle children">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+                <span
+                  *ngIf="!layer.hasChildren"
+                  class="project-layer-expand-spacer"
+                  aria-hidden="true"></span>
+                <span class="project-layer-icon" [class.is-hidden]="layer.isEffectivelyHidden" [class.is-layout-active]="layer.hasLayout" aria-hidden="true">
+                  <svg *ngIf="layer.devicePreset === 'desktop'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8"/><path d="M12 16v4"/></svg>
+                  <svg *ngIf="layer.devicePreset === 'tablet'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4.5" y="3" width="15" height="18" rx="2.8"/><circle cx="12" cy="6.3" r="0.7" fill="currentColor" stroke="none"/><path d="M9.25 17.8h5.5"/></svg>
+                  <svg *ngIf="layer.devicePreset === 'mobile'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="3.2"/><path d="M10 5.7h4"/><path d="M10 18.5h4"/></svg>
+                  <svg *ngIf="isFrame(layer.type) && !layer.devicePreset && !layer.hasLayout" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+                  <svg *ngIf="isFrame(layer.type) && !layer.devicePreset && layer.hasLayout" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 8h18"/><rect x="6" y="11" width="3" height="7" rx="0.8"/><rect x="10.5" y="11" width="3" height="7" rx="0.8"/><rect x="15" y="11" width="3" height="7" rx="0.8"/></svg>
+                  <svg *ngIf="isRectangle(layer.type) && !layer.hasLayout" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+                  <svg *ngIf="isRectangle(layer.type) && layer.hasLayout" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/><path d="M3 12h18"/></svg>
+                  <svg *ngIf="isText(layer.type)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>
+                  <svg *ngIf="!isFrame(layer.type) && !isRectangle(layer.type) && !isText(layer.type)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+                </span>
+                <div class="project-layer-body">
+                  <input
+                    *ngIf="editingLayerId === layer.id; else layerNameLabel"
+                    type="text"
+                    class="project-layer-input"
+                    [attr.data-layer-name-id]="layer.id"
+                    [value]="editingLayerName"
+                    (click)="onLayerNameClick(page.id, layer.id, $event)"
+                    (dblclick)="startRename(layer.id, $event)"
+                    (blur)="stopRename(page.id, layer.id)"
+                    (input)="onLayerNameInput($event)"
+                    (keydown)="onLayerNameKeyDown(layer.id, $event)"
+                    placeholder="Layer name" />
+                  <ng-template #layerNameLabel>
+                    <span
+                      class="project-layer-title"
+                      (click)="onLayerNameClick(page.id, layer.id, $event)"
+                      (dblclick)="startRename(layer.id, $event)">{{ layer.name }}</span>
+                  </ng-template>
+                </div>
+                <button
+                  type="button"
+                  class="project-layer-visibility"
+                  [attr.aria-label]="layer.visible ? 'Hide element' : 'Show element'"
+                  [title]="layer.visible ? 'Hide element' : 'Show element'"
+                  (click)="onLayerVisibilityToggle(page.id, layer.id, $event)">
+                  <svg *ngIf="layer.visible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                  <svg *ngIf="!layer.visible" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m2 2 20 20"/>
+                    <path d="M10.58 10.58a2 2 0 1 0 2.83 2.83"/>
+                    <path d="M9.88 5.09A10.94 10.94 0 0 1 12 4.91c5.05 0 9.27 3.11 10.67 7.5a10.96 10.96 0 0 1-1.79 3.09"/>
+                    <path d="M6.61 6.61A10.95 10.95 0 0 0 1.33 12.4a10.75 10.75 0 0 0 14.2 6.18"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </ng-container>
+        </div>
+      </section>
+    </ng-container>
+
+    <ng-template #aiChatTab>
+      <section class="project-section project-section--placeholder">
+        <p class="project-section-title">AI Chat</p>
+        <p class="project-placeholder-text">This tab is reserved for the future AI-assisted UI generation chat.</p>
+        <p class="project-placeholder-text project-placeholder-text--muted">When the integration is ready, you will be able to prompt the assistant here and generate UI directly from the canvas workflow.</p>
+      </section>
+    </ng-template>
+  </div>
 </aside>
 
 <app-context-menu
-  *ngIf="pageMenuPageId"
+  *ngIf="pageMenuPageId && activeTab === 'navigator'"
   [x]="pageMenuX"
   [y]="pageMenuY"
   [items]="pageMenuItems"

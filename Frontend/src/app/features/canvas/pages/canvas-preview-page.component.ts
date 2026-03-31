@@ -151,12 +151,28 @@ export class CanvasPreviewPage {
     return this.el.getElementStrokeStyle(element);
   }
 
+  getElementBorderRadius(element: CanvasElement): string {
+    return this.el.getElementBorderRadius(element);
+  }
+
   getElementBoxShadow(element: CanvasElement): string {
     return this.el.getElementBoxShadow(element);
   }
 
   getElementTransform(element: CanvasElement): string | null {
     return this.el.getElementTransform(element);
+  }
+
+  getElementTransformOrigin(element: CanvasElement): string | null {
+    return this.el.getElementTransformOrigin(element);
+  }
+
+  getElementBackfaceVisibility(element: CanvasElement): string | null {
+    return this.el.getElementBackfaceVisibility(element);
+  }
+
+  getElementTransformStyle(element: CanvasElement): string | null {
+    return this.el.getElementTransformStyle(element);
   }
 
   isInteractiveElement(element: CanvasElement): boolean {

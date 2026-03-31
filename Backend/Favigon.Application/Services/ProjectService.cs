@@ -199,13 +199,16 @@ public class ProjectService : IProjectService
               continue;
             }
 
-            if (childNode is JsonValue jsonValue)
+            if (childNode is JsonValue jsonValue
+              && TryNormalizeJsonValue(jsonValue, out var normalizedValue))
             {
-              jsonObject[propertyName] = NormalizeJsonValue(jsonValue);
-              continue;
+              jsonObject[propertyName] = normalizedValue;
             }
 
-            NormalizeNumbers(childNode);
+            if (childNode is not JsonValue)
+            {
+              NormalizeNumbers(childNode);
+            }
           }
 
           break;
@@ -220,13 +223,16 @@ public class ProjectService : IProjectService
               continue;
             }
 
-            if (childNode is JsonValue jsonValue)
+            if (childNode is JsonValue jsonValue
+              && TryNormalizeJsonValue(jsonValue, out var normalizedValue))
             {
-              jsonArray[index] = NormalizeJsonValue(jsonValue);
-              continue;
+              jsonArray[index] = normalizedValue;
             }
 
-            NormalizeNumbers(childNode);
+            if (childNode is not JsonValue)
+            {
+              NormalizeNumbers(childNode);
+            }
           }
 
           break;
@@ -234,17 +240,20 @@ public class ProjectService : IProjectService
     }
   }
 
-  private static JsonNode NormalizeJsonValue(JsonValue value)
+  private static bool TryNormalizeJsonValue(JsonValue value, out JsonNode normalizedValue)
   {
+    normalizedValue = value;
+
     if (value.TryGetValue<JsonElement>(out var jsonElement)
       && jsonElement.ValueKind == JsonValueKind.Number
       && jsonElement.TryGetDecimal(out var number))
     {
       var rounded = Math.Round(number, 2, MidpointRounding.AwayFromZero);
-      return JsonValue.Create(rounded)!;
+      normalizedValue = JsonValue.Create(rounded)!;
+      return true;
     }
 
-    return value;
+    return false;
   }
 
 }

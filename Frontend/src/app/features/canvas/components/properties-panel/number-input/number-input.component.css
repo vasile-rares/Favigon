@@ -1,5 +1,8 @@
 :host {
-  --pp-control-height: 36px;
+  --pp-control-height: var(--canvas-panel-control-height, 36px);
+  --pp-control-radius: var(--canvas-panel-control-radius, 10px);
+  --pp-control-padding-x: var(--canvas-panel-control-padding-x, 0.55rem);
+  --number-input-suffix-gap: 0.08rem;
   display: block;
   min-width: 0;
 }
@@ -32,7 +35,7 @@ input[type='number']::-webkit-inner-spin-button {
   height: 100%;
   border: 1px solid rgba(255, 255, 255, 0.05);
   background: rgba(0, 0, 0, 0.25);
-  border-radius: 10px;
+  border-radius: var(--pp-control-radius);
   box-shadow:
     inset 0 2px 5px rgba(0, 0, 0, 0.3),
     0 1px 0 rgba(255, 255, 255, 0.05);
@@ -56,16 +59,16 @@ input[type='number']::-webkit-inner-spin-button {
 }
 
 .number-input--boxed {
-  padding: 0 0.55rem;
+  padding: 0 var(--pp-control-padding-x);
 }
 
 .number-input--compact {
-  width: 72px;
-  padding: 0 0.55rem;
+  width: var(--number-input-compact-width, 72px);
+  padding: 0 var(--pp-control-padding-x);
 }
 
 .number-input--popup {
-  padding: 0 0.55rem;
+  padding: 0 var(--pp-control-padding-x);
 }
 
 .number-input__field {
@@ -74,16 +77,33 @@ input[type='number']::-webkit-inner-spin-button {
   min-width: 0;
   border: none;
   background: transparent;
-  color: var(--color-zinc-100);
-  font-size: 0.84rem;
-  line-height: 1.2;
-  padding: 0 18px 0 0;
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-100));
+  font-size: var(--canvas-panel-font-size, 0.84rem);
   margin: 0;
   outline: none;
   appearance: none;
   -webkit-appearance: none;
   cursor: text;
   text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+.number-input__suffix {
+  position: absolute;
+  top: 50%;
+  left: calc(
+    var(--pp-control-padding-x) +
+      (var(--number-input-value-length, 1) * 1ch) +
+      var(--number-input-suffix-gap)
+  );
+  transform: translateY(-50%);
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-400));
+  font-size: var(--canvas-panel-font-size, 0.84rem);
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.14s ease;
 }
 
 .number-input__stepper {
@@ -116,7 +136,7 @@ input[type='number']::-webkit-inner-spin-button {
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--color-zinc-400);
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-400));
   cursor: ns-resize;
   min-height: 8px;
   border-radius: 4px;

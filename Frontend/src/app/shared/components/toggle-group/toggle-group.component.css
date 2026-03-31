@@ -1,5 +1,13 @@
 :host {
-  --toggle-group-height: 36px;
+  --toggle-group-height: var(--canvas-panel-control-height, 36px);
+  --toggle-group-padding: var(--canvas-panel-toggle-group-padding, 0.2rem);
+  --toggle-group-radius: var(--canvas-panel-control-radius, 10px);
+  --toggle-group-indicator-inset: var(--canvas-panel-toggle-group-padding, 0.2rem);
+  --toggle-group-button-radius: var(--canvas-panel-toggle-group-button-radius, 7px);
+  --toggle-group-button-padding: var(--canvas-panel-toggle-group-button-padding, 0.36rem 0.65rem);
+  --toggle-group-icon-only-button-padding: 0.5rem 0.6rem;
+  --toggle-group-icon-size: 18px;
+  --toggle-group-icon-offset-y: 0.5px;
   display: block;
   min-width: 0;
 }
@@ -8,6 +16,7 @@
   position: relative;
   box-sizing: border-box;
   display: inline-grid;
+  width: var(--canvas-panel-toggle-group-width, auto);
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
   align-items: center;
@@ -15,8 +24,8 @@
   max-width: 100%;
   min-height: var(--toggle-group-height);
   height: var(--toggle-group-height);
-  padding: 0.25rem;
-  border-radius: 10px;
+  padding: var(--toggle-group-padding);
+  border-radius: var(--toggle-group-radius);
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow:
@@ -49,11 +58,11 @@
 
 .toggle-group__indicator {
   position: absolute;
-  top: 0.25rem;
-  bottom: 0.25rem;
-  left: 0.25rem;
-  width: calc((100% - 0.5rem) / var(--toggle-group-count));
-  border-radius: 8px;
+  top: var(--toggle-group-indicator-inset);
+  bottom: var(--toggle-group-indicator-inset);
+  left: var(--toggle-group-indicator-inset);
+  width: calc((100% - (var(--toggle-group-indicator-inset) * 2)) / var(--toggle-group-count));
+  border-radius: var(--toggle-group-button-radius);
   background: rgba(255, 255, 255, 0.08);
   box-shadow:
     inset 0 1px 2px rgba(0, 0, 0, 0.45),
@@ -72,16 +81,20 @@
 .toggle-group__button {
   position: relative;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
   min-height: 100%;
   z-index: 1;
   border: none;
   background: transparent;
-  color: var(--color-zinc-400);
-  padding: 0.42rem 0.75rem;
-  border-radius: 8px;
-  font-size: 0.78rem;
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-400));
+  padding: var(--toggle-group-button-padding);
+  border-radius: var(--toggle-group-button-radius);
+  font-size: var(--canvas-panel-font-size, 0.78rem);
   font-weight: 600;
+  line-height: 1;
   cursor: pointer;
   transition:
     color 120ms ease,
@@ -95,15 +108,17 @@
 .toggle-group__button--icon-only {
   min-width: min(54px, calc((100% - 0.5rem) / var(--toggle-group-count)));
   min-height: 100%;
-  padding: 0.5rem clamp(0.35rem, 2vw, 0.95rem);
+  padding: var(--toggle-group-icon-only-button-padding);
 }
 
 .toggle-group__button-content {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
+  flex: 1 1 auto;
   gap: 0.42rem;
   width: 100%;
+  min-height: 100%;
 }
 
 .toggle-group__button-content--icon-only {
@@ -112,20 +127,25 @@
 }
 
 .toggle-group__icon {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  flex: 0 0 auto;
+  width: var(--toggle-group-icon-size);
+  height: var(--toggle-group-icon-size);
   line-height: 0;
-  transform: translateY(0.5px);
+  transform: translateY(var(--toggle-group-icon-offset-y));
 }
 
 .toggle-group__icon-svg {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: var(--toggle-group-icon-size);
+  height: var(--toggle-group-icon-size);
   overflow: visible;
+}
+
+.toggle-group__icon-svg--radius-corners {
+  transform: translateX(0.5px);
 }
 
 .toggle-group__label {
@@ -133,5 +153,5 @@
 }
 
 .toggle-group__button.is-active {
-  color: var(--color-zinc-100);
+  color: var(--canvas-panel-section-title-color, var(--color-zinc-100));
 }

@@ -36,6 +36,7 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
   @Input() step = 1;
   @Input() appearance: NumberInputAppearance = 'default';
   @Input() ariaLabel = 'Numeric input';
+  @Input() suffix: string | null = null;
 
   @Output() valueChange = new EventEmitter<number>();
   @Output() gestureStarted = new EventEmitter<void>();
@@ -46,16 +47,29 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
 
   @HostBinding('style.width')
   get hostWidth(): string {
-    return this.appearance === 'compact' ? '72px' : '100%';
+    return this.appearance === 'compact'
+      ? 'var(--number-input-compact-host-width, 72px)'
+      : '100%';
   }
 
   @HostBinding('style.flex')
   get hostFlex(): string {
-    return this.appearance === 'compact' ? '0 0 72px' : '1 1 auto';
+    return this.appearance === 'compact'
+      ? 'var(--number-input-compact-host-flex, 0 0 72px)'
+      : '1 1 auto';
+  }
+
+  @HostBinding('style.--number-input-value-length')
+  get hostValueLength(): string {
+    return `${Math.max(this.displayValue.length, 1)}`;
   }
 
   displayValue = '';
   private activeDrag: StepperDragState | null = null;
+
+  get hasInlineSuffix(): boolean {
+    return !!this.suffix && this.displayValue.length > 0;
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
     if ('value' in changes || 'step' in changes || 'min' in changes || 'max' in changes) {
@@ -78,6 +92,7 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
       'number-input--boxed': this.appearance === 'boxed',
       'number-input--compact': this.appearance === 'compact',
       'number-input--popup': this.appearance === 'popup',
+      'number-input--with-suffix': this.hasInlineSuffix,
     };
   }
 

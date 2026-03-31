@@ -10,6 +10,17 @@ export type CanvasOverflowMode = 'clip' | 'visible';
 export type CanvasShadowPreset = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 export type CanvasPageViewportPreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
 export type CanvasLinkType = 'page' | 'url';
+export type CanvasRotationMode = '2d' | '3d';
+export type CanvasBackfaceVisibility = 'visible' | 'hidden';
+export type CanvasTransformOption =
+  | 'scale'
+  | 'rotate'
+  | 'skew'
+  | 'depth'
+  | 'perspective'
+  | 'origin'
+  | 'backface'
+  | 'preserve3d';
 
 export type CanvasDisplayMode = 'block' | 'flex' | 'grid';
 export type CanvasPositionMode = 'static' | 'relative' | 'absolute' | 'fixed' | 'sticky';
@@ -31,6 +42,13 @@ export interface CanvasSpacing {
   left: number;
 }
 
+export interface CanvasCornerRadii {
+  topLeft: number;
+  topRight: number;
+  bottomRight: number;
+  bottomLeft: number;
+}
+
 export interface CanvasElementIrMeta {
   type?: string;
   props?: Record<string, unknown>;
@@ -46,6 +64,18 @@ export interface CanvasElement {
   width: number;
   height: number;
   rotation?: number;
+  rotationMode?: CanvasRotationMode;
+  scaleX?: number;
+  scaleY?: number;
+  skewX?: number;
+  skewY?: number;
+  depth?: number;
+  perspective?: number;
+  transformOriginX?: number;
+  transformOriginY?: number;
+  backfaceVisibility?: CanvasBackfaceVisibility;
+  preserve3D?: boolean;
+  transformOptions?: CanvasTransformOption[];
   visible?: boolean;
   fill?: string;
   stroke?: string;
@@ -53,6 +83,7 @@ export interface CanvasElement {
   strokeStyle?: string;
   opacity?: number;
   cornerRadius?: number;
+  cornerRadii?: CanvasCornerRadii;
   overflow?: CanvasOverflowMode;
   shadow?: CanvasShadowPreset;
   text?: string;

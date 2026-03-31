@@ -63,6 +63,9 @@
               [style.width.px]="previewEl.width"
               [style.height.px]="previewEl.height"
               [style.transform]="getElementTransform(previewEl)"
+              [style.transform-origin]="getElementTransformOrigin(previewEl)"
+              [style.backface-visibility]="getElementBackfaceVisibility(previewEl)"
+              [style.transform-style]="getElementTransformStyle(previewEl)"
               [style.position]="isNested ? getPreviewNestedPositionStyle(previewEl) : null"
               [style.display]="getElementLayoutDisplay(previewEl)"
               [style.flex-direction]="getElementLayoutFlexDirection(previewEl)"
@@ -79,7 +82,7 @@
               [style.opacity]="previewEl.opacity ?? 1"
               [style.clip-path]="isNested ? null : getElementClipPathForPage(previewEl, previewPageId)"
               [style.visibility]="!isNested && isElementClippedOutForPage(previewEl, previewPageId) ? 'hidden' : 'visible'"
-              [style.border-radius.px]="previewEl.cornerRadius ?? (previewEl.type === 'image' ? 6 : 0)">
+              [style.border-radius]="getElementBorderRadius(previewEl)">
 
               <ng-container *ngIf="previewEl.type === 'text'">
                 <div
@@ -99,7 +102,7 @@
                 <img [src]="previewEl.imageUrl" alt="Canvas image" draggable="false" />
               </ng-container>
 
-              <ng-container *ngIf="isLayoutContainer(previewEl)">
+              <ng-container *ngIf="isContainerElement(previewEl)">
                 <ng-container *ngFor="let child of getLayoutChildrenForPage(previewEl, previewPageId); trackBy: trackByElementId">
                   <ng-container
                     *ngTemplateOutlet="previewElementTpl; context: { element: child, pageId: previewPageId, isNested: true }"></ng-container>
@@ -182,6 +185,9 @@
               [style.width.px]="el.width"
               [style.height.px]="el.height"
               [style.transform]="getElementTransform(el)"
+              [style.transform-origin]="getElementTransformOrigin(el)"
+              [style.backface-visibility]="getElementBackfaceVisibility(el)"
+              [style.transform-style]="getElementTransformStyle(el)"
               [style.position]="isNested ? getNestedPositionStyle(el) : null"
               [style.display]="getElementLayoutDisplay(el)"
               [style.flex-direction]="getElementLayoutFlexDirection(el)"
@@ -201,7 +207,7 @@
               [style.opacity]="el.opacity ?? 1"
               [style.clip-path]="isNested ? null : getElementClipPath(el)"
               [style.visibility]="!isNested && isElementClippedOut(el) ? 'hidden' : 'visible'"
-              [style.border-radius.px]="el.cornerRadius ?? (el.type === 'image' ? 6 : 0)"
+              [style.border-radius]="getElementBorderRadius(el)"
               (pointerdown)="onElementPointerDown($event, el.id)"
               (pointerenter)="hoveredElementId.set(el.id)"
               (pointerleave)="hoveredElementId.set(null)"
@@ -246,8 +252,8 @@
                 <img [src]="el.imageUrl" alt="Canvas image" draggable="false" />
               </ng-container>
 
-              <!-- Nested children for layout containers -->
-              <ng-container *ngIf="isLayoutContainer(el)">
+              <!-- Nested children for containers -->
+              <ng-container *ngIf="isContainerElement(el)">
                 <ng-container *ngFor="let child of getLayoutChildren(el); trackBy: trackByElementId">
                   <ng-container *ngTemplateOutlet="elementTpl; context: { element: child, isNested: true, isFlow: isChildInFlow(child) }"></ng-container>
                 </ng-container>
@@ -362,7 +368,8 @@
               [style.top.px]="getSelectionTop(el)"
               [style.width.px]="getSelectionWidth(el)"
               [style.height.px]="getSelectionHeight(el)"
-              [style.transform]="getElementTransform(el)">
+              [style.transform]="getElementTransform(el)"
+              [style.transform-origin]="getElementTransformOrigin(el)">
             </div>
           </ng-container>
 
@@ -375,6 +382,7 @@
               [style.width.px]="getSelectionWidth(sel)"
               [style.height.px]="getSelectionHeight(sel)"
               [style.transform]="getElementTransform(sel)"
+              [style.transform-origin]="getElementTransformOrigin(sel)"
               (pointerdown)="onSelectionOutlinePointerDown($event, sel.id)"
               (dblclick)="onElementDoubleClick($event, sel.id)"
               (contextmenu)="onElementContextMenu($event, sel.id)">

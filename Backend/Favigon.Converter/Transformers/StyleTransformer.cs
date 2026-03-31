@@ -19,9 +19,22 @@ public static class StyleTransformer
 
     if (style.Color is not null) css["color"] = style.Color;
     if (style.Background is not null) css["background"] = style.Background;
+    if (style.Transform is not null) css["transform"] = style.Transform;
+    if (style.TransformOrigin is not null) css["transform-origin"] = style.TransformOrigin;
+    if (style.BackfaceVisibility is not null)
+      css["backface-visibility"] = style.BackfaceVisibility;
+    if (style.TransformStyle is not null) css["transform-style"] = style.TransformStyle;
     if (style.Border is not null) ApplyBorder(css, style.Border);
 
     if (style.BorderRadius is not null) css["border-radius"] = style.BorderRadius.ToString();
+    if (style.BorderTopLeftRadius is not null)
+      css["border-top-left-radius"] = style.BorderTopLeftRadius.ToString();
+    if (style.BorderTopRightRadius is not null)
+      css["border-top-right-radius"] = style.BorderTopRightRadius.ToString();
+    if (style.BorderBottomRightRadius is not null)
+      css["border-bottom-right-radius"] = style.BorderBottomRightRadius.ToString();
+    if (style.BorderBottomLeftRadius is not null)
+      css["border-bottom-left-radius"] = style.BorderBottomLeftRadius.ToString();
     if (style.FontSize is not null) css["font-size"] = style.FontSize.ToString();
     if (style.FontWeight is not null) css["font-weight"] = style.FontWeight.Value.ToString();
     if (style.FontFamily is not null) css["font-family"] = style.FontFamily;

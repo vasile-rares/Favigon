@@ -1,13 +1,15 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { CanvasElement, CanvasElementType } from '../../../core/models/canvas.models';
 import { roundToTwoDecimals, clamp, collectSubtreeIds } from '../utils/canvas-interaction.util';
 import { CanvasClipboardSnapshot, Bounds } from '../canvas.types';
+import { CanvasElementService } from './canvas-element.service';
 
 const PASTE_OFFSET = 24;
 
 @Injectable()
 export class CanvasClipboardService {
   private snapshot: CanvasClipboardSnapshot | null = null;
+  private readonly elementService = inject(CanvasElementService);
 
   get hasClipboard(): boolean {
     return this.snapshot !== null;
@@ -121,6 +123,10 @@ export class CanvasClipboardService {
 
       if (element.id === clipboard.rootId) {
         cloned.parentId = targetParentId;
+        cloned.position = this.elementService.getDefaultPositionForPlacement(
+          cloned.type,
+          targetParent,
+        );
 
         if (targetParent) {
           cloned.x = clamp(element.x + offset, 0, targetParent.width - element.width);

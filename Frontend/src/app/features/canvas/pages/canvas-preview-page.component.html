@@ -72,12 +72,15 @@
           [style.width.px]="el.width"
           [style.height.px]="el.height"
           [style.transform]="getElementTransform(el)"
+          [style.transform-origin]="getElementTransformOrigin(el)"
+          [style.backface-visibility]="getElementBackfaceVisibility(el)"
+          [style.transform-style]="getElementTransformStyle(el)"
           [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
           [style.border]="getElementBorderStyle(el)"
           [style.box-shadow]="getElementBoxShadow(el)"
           [style.opacity]="el.opacity ?? 1"
           [style.clip-path]="getElementClipPath(el)"
-          [style.border-radius.px]="el.cornerRadius ?? (el.type === 'image' ? 6 : 0)"
+          [style.border-radius]="getElementBorderRadius(el)"
           (click)="onElementClick($event, el)"
           (keydown)="onElementKeydown($event, el)">
 
