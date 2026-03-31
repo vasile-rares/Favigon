@@ -13,6 +13,11 @@ export interface ProjectCreateRequest {
   isPublic: boolean;
 }
 
+export interface ProjectUpdateRequest {
+  name: string;
+  isPublic: boolean;
+}
+
 export interface ProjectDesignResponse {
   projectId: number;
   designJson: string;

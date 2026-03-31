@@ -3,12 +3,13 @@ import {
   DestroyRef,
   ElementRef,
   HostListener,
+  Input,
   OnInit,
   ViewChild,
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
 import { ProjectService } from '../../../core/services/project.service';
@@ -18,6 +19,7 @@ import { UserSearchResult } from '../../../core/models/user.models';
 import { UserMenuDropdownComponent } from '../user-menu-dropdown/user-menu-dropdown.component';
 import { DIALOG_BOX_IMPORTS } from '../dialog-box/dialog-box.component';
 import { TextInputComponent } from '../text-input/text-input.component';
+import { ToggleGroupComponent, ToggleGroupOption } from '../toggle-group/toggle-group.component';
 import {
   DropdownSelectComponent,
   DropdownSelectOption,
@@ -27,6 +29,8 @@ import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
 import { filter, map, distinctUntilChanged, debounceTime, Subject, switchMap, of } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
+
+const PROJECT_MENU_ANIMATION_MS = 120;
 
 interface HeaderUserProfile {
   displayName: string;
@@ -42,10 +46,10 @@ interface HeaderUserProfile {
     CommonModule,
     FormsModule,
     ReactiveFormsModule,
-    RouterLink,
     UserMenuDropdownComponent,
     ...DIALOG_BOX_IMPORTS,
     TextInputComponent,
+    ToggleGroupComponent,
     DropdownSelectComponent,
     ActionButtonComponent,
   ],
@@ -53,6 +57,8 @@ interface HeaderUserProfile {
   styleUrl: './header-bar.component.css',
 })
 export class HeaderBarComponent implements OnInit {
+  @Input() appearance: 'default' | 'canvas' = 'default';
+
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly activatedRoute = inject(ActivatedRoute);
@@ -67,9 +73,19 @@ export class HeaderBarComponent implements OnInit {
   displayName = '';
   username = '';
   email = '';
+  currentProjectId: number | null = null;
   currentProjectName: string | null = null;
+  currentProjectIsPublic: boolean | null = null;
   isProjectContext = false;
   isUserMenuOpen = false;
+
+  readonly isProjectMenuOpen = signal(false);
+  readonly showProjectMenu = signal(false);
+  readonly isProjectMenuClosing = signal(false);
+  readonly isProjectUpdating = signal(false);
+  readonly projectNameDraft = signal('');
+  readonly projectVisibilityDraft = signal(false);
+  readonly projectUpdateError = signal<string | null>(null);
 
   // Search
   searchQuery = signal('');
@@ -91,6 +107,10 @@ export class HeaderBarComponent implements OnInit {
     { label: 'Private', value: false },
     { label: 'Public', value: true },
   ];
+  readonly projectVisibilityOptions: ToggleGroupOption[] = [
+    { label: 'Private', value: false },
+    { label: 'Public', value: true },
+  ];
 
   @ViewChild('userMenuContainer')
   userMenuContainer?: ElementRef<HTMLElement>;
@@ -98,15 +118,21 @@ export class HeaderBarComponent implements OnInit {
   @ViewChild('searchContainer')
   searchContainer?: ElementRef<HTMLElement>;
 
+  @ViewChild('projectMenuContainer')
+  projectMenuContainer?: ElementRef<HTMLElement>;
+
+  @ViewChild('projectNameInput')
+  projectNameInput?: TextInputComponent;
+
+  private projectMenuCloseTimer: ReturnType<typeof setTimeout> | null = null;
+
   get avatarUrl(): string {
     return this.profilePictureUrl?.trim() || this.fallbackAvatarUrl;
   }
 
-  get profileRouterLink(): string[] {
-    return this.username ? ['/', this.username] : ['/'];
-  }
-
   ngOnInit(): void {
+    this.destroyRef.onDestroy(() => this.clearProjectMenuCloseTimer());
+
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
       .pipe(
@@ -200,6 +226,119 @@ export class HeaderBarComponent implements OnInit {
     this.openCreateProjectDialog();
   }
 
+  toggleProjectMenu(): void {
+    if (this.isProjectMenuOpen()) {
+      this.closeProjectMenu();
+      return;
+    }
+
+    this.openProjectMenu();
+  }
+
+  openProjectMenu(): void {
+    if (!this.isProjectContext || !this.currentProjectName || this.isProjectUpdating()) {
+      return;
+    }
+
+    this.clearProjectMenuCloseTimer();
+
+    this.projectNameDraft.set(this.currentProjectName);
+    this.projectVisibilityDraft.set(this.currentProjectIsPublic ?? false);
+    this.projectUpdateError.set(null);
+    this.isProjectMenuClosing.set(false);
+    this.showProjectMenu.set(true);
+    this.isProjectMenuOpen.set(true);
+
+    this.focusProjectNameInput();
+  }
+
+  closeProjectMenu(): void {
+    if (this.isProjectUpdating()) {
+      return;
+    }
+
+    this.projectNameDraft.set(this.currentProjectName ?? '');
+    this.projectVisibilityDraft.set(this.currentProjectIsPublic ?? false);
+    this.projectUpdateError.set(null);
+    this.isProjectMenuOpen.set(false);
+
+    if (!this.showProjectMenu()) {
+      return;
+    }
+
+    this.clearProjectMenuCloseTimer();
+    this.isProjectMenuClosing.set(true);
+    this.projectMenuCloseTimer = setTimeout(() => {
+      this.showProjectMenu.set(false);
+      this.isProjectMenuClosing.set(false);
+      this.projectMenuCloseTimer = null;
+    }, PROJECT_MENU_ANIMATION_MS);
+  }
+
+  saveProjectSettings(): void {
+    if (!this.isProjectMenuOpen() || this.isProjectUpdating()) {
+      return;
+    }
+
+    const projectId = this.currentProjectId;
+    const nextName = this.projectNameDraft().trim();
+    const currentName = this.currentProjectName?.trim() ?? '';
+    const nextVisibility = this.projectVisibilityDraft();
+    const currentVisibility = this.currentProjectIsPublic ?? false;
+
+    if (projectId === null) {
+      this.closeProjectMenu();
+      return;
+    }
+
+    if (!nextName) {
+      this.projectUpdateError.set('Project name is required.');
+      this.focusProjectNameInput();
+      return;
+    }
+
+    if (nextName === currentName && nextVisibility === currentVisibility) {
+      this.closeProjectMenu();
+      return;
+    }
+
+    this.isProjectUpdating.set(true);
+    this.projectUpdateError.set(null);
+
+    this.projectService
+      .update(projectId, {
+        name: nextName,
+        isPublic: nextVisibility,
+      })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (project) => {
+          this.currentProjectName = project.name;
+          this.currentProjectIsPublic = project.isPublic;
+          this.projectNameDraft.set(project.name);
+          this.projectVisibilityDraft.set(project.isPublic);
+          this.projectUpdateError.set(null);
+          this.isProjectUpdating.set(false);
+          this.closeProjectMenu();
+        },
+        error: (error: unknown) => {
+          this.projectUpdateError.set(extractApiErrorMessage(error, 'Failed to update project.'));
+          this.isProjectUpdating.set(false);
+          this.focusProjectNameInput();
+        },
+      });
+  }
+
+  openProjectPreview(): void {
+    if (this.currentProjectId === null) {
+      return;
+    }
+
+    const urlTree = this.router.createUrlTree(['project', this.currentProjectId, 'preview']);
+    const url = this.router.serializeUrl(urlTree);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
   openCreateProjectDialog(): void {
     this.createDialogError.set(null);
     this.createProjectForm.reset({ name: 'Untitled Project', isPublic: false });
@@ -246,22 +385,62 @@ export class HeaderBarComponent implements OnInit {
 
   private syncRouteContext(projectId: number | null) {
     if (projectId === null) {
+      this.currentProjectId = null;
       this.isProjectContext = false;
       this.currentProjectName = null;
+      this.currentProjectIsPublic = null;
+      this.projectNameDraft.set('');
+      this.projectVisibilityDraft.set(false);
+      this.projectUpdateError.set(null);
+      this.isProjectMenuOpen.set(false);
+      this.showProjectMenu.set(false);
+      this.isProjectMenuClosing.set(false);
+      this.clearProjectMenuCloseTimer();
       return;
     }
 
+    this.currentProjectId = projectId;
     this.isProjectContext = true;
     this.currentProjectName = `Project #${projectId}`;
+    this.currentProjectIsPublic = null;
+    this.projectNameDraft.set(this.currentProjectName);
+    this.projectVisibilityDraft.set(false);
+    this.projectUpdateError.set(null);
+    this.isProjectMenuOpen.set(false);
+    this.showProjectMenu.set(false);
+    this.isProjectMenuClosing.set(false);
+    this.clearProjectMenuCloseTimer();
 
-    this.projectService.getById(projectId).subscribe({
-      next: (project) => {
-        this.currentProjectName = project.name;
-      },
-      error: () => {
-        this.currentProjectName = `Project #${projectId}`;
-      },
+    this.projectService
+      .getById(projectId)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (project) => {
+          this.currentProjectName = project.name;
+          this.currentProjectIsPublic = project.isPublic;
+          this.projectNameDraft.set(project.name);
+          this.projectVisibilityDraft.set(project.isPublic);
+        },
+        error: () => {
+          this.currentProjectName = `Project #${projectId}`;
+          this.currentProjectIsPublic = null;
+          this.projectNameDraft.set(this.currentProjectName);
+          this.projectVisibilityDraft.set(false);
+        },
+      });
+  }
+
+  private focusProjectNameInput(): void {
+    setTimeout(() => {
+      this.projectNameInput?.focus(true);
     });
+  }
+
+  private clearProjectMenuCloseTimer(): void {
+    if (this.projectMenuCloseTimer) {
+      clearTimeout(this.projectMenuCloseTimer);
+      this.projectMenuCloseTimer = null;
+    }
   }
 
   private getProjectIdFromRoute(): number | null {
@@ -298,6 +477,13 @@ export class HeaderBarComponent implements OnInit {
   onDocumentClick(event: MouseEvent): void {
     const target = event.target as Node | null;
 
+    if (this.isProjectMenuOpen()) {
+      const projectMenuEl = this.projectMenuContainer?.nativeElement;
+      if (target && projectMenuEl && !projectMenuEl.contains(target)) {
+        this.closeProjectMenu();
+      }
+    }
+
     if (this.isUserMenuOpen) {
       const container = this.userMenuContainer?.nativeElement;
       if (target && container && !container.contains(target)) {
@@ -315,6 +501,7 @@ export class HeaderBarComponent implements OnInit {
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    this.closeProjectMenu();
     this.closeUserMenu();
     this.isSearchOpen.set(false);
   }

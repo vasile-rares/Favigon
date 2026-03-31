@@ -26,7 +26,10 @@ import {
 import { IRNode } from '../../../../core/models/ir.models';
 import { NumberInputComponent } from './number-input/number-input.component';
 import { StylePopupFieldComponent } from './style-popup-field/style-popup-field.component';
-import { ToggleGroupComponent, ToggleGroupOption } from './toggle-group/toggle-group.component';
+import {
+  ToggleGroupComponent,
+  ToggleGroupOption,
+} from '../../../../shared/components/toggle-group/toggle-group.component';
 import { formatCanvasElementTypeLabel } from '../../utils/canvas-label.util';
 import { roundToTwoDecimals } from '../../utils/canvas-interaction.util';
 import { SupportedFramework } from '../../canvas.types';
@@ -656,7 +659,8 @@ export class PropertiesPanelComponent {
       return;
     }
 
-    const currentValue = field === 'lineHeightUnit' ? (element.lineHeight ?? 1.2) : (element.letterSpacing ?? 0);
+    const currentValue =
+      field === 'lineHeightUnit' ? (element.lineHeight ?? 1.2) : (element.letterSpacing ?? 0);
     const currentUnit =
       field === 'lineHeightUnit'
         ? this.lineHeightUnitValue(element)

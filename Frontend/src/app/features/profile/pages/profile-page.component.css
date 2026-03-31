@@ -30,7 +30,7 @@
   max-width: 960px;
   width: 100%;
   margin: 0 auto;
-  padding: 2.5rem 3rem 0; /* Only top/side padding, bottom handled by scroll area */
+  padding: 1.75rem 3rem 0; /* Only top/side padding, bottom handled by scroll area */
   position: relative;
   min-height: 0;
   transition:

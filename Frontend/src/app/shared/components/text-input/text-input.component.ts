@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, Optional, Self } from '@angular/core';
+import { Component, ElementRef, Input, Optional, Self, ViewChild } from '@angular/core';
 import { ControlValueAccessor, FormsModule, NgControl } from '@angular/forms';
 
 @Component({
@@ -29,6 +29,9 @@ export class TextInputComponent implements ControlValueAccessor {
   value = '';
   disabled = false;
   passwordVisible = false;
+
+  @ViewChild('inputElement')
+  private inputElement?: ElementRef<HTMLInputElement | HTMLTextAreaElement>;
 
   private onChange: (value: string) => void = () => undefined;
   private onTouched: () => void = () => undefined;
@@ -89,5 +92,18 @@ export class TextInputComponent implements ControlValueAccessor {
     }
 
     this.passwordVisible = !this.passwordVisible;
+  }
+
+  focus(selectText = false): void {
+    const input = this.inputElement?.nativeElement;
+    if (!input || this.disabled) {
+      return;
+    }
+
+    input.focus();
+
+    if (selectText && typeof input.select === 'function') {
+      input.select();
+    }
   }
 }

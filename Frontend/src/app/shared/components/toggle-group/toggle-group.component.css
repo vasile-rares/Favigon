@@ -1,5 +1,5 @@
 :host {
-  --pp-control-height: 36px;
+  --toggle-group-height: 36px;
   display: block;
   min-width: 0;
 }
@@ -13,8 +13,8 @@
   align-items: center;
   min-width: 0;
   max-width: 100%;
-  min-height: var(--pp-control-height);
-  height: var(--pp-control-height);
+  min-height: var(--toggle-group-height);
+  height: var(--toggle-group-height);
   padding: 0.25rem;
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.25);

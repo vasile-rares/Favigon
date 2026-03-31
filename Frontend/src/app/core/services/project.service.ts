@@ -7,6 +7,7 @@ import {
   ProjectDesignResponse,
   ProjectDesignSaveRequest,
   ProjectResponse,
+  ProjectUpdateRequest,
 } from '../models/project.models';
 
 @Injectable({ providedIn: 'root' })
@@ -24,6 +25,10 @@ export class ProjectService {
 
   create(request: ProjectCreateRequest): Observable<ProjectResponse> {
     return this.http.post<ProjectResponse>(`${this.baseUrl}/projects`, request);
+  }
+
+  update(projectId: number, request: ProjectUpdateRequest): Observable<ProjectResponse> {
+    return this.http.put<ProjectResponse>(`${this.baseUrl}/projects/${projectId}`, request);
   }
 
   delete(projectId: number): Observable<void> {

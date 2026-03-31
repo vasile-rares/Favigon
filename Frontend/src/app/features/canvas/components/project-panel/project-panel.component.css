@@ -1,8 +1,8 @@
 :host {
   position: absolute;
-  left: 12px;
-  top: 60px;
-  bottom: 12px;
+  left: var(--canvas-edge-gap, 12px);
+  top: var(--canvas-top-chrome-offset, 60px);
+  bottom: var(--canvas-edge-gap, 12px);
   width: 280px;
   z-index: 20;
   display: flex;

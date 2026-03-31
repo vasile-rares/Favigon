@@ -11,6 +11,7 @@
   <div class="input-control-wrap">
     @if (multiline) {
       <textarea
+        #inputElement
         class="text-input text-input--textarea"
         [id]="id"
         [placeholder]="placeholder"
@@ -23,6 +24,7 @@
         (blur)="handleBlur()"></textarea>
     } @else {
       <input
+        #inputElement
         class="text-input"
         [class.text-input--with-toggle]="type === 'password' && enablePasswordToggle"
         [id]="id"
