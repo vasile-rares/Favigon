@@ -14,6 +14,11 @@ interface PreviewDeviceOption {
   width: number;
 }
 
+interface PreviewLinkTarget {
+  kind: 'page' | 'url';
+  value: string;
+}
+
 const PREVIEW_DEVICE_OPTIONS: PreviewDeviceOption[] = [
   { id: 'desktop', label: 'Desktop', width: 1280 },
   { id: 'tablet', label: 'Tablet', width: 800 },
@@ -97,6 +102,31 @@ export class CanvasPreviewPage {
     this.syncQueryPage(pageId);
   }
 
+  onElementClick(event: MouseEvent, element: CanvasElement): void {
+    const target = this.resolveLinkTarget(element);
+    if (!target) {
+      return;
+    }
+
+    event.stopPropagation();
+    this.activateLinkTarget(target);
+  }
+
+  onElementKeydown(event: KeyboardEvent, element: CanvasElement): void {
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return;
+    }
+
+    const target = this.resolveLinkTarget(element);
+    if (!target) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+    this.activateLinkTarget(target);
+  }
+
   togglePageMenu(): void {
     this.isPageMenuOpen.update((open) => !open);
   }
@@ -127,6 +157,22 @@ export class CanvasPreviewPage {
 
   getElementTransform(element: CanvasElement): string | null {
     return this.el.getElementTransform(element);
+  }
+
+  isInteractiveElement(element: CanvasElement): boolean {
+    return this.resolveLinkTarget(element) !== null;
+  }
+
+  hasDirectLink(element: CanvasElement): boolean {
+    return this.getDirectLinkTarget(element) !== null;
+  }
+
+  getElementTabIndex(element: CanvasElement): number | null {
+    return this.hasDirectLink(element) ? 0 : null;
+  }
+
+  getElementRole(element: CanvasElement): string | null {
+    return this.hasDirectLink(element) ? 'link' : null;
   }
 
   getElementClipPath(element: CanvasElement): string {
@@ -212,6 +258,54 @@ export class CanvasPreviewPage {
       : 720;
   }
 
+  private activateLinkTarget(target: PreviewLinkTarget): void {
+    this.closePageMenu();
+
+    if (target.kind === 'page') {
+      this.selectPage(target.value);
+      return;
+    }
+
+    window.open(target.value, '_blank', 'noopener,noreferrer');
+  }
+
+  private resolveLinkTarget(element: CanvasElement): PreviewLinkTarget | null {
+    const elements = this.currentPage()?.elements ?? [];
+    let current: CanvasElement | undefined = element;
+
+    while (current) {
+      const directTarget = this.getDirectLinkTarget(current);
+      if (directTarget) {
+        return directTarget;
+      }
+
+      const parentId: string | null | undefined = current.parentId;
+      current = parentId ? elements.find((entry) => entry.id === parentId) : undefined;
+    }
+
+    return null;
+  }
+
+  private getDirectLinkTarget(element: CanvasElement): PreviewLinkTarget | null {
+    if (element.linkType === 'page') {
+      const pageId = typeof element.linkPageId === 'string' ? element.linkPageId : '';
+      if (pageId && this.pages().some((page) => page.id === pageId)) {
+        return { kind: 'page', value: pageId };
+      }
+
+      return null;
+    }
+
+    if (element.linkType === 'url') {
+      const url = normalizePreviewLinkUrl(element.linkUrl);
+      if (url) {
+        return { kind: 'url', value: url };
+      }
+    }
+
+    return null;
+  }
+
   private syncQueryPage(pageId: string): void {
     void this.router.navigate([], {
       relativeTo: this.route,
@@ -220,4 +314,26 @@ export class CanvasPreviewPage {
       replaceUrl: true,
     });
   }
+}
+
+function normalizePreviewLinkUrl(value: string | undefined): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (
+    normalized.startsWith('/') ||
+    normalized.startsWith('#') ||
+    normalized.startsWith('//') ||
+    /^[a-z][a-z0-9+.-]*:/i.test(normalized)
+  ) {
+    return normalized;
+  }
+
+  return `https://${normalized}`;
 }

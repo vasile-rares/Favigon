@@ -5,6 +5,7 @@
   CanvasFontSizeUnit,
   CanvasFlexDirection,
   CanvasJustifyContent,
+  CanvasLinkType,
   CanvasPageModel,
   CanvasPositionMode,
   CanvasProjectDocument,
@@ -42,6 +43,10 @@ const MANAGED_PROP_KEYS = [
   'fontStyle',
   'primitive',
   'sourceType',
+  'href',
+  'target',
+  'linkType',
+  'linkPageId',
 ] as const;
 
 const DEFAULT_POSITION = 24;
@@ -397,6 +402,23 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
     props['name'] = element.name;
   }
 
+  if (element.linkType === 'page' && typeof element.linkPageId === 'string') {
+    const linkPageId = element.linkPageId.trim();
+    if (linkPageId.length > 0) {
+      props['linkType'] = 'page';
+      props['linkPageId'] = linkPageId;
+    }
+  }
+
+  if (element.linkType === 'url') {
+    const href = normalizeExternalLinkUrl(element.linkUrl);
+    if (href) {
+      props['linkType'] = 'url';
+      props['href'] = href;
+      props['target'] = '_blank';
+    }
+  }
+
   return props;
 }
 
@@ -551,6 +573,9 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
         ? readLengthUnit<CanvasTextSpacingUnit>(node.style?.lineHeight, 'em', ['px', 'em'])
         : undefined,
     imageUrl: mappedType === 'image' ? readStringProp(node.props, 'src', '') : undefined,
+    linkType: readLinkTypeFromProps(node.props),
+    linkPageId: readOptionalStringProp(node.props, 'linkPageId') ?? undefined,
+    linkUrl: readOptionalStringProp(node.props, 'href') ?? undefined,
     irMeta: {
       type: node.type,
       props: preservedProps,
@@ -771,6 +796,39 @@ function readOptionalStringProp(
 ): string | undefined {
   const value = props?.[key];
   return typeof value === 'string' ? value : undefined;
+}
+
+function readLinkTypeFromProps(
+  props: Record<string, unknown> | undefined,
+): CanvasLinkType | undefined {
+  const value = props?.['linkType'];
+  if (value === 'page' || value === 'url') {
+    return value;
+  }
+
+  return typeof props?.['href'] === 'string' ? 'url' : undefined;
+}
+
+function normalizeExternalLinkUrl(value: string | undefined): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (
+    normalized.startsWith('/') ||
+    normalized.startsWith('#') ||
+    normalized.startsWith('//') ||
+    /^[a-z][a-z0-9+.-]*:/i.test(normalized)
+  ) {
+    return normalized;
+  }
+
+  return `https://${normalized}`;
 }
 
 function readShadow(

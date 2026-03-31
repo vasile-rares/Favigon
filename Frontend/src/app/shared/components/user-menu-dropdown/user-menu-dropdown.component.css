@@ -9,26 +9,15 @@
   top: calc(100% + 0.75rem);
   width: 256px;
   border-radius: var(--user-menu-panel-radius);
-  background: transparent;
-  color: var(--color-text-light);
-  overflow: hidden;
-  z-index: 40;
-  transform-origin: top right;
-  isolation: isolate;
-}
-
-.user-menu__panel::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
   background: var(--chrome-panel-background);
   backdrop-filter: var(--chrome-panel-blur);
   -webkit-backdrop-filter: var(--chrome-panel-blur);
   border: var(--chrome-panel-border);
   box-shadow: var(--chrome-panel-shadow);
-  z-index: -1;
-  pointer-events: none;
+  color: var(--color-text-light);
+  overflow: hidden;
+  z-index: 40;
+  transform-origin: top right;
 }
 
 .user-menu__panel--open {

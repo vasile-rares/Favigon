@@ -11,8 +11,14 @@ public sealed class HtmlTextMapper : HtmlMapperBase
   protected override string EmitElement(IRNode node, EmitContext ctx)
   {
     var content = GetProp(node, "content");
+    var href = GetProp(node, "href");
     var inline = GetBoolProp(node, "inline");
     var tag = inline ? "span" : "p";
+
+    if (!string.IsNullOrWhiteSpace(href))
+    {
+      return Paired("a", BuildLinkAttrs(node, href), content, ctx.Indent, inlineContent: true);
+    }
 
     return Paired(tag, NodeClass(node), content, ctx.Indent, inlineContent: true);
   }
@@ -75,6 +81,13 @@ public sealed class HtmlImageMapper : HtmlMapperBase
   {
     var src = GetProp(node, "src", "");
     var alt = GetProp(node, "alt", "");
+    var href = GetProp(node, "href");
+
+    if (!string.IsNullOrWhiteSpace(href))
+    {
+      var inner = SelfClosing("img", $" src=\"{src}\" alt=\"{alt}\"", ctx.Deeper().Indent);
+      return Paired("a", BuildLinkAttrs(node, href), inner, ctx.Indent);
+    }
 
     var attrs = NodeClass(node);
     attrs += $" src=\"{src}\" alt=\"{alt}\"";
@@ -408,16 +421,26 @@ public sealed class HtmlContainerMapper : HtmlMapperBase
 {
   public override string Type => "Container";
 
-  protected override string EmitElement(IRNode node, EmitContext ctx) =>
-      Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
+  protected override string EmitElement(IRNode node, EmitContext ctx)
+  {
+    var href = GetProp(node, "href");
+    return !string.IsNullOrWhiteSpace(href)
+      ? Paired("a", BuildLinkAttrs(node, href), EmitChildren(node, ctx), ctx.Indent)
+      : Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
+  }
 }
 
 public sealed class HtmlFrameMapper : HtmlMapperBase
 {
   public override string Type => "Frame";
 
-  protected override string EmitElement(IRNode node, EmitContext ctx) =>
-      Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
+  protected override string EmitElement(IRNode node, EmitContext ctx)
+  {
+    var href = GetProp(node, "href");
+    return !string.IsNullOrWhiteSpace(href)
+      ? Paired("a", BuildLinkAttrs(node, href), EmitChildren(node, ctx), ctx.Indent)
+      : Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
+  }
 }
 
 public sealed class HtmlDividerMapper : HtmlMapperBase

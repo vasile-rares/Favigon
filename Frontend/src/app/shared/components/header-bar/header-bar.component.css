@@ -17,6 +17,14 @@
   pointer-events: auto;
 }
 
+:host(.canvas-header) .header-project-menu {
+  pointer-events: auto;
+}
+
+:host(.canvas-header) app-user-menu-dropdown {
+  pointer-events: auto;
+}
+
 .header-bar {
   position: relative;
   height: 55px;
@@ -110,7 +118,7 @@
 }
 
 .header-bar--canvas .header-brand-logo {
-  height: 22px;
+  height: 27px;
 }
 
 .header-project-title {
@@ -144,6 +152,11 @@
 
 .header-project-status-dot--public {
   background: #22c55e;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 0 8px rgba(34, 197, 94, 0.4),
+    0 0 16px rgba(34, 197, 94, 0.28),
+    0 0 24px rgba(34, 197, 94, 0.16);
 }
 
 .header-project-status-dot--private {
@@ -152,13 +165,17 @@
 
 .header-project-menu {
   position: absolute;
-  top: calc(100% + 1.55rem);
+  top: calc(100% + 0.65rem);
   left: 50%;
   transform: translateX(-50%);
   width: min(280px, calc(100vw - 24px));
   padding: 0.85rem;
   border-radius: 16px;
-  background: transparent;
+  border: var(--chrome-panel-border);
+  background: var(--chrome-panel-background);
+  backdrop-filter: var(--chrome-panel-blur);
+  -webkit-backdrop-filter: var(--chrome-panel-blur);
+  box-shadow: var(--chrome-panel-shadow);
   display: flex;
   flex-direction: column;
   gap: 0.8rem;
@@ -167,20 +184,6 @@
   isolation: isolate;
   overflow: hidden;
   opacity: 0;
-}
-
-.header-project-menu::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--chrome-panel-background);
-  backdrop-filter: var(--chrome-panel-blur);
-  -webkit-backdrop-filter: var(--chrome-panel-blur);
-  border: var(--chrome-panel-border);
-  box-shadow: var(--chrome-panel-shadow);
-  z-index: -1;
-  pointer-events: none;
 }
 
 .header-project-menu--open {

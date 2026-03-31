@@ -47,8 +47,8 @@ export class CanvasElementService {
     tool: CanvasElementType,
     pointer: Point,
     elements: CanvasElement[],
-    selectedFrame: CanvasElement | null,
-    frameBounds: Bounds | null,
+    selectedContainer: CanvasElement | null,
+    containerBounds: Bounds | null,
     frameTemplateSize: { width: number; height: number },
   ): { element: CanvasElement | null; error: string | null } {
     const defaultWidth =
@@ -68,32 +68,32 @@ export class CanvasElementService {
       }
     }
 
-    if (tool !== 'frame' && selectedFrame && frameBounds) {
+    if (tool !== 'frame' && selectedContainer && containerBounds) {
       if (
         !(
-          pointer.x >= frameBounds.x &&
-          pointer.x <= frameBounds.x + frameBounds.width &&
-          pointer.y >= frameBounds.y &&
-          pointer.y <= frameBounds.y + frameBounds.height
+          pointer.x >= containerBounds.x &&
+          pointer.x <= containerBounds.x + containerBounds.width &&
+          pointer.y >= containerBounds.y &&
+          pointer.y <= containerBounds.y + containerBounds.height
         )
       ) {
         return {
           element: null,
-          error: 'Click inside the selected frame to place the element.',
+          error: 'Click inside the selected container to place the element.',
         };
       }
 
       x = clamp(
-        pointer.x - frameBounds.x - defaultWidth / 2,
+        pointer.x - containerBounds.x - defaultWidth / 2,
         0,
-        selectedFrame.width - defaultWidth,
+        selectedContainer.width - defaultWidth,
       );
       y = clamp(
-        pointer.y - frameBounds.y - defaultHeight / 2,
+        pointer.y - containerBounds.y - defaultHeight / 2,
         0,
-        selectedFrame.height - defaultHeight,
+        selectedContainer.height - defaultHeight,
       );
-      parentId = selectedFrame.id;
+      parentId = selectedContainer.id;
     }
 
     return {
@@ -236,8 +236,12 @@ export class CanvasElementService {
     return true;
   }
 
-  getSelectedFrame(selectedElement: CanvasElement | null): CanvasElement | null {
-    return selectedElement?.type === 'frame' ? selectedElement : null;
+  isContainerElement(element: CanvasElement | null | undefined): element is CanvasElement {
+    return !!element && (element.type === 'frame' || element.type === 'rectangle');
+  }
+
+  getSelectedContainer(selectedElement: CanvasElement | null): CanvasElement | null {
+    return this.isContainerElement(selectedElement) ? selectedElement : null;
   }
 
   // ── Frame Positioning ─────────────────────────────────────
@@ -352,7 +356,7 @@ export class CanvasElementService {
   }
 
   private canContainChildren(element: CanvasElement): boolean {
-    return element.type === 'frame' || element.type === 'rectangle';
+    return this.isContainerElement(element);
   }
 
   // ── Element Update Helper ────────────────────────────────

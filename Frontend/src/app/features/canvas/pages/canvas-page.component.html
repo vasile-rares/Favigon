@@ -378,33 +378,34 @@
               (pointerdown)="onSelectionOutlinePointerDown($event, sel.id)"
               (dblclick)="onElementDoubleClick($event, sel.id)"
               (contextmenu)="onElementContextMenu($event, sel.id)">
+              <ng-container *ngIf="showSelectionHandles(sel)">
+                <div class="edge-hit edge-hit-n" (pointerdown)="onResizeHandlePointerDown($event, sel.id, 'n')"></div>
+                <div class="edge-hit edge-hit-s" (pointerdown)="onResizeHandlePointerDown($event, sel.id, 's')"></div>
+                <div class="edge-hit edge-hit-e" (pointerdown)="onResizeHandlePointerDown($event, sel.id, 'e')"></div>
+                <div class="edge-hit edge-hit-w" (pointerdown)="onResizeHandlePointerDown($event, sel.id, 'w')"></div>
 
-              <div class="edge-hit edge-hit-n" (pointerdown)="onResizeHandlePointerDown($event, sel.id, 'n')"></div>
-              <div class="edge-hit edge-hit-s" (pointerdown)="onResizeHandlePointerDown($event, sel.id, 's')"></div>
-              <div class="edge-hit edge-hit-e" (pointerdown)="onResizeHandlePointerDown($event, sel.id, 'e')"></div>
-              <div class="edge-hit edge-hit-w" (pointerdown)="onResizeHandlePointerDown($event, sel.id, 'w')"></div>
-
-              <button
-                *ngIf="supportsCornerRadius(sel)"
-                type="button"
-                class="corner-radius-handle"
-                [style.top.px]="getOverlayCornerRadiusInset(sel)"
-                [style.right.px]="getOverlayCornerRadiusInset(sel)"
-                (pointerdown)="onCornerRadiusHandlePointerDown($event, sel.id)"
-                aria-label="Adjust corner radius"></button>
-
-              <div
-                *ngFor="let corner of cornerHandles"
-                class="corner-zone"
-                [ngClass]="cornerZoneClass(corner)"
-                (pointerdown)="onCornerZonePointerDown($event, sel.id, corner)">
                 <button
+                  *ngIf="supportsCornerRadius(sel)"
                   type="button"
-                  class="handle"
-                  [ngClass]="handleClass(corner)"
-                  (pointerdown)="onResizeHandlePointerDown($event, sel.id, corner)"
-                  aria-label="Resize element"></button>
-              </div>
+                  class="corner-radius-handle"
+                  [style.top.px]="getOverlayCornerRadiusInset(sel)"
+                  [style.right.px]="getOverlayCornerRadiusInset(sel)"
+                  (pointerdown)="onCornerRadiusHandlePointerDown($event, sel.id)"
+                  aria-label="Adjust corner radius"></button>
+
+                <div
+                  *ngFor="let corner of cornerHandles"
+                  class="corner-zone"
+                  [ngClass]="cornerZoneClass(corner)"
+                  (pointerdown)="onCornerZonePointerDown($event, sel.id, corner)">
+                  <button
+                    type="button"
+                    class="handle"
+                    [ngClass]="handleClass(corner)"
+                    (pointerdown)="onResizeHandlePointerDown($event, sel.id, corner)"
+                    aria-label="Resize element"></button>
+                </div>
+              </ng-container>
             </div>
           </ng-container>
 
@@ -414,6 +415,8 @@
 
     <app-properties-panel
       [selectedElement]="selectedElement()"
+      [pages]="pages()"
+      [currentPageId]="currentPageId()"
       [currentTool]="currentTool()"
       [selectedFramework]="selectedFramework()"
       [validationResult]="validationResult()"

@@ -61,9 +61,12 @@
         <div
           *ngFor="let el of visibleElements(); trackBy: trackByElementId"
           class="preview-element"
+          [class.preview-element--interactive]="isInteractiveElement(el)"
           [class.frame]="el.type === 'frame'"
           [class.text]="el.type === 'text'"
           [class.image]="el.type === 'image'"
+          [attr.role]="getElementRole(el)"
+          [attr.tabindex]="getElementTabIndex(el)"
           [style.left.px]="getRenderedX(el)"
           [style.top.px]="getRenderedY(el)"
           [style.width.px]="el.width"
@@ -74,7 +77,9 @@
           [style.box-shadow]="getElementBoxShadow(el)"
           [style.opacity]="el.opacity ?? 1"
           [style.clip-path]="getElementClipPath(el)"
-          [style.border-radius.px]="el.cornerRadius ?? (el.type === 'image' ? 6 : 0)">
+          [style.border-radius.px]="el.cornerRadius ?? (el.type === 'image' ? 6 : 0)"
+          (click)="onElementClick($event, el)"
+          (keydown)="onElementKeydown($event, el)">
 
           <ng-container *ngIf="el.type === 'text'">
             <div

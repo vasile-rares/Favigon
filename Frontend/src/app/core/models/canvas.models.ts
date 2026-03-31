@@ -9,6 +9,7 @@ export type CanvasTextSpacingUnit = 'px' | 'em';
 export type CanvasOverflowMode = 'clip' | 'visible';
 export type CanvasShadowPreset = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 export type CanvasPageViewportPreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
+export type CanvasLinkType = 'page' | 'url';
 
 export type CanvasDisplayMode = 'block' | 'flex' | 'grid';
 export type CanvasPositionMode = 'static' | 'relative' | 'absolute' | 'fixed' | 'sticky';
@@ -67,6 +68,9 @@ export interface CanvasElement {
   lineHeight?: number;
   lineHeightUnit?: CanvasTextSpacingUnit;
   imageUrl?: string;
+  linkType?: CanvasLinkType;
+  linkPageId?: string | null;
+  linkUrl?: string;
   // Layout (frame + rectangle)
   display?: CanvasDisplayMode;
   flexDirection?: CanvasFlexDirection;

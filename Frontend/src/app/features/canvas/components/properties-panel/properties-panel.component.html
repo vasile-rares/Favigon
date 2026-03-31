@@ -47,6 +47,69 @@
     <!-- -- Element properties --------------------------- -->
     <ng-container *ngIf="selectedElement as element">
 
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasLink(element)">
+        <div class="properties-section-header">
+          <p class="properties-section-title">Link</p>
+          <button
+            type="button"
+            class="pp-section-toggle"
+            [attr.aria-label]="hasLink(element) ? 'Remove link' : 'Add link'"
+            [title]="hasLink(element) ? 'Remove link' : 'Add link'"
+            (click)="hasLink(element) ? removeLink() : addLink()">
+            {{ hasLink(element) ? '−' : '+' }}
+          </button>
+        </div>
+
+        <ng-container *ngIf="hasLink(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Type</span>
+            <div class="pp-style-control">
+              <app-toggle-group
+                [ariaLabel]="'Link type'"
+                [options]="linkTypeOptions"
+                [value]="linkTypeValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onLinkTypeChange($event)"></app-toggle-group>
+            </div>
+          </div>
+
+          <ng-container [ngSwitch]="linkTypeValue(element)">
+            <ng-container *ngSwitchCase="'page'">
+              <div class="pp-style-row" *ngIf="linkPageOptions(element).length > 0; else noLinkPages">
+                <span class="pp-row-label">Page</span>
+                <div class="pp-style-control pp-style-control--dropdown">
+                  <app-dropdown-select
+                    [enableSearch]="false"
+                    [placeholder]="'Select page'"
+                    [options]="linkPageOptions(element)"
+                    [ngModel]="linkPageValue(element)"
+                    (ngModelChange)="onLinkPageChange($event)"></app-dropdown-select>
+                </div>
+              </div>
+            </ng-container>
+
+            <div class="pp-style-row" *ngSwitchCase="'url'">
+              <span class="pp-row-label">URL</span>
+              <div class="pp-style-control pp-style-control--dropdown">
+                <input
+                  type="url"
+                  class="pp-text-input pp-text-input--boxed"
+                  [value]="linkUrlValue(element)"
+                  (input)="onLinkUrlChange($event)"
+                  placeholder="https://example.com" />
+              </div>
+            </div>
+          </ng-container>
+
+          <ng-template #noLinkPages>
+            <p class="properties-section-hint">Add another page to create an internal navigation target.</p>
+          </ng-template>
+        </ng-container>
+      </section>
+
       <!-- -- Position -- -->
       <section class="properties-section" *ngIf="supportsPosition(element.type)">
         <p class="properties-section-title">Position</p>
@@ -373,6 +436,7 @@
         </ng-container>
 
       </section>
+
       <!-- -- Text -- -->
       <section class="properties-section properties-section--text" *ngIf="isText(element.type)">
         <p class="properties-section-title">Text</p>

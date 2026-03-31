@@ -404,7 +404,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     const selected = this.selectedElement();
-    const shouldKeepSelection = tool !== 'frame' && selected?.type === 'frame';
+    const shouldKeepSelection = tool !== 'frame' && this.el.isContainerElement(selected);
     if (!shouldKeepSelection) {
       this.selectedElementId.set(null);
     }
@@ -1195,8 +1195,10 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       const target = event.target as HTMLElement;
       if (this.isCanvasBackgroundTarget(target)) {
         // commit text editing if active
-        if (this.editingTextElementId()) {
+        const editingId = this.editingTextElementId();
+        if (editingId) {
           this.history.commitTextEditHistory(() => this.createHistorySnapshot());
+          this.discardEmptyTextElement(editingId);
           this.editingTextElementId.set(null);
         }
         this.clearSelectedPageLayer();
@@ -1214,17 +1216,17 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const targetFrame = this.resolveInsertionFrame(pointer);
-    const frameBounds = targetFrame
-      ? this.el.getAbsoluteBounds(targetFrame, this.elements())
+    const targetContainer = this.resolveInsertionContainer(pointer);
+    const containerBounds = targetContainer
+      ? this.el.getAbsoluteBounds(targetContainer, this.elements())
       : null;
 
     const result = this.el.createElementAtPoint(
       tool,
       pointer,
       this.elements(),
-      targetFrame,
-      frameBounds,
+      targetContainer,
+      containerBounds,
       this.viewport.frameTemplate(),
     );
 
@@ -1272,6 +1274,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const editingId = this.editingTextElementId();
     if (editingId && editingId !== id) {
       this.history.commitTextEditHistory(() => this.createHistorySnapshot());
+      this.discardEmptyTextElement(editingId);
       this.editingTextElementId.set(null);
     }
 
@@ -1293,12 +1296,12 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     this.selectedElementId.set(id);
 
     if (this.currentTool() !== 'select') {
-      const selectedFrame = this.el.getSelectedFrame(this.selectedElement());
+      const selectedContainer = this.el.getSelectedContainer(this.selectedElement());
       const clickedElement = this.el.findElementById(id, this.elements());
       if (
-        selectedFrame &&
-        clickedElement?.id === selectedFrame.id &&
-        clickedElement.type === 'frame'
+        selectedContainer &&
+        clickedElement?.id === selectedContainer.id &&
+        this.el.isContainerElement(clickedElement)
       ) {
         return;
       }
@@ -1435,11 +1438,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     if (this.editingTextElementId() === id) {
       this.editingTextElementId.set(null);
     }
-    const element = this.el.findElementById(id, this.elements());
-    if (element?.type === 'text' && !element.text?.trim()) {
-      this.updateCurrentPageElements((elements) => elements.filter((el) => el.id !== id));
-      this.selectedElementId.set(null);
-    }
+    this.discardEmptyTextElement(id);
   }
 
   onTextEditorKeyDown(event: KeyboardEvent, id: string): void {
@@ -1449,8 +1448,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
     event.preventDefault();
     this.history.commitTextEditHistory(() => this.createHistorySnapshot());
+    const removed = this.discardEmptyTextElement(id);
     this.editingTextElementId.set(null);
-    if (this.selectedElementId() !== id) {
+    if (!removed && this.selectedElementId() !== id) {
       this.selectedElementId.set(id);
     }
     (event.target as HTMLTextAreaElement | null)?.blur();
@@ -1604,12 +1604,20 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     const applyPatch = (): void => {
       this.updateCurrentPageElements((elements) => {
+        let effectivePatch = patch;
         const withPatch = elements.map((element) => {
           if (element.id !== selectedId) {
             return element;
           }
-          const nextElement: CanvasElement = { ...element, ...patch };
+          let nextElement: CanvasElement = { ...element, ...patch };
           this.el.normalizeElement(nextElement, elements);
+
+          const textLayoutPatch = this.getAutoSizedTextLayoutPatch(element, nextElement, patch);
+          if (textLayoutPatch) {
+            nextElement = { ...nextElement, ...textLayoutPatch };
+            effectivePatch = { ...patch, ...textLayoutPatch };
+          }
+
           return nextElement;
         });
         const patchedEl = withPatch.find((e) => e.id === selectedId);
@@ -1618,7 +1626,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
             e.id === selectedId ? { ...e, primarySyncId: undefined } : e,
           );
         }
-        return this.syncElementPatchToPrimary(selectedId, patch, withPatch);
+        return this.syncElementPatchToPrimary(selectedId, effectivePatch, withPatch);
       });
     };
 
@@ -2140,8 +2148,12 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   getSelectionOverlayElement(): CanvasElement | null {
     const sel = this.selectedElement();
     if (!sel) return null;
-    if (sel.type === 'text') return null;
+    if (sel.type === 'text' && !sel.text?.length) return null;
     return sel;
+  }
+
+  showSelectionHandles(element: CanvasElement): boolean {
+    return element.type !== 'text';
   }
 
   getRenderedX(element: CanvasElement): number {
@@ -2832,6 +2844,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     this.isRotating = false;
     this.history.commitGestureHistory(() => this.createHistorySnapshot());
     this.history.commitTextEditHistory(() => this.createHistorySnapshot());
+    this.discardEmptyTextElement(this.editingTextElementId());
     this.editingTextElementId.set(null);
   }
 
@@ -3645,10 +3658,13 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     this.editingCanvasHeaderPageName.set('');
   }
 
-  private resolveInsertionFrame(pointer: Point): CanvasElement | null {
+  private resolveInsertionContainer(pointer: Point): CanvasElement | null {
     const elements = this.elements();
-    const hoveredFrames = elements.filter((element) => {
-      if (element.type !== 'frame' || !this.el.isElementEffectivelyVisible(element.id, elements)) {
+    const hoveredContainers = elements.filter((element) => {
+      if (
+        !this.el.isContainerElement(element) ||
+        !this.el.isElementEffectivelyVisible(element.id, elements)
+      ) {
         return false;
       }
 
@@ -3661,19 +3677,19 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       );
     });
 
-    if (hoveredFrames.length > 0) {
-      return hoveredFrames.reduce((best, candidate) => {
+    if (hoveredContainers.length > 0) {
+      return hoveredContainers.reduce((best, candidate) => {
         const bestArea = best.width * best.height;
         const candidateArea = candidate.width * candidate.height;
         return candidateArea < bestArea ? candidate : best;
       });
     }
 
-    return this.el.getSelectedFrame(this.selectedElement());
+    return this.el.getSelectedContainer(this.selectedElement());
   }
 
-  /** After a drag, if a free element was dropped inside a frame that is larger
-   *  than the element, auto-reparent it to that frame. */
+  /** After a drag, if a free element was dropped inside a container that is larger
+   *  than the element, auto-reparent it to that container. */
   private autoGroupOnDrop(): void {
     const id = this.selectedElementId();
     if (!id) return;
@@ -3686,11 +3702,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const centerX = elementBounds.x + elementBounds.width / 2;
     const centerY = elementBounds.y + elementBounds.height / 2;
 
-    // Find all containers (frames or layout rectangles) whose bounds contain
+    // Find all containers (frames or rectangles) whose bounds contain
     // the element's center and that are strictly larger in both dimensions.
     const candidateContainers = elements.filter((el) => {
       if (el.id === id) return false;
-      if (el.type !== 'frame' && !this.isLayoutContainer(el)) return false;
+      if (!this.el.isContainerElement(el)) return false;
       const fb = this.el.getAbsoluteBounds(el, elements);
       const centerInside =
         centerX >= fb.x &&
@@ -3770,6 +3786,69 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     return { width: Math.max(w, 24), height: Math.max(h, 4) };
   }
 
+  private discardEmptyTextElement(id: string | null): boolean {
+    if (!id) {
+      return false;
+    }
+
+    const element = this.el.findElementById(id, this.elements());
+    if (element?.type !== 'text' || element.text?.trim()) {
+      return false;
+    }
+
+    this.updateCurrentPageElements((elements) => {
+      const withoutElement = this.el.removeElementWithChildren(elements, id);
+      return withoutElement.filter((el) => el.primarySyncId !== id);
+    });
+
+    if (this.selectedElementId() === id) {
+      this.selectedElementId.set(null);
+    }
+
+    return true;
+  }
+
+  private getAutoSizedTextLayoutPatch(
+    previousElement: CanvasElement,
+    nextElement: CanvasElement,
+    patch: Partial<CanvasElement>,
+  ): Partial<CanvasElement> | null {
+    if (!this.shouldAutoSizeTextFromPatch(previousElement, patch) || !nextElement.text) {
+      return null;
+    }
+
+    const size = this.measureTextSize(nextElement);
+    const centerX = previousElement.x + previousElement.width / 2;
+
+    return {
+      x: roundToTwoDecimals(centerX - size.width / 2),
+      width: size.width,
+      height: size.height,
+    };
+  }
+
+  private shouldAutoSizeTextFromPatch(
+    element: CanvasElement,
+    patch: Partial<CanvasElement>,
+  ): boolean {
+    if (element.type !== 'text') {
+      return false;
+    }
+
+    return (
+      patch.text !== undefined ||
+      patch.fontFamily !== undefined ||
+      patch.fontWeight !== undefined ||
+      patch.fontStyle !== undefined ||
+      patch.fontSize !== undefined ||
+      patch.fontSizeUnit !== undefined ||
+      patch.lineHeight !== undefined ||
+      patch.lineHeightUnit !== undefined ||
+      patch.letterSpacing !== undefined ||
+      patch.letterSpacingUnit !== undefined
+    );
+  }
+
   // ── Private: History Shortcuts ────────────────────────────
 
   private runWithHistory(action: () => void): void {
@@ -3812,10 +3891,10 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const selectedFrame = this.el.getSelectedFrame(this.selectedElement());
+    const selectedContainer = this.el.getSelectedContainer(this.selectedElement());
     const { parentId: targetParentId, error } = this.clipboard.resolvePasteParentId(
       this.elements(),
-      selectedFrame,
+      selectedContainer,
     );
 
     if (error) {

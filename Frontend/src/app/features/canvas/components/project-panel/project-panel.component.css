@@ -26,6 +26,11 @@
   overflow-y: auto;
   pointer-events: all;
   border-radius: 20px;
+  background: var(--chrome-panel-background);
+  backdrop-filter: var(--chrome-panel-blur);
+  -webkit-backdrop-filter: var(--chrome-panel-blur);
+  border: var(--chrome-panel-border);
+  box-shadow: var(--chrome-panel-shadow);
   scrollbar-width: none;
   -ms-overflow-style: none;
 

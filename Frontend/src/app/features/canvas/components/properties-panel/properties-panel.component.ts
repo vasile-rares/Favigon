@@ -15,7 +15,9 @@ import {
   CanvasFlexDirection,
   CanvasFlexWrap,
   CanvasJustifyContent,
+  CanvasLinkType,
   CanvasOverflowMode,
+  CanvasPageModel,
   CanvasPositionMode,
   CanvasShadowPreset,
   CanvasSpacing,
@@ -80,6 +82,8 @@ interface FrameTemplate {
 })
 export class PropertiesPanelComponent {
   @Input() selectedElement: CanvasElement | null = null;
+  @Input() pages: readonly CanvasPageModel[] = [];
+  @Input() currentPageId: string | null = null;
   @Input() currentTool: CanvasElementType | 'select' = 'select';
   @Input() selectedFramework: SupportedFramework = 'html';
   @Input() validationResult: boolean | null = null;
@@ -153,6 +157,10 @@ export class PropertiesPanelComponent {
       ariaLabel: 'Justify text',
       title: 'Justify',
     },
+  ];
+  readonly linkTypeOptions: readonly ToggleGroupOption[] = [
+    { label: 'Page', value: 'page' },
+    { label: 'URL', value: 'url' },
   ];
   readonly overflowOptions: CanvasOverflowMode[] = ['clip', 'visible'];
   readonly shadowOptions: CanvasShadowPreset[] = ['sm', 'md', 'lg', 'xl'];
@@ -470,6 +478,42 @@ export class PropertiesPanelComponent {
     return element.textVerticalAlign ?? 'middle';
   }
 
+  hasLink(element: CanvasElement): boolean {
+    return element.linkType === 'page' || element.linkType === 'url';
+  }
+
+  linkTypeValue(element: CanvasElement): CanvasLinkType {
+    return element.linkType === 'page' ? 'page' : 'url';
+  }
+
+  linkPageOptions(element: CanvasElement): DropdownSelectOption[] {
+    const selectedPageId =
+      element.linkType === 'page' && typeof element.linkPageId === 'string'
+        ? element.linkPageId
+        : null;
+
+    return this.pages
+      .filter((page) => page.id !== this.currentPageId || page.id === selectedPageId)
+      .map((page) => ({
+        label: page.id === this.currentPageId ? `${page.name} (current)` : page.name,
+        value: page.id,
+      }));
+  }
+
+  linkPageValue(element: CanvasElement): string | null {
+    if (element.linkType !== 'page') {
+      return null;
+    }
+
+    return typeof element.linkPageId === 'string' && element.linkPageId.trim().length > 0
+      ? element.linkPageId
+      : null;
+  }
+
+  linkUrlValue(element: CanvasElement): string {
+    return element.linkType === 'url' ? (element.linkUrl ?? '') : '';
+  }
+
   fillLabel(element: CanvasElement): string {
     const value = this.fillInputValue(element);
     return value === 'transparent' ? 'Transparent' : preserveColorDisplayValue(value);
@@ -566,6 +610,25 @@ export class PropertiesPanelComponent {
     this.emitPatch({ display: 'flex' });
   }
 
+  addLink(): void {
+    const pageId = this.firstAvailableLinkPageId();
+
+    if (pageId) {
+      this.emitPatch({
+        linkType: 'page',
+        linkPageId: pageId,
+        linkUrl: undefined,
+      });
+      return;
+    }
+
+    this.emitPatch({
+      linkType: 'url',
+      linkPageId: undefined,
+      linkUrl: '',
+    });
+  }
+
   removeLayout(): void {
     this.emitPatch({
       display: undefined,
@@ -577,6 +640,14 @@ export class PropertiesPanelComponent {
       gridTemplateColumns: undefined,
       gridTemplateRows: undefined,
       padding: undefined,
+    });
+  }
+
+  removeLink(): void {
+    this.emitPatch({
+      linkType: undefined,
+      linkPageId: undefined,
+      linkUrl: undefined,
     });
   }
 
@@ -710,6 +781,45 @@ export class PropertiesPanelComponent {
     }
   }
 
+  onLinkTypeChange(value: string | number | boolean | null): void {
+    if (value === 'page') {
+      this.emitPatch({
+        linkType: 'page',
+        linkPageId: this.firstAvailableLinkPageId(),
+        linkUrl: undefined,
+      });
+      return;
+    }
+
+    if (value === 'url') {
+      this.emitPatch({
+        linkType: 'url',
+        linkPageId: undefined,
+        linkUrl: '',
+      });
+    }
+  }
+
+  onLinkPageChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string' || !this.pages.some((page) => page.id === value)) {
+      return;
+    }
+
+    this.emitPatch({
+      linkType: 'page',
+      linkPageId: value,
+      linkUrl: undefined,
+    });
+  }
+
+  onLinkUrlChange(event: Event): void {
+    this.emitPatch({
+      linkType: 'url',
+      linkPageId: undefined,
+      linkUrl: (event.target as HTMLInputElement).value,
+    });
+  }
+
   setTextVerticalAlign(align: CanvasTextVerticalAlign): void {
     this.emitPatch({ textVerticalAlign: align });
   }
@@ -721,6 +831,17 @@ export class PropertiesPanelComponent {
   private fontSizeInPixels(element: CanvasElement): number {
     const fontSize = element.fontSize ?? 16;
     return this.fontSizeUnitValue(element) === 'rem' ? fontSize * 16 : fontSize;
+  }
+
+  private firstAvailableLinkPageId(): string | undefined {
+    const selectedPageId =
+      this.selectedElement?.linkType === 'page' &&
+      typeof this.selectedElement.linkPageId === 'string'
+        ? this.selectedElement.linkPageId
+        : null;
+
+    return this.pages.find((page) => page.id !== this.currentPageId || page.id === selectedPageId)
+      ?.id;
   }
 
   private toHexColorOrFallback(value: string | undefined, fallback: string): string {

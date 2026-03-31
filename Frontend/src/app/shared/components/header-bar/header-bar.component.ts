@@ -115,11 +115,17 @@ export class HeaderBarComponent implements OnInit {
   @ViewChild('userMenuContainer')
   userMenuContainer?: ElementRef<HTMLElement>;
 
+  @ViewChild('userMenuDropdownEl', { read: ElementRef })
+  userMenuDropdownEl?: ElementRef<HTMLElement>;
+
   @ViewChild('searchContainer')
   searchContainer?: ElementRef<HTMLElement>;
 
   @ViewChild('projectMenuContainer')
   projectMenuContainer?: ElementRef<HTMLElement>;
+
+  @ViewChild('projectMenuEl')
+  projectMenuEl?: ElementRef<HTMLElement>;
 
   @ViewChild('projectNameInput')
   projectNameInput?: TextInputComponent;
@@ -478,15 +484,25 @@ export class HeaderBarComponent implements OnInit {
     const target = event.target as Node | null;
 
     if (this.isProjectMenuOpen()) {
-      const projectMenuEl = this.projectMenuContainer?.nativeElement;
-      if (target && projectMenuEl && !projectMenuEl.contains(target)) {
+      const triggerEl = this.projectMenuContainer?.nativeElement;
+      const menuEl = this.projectMenuEl?.nativeElement;
+      if (
+        target &&
+        !(triggerEl && triggerEl.contains(target)) &&
+        !(menuEl && menuEl.contains(target))
+      ) {
         this.closeProjectMenu();
       }
     }
 
     if (this.isUserMenuOpen) {
-      const container = this.userMenuContainer?.nativeElement;
-      if (target && container && !container.contains(target)) {
+      const triggerEl = this.userMenuContainer?.nativeElement;
+      const panelEl = this.userMenuDropdownEl?.nativeElement;
+      if (
+        target &&
+        !(triggerEl && triggerEl.contains(target)) &&
+        !(panelEl && panelEl.contains(target))
+      ) {
         this.closeUserMenu();
       }
     }

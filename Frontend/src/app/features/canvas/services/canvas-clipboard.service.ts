@@ -61,7 +61,7 @@ export class CanvasClipboardService {
 
   resolvePasteParentId(
     currentElements: CanvasElement[],
-    selectedFrame: CanvasElement | null,
+    selectedContainer: CanvasElement | null,
   ): { parentId: string | null; error: string | null } {
     const clipboard = this.snapshot;
     if (!clipboard) {
@@ -87,8 +87,8 @@ export class CanvasClipboardService {
       return { parentId: originalParentId, error: null };
     }
 
-    if (selectedFrame) {
-      return { parentId: selectedFrame.id, error: null };
+    if (selectedContainer) {
+      return { parentId: selectedContainer.id, error: null };
     }
 
     return {

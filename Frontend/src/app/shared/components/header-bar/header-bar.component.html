@@ -29,60 +29,6 @@
           [attr.aria-label]="currentProjectIsPublic ? 'Public project' : 'Private project'"></span>
       }
 
-      @if (showProjectMenu()) {
-        <div
-          class="header-project-menu"
-          [class.header-project-menu--open]="!isProjectMenuClosing()"
-          [class.header-project-menu--closing]="isProjectMenuClosing()"
-          role="dialog"
-          aria-label="Project settings">
-          <app-text-input
-            #projectNameInput
-            class="header-project-menu__input"
-            id="header-project-menu-name"
-            label="Project name"
-            placeholder="Project name"
-            [maxLength]="100"
-            [errorText]="projectUpdateError() || ''"
-            [forceInvalid]="!!projectUpdateError()"
-            [ngModel]="projectNameDraft()"
-            (ngModelChange)="projectNameDraft.set($event)"
-            (keydown.enter)="$event.preventDefault(); saveProjectSettings()"
-            (keydown.escape)="$event.preventDefault(); closeProjectMenu()"></app-text-input>
-
-          <div class="header-project-menu__field">
-            <span class="header-project-menu__label">Visibility</span>
-            <app-toggle-group
-              [options]="projectVisibilityOptions"
-              [value]="projectVisibilityDraft()"
-              [stretch]="true"
-              [minWidth]="null"
-              ariaLabel="Project visibility"
-              (valueChange)="projectVisibilityDraft.set($event === true)"></app-toggle-group>
-          </div>
-
-          <div class="header-project-menu__actions">
-            <app-action-button
-              class="header-project-menu__action"
-              type="button"
-              variant="outline"
-              [fullWidth]="false"
-              [disabled]="isProjectUpdating()"
-              (clicked)="closeProjectMenu()">
-              Cancel
-            </app-action-button>
-            <app-action-button
-              class="header-project-menu__action"
-              type="button"
-              variant="primary"
-              [fullWidth]="false"
-              [disabled]="isProjectUpdating()"
-              (clicked)="saveProjectSettings()">
-              {{ isProjectUpdating() ? 'Saving...' : 'Save' }}
-            </app-action-button>
-          </div>
-        </div>
-      }
     </div>
   }
 
@@ -187,18 +133,75 @@
           </svg>
         </span>
       </button>
-
-      <app-user-menu-dropdown
-        [displayName]="displayName"
-        [email]="email"
-        [avatarUrl]="avatarUrl"
-        [username]="username"
-        [isOpen]="isUserMenuOpen"
-        (closeRequested)="closeUserMenu()"
-        (logoutClicked)="onLogout()"></app-user-menu-dropdown>
     </div>
   </div>
 </header>
+
+<app-user-menu-dropdown
+  #userMenuDropdownEl
+  [displayName]="displayName"
+  [email]="email"
+  [avatarUrl]="avatarUrl"
+  [username]="username"
+  [isOpen]="isUserMenuOpen"
+  (closeRequested)="closeUserMenu()"
+  (logoutClicked)="onLogout()"></app-user-menu-dropdown>
+
+@if (isProjectContext && currentProjectName && showProjectMenu()) {
+  <div
+    class="header-project-menu"
+    #projectMenuEl
+    [class.header-project-menu--open]="!isProjectMenuClosing()"
+    [class.header-project-menu--closing]="isProjectMenuClosing()"
+    role="dialog"
+    aria-label="Project settings">
+    <app-text-input
+      #projectNameInput
+      class="header-project-menu__input"
+      id="header-project-menu-name"
+      label="Project name"
+      placeholder="Project name"
+      [maxLength]="100"
+      [errorText]="projectUpdateError() || ''"
+      [forceInvalid]="!!projectUpdateError()"
+      [ngModel]="projectNameDraft()"
+      (ngModelChange)="projectNameDraft.set($event)"
+      (keydown.enter)="$event.preventDefault(); saveProjectSettings()"
+      (keydown.escape)="$event.preventDefault(); closeProjectMenu()"></app-text-input>
+
+    <div class="header-project-menu__field">
+      <span class="header-project-menu__label">Visibility</span>
+      <app-toggle-group
+        [options]="projectVisibilityOptions"
+        [value]="projectVisibilityDraft()"
+        [stretch]="true"
+        [minWidth]="null"
+        ariaLabel="Project visibility"
+        (valueChange)="projectVisibilityDraft.set($event === true)"></app-toggle-group>
+    </div>
+
+    <div class="header-project-menu__actions">
+      <app-action-button
+        class="header-project-menu__action"
+        type="button"
+        variant="outline"
+        [fullWidth]="false"
+        [disabled]="isProjectUpdating()"
+        (clicked)="closeProjectMenu()">
+        Cancel
+      </app-action-button>
+      <app-action-button
+        class="header-project-menu__action"
+        type="button"
+        variant="primary"
+        [fullWidth]="false"
+        [disabled]="isProjectUpdating()"
+        (clicked)="saveProjectSettings()">
+        {{ isProjectUpdating() ? 'Saving...' : 'Save' }}
+      </app-action-button>
+    </div>
+  </div>
+}
 
 @if (isCreateDialogOpen()) {
   <app-dialog-box
