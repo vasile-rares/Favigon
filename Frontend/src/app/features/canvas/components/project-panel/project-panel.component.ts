@@ -52,8 +52,14 @@ const MIN_PANEL_WIDTH = 280;
 const MAX_PANEL_WIDTH = 560;
 const PANEL_VIEWPORT_GUTTER = 240;
 const DEVICE_FRAME_PRESET_OPTIONS = VIEWPORT_PRESET_OPTIONS.filter(
-  (option): option is { id: Exclude<DeviceFramePreset, 'custom'>; label: string; width: number; height: number } =>
-    option.id === 'desktop' || option.id === 'tablet' || option.id === 'mobile',
+  (
+    option,
+  ): option is {
+    id: Exclude<DeviceFramePreset, 'custom'>;
+    label: string;
+    width: number;
+    height: number;
+  } => option.id === 'desktop' || option.id === 'tablet' || option.id === 'mobile',
 );
 
 @Component({
@@ -665,6 +671,10 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
     return type === 'rectangle';
   }
 
+  usesFilledRectangleLayerIcon(layer: LayerEntry): boolean {
+    return layer.type === 'rectangle' && layer.hasChildren && !layer.hasLayout;
+  }
+
   isText(type: CanvasElementType): boolean {
     return type === 'text';
   }
@@ -802,7 +812,9 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
     }
 
     const roundedWidth = Math.round(element.width);
-    const matchedPreset = DEVICE_FRAME_PRESET_OPTIONS.find((option) => option.width === roundedWidth);
+    const matchedPreset = DEVICE_FRAME_PRESET_OPTIONS.find(
+      (option) => option.width === roundedWidth,
+    );
     return matchedPreset?.id ?? null;
   }
 

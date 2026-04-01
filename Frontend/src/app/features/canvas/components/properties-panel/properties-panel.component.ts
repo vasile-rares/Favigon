@@ -1058,7 +1058,10 @@ export class PropertiesPanelComponent {
 
     this.emitPatch({
       transformOptions: this.mergeTransformOptions(element, 'depth'),
-      depth: Math.max(TRANSFORM_DEPTH_MIN, Math.min(TRANSFORM_DEPTH_MAX, roundToTwoDecimals(value))),
+      depth: Math.max(
+        TRANSFORM_DEPTH_MIN,
+        Math.min(TRANSFORM_DEPTH_MAX, roundToTwoDecimals(value)),
+      ),
     });
   }
 

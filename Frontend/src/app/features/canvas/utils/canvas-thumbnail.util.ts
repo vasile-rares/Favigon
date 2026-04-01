@@ -142,8 +142,7 @@ function drawText(
   ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.fillStyle = el.fill ?? '#ffffff';
   ctx.textBaseline = 'middle';
-  ctx.textAlign =
-    el.textAlign === 'center' || el.textAlign === 'right' ? el.textAlign : 'left';
+  ctx.textAlign = el.textAlign === 'center' || el.textAlign === 'right' ? el.textAlign : 'left';
 
   const textX = el.textAlign === 'center' ? x + w / 2 : el.textAlign === 'right' ? x + w : x;
   const textY = y + h / 2;

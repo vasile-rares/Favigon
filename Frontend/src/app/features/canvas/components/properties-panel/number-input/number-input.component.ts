@@ -47,9 +47,7 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
 
   @HostBinding('style.width')
   get hostWidth(): string {
-    return this.appearance === 'compact'
-      ? 'var(--number-input-compact-host-width, 72px)'
-      : '100%';
+    return this.appearance === 'compact' ? 'var(--number-input-compact-host-width, 72px)' : '100%';
   }
 
   @HostBinding('style.flex')

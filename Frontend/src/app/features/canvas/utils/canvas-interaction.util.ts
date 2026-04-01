@@ -33,13 +33,13 @@ export function withRoundedPrecision(element: CanvasElement): CanvasElement {
       typeof element.cornerRadius === 'number'
         ? roundToTwoDecimals(element.cornerRadius)
         : undefined,
-    cornerRadii: element.cornerRadii
-      ? roundCornerRadii(element.cornerRadii)
-      : undefined,
+    cornerRadii: element.cornerRadii ? roundCornerRadii(element.cornerRadii) : undefined,
   };
 }
 
-export function getDefaultCornerRadius(element: Pick<CanvasElement, 'type' | 'cornerRadius'>): number {
+export function getDefaultCornerRadius(
+  element: Pick<CanvasElement, 'type' | 'cornerRadius'>,
+): number {
   return Number.isFinite(element.cornerRadius ?? Number.NaN)
     ? roundToTwoDecimals(element.cornerRadius as number)
     : element.type === 'image'
@@ -66,7 +66,9 @@ export function roundCornerRadii(radii: CanvasCornerRadii): CanvasCornerRadii {
   };
 }
 
-export function getResolvedCornerRadii(element: Pick<CanvasElement, 'type' | 'cornerRadius' | 'cornerRadii'>): CanvasCornerRadii {
+export function getResolvedCornerRadii(
+  element: Pick<CanvasElement, 'type' | 'cornerRadius' | 'cornerRadii'>,
+): CanvasCornerRadii {
   if (element.cornerRadii) {
     return roundCornerRadii(element.cornerRadii);
   }
@@ -74,9 +76,7 @@ export function getResolvedCornerRadii(element: Pick<CanvasElement, 'type' | 'co
   return buildUniformCornerRadii(getDefaultCornerRadius(element));
 }
 
-export function hasPerCornerRadius(
-  element: Pick<CanvasElement, 'cornerRadii'>,
-): boolean {
+export function hasPerCornerRadius(element: Pick<CanvasElement, 'cornerRadii'>): boolean {
   return !!element.cornerRadii;
 }
 
@@ -133,9 +133,7 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
 
   if (element.type !== 'text') {
     element.cornerRadius = getDefaultCornerRadius(element);
-    element.cornerRadii = element.cornerRadii
-      ? roundCornerRadii(element.cornerRadii)
-      : undefined;
+    element.cornerRadii = element.cornerRadii ? roundCornerRadii(element.cornerRadii) : undefined;
   }
 
   if (element.type !== 'text') {

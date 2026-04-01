@@ -435,6 +435,10 @@
   color: var(--color-brand-primary);
 }
 
+.project-layer-icon.is-filled-container-active {
+  color: var(--color-brand-primary);
+}
+
 .project-layer-icon.is-hidden {
   color: var(--project-panel-muted-color);
 }

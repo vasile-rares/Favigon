@@ -59,7 +59,6 @@
     width: 0;
     height: 0;
   }
-
 }
 
 /* ── Header ──────────────────────────────────────────────── */
@@ -172,8 +171,7 @@
   padding: 0;
   cursor: pointer;
   flex-shrink: 0;
-  transition:
-    color 0.18s ease;
+  transition: color 0.18s ease;
 
   &:hover {
     color: var(--color-zinc-100);

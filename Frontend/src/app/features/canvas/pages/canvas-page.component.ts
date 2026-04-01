@@ -95,6 +95,12 @@ const PAGE_SHELL_HEADER_HORIZONTAL_INSET = 8;
 const FRAME_TITLE_MIN_ZOOM = 0.62;
 const ELEMENT_DRAG_START_THRESHOLD = 3;
 
+interface RectangleDrawState {
+  startPoint: Point;
+  currentPoint: Point;
+  containerId: string | null;
+}
+
 @Component({
   selector: 'app-canvas-page',
   standalone: true,
@@ -289,10 +295,14 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   readonly hoveredElementId = signal<string | null>(null);
   readonly hoveredFrameTitleId = signal<string | null>(null);
   readonly snapLines = signal<SnapLine[]>([]);
+  readonly rectangleDrawPreview = signal<Bounds | null>(null);
+  readonly flowDragPlaceholder = signal<{ elementId: string; bounds: Bounds } | null>(null);
   readonly isFrameReorderAnimating = signal(false);
   readonly draggingFlowChildId = signal<string | null>(null);
   readonly layoutDropTarget = signal<{ containerId: string; index: number } | null>(null);
   private hasMovedElementDuringDrag = false;
+  private rectangleDrawState: RectangleDrawState | null = null;
+  private isFlowDragInsideContainer = false;
   private isResizing = false;
   private isRotating = false;
   private isAdjustingCornerRadius = false;
@@ -398,6 +408,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   selectTool(tool: CanvasElementType | 'select'): void {
+    this.clearRectangleDraw();
     this.currentTool.set(tool);
     if (tool === 'select') {
       return;
@@ -578,6 +589,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   onActivePageShellClick(pageId: string): void {
+    if (this.suppressNextPageShellClick) {
+      this.suppressNextPageShellClick = false;
+      return;
+    }
+
     this.clearSelectedPageLayer();
     this.layersFocusedPageId.set(pageId);
     this.selectedElementId.set(null);
@@ -769,6 +785,10 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     if (target.closest('.page-shell-header')) {
+      return;
+    }
+
+    if (pageId === this.currentPageId() && this.startRectangleDraw(event, true)) {
       return;
     }
 
@@ -999,7 +1019,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   getPreviewNestedPositionStyle(element: CanvasElement): string | null {
-    if (this.isChildInFlow(element)) return null;
+    if (this.isChildInFlow(element)) {
+      return this.isContainerElement(element) ? 'relative' : null;
+    }
     return element.position ?? 'absolute';
   }
 
@@ -1171,6 +1193,10 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       this.layersFocusedPageId.set(null);
     }
     if (!this.shouldStartPanning(event, target)) {
+      if (this.startRectangleDraw(event)) {
+        return;
+      }
+
       return;
     }
 
@@ -1221,48 +1247,27 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       ? this.el.getAbsoluteBounds(targetContainer, this.elements())
       : null;
 
-    const result = this.el.createElementAtPoint(
-      tool,
-      pointer,
-      this.elements(),
-      targetContainer,
-      containerBounds,
-      this.viewport.frameTemplate(),
-    );
-
-    if (result.error) {
-      this.apiError.set(result.error);
+    const newElement = this.createElementAtCanvasPoint(tool, pointer, targetContainer, containerBounds);
+    if (!newElement) {
       return;
     }
 
-    if (!result.element) {
-      return;
-    }
-
-    const newElement = result.element;
-    this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => {
-        const synced = this.createSyncedCopies(newElement, elements);
-        return [...elements, newElement, ...synced];
-      });
-      this.selectedElementId.set(newElement.id);
-      this.currentTool.set('select');
-    });
-
-    if (newElement.type === 'text') {
-      this.editingTextElementId.set(newElement.id);
-      this.focusInlineTextEditor(newElement.id);
-    }
   }
 
   // ── Element Events ────────────────────────────────────────
 
   onElementPointerDown(event: MouseEvent, id: string): void {
     const target = event.target as HTMLElement;
+    this.flowDragPlaceholder.set(null);
+
     if (this.shouldStartPanning(event, target)) {
       this.viewport.startPanning(event);
       this.isDragging = false;
       this.isResizing = false;
+      return;
+    }
+
+    if (this.startRectangleDraw(event)) {
       return;
     }
 
@@ -1329,16 +1334,16 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const parent = this.el.findElementById(element.parentId ?? null, this.elements());
     if (parent && this.isLayoutContainer(parent) && this.isChildInFlow(element)) {
       this.draggingFlowChildId.set(element.id);
+      const liveSceneBounds = this.getLiveOverlaySceneBounds(element);
+      const liveCanvasBounds = this.getLiveElementCanvasBounds(element);
       const cached = this.flowBoundsCache.get(element.id);
-      const layout = this.activePageLayout();
-      if (cached) {
-        bounds = {
-          x: cached.x - (layout?.x ?? 0),
-          y: cached.y - (layout?.y ?? 0),
-          width: cached.width,
-          height: cached.height,
-        };
-      }
+      this.setFlowDragPlaceholder(element, liveSceneBounds ?? cached ?? null);
+      this.layoutDropTarget.set({
+        containerId: parent.id,
+        index: this.getFlowChildIndex(parent.id, element.id, this.elements()),
+      });
+      this.isFlowDragInsideContainer = true;
+      bounds = liveCanvasBounds ?? bounds;
     }
 
     this.beginGestureHistory();
@@ -1748,9 +1753,29 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     position: 'before' | 'after' | 'inside';
   }): void {
     this.runWithHistory(() => {
-      this.updatePageElements(change.pageId, (elements) =>
-        this.el.reorderLayerElements(elements, change.draggedId, change.targetId, change.position),
-      );
+      this.updatePageElements(change.pageId, (elements) => {
+        const dragged = this.el.findElementById(change.draggedId, elements);
+        const draggedBounds = dragged
+          ? this.getLiveElementCanvasBounds(dragged) ?? this.getFlowAwareBounds(dragged, elements)
+          : null;
+        const reordered = this.el.reorderLayerElements(
+          elements,
+          change.draggedId,
+          change.targetId,
+          change.position,
+        );
+
+        if (!draggedBounds) {
+          return reordered;
+        }
+
+        return this.normalizeDraggedElementAfterLayerMove(
+          elements,
+          reordered,
+          change.draggedId,
+          draggedBounds,
+        );
+      });
     });
   }
 
@@ -1856,6 +1881,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
             : page,
         ),
       );
+      return;
+    }
+
+    if (this.rectangleDrawState) {
+      this.updateRectangleDrawPreviewFromEvent(event);
       return;
     }
 
@@ -2028,8 +2058,16 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
   }
 
-  @HostListener('window:pointerup')
-  onPointerUp(): void {
+  @HostListener('window:pointerup', ['$event'])
+  onPointerUp(event: MouseEvent): void {
+    if (this.rectangleDrawState) {
+      this.updateRectangleDrawPreviewFromEvent(event);
+      this.commitRectangleDraw();
+      this.clearRectangleDraw();
+      this.deferRectangleDrawClickSuppressionReset();
+      return;
+    }
+
     const selectedOnDrop = this.selectedElement();
     const prevParentId = selectedOnDrop?.parentId ?? null;
     const shouldCommitGestureHistory =
@@ -2090,7 +2128,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     this.isDraggingPage = false;
     this.hasMovedElementDuringDrag = false;
     this.hasMovedPageDuringDrag = false;
+    this.isFlowDragInsideContainer = false;
     this.snapLines.set([]);
+    this.flowDragPlaceholder.set(null);
     this.draggingFlowChildId.set(null);
     this.layoutDropTarget.set(null);
 
@@ -2234,7 +2274,12 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
   /** Direct children of a container, visible only. */
   getLayoutChildren(element: CanvasElement): CanvasElement[] {
-    return this.visibleElements().filter((el) => el.parentId === element.id);
+    const draggedId = this.draggingFlowChildId();
+    return this.visibleElements().filter(
+      (el) =>
+        el.parentId === element.id &&
+        !(this.hasMovedElementDuringDrag && draggedId === el.id && this.isChildInFlow(el)),
+    );
   }
 
   /** X position for a nested child: no left for flow children, relative x for absolute. */
@@ -2296,12 +2341,70 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
   getNestedPositionStyle(element: CanvasElement): string | null {
     if (this.isFlowChildDragging(element)) return 'absolute';
-    if (this.isChildInFlow(element)) return null;
+    if (this.isChildInFlow(element)) {
+      return this.isContainerElement(element) ? 'relative' : null;
+    }
     return element.position ?? 'absolute';
   }
 
   isFlowChildDragging(element: CanvasElement): boolean {
     return this.draggingFlowChildId() === element.id && this.hasMovedElementDuringDrag;
+  }
+
+  getFlowDragPlaceholder(): { element: CanvasElement; bounds: Bounds } | null {
+    const placeholder = this.flowDragPlaceholder();
+    if (!placeholder || !this.hasMovedElementDuringDrag) {
+      return null;
+    }
+
+    const draggedId = this.draggingFlowChildId();
+    if (!draggedId || draggedId !== placeholder.elementId) {
+      return null;
+    }
+
+    const element = this.el.findElementById(placeholder.elementId, this.elements());
+    if (!element) {
+      return null;
+    }
+
+    return {
+      element,
+      bounds: placeholder.bounds,
+    };
+  }
+
+  getFlowDragPlaceholderFill(element: CanvasElement): string {
+    if (element.type === 'text' || element.type === 'image') {
+      return 'rgba(255, 255, 255, 0.08)';
+    }
+
+    return element.fill ?? 'rgba(255, 255, 255, 0.08)';
+  }
+
+  getFlowDragLayoutPlaceholder(
+    containerId: string,
+  ): { element: CanvasElement; index: number; bounds: Bounds } | null {
+    const placeholder = this.flowDragPlaceholder();
+    if (!placeholder || !this.hasMovedElementDuringDrag) {
+      return null;
+    }
+
+    const draggedId = this.draggingFlowChildId();
+    const target = this.layoutDropTarget();
+    if (!draggedId || !target || target.containerId !== containerId) {
+      return null;
+    }
+
+    const element = this.el.findElementById(draggedId, this.elements());
+    if (!element || element.parentId !== containerId || !this.isChildInFlow(element)) {
+      return null;
+    }
+
+    return {
+      element,
+      index: target.index,
+      bounds: placeholder.bounds,
+    };
   }
 
   markFlowBoundsDirty(): void {
@@ -2340,34 +2443,40 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const parent = this.el.findElementById(dragged.parentId ?? null, elements);
     if (!parent) return;
 
-    const parentBounds = this.el.getAbsoluteBounds(parent, elements);
-    const relX = absoluteX - parentBounds.x;
-    const relY = absoluteY - parentBounds.y;
+    const parentBounds =
+      this.getLiveElementCanvasBounds(parent) ?? this.el.getAbsoluteBounds(parent, elements);
+    const layout = this.activePageLayout();
+    const currentPreview = this.flowDragPlaceholder();
+    const previewWidth =
+      currentPreview?.elementId === dragged.id ? currentPreview.bounds.width : dragged.width;
+    const previewHeight =
+      currentPreview?.elementId === dragged.id ? currentPreview.bounds.height : dragged.height;
+    this.flowDragPlaceholder.set({
+      elementId: dragged.id,
+      bounds: {
+        x: roundToTwoDecimals(absoluteX + (layout?.x ?? 0)),
+        y: roundToTwoDecimals(absoluteY + (layout?.y ?? 0)),
+        width: roundToTwoDecimals(previewWidth),
+        height: roundToTwoDecimals(previewHeight),
+      },
+    });
 
     // Check if element center is still inside the parent container
-    const centerX = absoluteX + dragged.width / 2;
-    const centerY = absoluteY + dragged.height / 2;
+    const centerX = absoluteX + previewWidth / 2;
+    const centerY = absoluteY + previewHeight / 2;
     const insideParent =
       centerX >= parentBounds.x &&
       centerX <= parentBounds.x + parentBounds.width &&
       centerY >= parentBounds.y &&
       centerY <= parentBounds.y + parentBounds.height;
 
+    this.isFlowDragInsideContainer = insideParent;
+
     if (insideParent) {
-      const dropIndex = this.computeLayoutDropIndex(parent, absoluteX, absoluteY, elements);
+      const dropIndex = this.computeLayoutDropIndex(parent, centerX, centerY, elements);
       this.layoutDropTarget.set({ containerId: parent.id, index: dropIndex });
-    } else {
-      this.layoutDropTarget.set(null);
     }
 
-    // Update element x/y for visual tracking (position: absolute override)
-    this.updateCurrentPageElements((els) =>
-      els.map((el) =>
-        el.id === dragged.id
-          ? { ...el, x: roundToTwoDecimals(relX), y: roundToTwoDecimals(relY) }
-          : el,
-      ),
-    );
     this.snapLines.set([]);
   }
 
@@ -2408,12 +2517,24 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     return siblings.length;
   }
 
+  private getFlowChildIndex(
+    containerId: string,
+    childId: string,
+    elements: CanvasElement[],
+  ): number {
+    const flowChildren = elements.filter(
+      (element) => element.parentId === containerId && this.isChildInFlow(element),
+    );
+    const index = flowChildren.findIndex((element) => element.id === childId);
+    return index < 0 ? flowChildren.length : index;
+  }
+
   private commitFlowChildDrop(): void {
     const draggedId = this.draggingFlowChildId();
     if (!draggedId) return;
 
     const target = this.layoutDropTarget();
-    if (target) {
+    if (target && this.isFlowDragInsideContainer) {
       this.commitFlowChildReorder(draggedId, target.containerId, target.index);
     } else {
       const dragged = this.el.findElementById(draggedId, this.elements());
@@ -2482,7 +2603,17 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       const dragged = elements.find((el) => el.id === draggedId);
       if (!dragged) return elements;
 
-      const absBounds = this.el.getAbsoluteBounds(dragged, elements);
+      const preview = this.flowDragPlaceholder();
+      const layout = this.activePageLayout();
+      const absBounds =
+        preview && preview.elementId === draggedId
+          ? {
+              x: roundToTwoDecimals(preview.bounds.x - (layout?.x ?? 0)),
+              y: roundToTwoDecimals(preview.bounds.y - (layout?.y ?? 0)),
+              width: preview.bounds.width,
+              height: preview.bounds.height,
+            }
+          : this.el.getAbsoluteBounds(dragged, elements);
       return elements.map((el) =>
         el.id === draggedId
           ? {
@@ -2490,6 +2621,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
               parentId: null,
               x: roundToTwoDecimals(absBounds.x),
               y: roundToTwoDecimals(absBounds.y),
+              width: roundToTwoDecimals(absBounds.width),
+              height: roundToTwoDecimals(absBounds.height),
               position: this.el.getDefaultPositionForPlacement(el.type, null),
             }
           : el,
@@ -2686,21 +2819,15 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return null;
     }
 
-    let left = domEl.offsetLeft;
-    let top = domEl.offsetTop;
-    let current = domEl.offsetParent as HTMLElement | null;
-
-    while (current && current !== sceneEl) {
-      left += current.offsetLeft;
-      top += current.offsetTop;
-      current = current.offsetParent as HTMLElement | null;
-    }
+    const zoom = this.viewport.zoomLevel();
+    const sceneRect = sceneEl.getBoundingClientRect();
+    const rect = domEl.getBoundingClientRect();
 
     return {
-      x: roundToTwoDecimals(left),
-      y: roundToTwoDecimals(top),
-      width: roundToTwoDecimals(domEl.offsetWidth),
-      height: roundToTwoDecimals(domEl.offsetHeight),
+      x: roundToTwoDecimals((rect.left - sceneRect.left) / zoom),
+      y: roundToTwoDecimals((rect.top - sceneRect.top) / zoom),
+      width: roundToTwoDecimals(rect.width / zoom),
+      height: roundToTwoDecimals(rect.height / zoom),
     };
   }
 
@@ -3397,6 +3524,153 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     };
   }
 
+  private startRectangleDraw(event: MouseEvent, suppressPageShellClick = false): boolean {
+    if (this.currentTool() !== 'rectangle' || event.button !== 0 || this.viewport.isSpacePressed()) {
+      return false;
+    }
+
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer) {
+      return false;
+    }
+
+    const { container, containerBounds } = this.resolveInsertionContext(pointer);
+
+    event.preventDefault();
+    event.stopPropagation();
+    this.suppressNextCanvasClick = true;
+    if (suppressPageShellClick) {
+      this.suppressNextPageShellClick = true;
+    }
+
+    if (container && containerBounds && !this.isPointInsideBounds(pointer, containerBounds)) {
+      this.apiError.set('Click inside the selected container to place the element.');
+      return true;
+    }
+
+    this.commitActiveTextEditor();
+    this.apiError.set(null);
+    this.clearSelectedPageLayer();
+    this.layersFocusedPageId.set(this.currentPageId());
+    this.selectedElementId.set(null);
+
+    this.rectangleDrawState = {
+      startPoint: pointer,
+      currentPoint: pointer,
+      containerId: container?.id ?? null,
+    };
+    this.rectangleDrawPreview.set({
+      x: pointer.x,
+      y: pointer.y,
+      width: 0,
+      height: 0,
+    });
+    return true;
+  }
+
+  private updateRectangleDrawPreviewFromEvent(event: MouseEvent): void {
+    const state = this.rectangleDrawState;
+    if (!state) {
+      return;
+    }
+
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer) {
+      return;
+    }
+
+    const container = this.el.findElementById(state.containerId, this.elements());
+    const containerBounds = container ? this.el.getAbsoluteBounds(container, this.elements()) : null;
+    const clampedPoint = containerBounds
+      ? {
+          x: clamp(pointer.x, containerBounds.x, containerBounds.x + containerBounds.width),
+          y: clamp(pointer.y, containerBounds.y, containerBounds.y + containerBounds.height),
+        }
+      : pointer;
+
+    this.rectangleDrawState = {
+      ...state,
+      currentPoint: clampedPoint,
+    };
+    this.rectangleDrawPreview.set(this.buildRectangleDrawBounds(state.startPoint, clampedPoint));
+  }
+
+  private commitRectangleDraw(): void {
+    const state = this.rectangleDrawState;
+    if (!state) {
+      return;
+    }
+
+    const container = this.el.findElementById(state.containerId, this.elements());
+    const containerBounds = container ? this.el.getAbsoluteBounds(container, this.elements()) : null;
+    const bounds = this.buildRectangleDrawBounds(state.startPoint, state.currentPoint);
+    const distance = Math.hypot(
+      state.currentPoint.x - state.startPoint.x,
+      state.currentPoint.y - state.startPoint.y,
+    );
+
+    if (distance < ELEMENT_DRAG_START_THRESHOLD) {
+      this.createElementAtCanvasPoint('rectangle', state.startPoint, container, containerBounds);
+      return;
+    }
+
+    const result = this.el.createRectangleFromBounds(
+      bounds,
+      this.elements(),
+      container,
+      containerBounds,
+    );
+    this.commitElementCreationResult(result);
+  }
+
+  private buildRectangleDrawBounds(startPoint: Point, endPoint: Point): Bounds {
+    return {
+      x: roundToTwoDecimals(Math.min(startPoint.x, endPoint.x)),
+      y: roundToTwoDecimals(Math.min(startPoint.y, endPoint.y)),
+      width: roundToTwoDecimals(Math.abs(endPoint.x - startPoint.x)),
+      height: roundToTwoDecimals(Math.abs(endPoint.y - startPoint.y)),
+    };
+  }
+
+  private clearRectangleDraw(): void {
+    this.rectangleDrawState = null;
+    this.rectangleDrawPreview.set(null);
+  }
+
+  private setFlowDragPlaceholder(element: CanvasElement, cachedBounds: Bounds | null): void {
+    if (cachedBounds) {
+      this.flowDragPlaceholder.set({
+        elementId: element.id,
+        bounds: {
+          x: cachedBounds.x,
+          y: cachedBounds.y,
+          width: cachedBounds.width,
+          height: cachedBounds.height,
+        },
+      });
+      return;
+    }
+
+    const absoluteBounds = this.el.getAbsoluteBounds(element, this.elements());
+    const layout = this.activePageLayout();
+    this.flowDragPlaceholder.set({
+      elementId: element.id,
+      bounds: {
+        x: absoluteBounds.x + (layout?.x ?? 0),
+        y: absoluteBounds.y + (layout?.y ?? 0),
+        width: absoluteBounds.width,
+        height: absoluteBounds.height,
+      },
+    });
+  }
+
+  private deferRectangleDrawClickSuppressionReset(): void {
+    setTimeout(() => {
+      this.suppressNextCanvasClick = false;
+      this.suppressNextPageShellClick = false;
+    }, 0);
+  }
+
   private getNextPageCanvasPosition(): Point {
     const layouts = this.pageLayouts();
     if (layouts.length === 0) {
@@ -3749,7 +4023,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
         };
       }
 
-      const previousChild = previousElements.find((candidate) => candidate.id === element.id) ?? element;
+      const previousChild =
+        previousElements.find((candidate) => candidate.id === element.id) ?? element;
       const childBounds = this.getFlowAwareBounds(previousChild, previousElements);
 
       return {
@@ -3758,7 +4033,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
           clamp(childBounds.x - previousContainerBounds.x, 0, nextContainer.width - element.width),
         ),
         y: roundToTwoDecimals(
-          clamp(childBounds.y - previousContainerBounds.y, 0, nextContainer.height - element.height),
+          clamp(
+            childBounds.y - previousContainerBounds.y,
+            0,
+            nextContainer.height - element.height,
+          ),
         ),
         position: this.el.getDefaultPositionForPlacement(element.type, nextContainer),
       };
@@ -3778,6 +4057,65 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     return this.el.getAbsoluteBounds(element, elements);
+  }
+
+  private normalizeDraggedElementAfterLayerMove(
+    previousElements: CanvasElement[],
+    nextElements: CanvasElement[],
+    draggedId: string,
+    previousBounds: Bounds,
+  ): CanvasElement[] {
+    const dragged = this.el.findElementById(draggedId, nextElements);
+    if (!dragged) {
+      return nextElements;
+    }
+
+    const nextParent = this.el.findElementById(dragged.parentId ?? null, nextElements);
+    const nextPosition = this.el.getDefaultPositionForPlacement(dragged.type, nextParent);
+
+    if (!nextParent) {
+      return nextElements.map((element) =>
+        element.id === draggedId
+          ? {
+              ...element,
+              x: roundToTwoDecimals(previousBounds.x),
+              y: roundToTwoDecimals(previousBounds.y),
+              position: nextPosition,
+            }
+          : element,
+      );
+    }
+
+    if (this.isLayoutContainer(nextParent)) {
+      return nextElements.map((element) =>
+        element.id === draggedId
+          ? {
+              ...element,
+              x: 0,
+              y: 0,
+              position: nextPosition,
+            }
+          : element,
+      );
+    }
+
+    const previousParent = this.el.findElementById(nextParent.id, previousElements) ?? nextParent;
+    const parentBounds =
+      this.getLiveElementCanvasBounds(previousParent) ??
+      this.getFlowAwareBounds(previousParent, previousElements);
+    const maxX = Math.max(0, nextParent.width - dragged.width);
+    const maxY = Math.max(0, nextParent.height - dragged.height);
+
+    return nextElements.map((element) =>
+      element.id === draggedId
+        ? {
+            ...element,
+            x: roundToTwoDecimals(clamp(previousBounds.x - parentBounds.x, 0, maxX)),
+            y: roundToTwoDecimals(clamp(previousBounds.y - parentBounds.y, 0, maxY)),
+            position: nextPosition,
+          }
+        : element,
+    );
   }
 
   private getElementNestingDepth(element: CanvasElement, elements: CanvasElement[]): number {
@@ -3840,6 +4178,91 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     return this.el.getSelectedContainer(this.selectedElement());
+  }
+
+  private resolveInsertionContext(pointer: Point): {
+    container: CanvasElement | null;
+    containerBounds: Bounds | null;
+  } {
+    const container = this.resolveInsertionContainer(pointer);
+    return {
+      container,
+      containerBounds: container ? this.el.getAbsoluteBounds(container, this.elements()) : null,
+    };
+  }
+
+  private isPointInsideBounds(point: Point, bounds: Bounds): boolean {
+    return (
+      point.x >= bounds.x &&
+      point.x <= bounds.x + bounds.width &&
+      point.y >= bounds.y &&
+      point.y <= bounds.y + bounds.height
+    );
+  }
+
+  private commitActiveTextEditor(): void {
+    const editingId = this.editingTextElementId();
+    if (!editingId) {
+      return;
+    }
+
+    this.history.commitTextEditHistory(() => this.createHistorySnapshot());
+    this.discardEmptyTextElement(editingId);
+    this.editingTextElementId.set(null);
+  }
+
+  private createElementAtCanvasPoint(
+    tool: CanvasElementType,
+    pointer: Point,
+    targetContainer?: CanvasElement | null,
+    containerBounds?: Bounds | null,
+  ): CanvasElement | null {
+    const resolvedContainer = targetContainer ?? this.resolveInsertionContainer(pointer);
+    const resolvedContainerBounds =
+      containerBounds ??
+      (resolvedContainer ? this.el.getAbsoluteBounds(resolvedContainer, this.elements()) : null);
+
+    const result = this.el.createElementAtPoint(
+      tool,
+      pointer,
+      this.elements(),
+      resolvedContainer,
+      resolvedContainerBounds,
+      this.viewport.frameTemplate(),
+    );
+
+    return this.commitElementCreationResult(result);
+  }
+
+  private commitElementCreationResult(result: {
+    element: CanvasElement | null;
+    error: string | null;
+  }): CanvasElement | null {
+    if (result.error) {
+      this.apiError.set(result.error);
+      return null;
+    }
+
+    if (!result.element) {
+      return null;
+    }
+
+    const newElement = result.element;
+    this.runWithHistory(() => {
+      this.updateCurrentPageElements((elements) => {
+        const synced = this.createSyncedCopies(newElement, elements);
+        return [...elements, newElement, ...synced];
+      });
+      this.selectedElementId.set(newElement.id);
+      this.currentTool.set('select');
+    });
+
+    if (newElement.type === 'text') {
+      this.editingTextElementId.set(newElement.id);
+      this.focusInlineTextEditor(newElement.id);
+    }
+
+    return newElement;
   }
 
   /** After a drag, if a free element was dropped inside a container that is larger

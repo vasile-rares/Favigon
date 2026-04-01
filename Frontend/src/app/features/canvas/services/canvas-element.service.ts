@@ -173,6 +173,63 @@ export class CanvasElementService {
     };
   }
 
+  createRectangleFromBounds(
+    bounds: Bounds,
+    elements: CanvasElement[],
+    selectedContainer: CanvasElement | null,
+    containerBounds: Bounds | null,
+  ): { element: CanvasElement | null; error: string | null } {
+    const maxWidth = selectedContainer ? Math.max(selectedContainer.width, MIN_ELEMENT_SIZE) : null;
+    const maxHeight = selectedContainer
+      ? Math.max(selectedContainer.height, MIN_ELEMENT_SIZE)
+      : null;
+    const width = roundToTwoDecimals(
+      maxWidth == null
+        ? Math.max(bounds.width, MIN_ELEMENT_SIZE)
+        : clamp(bounds.width, MIN_ELEMENT_SIZE, maxWidth),
+    );
+    const height = roundToTwoDecimals(
+      maxHeight == null
+        ? Math.max(bounds.height, MIN_ELEMENT_SIZE)
+        : clamp(bounds.height, MIN_ELEMENT_SIZE, maxHeight),
+    );
+    const center = {
+      x: roundToTwoDecimals(bounds.x + width / 2),
+      y: roundToTwoDecimals(bounds.y + height / 2),
+    };
+    const result = this.createElementAtPoint(
+      'rectangle',
+      center,
+      elements,
+      selectedContainer,
+      containerBounds,
+      { width, height },
+    );
+
+    if (!result.element || result.error) {
+      return result;
+    }
+
+    let x = roundToTwoDecimals(bounds.x);
+    let y = roundToTwoDecimals(bounds.y);
+
+    if (selectedContainer && containerBounds) {
+      x = clamp(bounds.x - containerBounds.x, 0, Math.max(0, selectedContainer.width - width));
+      y = clamp(bounds.y - containerBounds.y, 0, Math.max(0, selectedContainer.height - height));
+    }
+
+    return {
+      element: {
+        ...result.element,
+        x: roundToTwoDecimals(x),
+        y: roundToTwoDecimals(y),
+        width,
+        height,
+      },
+      error: null,
+    };
+  }
+
   createPage(name: string): CanvasPageModel {
     return {
       id: crypto.randomUUID(),

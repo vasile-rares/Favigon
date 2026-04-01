@@ -111,6 +111,67 @@
             </div>
           </ng-template>
 
+          <ng-template #flowDragPreviewChildTpl let-previewChild="element">
+            <div
+              class="canvas-element canvas-element-preview"
+              [class.layout-child]="true"
+              [class.flow-child]="isChildInFlow(previewChild)"
+              [class.frame]="previewChild.type === 'frame'"
+              [class.rectangle]="previewChild.type === 'rectangle'"
+              [class.text]="previewChild.type === 'text'"
+              [class.image]="previewChild.type === 'image'"
+              [class.layout-container]="isLayoutContainer(previewChild)"
+              [style.left.px]="getPreviewNestedX(previewChild)"
+              [style.top.px]="getPreviewNestedY(previewChild)"
+              [style.width.px]="previewChild.width"
+              [style.height.px]="previewChild.height"
+              [style.transform]="getElementTransform(previewChild)"
+              [style.transform-origin]="getElementTransformOrigin(previewChild)"
+              [style.backface-visibility]="getElementBackfaceVisibility(previewChild)"
+              [style.transform-style]="getElementTransformStyle(previewChild)"
+              [style.position]="getPreviewNestedPositionStyle(previewChild)"
+              [style.display]="getElementLayoutDisplay(previewChild)"
+              [style.flex-direction]="getElementLayoutFlexDirection(previewChild)"
+              [style.flex-wrap]="getElementLayoutFlexWrap(previewChild)"
+              [style.justify-content]="getElementLayoutJustifyContent(previewChild)"
+              [style.align-items]="getElementLayoutAlignItems(previewChild)"
+              [style.gap]="getElementLayoutGap(previewChild)"
+              [style.grid-template-columns]="getElementLayoutGridTemplateColumns(previewChild)"
+              [style.grid-template-rows]="getElementLayoutGridTemplateRows(previewChild)"
+              [style.padding]="getElementLayoutPadding(previewChild)"
+              [style.background-color]="previewChild.type !== 'text' && previewChild.type !== 'image' ? previewChild.fill : 'transparent'"
+              [style.color]="previewChild.type === 'text' ? previewChild.fill : null"
+              [style.border]="getElementBorderStyle(previewChild)"
+              [style.opacity]="previewChild.opacity ?? 1"
+              [style.border-radius]="getElementBorderRadius(previewChild)">
+
+              <ng-container *ngIf="previewChild.type === 'text'">
+                <div
+                  class="text-content"
+                  [style.font-size]="getTextFontSize(previewChild)"
+                  [style.font-family]="getTextFontFamily(previewChild)"
+                  [style.font-weight]="getTextFontWeight(previewChild)"
+                  [style.font-style]="getTextFontStyle(previewChild)"
+                  [style.line-height]="getTextLineHeight(previewChild)"
+                  [style.letter-spacing]="getTextLetterSpacing(previewChild)"
+                  [style.text-align]="getTextAlignValue(previewChild)">
+                  <span>{{ previewChild.text }}</span>
+                </div>
+              </ng-container>
+
+              <ng-container *ngIf="previewChild.type === 'image'">
+                <img [src]="previewChild.imageUrl" alt="Canvas image" draggable="false" />
+              </ng-container>
+
+              <ng-container *ngIf="isContainerElement(previewChild)">
+                <ng-container *ngFor="let nestedChild of getLayoutChildren(previewChild); trackBy: trackByElementId">
+                  <ng-container
+                    *ngTemplateOutlet="flowDragPreviewChildTpl; context: { element: nestedChild }"></ng-container>
+                </ng-container>
+              </ng-container>
+            </div>
+          </ng-template>
+
           <ng-container *ngFor="let layout of inactivePageLayouts()">
             <div
               class="page-shell page-shell--inactive"
@@ -141,6 +202,14 @@
               [style.border-width.px]="getShellBorderWidth()"
               (pointerdown)="onPageShellPointerDown($event, activeLayout.pageId)"
               (click)="onActivePageShellClick(activeLayout.pageId)"></div>
+
+            <div
+              *ngIf="rectangleDrawPreview() as rectangleDraft"
+              class="canvas-element canvas-element-preview canvas-element-preview--draft rectangle"
+              [style.left.px]="activeLayout.x + rectangleDraft.x"
+              [style.top.px]="activeLayout.y + rectangleDraft.y"
+              [style.width.px]="rectangleDraft.width"
+              [style.height.px]="rectangleDraft.height"></div>
 
           </ng-container>
 
@@ -254,8 +323,34 @@
 
               <!-- Nested children for containers -->
               <ng-container *ngIf="isContainerElement(el)">
-                <ng-container *ngFor="let child of getLayoutChildren(el); trackBy: trackByElementId">
+                <div
+                  *ngIf="getFlowDragLayoutPlaceholder(el.id)?.index === 0 && getFlowDragLayoutPlaceholder(el.id) as flowLayoutPlaceholder"
+                  class="canvas-element canvas-element--flow-layout-placeholder"
+                  [class.rectangle]="flowLayoutPlaceholder.element.type === 'rectangle'"
+                  [class.text]="flowLayoutPlaceholder.element.type === 'text'"
+                  [class.image]="flowLayoutPlaceholder.element.type === 'image'"
+                  [style.width.px]="flowLayoutPlaceholder.bounds.width"
+                  [style.height.px]="flowLayoutPlaceholder.bounds.height"
+                  [style.background-color]="getFlowDragPlaceholderFill(flowLayoutPlaceholder.element)"
+                  [style.border]="getElementBorderStyle(flowLayoutPlaceholder.element)"
+                  [style.border-radius]="getElementBorderRadius(flowLayoutPlaceholder.element)">
+                </div>
+
+                <ng-container *ngFor="let child of getLayoutChildren(el); let childIndex = index; trackBy: trackByElementId">
                   <ng-container *ngTemplateOutlet="elementTpl; context: { element: child, isNested: true, isFlow: isChildInFlow(child) }"></ng-container>
+
+                  <div
+                    *ngIf="getFlowDragLayoutPlaceholder(el.id)?.index === childIndex + 1 && getFlowDragLayoutPlaceholder(el.id) as flowLayoutPlaceholder"
+                    class="canvas-element canvas-element--flow-layout-placeholder"
+                    [class.rectangle]="flowLayoutPlaceholder.element.type === 'rectangle'"
+                    [class.text]="flowLayoutPlaceholder.element.type === 'text'"
+                    [class.image]="flowLayoutPlaceholder.element.type === 'image'"
+                    [style.width.px]="flowLayoutPlaceholder.bounds.width"
+                    [style.height.px]="flowLayoutPlaceholder.bounds.height"
+                    [style.background-color]="getFlowDragPlaceholderFill(flowLayoutPlaceholder.element)"
+                    [style.border]="getElementBorderStyle(flowLayoutPlaceholder.element)"
+                    [style.border-radius]="getElementBorderRadius(flowLayoutPlaceholder.element)">
+                  </div>
                 </ng-container>
               </ng-container>
 
@@ -267,9 +362,66 @@
             <ng-container *ngTemplateOutlet="elementTpl; context: { element: el, isNested: false, isFlow: false }"></ng-container>
           </ng-container>
 
+          <div
+            *ngIf="getFlowDragPlaceholder() as flowPlaceholder"
+            class="canvas-element canvas-element--flow-drag-preview"
+            [class.rectangle]="flowPlaceholder.element.type === 'rectangle'"
+            [class.text]="flowPlaceholder.element.type === 'text'"
+            [class.image]="flowPlaceholder.element.type === 'image'"
+            [class.frame]="flowPlaceholder.element.type === 'frame'"
+            [class.layout-container]="isLayoutContainer(flowPlaceholder.element)"
+            [style.left.px]="flowPlaceholder.bounds.x"
+            [style.top.px]="flowPlaceholder.bounds.y"
+            [style.width.px]="flowPlaceholder.bounds.width"
+            [style.height.px]="flowPlaceholder.bounds.height"
+            [style.transform]="getElementTransform(flowPlaceholder.element)"
+            [style.transform-origin]="getElementTransformOrigin(flowPlaceholder.element)"
+            [style.backface-visibility]="getElementBackfaceVisibility(flowPlaceholder.element)"
+            [style.transform-style]="getElementTransformStyle(flowPlaceholder.element)"
+            [style.display]="getElementLayoutDisplay(flowPlaceholder.element)"
+            [style.flex-direction]="getElementLayoutFlexDirection(flowPlaceholder.element)"
+            [style.flex-wrap]="getElementLayoutFlexWrap(flowPlaceholder.element)"
+            [style.justify-content]="getElementLayoutJustifyContent(flowPlaceholder.element)"
+            [style.align-items]="getElementLayoutAlignItems(flowPlaceholder.element)"
+            [style.gap]="getElementLayoutGap(flowPlaceholder.element)"
+            [style.grid-template-columns]="getElementLayoutGridTemplateColumns(flowPlaceholder.element)"
+            [style.grid-template-rows]="getElementLayoutGridTemplateRows(flowPlaceholder.element)"
+            [style.padding]="getElementLayoutPadding(flowPlaceholder.element)"
+            [style.background-color]="getFlowDragPlaceholderFill(flowPlaceholder.element)"
+            [style.color]="flowPlaceholder.element.type === 'text' ? flowPlaceholder.element.fill : null"
+            [style.border]="getElementBorderStyle(flowPlaceholder.element)"
+            [style.opacity]="flowPlaceholder.element.opacity ?? 1"
+            [style.border-radius]="getElementBorderRadius(flowPlaceholder.element)">
+
+            <ng-container *ngIf="flowPlaceholder.element.type === 'text'">
+              <div
+                class="text-content"
+                [style.font-size]="getTextFontSize(flowPlaceholder.element)"
+                [style.font-family]="getTextFontFamily(flowPlaceholder.element)"
+                [style.font-weight]="getTextFontWeight(flowPlaceholder.element)"
+                [style.font-style]="getTextFontStyle(flowPlaceholder.element)"
+                [style.line-height]="getTextLineHeight(flowPlaceholder.element)"
+                [style.letter-spacing]="getTextLetterSpacing(flowPlaceholder.element)"
+                [style.text-align]="getTextAlignValue(flowPlaceholder.element)">
+                <span>{{ flowPlaceholder.element.text }}</span>
+              </div>
+            </ng-container>
+
+            <ng-container *ngIf="flowPlaceholder.element.type === 'image'">
+              <img [src]="flowPlaceholder.element.imageUrl" alt="Canvas image" draggable="false" />
+            </ng-container>
+
+            <ng-container *ngIf="isContainerElement(flowPlaceholder.element)">
+              <ng-container *ngFor="let child of getLayoutChildren(flowPlaceholder.element); trackBy: trackByElementId">
+                <ng-container
+                  *ngTemplateOutlet="flowDragPreviewChildTpl; context: { element: child }"></ng-container>
+              </ng-container>
+            </ng-container>
+          </div>
+
           <!-- Layout drop indicator -->
           <div
-            *ngIf="layoutDropTarget()"
+            *ngIf="layoutDropTarget() && !draggingFlowChildId()"
             class="layout-drop-indicator"
             [style.left.px]="getDropIndicatorLeft()"
             [style.top.px]="getDropIndicatorTop()"
