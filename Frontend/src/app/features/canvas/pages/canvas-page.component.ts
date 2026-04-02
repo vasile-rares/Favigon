@@ -318,6 +318,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     startY: 0,
   };
   private suppressNextCanvasClick = false;
+  private resizeSubtreeSnapshot = new Map<string, CanvasElement>();
 
   private resizeStart: ResizeState = {
     pointerX: 0,
@@ -1247,11 +1248,15 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       ? this.el.getAbsoluteBounds(targetContainer, this.elements())
       : null;
 
-    const newElement = this.createElementAtCanvasPoint(tool, pointer, targetContainer, containerBounds);
+    const newElement = this.createElementAtCanvasPoint(
+      tool,
+      pointer,
+      targetContainer,
+      containerBounds,
+    );
     if (!newElement) {
       return;
     }
-
   }
 
   // ── Element Events ────────────────────────────────────────
@@ -1515,6 +1520,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     const bounds = this.el.getAbsoluteBounds(element, this.elements());
+    this.captureResizeSubtreeSnapshot(id, this.elements());
     this.selectedElementId.set(id);
     this.beginGestureHistory();
     this.isDragging = false;
@@ -1756,7 +1762,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       this.updatePageElements(change.pageId, (elements) => {
         const dragged = this.el.findElementById(change.draggedId, elements);
         const draggedBounds = dragged
-          ? this.getLiveElementCanvasBounds(dragged) ?? this.getFlowAwareBounds(dragged, elements)
+          ? (this.getLiveElementCanvasBounds(dragged) ?? this.getFlowAwareBounds(dragged, elements))
           : null;
         const reordered = this.el.reorderLayerElements(
           elements,
@@ -2129,6 +2135,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     this.hasMovedElementDuringDrag = false;
     this.hasMovedPageDuringDrag = false;
     this.isFlowDragInsideContainer = false;
+    this.resizeSubtreeSnapshot = new Map();
     this.snapLines.set([]);
     this.flowDragPlaceholder.set(null);
     this.draggingFlowChildId.set(null);
@@ -2194,6 +2201,30 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
   getElementBorderStyle(element: CanvasElement): string {
     return this.el.getElementStrokeStyle(element);
+  }
+
+  usesIndependentStrokeSurface(element: CanvasElement): boolean {
+    return (
+      this.isContainerElement(element) &&
+      !this.isLayoutContainer(element) &&
+      getStrokeWidth(element) > 0
+    );
+  }
+
+  getRenderedBorderStyle(element: CanvasElement): string | null {
+    return this.usesIndependentStrokeSurface(element) ? null : this.getElementBorderStyle(element);
+  }
+
+  getElementSurfaceBorderStyle(element: CanvasElement): string | null {
+    return this.usesIndependentStrokeSurface(element) ? this.getElementBorderStyle(element) : null;
+  }
+
+  getElementOverflowStyle(element: CanvasElement): string | null {
+    if (!this.isContainerElement(element)) {
+      return null;
+    }
+
+    return this.el.getElementOverflowMode(element) === 'clip' ? 'hidden' : 'visible';
   }
 
   getElementBorderRadius(element: CanvasElement): string {
@@ -3273,6 +3304,10 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
         result = this.reflowRootFrames(snappedElements, resizedTarget.id, resizedTarget.x);
       }
 
+      if (resizedTarget) {
+        result = this.applyResponsiveResizeToDescendants(result, resizedTarget.id);
+      }
+
       const freshResized = result.find((e) => e.id === start.elementId) ?? null;
       // Don't propagate live resize from a synced copy — it will detach on pointerup
       if (freshResized?.primarySyncId) {
@@ -3466,6 +3501,97 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     };
   }
 
+  private captureResizeSubtreeSnapshot(elementId: string, elements: CanvasElement[]): void {
+    const subtreeIds = new Set(collectSubtreeIds(elements, elementId));
+    this.resizeSubtreeSnapshot = new Map(
+      elements
+        .filter((element) => subtreeIds.has(element.id))
+        .map((element) => [element.id, structuredClone(element)]),
+    );
+  }
+
+  private applyResponsiveResizeToDescendants(
+    elements: CanvasElement[],
+    resizedElementId: string,
+  ): CanvasElement[] {
+    const sourceRoot = this.resizeSubtreeSnapshot.get(resizedElementId);
+    const resizedRoot = this.el.findElementById(resizedElementId, elements);
+    if (
+      !sourceRoot ||
+      !resizedRoot ||
+      !this.isContainerElement(resizedRoot) ||
+      this.isLayoutContainer(resizedRoot) ||
+      this.resizeSubtreeSnapshot.size <= 1
+    ) {
+      return elements;
+    }
+
+    const sourceElements = Array.from(this.resizeSubtreeSnapshot.values());
+    const subtreeIds = new Set(this.resizeSubtreeSnapshot.keys());
+    const nextElements = elements.map((element) =>
+      subtreeIds.has(element.id) ? { ...element } : element,
+    );
+    const nextById = new Map(nextElements.map((element) => [element.id, element]));
+
+    const descendants = sourceElements
+      .filter((element) => element.id !== resizedElementId)
+      .sort(
+        (left, right) =>
+          this.getElementNestingDepth(left, sourceElements) -
+          this.getElementNestingDepth(right, sourceElements),
+      );
+
+    for (const sourceElement of descendants) {
+      const nextElement = nextById.get(sourceElement.id);
+      const sourceParent = this.resizeSubtreeSnapshot.get(sourceElement.parentId ?? '');
+      const nextParent = nextById.get(sourceElement.parentId ?? '');
+      if (!nextElement || !sourceParent || !nextParent) {
+        continue;
+      }
+
+      const scaleX = sourceParent.width > 0 ? nextParent.width / sourceParent.width : 1;
+      const scaleY = sourceParent.height > 0 ? nextParent.height / sourceParent.height : 1;
+      const shouldScalePosition =
+        !this.isLayoutContainer(nextParent) || !this.isChildInFlow(sourceElement);
+      const textScale = Math.min(Math.abs(scaleX), Math.abs(scaleY));
+
+      const updatedElement: CanvasElement = {
+        ...nextElement,
+        x: shouldScalePosition ? roundToTwoDecimals(sourceElement.x * scaleX) : nextElement.x,
+        y: shouldScalePosition ? roundToTwoDecimals(sourceElement.y * scaleY) : nextElement.y,
+        width: roundToTwoDecimals(sourceElement.width * scaleX),
+        height: roundToTwoDecimals(sourceElement.height * scaleY),
+      };
+
+      if (updatedElement.type === 'text' && typeof sourceElement.fontSize === 'number') {
+        updatedElement.fontSize = roundToTwoDecimals(sourceElement.fontSize * textScale);
+
+        if (
+          typeof sourceElement.letterSpacing === 'number' &&
+          sourceElement.letterSpacingUnit !== 'em'
+        ) {
+          updatedElement.letterSpacing = roundToTwoDecimals(
+            sourceElement.letterSpacing * textScale,
+          );
+        }
+
+        if (typeof sourceElement.lineHeight === 'number' && sourceElement.lineHeightUnit === 'px') {
+          updatedElement.lineHeight = roundToTwoDecimals(sourceElement.lineHeight * textScale);
+        }
+      }
+
+      this.el.normalizeElement(updatedElement, nextElements);
+      nextById.set(updatedElement.id, updatedElement);
+
+      const index = nextElements.findIndex((element) => element.id === updatedElement.id);
+      if (index >= 0) {
+        nextElements[index] = updatedElement;
+      }
+    }
+
+    return nextElements;
+  }
+
   // ── Private: Helpers ──────────────────────────────────────
 
   private updateCurrentPageElements(updater: (elements: CanvasElement[]) => CanvasElement[]): void {
@@ -3525,7 +3651,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   private startRectangleDraw(event: MouseEvent, suppressPageShellClick = false): boolean {
-    if (this.currentTool() !== 'rectangle' || event.button !== 0 || this.viewport.isSpacePressed()) {
+    if (
+      this.currentTool() !== 'rectangle' ||
+      event.button !== 0 ||
+      this.viewport.isSpacePressed()
+    ) {
       return false;
     }
 
@@ -3580,7 +3710,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     const container = this.el.findElementById(state.containerId, this.elements());
-    const containerBounds = container ? this.el.getAbsoluteBounds(container, this.elements()) : null;
+    const containerBounds = container
+      ? this.el.getAbsoluteBounds(container, this.elements())
+      : null;
     const clampedPoint = containerBounds
       ? {
           x: clamp(pointer.x, containerBounds.x, containerBounds.x + containerBounds.width),
@@ -3602,7 +3734,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     const container = this.el.findElementById(state.containerId, this.elements());
-    const containerBounds = container ? this.el.getAbsoluteBounds(container, this.elements()) : null;
+    const containerBounds = container
+      ? this.el.getAbsoluteBounds(container, this.elements())
+      : null;
     const bounds = this.buildRectangleDrawBounds(state.startPoint, state.currentPoint);
     const distance = Math.hypot(
       state.currentPoint.x - state.startPoint.x,

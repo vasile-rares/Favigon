@@ -258,6 +258,21 @@
   user-select: none;
   box-sizing: border-box;
 
+  &.has-independent-stroke-surface {
+    isolation: isolate;
+  }
+
+  &.has-independent-stroke-surface::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: var(--canvas-element-surface-border);
+    border-radius: inherit;
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 1;
+  }
+
   &.frame {
     background-color: var(--color-zinc-700);
   }
