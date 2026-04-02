@@ -38,6 +38,11 @@ import {
   buildCanvasElementTransformStyle,
   parseCanvasTransformStyle,
 } from '../utils/canvas-transform.util';
+import {
+  hasCanvasElementLink,
+  normalizeCanvasAccessibilityLabel,
+  normalizeStoredCanvasTag,
+} from '../utils/canvas-accessibility.util';
 
 const ROOT_ROLE = 'canvas-root';
 const ROOT_TYPE = 'Container';
@@ -51,6 +56,9 @@ const MANAGED_PROP_KEYS = [
   'fontStyle',
   'primitive',
   'sourceType',
+  'tag',
+  'ariaLabel',
+  'alt',
   'href',
   'target',
   'linkType',
@@ -412,6 +420,9 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
     ...(element.irMeta?.props ?? {}),
     primitive: true,
   };
+  const hasLink = hasCanvasElementLink(element);
+  const tag = normalizeStoredCanvasTag(element.type, element.tag, hasLink);
+  const ariaLabel = normalizeCanvasAccessibilityLabel(element.ariaLabel);
 
   if (element.type === 'text') {
     props['content'] = element.text ?? '';
@@ -435,6 +446,18 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
 
   if (typeof element.name === 'string') {
     props['name'] = element.name;
+  }
+
+  if (tag) {
+    props['tag'] = tag;
+  }
+
+  if (ariaLabel) {
+    if (element.type === 'image') {
+      props['alt'] = ariaLabel;
+    } else {
+      props['ariaLabel'] = ariaLabel;
+    }
   }
 
   if (element.linkType === 'page' && typeof element.linkPageId === 'string') {
@@ -550,6 +573,13 @@ function mapPositionMode(pos: CanvasPositionMode): PositionMode {
 function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
   const mappedType = mapIRType(node.type);
   const defaults = mappedType === 'text' ? DEFAULT_ELEMENT_SIZE.text : DEFAULT_ELEMENT_SIZE.generic;
+  const linkType = readLinkTypeFromProps(node.props);
+  const importedTag = readOptionalStringProp(node.props, 'tag');
+  const importedAriaLabel =
+    mappedType === 'image'
+      ? (readOptionalStringProp(node.props, 'alt') ??
+        readOptionalStringProp(node.props, 'ariaLabel'))
+      : readOptionalStringProp(node.props, 'ariaLabel');
   const defaultCornerRadius = mappedType === 'image' ? DEFAULT_IMAGE_RADIUS : 0;
   const cornerRadius =
     mappedType !== 'text'
@@ -616,9 +646,11 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
         ? readLengthUnit<CanvasTextSpacingUnit>(node.style?.lineHeight, 'em', ['px', 'em'])
         : undefined,
     imageUrl: mappedType === 'image' ? readStringProp(node.props, 'src', '') : undefined,
-    linkType: readLinkTypeFromProps(node.props),
+    linkType,
     linkPageId: readOptionalStringProp(node.props, 'linkPageId') ?? undefined,
     linkUrl: readOptionalStringProp(node.props, 'href') ?? undefined,
+    tag: normalizeStoredCanvasTag(mappedType, importedTag, linkType !== undefined),
+    ariaLabel: normalizeCanvasAccessibilityLabel(importedAriaLabel),
     ...transformFields,
     irMeta: {
       type: node.type,

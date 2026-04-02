@@ -23,12 +23,13 @@ export class DropdownSelectComponent implements ControlValueAccessor {
   @Input() emptyText = 'No items found.';
   @Input() enableSearch = true;
   @Input() options: DropdownSelectOption[] = [];
+  @Input() disabled = false;
 
   isOpen = false;
   isClosing = false;
+  openDirection: 'below' | 'above' = 'below';
   searchQuery = '';
   selectedValue: string | number | boolean | null = null;
-  disabled = false;
 
   private readonly panelAnimationMs = 140;
   private closeTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -93,6 +94,7 @@ export class DropdownSelectComponent implements ControlValueAccessor {
     this.clearPendingClose();
     this.isClosing = false;
     this.isOpen = true;
+    this.updatePanelPlacement();
   }
 
   selectOption(option: DropdownSelectOption): void {
@@ -114,6 +116,15 @@ export class DropdownSelectComponent implements ControlValueAccessor {
     }
 
     this.closePanel();
+  }
+
+  @HostListener('window:resize')
+  onWindowResize(): void {
+    if (!this.isOpen) {
+      return;
+    }
+
+    this.updatePanelPlacement();
   }
 
   private closePanel(): void {
@@ -140,5 +151,24 @@ export class DropdownSelectComponent implements ControlValueAccessor {
 
     clearTimeout(this.closeTimeoutId);
     this.closeTimeoutId = null;
+  }
+
+  private updatePanelPlacement(): void {
+    requestAnimationFrame(() => {
+      const host = this.hostRef.nativeElement;
+      const trigger = host.querySelector('.dropdown-select__trigger') as HTMLElement | null;
+      const panel = host.querySelector('.dropdown-select__panel') as HTMLElement | null;
+      if (!trigger || !panel) {
+        return;
+      }
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const availableBelow = Math.max(0, window.innerHeight - triggerRect.bottom - 12);
+      const availableAbove = Math.max(0, triggerRect.top - 12);
+      const desiredHeight = Math.min(panel.scrollHeight, window.innerHeight - 24);
+
+      this.openDirection =
+        availableBelow < desiredHeight && availableAbove > availableBelow ? 'above' : 'below';
+    });
   }
 }

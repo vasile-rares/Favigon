@@ -22,7 +22,7 @@ public abstract class ReactMapperBase : FrameworkMapperBase
             }
         }
 
-        return attrs;
+        return AppendAriaLabel(node, attrs);
     }
 
     protected override string OpenNodeComment(IRNode node, EmitContext ctx) =>

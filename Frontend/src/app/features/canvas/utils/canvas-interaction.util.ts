@@ -1,5 +1,10 @@
 import { CanvasCornerRadii, CanvasElement } from '../../../core/models/canvas.models';
 import { clamp, roundToTwoDecimals } from './canvas-math.util';
+import {
+  hasCanvasElementLink,
+  normalizeCanvasAccessibilityLabel,
+  normalizeStoredCanvasTag,
+} from './canvas-accessibility.util';
 
 const MIN_SIZE = 24;
 
@@ -95,6 +100,10 @@ export function getElementBorderRadiusCss(
 export function mutateNormalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
   element.width = Math.max(MIN_SIZE, element.width);
   element.height = Math.max(MIN_SIZE, element.height);
+
+  const hasLink = hasCanvasElementLink(element);
+  element.tag = normalizeStoredCanvasTag(element.type, element.tag, hasLink);
+  element.ariaLabel = normalizeCanvasAccessibilityLabel(element.ariaLabel);
 
   if (element.type === 'text') {
     element.fontSizeUnit = element.fontSizeUnit === 'rem' ? 'rem' : 'px';

@@ -25,7 +25,7 @@ public abstract class AngularMapperBase : FrameworkMapperBase
             }
         }
 
-        return attrs;
+        return AppendAriaLabel(node, attrs);
     }
 
     protected override string OpenNodeComment(IRNode node, EmitContext ctx) =>

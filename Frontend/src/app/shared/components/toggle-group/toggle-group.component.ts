@@ -16,7 +16,9 @@ export type ToggleGroupIcon =
   | 'text-align-right'
   | 'text-align-justify'
   | 'radius-full'
-  | 'radius-corners';
+  | 'radius-corners'
+  | 'spacing-all'
+  | 'spacing-sides';
 
 export interface ToggleGroupOption {
   label: string;

@@ -10,6 +10,20 @@ export type CanvasOverflowMode = 'clip' | 'visible';
 export type CanvasShadowPreset = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 export type CanvasPageViewportPreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
 export type CanvasLinkType = 'page' | 'url';
+export type CanvasSemanticTag =
+  | 'a'
+  | 'article'
+  | 'aside'
+  | 'div'
+  | 'footer'
+  | 'header'
+  | 'img'
+  | 'label'
+  | 'main'
+  | 'nav'
+  | 'p'
+  | 'section'
+  | 'span';
 export type CanvasRotationMode = '2d' | '3d';
 export type CanvasBackfaceVisibility = 'visible' | 'hidden';
 export type CanvasTransformOption =
@@ -102,6 +116,8 @@ export interface CanvasElement {
   linkType?: CanvasLinkType;
   linkPageId?: string | null;
   linkUrl?: string;
+  tag?: CanvasSemanticTag;
+  ariaLabel?: string;
   // Layout (frame + rectangle)
   display?: CanvasDisplayMode;
   flexDirection?: CanvasFlexDirection;

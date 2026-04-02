@@ -13,14 +13,14 @@ public sealed class HtmlTextMapper : HtmlMapperBase
     var content = GetProp(node, "content");
     var href = GetProp(node, "href");
     var inline = GetBoolProp(node, "inline");
-    var tag = inline ? "span" : "p";
+    var tag = ResolveTag(node, inline ? "span" : "p", "div", "p", "span", "label");
 
     if (!string.IsNullOrWhiteSpace(href))
     {
       return Paired("a", BuildLinkAttrs(node, href), content, ctx.Indent, inlineContent: true);
     }
 
-    return Paired(tag, NodeClass(node), content, ctx.Indent, inlineContent: true);
+    return Paired(tag, AppendAriaLabel(node, NodeClass(node)), content, ctx.Indent, inlineContent: true);
   }
 }
 
@@ -424,9 +424,22 @@ public sealed class HtmlContainerMapper : HtmlMapperBase
   protected override string EmitElement(IRNode node, EmitContext ctx)
   {
     var href = GetProp(node, "href");
+    var tag = ResolveTag(
+      node,
+      "div",
+      "div",
+      "section",
+      "article",
+      "aside",
+      "main",
+      "header",
+      "footer",
+      "nav"
+    );
+
     return !string.IsNullOrWhiteSpace(href)
       ? Paired("a", BuildLinkAttrs(node, href), EmitChildren(node, ctx), ctx.Indent)
-      : Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
+      : Paired(tag, AppendAriaLabel(node, NodeClass(node)), EmitChildren(node, ctx), ctx.Indent);
   }
 }
 
@@ -437,9 +450,22 @@ public sealed class HtmlFrameMapper : HtmlMapperBase
   protected override string EmitElement(IRNode node, EmitContext ctx)
   {
     var href = GetProp(node, "href");
+    var tag = ResolveTag(
+      node,
+      "div",
+      "div",
+      "section",
+      "article",
+      "aside",
+      "main",
+      "header",
+      "footer",
+      "nav"
+    );
+
     return !string.IsNullOrWhiteSpace(href)
       ? Paired("a", BuildLinkAttrs(node, href), EmitChildren(node, ctx), ctx.Indent)
-      : Paired("div", NodeClass(node), EmitChildren(node, ctx), ctx.Indent);
+      : Paired(tag, AppendAriaLabel(node, NodeClass(node)), EmitChildren(node, ctx), ctx.Indent);
   }
 }
 

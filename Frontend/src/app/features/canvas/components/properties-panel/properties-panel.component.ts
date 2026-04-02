@@ -22,6 +22,7 @@ import {
   CanvasPageModel,
   CanvasPositionMode,
   CanvasRotationMode,
+  CanvasSemanticTag,
   CanvasShadowPreset,
   CanvasSpacing,
   CanvasTransformOption,
@@ -46,9 +47,20 @@ import {
   hasPerCornerRadius,
   roundToTwoDecimals,
 } from '../../utils/canvas-interaction.util';
+import {
+  getAllowedCustomAccessibilityTags,
+  getDefaultAccessibilityTag,
+  getResolvedCanvasTag,
+  hasCanvasElementLink,
+  normalizeCanvasAccessibilityLabel,
+  normalizeStoredCanvasTag,
+  supportsCustomAccessibilityTag,
+} from '../../utils/canvas-accessibility.util';
 import { SupportedFramework } from '../../canvas.types';
 type PropertiesTab = 'design' | 'prototype';
 type CornerRadiusMode = 'full' | 'per-corner';
+type PaddingMode = 'full' | 'per-side';
+type AccessibilityField = 'tag' | 'ariaLabel';
 
 type EditableNumericField =
   | 'x'
@@ -90,6 +102,17 @@ interface CornerRadiusFieldDefinition {
   ariaLabel: string;
 }
 
+interface PaddingFieldDefinition {
+  key: keyof CanvasSpacing;
+  label: string;
+  ariaLabel: string;
+}
+
+interface AccessibilityFieldDefinition {
+  id: AccessibilityField;
+  label: string;
+}
+
 const TRANSFORM_OPTION_DEFINITIONS: readonly TransformOptionDefinition[] = [
   { id: 'scale', label: 'Scale' },
   { id: 'rotate', label: 'Rotate' },
@@ -106,6 +129,18 @@ const CORNER_RADIUS_FIELD_DEFINITIONS: readonly CornerRadiusFieldDefinition[] = 
   { key: 'topRight', label: 'TR', ariaLabel: 'Top right corner radius' },
   { key: 'bottomLeft', label: 'BL', ariaLabel: 'Bottom left corner radius' },
   { key: 'bottomRight', label: 'BR', ariaLabel: 'Bottom right corner radius' },
+] as const;
+
+const PADDING_FIELD_DEFINITIONS: readonly PaddingFieldDefinition[] = [
+  { key: 'top', label: 'T', ariaLabel: 'Padding top' },
+  { key: 'right', label: 'R', ariaLabel: 'Padding right' },
+  { key: 'left', label: 'L', ariaLabel: 'Padding left' },
+  { key: 'bottom', label: 'B', ariaLabel: 'Padding bottom' },
+] as const;
+
+const ACCESSIBILITY_FIELD_DEFINITIONS: readonly AccessibilityFieldDefinition[] = [
+  { id: 'tag', label: 'Tag' },
+  { id: 'ariaLabel', label: 'Aria Label' },
 ] as const;
 
 const TRANSFORM_DEPTH_MIN = -1000;
@@ -155,6 +190,12 @@ export class PropertiesPanelComponent {
   transformMenuItems: ContextMenuItem[] = [];
   transformMenuX = 0;
   transformMenuY = 0;
+  accessibilityMenuItems: ContextMenuItem[] = [];
+  accessibilityMenuX = 0;
+  accessibilityMenuY = 0;
+  private readonly paddingModeOverrides = new Map<string, PaddingMode>();
+  private readonly paddingLinkedValues = new Map<string, number>();
+  private readonly accessibilityFieldOverrides = new Map<string, Set<AccessibilityField>>();
   readonly propertiesTabOptions: readonly ToggleGroupOption[] = [
     {
       label: 'Design',
@@ -264,6 +305,23 @@ export class PropertiesPanelComponent {
     },
   ];
   readonly cornerRadiusFields = CORNER_RADIUS_FIELD_DEFINITIONS;
+  readonly paddingModeOptions: readonly ToggleGroupOption[] = [
+    {
+      label: '',
+      value: 'full',
+      icon: 'spacing-all',
+      ariaLabel: 'Use uniform padding',
+      title: 'Uniform padding',
+    },
+    {
+      label: '',
+      value: 'per-side',
+      icon: 'spacing-sides',
+      ariaLabel: 'Use per-side padding',
+      title: 'Per-side padding',
+    },
+  ];
+  readonly paddingFields = PADDING_FIELD_DEFINITIONS;
   readonly wrapOptions: readonly ToggleGroupOption[] = [
     { label: 'Yes', value: true },
     { label: 'No', value: false },
@@ -378,6 +436,7 @@ export class PropertiesPanelComponent {
   selectTab(tab: PropertiesTab): void {
     this.activeTab = tab;
     this.closeTransformMenu();
+    this.closeAccessibilityMenu();
   }
 
   onTabValueChange(value: string | number | boolean): void {
@@ -462,12 +521,23 @@ export class PropertiesPanelComponent {
     this.onTransformSectionHeaderClick(event);
   }
 
+  onAccessibilitySectionHeaderClick(event: MouseEvent): void {
+    this.openAccessibilityMenu(event, this.resolveSectionHeaderTrigger(event));
+  }
+
+  onAccessibilitySectionToggleClick(event: MouseEvent): void {
+    event.stopPropagation();
+    this.onAccessibilitySectionHeaderClick(event);
+  }
+
   private openTransformMenu(event: MouseEvent | null, trigger: HTMLElement | null): void {
     const element = this.selectedElement;
     const position = this.resolveTransformMenuPosition(event, trigger);
     if (!element || !position) {
       return;
     }
+
+    this.closeAccessibilityMenu();
 
     if (this.transformMenuItems.length > 0) {
       return;
@@ -476,6 +546,24 @@ export class PropertiesPanelComponent {
     this.transformMenuItems = this.buildTransformMenuItems(element);
     this.transformMenuX = position.x;
     this.transformMenuY = position.y;
+  }
+
+  private openAccessibilityMenu(event: MouseEvent | null, trigger: HTMLElement | null): void {
+    const element = this.selectedElement;
+    const position = this.resolveTransformMenuPosition(event, trigger);
+    if (!element || !position) {
+      return;
+    }
+
+    this.closeTransformMenu();
+
+    if (this.accessibilityMenuItems.length > 0) {
+      return;
+    }
+
+    this.accessibilityMenuItems = this.buildAccessibilityMenuItems(element);
+    this.accessibilityMenuX = position.x;
+    this.accessibilityMenuY = position.y;
   }
 
   private resolveTransformMenuPosition(
@@ -516,6 +604,10 @@ export class PropertiesPanelComponent {
     this.transformMenuItems = [];
   }
 
+  closeAccessibilityMenu(): void {
+    this.accessibilityMenuItems = [];
+  }
+
   hasStroke(type: CanvasElementType): boolean {
     return type !== 'text';
   }
@@ -540,6 +632,26 @@ export class PropertiesPanelComponent {
 
   cornerRadiusValue(element: CanvasElement, corner: keyof CanvasCornerRadii): number {
     return getResolvedCornerRadii(element)[corner];
+  }
+
+  paddingMode(element: CanvasElement): PaddingMode {
+    return (
+      this.paddingModeOverrides.get(element.id) ??
+      (this.hasPerSidePadding(element) ? 'per-side' : 'full')
+    );
+  }
+
+  fullPaddingInputValue(element: CanvasElement): number | null {
+    return this.paddingMode(element) === 'per-side' ? null : this.uniformPaddingValue(element);
+  }
+
+  uniformPaddingValue(element: CanvasElement): number {
+    const padding = this.getSpacingValues(element, 'padding');
+    if (!this.hasPerSidePadding(element)) {
+      return padding.top;
+    }
+
+    return this.paddingLinkedValues.get(element.id) ?? padding.top;
   }
 
   onCornerRadiusModeChange(value: string | number | boolean | null): void {
@@ -582,6 +694,81 @@ export class PropertiesPanelComponent {
     } satisfies CanvasCornerRadii;
 
     this.emitPatch({ cornerRadii: nextRadii });
+  }
+
+  onPaddingModeChange(value: string | number | boolean | null): void {
+    if (value !== 'full' && value !== 'per-side') {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const currentPadding = this.getSpacingValues(element, 'padding');
+    const linkedValue = this.uniformPaddingValue(element);
+
+    this.paddingModeOverrides.set(element.id, value);
+    this.paddingLinkedValues.set(element.id, linkedValue);
+
+    if (value === 'per-side') {
+      this.emitPatch({ padding: currentPadding });
+      return;
+    }
+
+    const nextValue = Math.max(0, roundToTwoDecimals(linkedValue));
+    this.emitPatch({
+      padding: {
+        top: nextValue,
+        right: nextValue,
+        bottom: nextValue,
+        left: nextValue,
+      },
+    });
+  }
+
+  onPaddingFullChange(value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const nextValue = Math.max(0, roundToTwoDecimals(value));
+    this.paddingModeOverrides.set(element.id, 'full');
+    this.paddingLinkedValues.set(element.id, nextValue);
+    this.emitPatch({
+      padding: {
+        top: nextValue,
+        right: nextValue,
+        bottom: nextValue,
+        left: nextValue,
+      },
+    });
+  }
+
+  onPaddingSideChange(side: keyof CanvasSpacing, value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const currentPadding = this.getSpacingValues(element, 'padding');
+    this.paddingModeOverrides.set(element.id, 'per-side');
+    this.emitPatch({
+      padding: {
+        ...currentPadding,
+        [side]: Math.max(0, roundToTwoDecimals(value)),
+      },
+    });
   }
 
   isFrame(type: CanvasElementType): boolean {
@@ -804,7 +991,7 @@ export class PropertiesPanelComponent {
   }
 
   hasLink(element: CanvasElement): boolean {
-    return element.linkType === 'page' || element.linkType === 'url';
+    return hasCanvasElementLink(element);
   }
 
   linkTypeValue(element: CanvasElement): CanvasLinkType {
@@ -931,6 +1118,19 @@ export class PropertiesPanelComponent {
     return element[type]?.[side] ?? 0;
   }
 
+  private getSpacingValues(element: CanvasElement, type: 'padding' | 'margin'): CanvasSpacing {
+    return element[type] ?? { top: 0, right: 0, bottom: 0, left: 0 };
+  }
+
+  private hasPerSidePadding(element: CanvasElement): boolean {
+    const padding = this.getSpacingValues(element, 'padding');
+    return !(
+      padding.top === padding.right &&
+      padding.top === padding.bottom &&
+      padding.top === padding.left
+    );
+  }
+
   addLayout(): void {
     this.emitPatch({ display: 'flex' });
   }
@@ -943,6 +1143,7 @@ export class PropertiesPanelComponent {
         linkType: 'page',
         linkPageId: pageId,
         linkUrl: undefined,
+        tag: undefined,
       });
       return;
     }
@@ -951,6 +1152,7 @@ export class PropertiesPanelComponent {
       linkType: 'url',
       linkPageId: undefined,
       linkUrl: '',
+      tag: undefined,
     });
   }
 
@@ -973,7 +1175,60 @@ export class PropertiesPanelComponent {
       linkType: undefined,
       linkPageId: undefined,
       linkUrl: undefined,
+      tag: undefined,
     });
+  }
+
+  hasAccessibilityFields(element: CanvasElement): boolean {
+    return (
+      this.hasAccessibilityField(element, 'tag') || this.hasAccessibilityField(element, 'ariaLabel')
+    );
+  }
+
+  hasAccessibilityField(element: CanvasElement, field: AccessibilityField): boolean {
+    if (field === 'tag') {
+      return this.hasLink(element) || !!getResolvedCanvasTag(element);
+    }
+
+    return (
+      !!normalizeCanvasAccessibilityLabel(element.ariaLabel) ||
+      this.hasAccessibilityFieldOverride(element.id, field)
+    );
+  }
+
+  supportsAccessibilityTag(element: CanvasElement): boolean {
+    return this.hasLink(element) || supportsCustomAccessibilityTag(element.type);
+  }
+
+  accessibilityTagOptions(element: CanvasElement): DropdownSelectOption[] {
+    if (this.hasLink(element)) {
+      return [{ label: 'a', value: 'a' }];
+    }
+
+    return getAllowedCustomAccessibilityTags(element.type).map((tag) => ({
+      label: tag,
+      value: tag,
+    }));
+  }
+
+  accessibilityTagValue(element: CanvasElement): CanvasSemanticTag | '' {
+    return getResolvedCanvasTag(element) ?? '';
+  }
+
+  isAccessibilityTagLocked(element: CanvasElement): boolean {
+    return this.hasLink(element);
+  }
+
+  accessibilityLabelValue(element: CanvasElement): string {
+    return element.ariaLabel ?? '';
+  }
+
+  accessibilityLabelPlaceholder(element: CanvasElement): string {
+    return element.type === 'image' ? 'Image alt' : 'Short label';
+  }
+
+  accessibilityTagPlaceholder(element: CanvasElement): string {
+    return this.supportsAccessibilityTag(element) ? 'Select tag' : 'Unavailable';
   }
 
   onTransformScaleChange(value: number): void {
@@ -1270,6 +1525,7 @@ export class PropertiesPanelComponent {
         linkType: 'page',
         linkPageId: this.firstAvailableLinkPageId(),
         linkUrl: undefined,
+        tag: undefined,
       });
       return;
     }
@@ -1279,6 +1535,7 @@ export class PropertiesPanelComponent {
         linkType: 'url',
         linkPageId: undefined,
         linkUrl: '',
+        tag: undefined,
       });
     }
   }
@@ -1292,6 +1549,7 @@ export class PropertiesPanelComponent {
       linkType: 'page',
       linkPageId: value,
       linkUrl: undefined,
+      tag: undefined,
     });
   }
 
@@ -1300,6 +1558,29 @@ export class PropertiesPanelComponent {
       linkType: 'url',
       linkPageId: undefined,
       linkUrl: (event.target as HTMLInputElement).value,
+      tag: undefined,
+    });
+  }
+
+  onAccessibilityTagChange(value: string | number | boolean | null): void {
+    const element = this.selectedElement;
+    if (!element || this.hasLink(element) || typeof value !== 'string') {
+      return;
+    }
+
+    this.emitPatch({
+      tag: normalizeStoredCanvasTag(element.type, value, false),
+    });
+  }
+
+  onAccessibilityLabelChange(event: Event): void {
+    const element = this.selectedElement;
+    if (element) {
+      this.setAccessibilityFieldOverride(element.id, 'ariaLabel', true);
+    }
+
+    this.emitPatch({
+      ariaLabel: normalizeCanvasAccessibilityLabel((event.target as HTMLInputElement).value),
     });
   }
 
@@ -1309,6 +1590,75 @@ export class PropertiesPanelComponent {
 
   private emitPatch(patch: Partial<CanvasElement>): void {
     this.elementPatch.emit(patch);
+  }
+
+  private buildAccessibilityMenuItems(element: CanvasElement): ContextMenuItem[] {
+    return ACCESSIBILITY_FIELD_DEFINITIONS.map((field) => ({
+      id: field.id,
+      label: field.label,
+      checked: this.hasAccessibilityField(element, field.id),
+      showCheckSlot: true,
+      disabled: field.id === 'tag' && this.hasLink(element),
+      action: () => this.toggleAccessibilityField(field.id),
+    }));
+  }
+
+  private toggleAccessibilityField(field: AccessibilityField): void {
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    if (field === 'tag') {
+      if (this.hasLink(element)) {
+        this.closeAccessibilityMenu();
+        return;
+      }
+
+      if (this.hasAccessibilityField(element, 'tag')) {
+        this.emitPatch({ tag: undefined });
+      } else {
+        this.emitPatch({ tag: getDefaultAccessibilityTag(element.type) });
+      }
+
+      this.closeAccessibilityMenu();
+      return;
+    }
+
+    const isActive = this.hasAccessibilityField(element, field);
+    this.setAccessibilityFieldOverride(element.id, field, !isActive);
+
+    if (isActive) {
+      this.emitPatch({ ariaLabel: undefined });
+    }
+
+    this.closeAccessibilityMenu();
+  }
+
+  private hasAccessibilityFieldOverride(elementId: string, field: AccessibilityField): boolean {
+    return this.accessibilityFieldOverrides.get(elementId)?.has(field) ?? false;
+  }
+
+  private setAccessibilityFieldOverride(
+    elementId: string,
+    field: AccessibilityField,
+    isActive: boolean,
+  ): void {
+    const current = this.accessibilityFieldOverrides.get(elementId);
+    const next = new Set<AccessibilityField>(current ?? []);
+
+    if (isActive) {
+      next.add(field);
+    } else {
+      next.delete(field);
+    }
+
+    if (next.size === 0) {
+      this.accessibilityFieldOverrides.delete(elementId);
+      return;
+    }
+
+    this.accessibilityFieldOverrides.set(elementId, next);
   }
 
   private buildTransformMenuItems(element: CanvasElement): ContextMenuItem[] {

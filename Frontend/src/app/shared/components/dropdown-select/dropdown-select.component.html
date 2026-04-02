@@ -29,6 +29,7 @@
   @if (isOpen || isClosing) {
     <div
       class="dropdown-select__panel"
+      [class.dropdown-select__panel--above]="openDirection === 'above'"
       [class.dropdown-select__panel--open]="isOpen && !isClosing"
       [class.dropdown-select__panel--closing]="isClosing"
       role="listbox">

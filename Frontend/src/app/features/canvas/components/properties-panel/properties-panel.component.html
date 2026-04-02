@@ -482,23 +482,49 @@
           </div>
           </ng-container>
 
-          <p class="pp-spacing-sub-title">Padding</p>
-          <div class="pp-spacing-grid">
-            <div class="pp-spacing-field">
-              <span class="pp-spacing-side-label">T</span>
-              <app-number-input ariaLabel="Padding top" [value]="spacingValue(element, 'padding', 'top')" [min]="0" [step]="1" (gestureStarted)="onNumberInputGestureStarted()" (gestureCommitted)="onNumberInputGestureCommitted()" (valueChange)="onSpacingChange('padding', 'top', $event)" />
-            </div>
-            <div class="pp-spacing-field">
-              <span class="pp-spacing-side-label">R</span>
-              <app-number-input ariaLabel="Padding right" [value]="spacingValue(element, 'padding', 'right')" [min]="0" [step]="1" (gestureStarted)="onNumberInputGestureStarted()" (gestureCommitted)="onNumberInputGestureCommitted()" (valueChange)="onSpacingChange('padding', 'right', $event)" />
-            </div>
-            <div class="pp-spacing-field">
-              <span class="pp-spacing-side-label">B</span>
-              <app-number-input ariaLabel="Padding bottom" [value]="spacingValue(element, 'padding', 'bottom')" [min]="0" [step]="1" (gestureStarted)="onNumberInputGestureStarted()" (gestureCommitted)="onNumberInputGestureCommitted()" (valueChange)="onSpacingChange('padding', 'bottom', $event)" />
-            </div>
-            <div class="pp-spacing-field">
-              <span class="pp-spacing-side-label">L</span>
-              <app-number-input ariaLabel="Padding left" [value]="spacingValue(element, 'padding', 'left')" [min]="0" [step]="1" (gestureStarted)="onNumberInputGestureStarted()" (gestureCommitted)="onNumberInputGestureCommitted()" (valueChange)="onSpacingChange('padding', 'left', $event)" />
+          <div class="pp-style-row pp-style-row--corner-radius">
+            <span class="pp-row-label">Padding</span>
+            <div class="pp-style-control pp-style-control--corner-radius">
+              <div class="pp-corner-radius-header">
+                <app-number-input
+                  appearance="compact"
+                  ariaLabel="Padding"
+                  [value]="fullPaddingInputValue(element)"
+                  [min]="0"
+                  [step]="1"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onPaddingFullChange($event)" />
+
+                <div class="pp-corner-radius-mode">
+                  <app-toggle-group
+                    [ariaLabel]="'Padding mode'"
+                    [options]="paddingModeOptions"
+                    [value]="paddingMode(element)"
+                    [stretch]="true"
+                    [minWidth]="null"
+                    (valueChange)="onPaddingModeChange($event)"></app-toggle-group>
+                </div>
+              </div>
+
+              <div class="pp-corner-radius-grid" *ngIf="paddingMode(element) === 'per-side'">
+                <div class="pp-corner-radius-field" *ngFor="let side of paddingFields">
+                  <div class="pp-corner-radius-input">
+                    <app-number-input
+                      appearance="compact"
+                      [ariaLabel]="side.ariaLabel"
+                      [value]="spacingValue(element, 'padding', side.key)"
+                      [min]="0"
+                      [step]="1"
+                      (gestureStarted)="onNumberInputGestureStarted()"
+                      (gestureCommitted)="onNumberInputGestureCommitted()"
+                      (valueChange)="onPaddingSideChange(side.key, $event)"></app-number-input>
+                    <span class="pp-corner-radius-tag pp-corner-radius-tag--text" aria-hidden="true">
+                      {{ side.label }}
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </ng-container>
@@ -864,6 +890,57 @@
         </ng-container>
       </section>
 
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasAccessibilityFields(element)"
+        [class.properties-section--actionable]="!hasAccessibilityFields(element)"
+        (click)="!hasAccessibilityFields(element) && onAccessibilitySectionHeaderClick($event)">
+        <div
+          class="properties-section-header properties-section-header--menu properties-section-header--actionable"
+          (click)="onAccessibilitySectionHeaderClick($event)">
+          <p class="properties-section-title">Accessibility</p>
+          <button
+            type="button"
+            class="pp-section-toggle pp-section-toggle--plus"
+            aria-label="Accessibility options"
+            title="Accessibility options"
+            (click)="onAccessibilitySectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="pp-style-row" *ngIf="hasAccessibilityField(element, 'tag') && supportsAccessibilityTag(element)">
+          <span class="pp-row-label">Tag</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <app-dropdown-select
+              [disabled]="isAccessibilityTagLocked(element)"
+              [enableSearch]="false"
+              [placeholder]="accessibilityTagPlaceholder(element)"
+              [options]="accessibilityTagOptions(element)"
+              [ngModel]="accessibilityTagValue(element)"
+              (ngModelChange)="onAccessibilityTagChange($event)"></app-dropdown-select>
+          </div>
+        </div>
+
+        <div class="pp-style-row" *ngIf="hasAccessibilityField(element, 'ariaLabel')">
+          <span class="pp-row-label">Aria Label</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <input
+              type="text"
+              class="pp-text-input pp-text-input--boxed"
+              [value]="accessibilityLabelValue(element)"
+              (input)="onAccessibilityLabelChange($event)"
+              [placeholder]="accessibilityLabelPlaceholder(element)" />
+          </div>
+        </div>
+        <p class="properties-section-hint" *ngIf="element.type === 'image'">
+          Image labels are exported as alt text.
+        </p>
+      </section>
+
     </ng-container>
   </ng-container>
 
@@ -936,3 +1013,11 @@
   [verticalDirection]="'below'"
   [items]="transformMenuItems"
   (closed)="closeTransformMenu()"></app-context-menu>
+
+<app-context-menu
+  *ngIf="accessibilityMenuItems.length > 0"
+  [x]="accessibilityMenuX"
+  [y]="accessibilityMenuY"
+  [verticalDirection]="'below'"
+  [items]="accessibilityMenuItems"
+  (closed)="closeAccessibilityMenu()"></app-context-menu>

@@ -81,6 +81,33 @@ public abstract class FrameworkMapperBase : IComponentMapper
     };
   }
 
+  protected static string AppendAriaLabel(IRNode node, string attrs)
+  {
+    var ariaLabel = GetProp(node, "ariaLabel");
+    return string.IsNullOrWhiteSpace(ariaLabel)
+      ? attrs
+      : $"{attrs} aria-label=\"{ariaLabel}\"";
+  }
+
+  protected static string ResolveTag(IRNode node, string defaultTag, params string[] allowedTags)
+  {
+    var requestedTag = GetProp(node, "tag");
+    if (string.IsNullOrWhiteSpace(requestedTag))
+    {
+      return defaultTag;
+    }
+
+    foreach (var allowedTag in allowedTags)
+    {
+      if (string.Equals(allowedTag, requestedTag, StringComparison.OrdinalIgnoreCase))
+      {
+        return allowedTag;
+      }
+    }
+
+    return defaultTag;
+  }
+
   protected static string SelfClosing(string tag, string attrs, string indent) =>
       $"{indent}<{tag}{attrs} />\n";
 
