@@ -2331,7 +2331,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
     if (cached) return cached.x;
     const layout = this.activePageLayout();
-    return this.el.getAbsoluteBounds(element, this.elements(), this.currentPage()).x + (layout?.x ?? 0);
+    return (
+      this.el.getAbsoluteBounds(element, this.elements(), this.currentPage()).x + (layout?.x ?? 0)
+    );
   }
 
   getRenderedY(element: CanvasElement): number {
@@ -2339,7 +2341,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
     if (cached) return cached.y;
     const layout = this.activePageLayout();
-    return this.el.getAbsoluteBounds(element, this.elements(), this.currentPage()).y + (layout?.y ?? 0);
+    return (
+      this.el.getAbsoluteBounds(element, this.elements(), this.currentPage()).y + (layout?.y ?? 0)
+    );
   }
 
   getRenderedWidth(element: CanvasElement): number {

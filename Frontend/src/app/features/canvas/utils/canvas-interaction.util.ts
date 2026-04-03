@@ -233,18 +233,10 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
     element.x = roundToTwoDecimals(element.x);
     element.y = roundToTwoDecimals(element.y);
     element.width = roundToTwoDecimals(
-      clamp(
-        element.width,
-        widthMin,
-        widthMaxConstraint ?? Number.POSITIVE_INFINITY,
-      ),
+      clamp(element.width, widthMin, widthMaxConstraint ?? Number.POSITIVE_INFINITY),
     );
     element.height = roundToTwoDecimals(
-      clamp(
-        element.height,
-        heightMin,
-        heightMaxConstraint ?? Number.POSITIVE_INFINITY,
-      ),
+      clamp(element.height, heightMin, heightMaxConstraint ?? Number.POSITIVE_INFINITY),
     );
     if (typeof element.fontSize === 'number') {
       element.fontSize = roundToTwoDecimals(element.fontSize);

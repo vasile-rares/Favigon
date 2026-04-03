@@ -243,7 +243,9 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
       const initialColor = this.getInitialPickerColor();
       this.syncPickerFromColor(initialColor);
       this.selectedColorFormat =
-        inferCssColorFormat(this.kind === 'fill' && this.isTransparent ? initialColor : this.colorValue) ??
+        inferCssColorFormat(
+          this.kind === 'fill' && this.isTransparent ? initialColor : this.colorValue,
+        ) ??
         inferCssColorFormat(initialColor) ??
         this.selectedColorFormat;
     }

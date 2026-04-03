@@ -923,7 +923,11 @@ export class PropertiesPanelComponent {
   }
 
   dimensionModeValue(element: CanvasElement, axis: CanvasSizeAxis): CanvasSizeMode {
-    return normalizeCanvasSizeMode(getCanvasSizeMode(element, axis), element, this.parentElement(element));
+    return normalizeCanvasSizeMode(
+      getCanvasSizeMode(element, axis),
+      element,
+      this.parentElement(element),
+    );
   }
 
   dimensionModeOptions(element: CanvasElement, axis: CanvasSizeAxis): DropdownSelectOption[] {
@@ -950,7 +954,9 @@ export class PropertiesPanelComponent {
       return 100;
     }
 
-    return sizingValue ?? deriveCanvasSizeValueFromPixels(mode, fixedPixels, axis, parent, page) ?? 100;
+    return (
+      sizingValue ?? deriveCanvasSizeValueFromPixels(mode, fixedPixels, axis, parent, page) ?? 100
+    );
   }
 
   dimensionInputSuffix(element: CanvasElement, axis: CanvasSizeAxis): string | null {
@@ -1022,10 +1028,17 @@ export class PropertiesPanelComponent {
         ? undefined
         : nextMode === 'fill'
           ? 100
-          : deriveCanvasSizeValueFromPixels(nextMode, fixedPixels, axis, parent, page) ?? 100;
+          : (deriveCanvasSizeValueFromPixels(nextMode, fixedPixels, axis, parent, page) ?? 100);
 
     this.emitPatch({
-      [axis]: resolveCanvasPixelsFromMode(nextMode, fixedPixels, axis, nextSizingValue, parent, page),
+      [axis]: resolveCanvasPixelsFromMode(
+        nextMode,
+        fixedPixels,
+        axis,
+        nextSizingValue,
+        parent,
+        page,
+      ),
       [getCanvasSizeModeField(axis)]: nextMode === 'fixed' ? undefined : nextMode,
       [getCanvasSizeValueField(axis)]: normalizeCanvasSizeValue(nextMode, nextSizingValue),
     } as Partial<CanvasElement>);
@@ -1099,8 +1112,7 @@ export class PropertiesPanelComponent {
     }
 
     const mode = this.dimensionConstraintModeValue(element, field);
-    const axis: CanvasSizeAxis =
-      field === 'minWidth' || field === 'maxWidth' ? 'width' : 'height';
+    const axis: CanvasSizeAxis = field === 'minWidth' || field === 'maxWidth' ? 'width' : 'height';
     const normalizedValue = Math.max(1, roundToTwoDecimals(value));
 
     if (mode === 'fixed') {
@@ -1120,7 +1132,10 @@ export class PropertiesPanelComponent {
         normalizedValue,
         this.parentElement(element),
       ),
-      [getCanvasConstraintSizeValueField(field)]: normalizeCanvasConstraintValue(mode, normalizedValue),
+      [getCanvasConstraintSizeValueField(field)]: normalizeCanvasConstraintValue(
+        mode,
+        normalizedValue,
+      ),
     } as Partial<CanvasElement>);
   }
 
@@ -1149,19 +1164,24 @@ export class PropertiesPanelComponent {
       return;
     }
 
-    const axis: CanvasSizeAxis =
-      field === 'minWidth' || field === 'maxWidth' ? 'width' : 'height';
+    const axis: CanvasSizeAxis = field === 'minWidth' || field === 'maxWidth' ? 'width' : 'height';
     const nextSizingValue =
       nextMode === 'fixed'
         ? undefined
-        : deriveCanvasConstraintValueFromPixels(nextMode, currentPixels as number, axis, parent) ??
-          100;
+        : (deriveCanvasConstraintValueFromPixels(nextMode, currentPixels as number, axis, parent) ??
+          100);
 
     this.emitPatch({
       [field]:
         nextMode === 'fixed'
           ? roundToTwoDecimals(currentPixels as number)
-          : resolveCanvasConstraintPixels(nextMode, currentPixels as number, axis, nextSizingValue, parent),
+          : resolveCanvasConstraintPixels(
+              nextMode,
+              currentPixels as number,
+              axis,
+              nextSizingValue,
+              parent,
+            ),
       [getCanvasConstraintModeField(field)]: nextMode === 'fixed' ? undefined : nextMode,
       [getCanvasConstraintSizeValueField(field)]: normalizeCanvasConstraintValue(
         nextMode,
@@ -1959,7 +1979,10 @@ export class PropertiesPanelComponent {
       return null;
     }
 
-    return this.currentPageModel()?.elements.find((candidate) => candidate.id === element.parentId) ?? null;
+    return (
+      this.currentPageModel()?.elements.find((candidate) => candidate.id === element.parentId) ??
+      null
+    );
   }
 
   private buildDimensionMenuItems(element: CanvasElement): ContextMenuItem[] {
@@ -1988,8 +2011,7 @@ export class PropertiesPanelComponent {
       return;
     }
 
-    const axis: CanvasSizeAxis =
-      field === 'minWidth' || field === 'maxWidth' ? 'width' : 'height';
+    const axis: CanvasSizeAxis = field === 'minWidth' || field === 'maxWidth' ? 'width' : 'height';
     this.emitPatch({
       [field]: getCanvasFixedSize(element, axis),
       [getCanvasConstraintModeField(field)]: undefined,

@@ -29,7 +29,10 @@ export function getCanvasSizeValueField(
   return axis === 'width' ? 'widthSizingValue' : 'heightSizingValue';
 }
 
-export function getCanvasFixedSize(element: Pick<CanvasElement, 'width' | 'height'>, axis: CanvasSizeAxis): number {
+export function getCanvasFixedSize(
+  element: Pick<CanvasElement, 'width' | 'height'>,
+  axis: CanvasSizeAxis,
+): number {
   return axis === 'width' ? element.width : element.height;
 }
 
@@ -40,7 +43,10 @@ export function getCanvasSizingValue(
   return axis === 'width' ? element.widthSizingValue : element.heightSizingValue;
 }
 
-export function getCanvasViewportSize(page: CanvasPageModel | null | undefined, axis: CanvasSizeAxis): number {
+export function getCanvasViewportSize(
+  page: CanvasPageModel | null | undefined,
+  axis: CanvasSizeAxis,
+): number {
   return axis === 'width'
     ? (page?.viewportWidth ?? DEFAULT_PAGE_WIDTH)
     : (page?.viewportHeight ?? DEFAULT_PAGE_HEIGHT);
@@ -122,7 +128,8 @@ export function deriveCanvasSizeValueFromPixels(
     return 100;
   }
 
-  const base = mode === 'relative' ? getCanvasParentSize(parent, axis) : getCanvasViewportSize(page, axis);
+  const base =
+    mode === 'relative' ? getCanvasParentSize(parent, axis) : getCanvasViewportSize(page, axis);
   if (!base || base <= 0) {
     return undefined;
   }
@@ -152,7 +159,8 @@ export function resolveCanvasPixelsFromMode(
     return fallbackPixels;
   }
 
-  const base = mode === 'relative' ? getCanvasParentSize(parent, axis) : getCanvasViewportSize(page, axis);
+  const base =
+    mode === 'relative' ? getCanvasParentSize(parent, axis) : getCanvasViewportSize(page, axis);
   if (!base || base <= 0) {
     return fallbackPixels;
   }
@@ -192,10 +200,7 @@ export function getCanvasConstraintAxis(field: CanvasConstraintField): CanvasSiz
 }
 
 export function getCanvasConstraintMode(
-  element: Pick<
-    CanvasElement,
-    'minWidthMode' | 'maxWidthMode' | 'minHeightMode' | 'maxHeightMode'
-  >,
+  element: Pick<CanvasElement, 'minWidthMode' | 'maxWidthMode' | 'minHeightMode' | 'maxHeightMode'>,
   field: CanvasConstraintField,
 ): CanvasConstraintSizeMode {
   switch (field) {
@@ -227,11 +232,7 @@ export function getCanvasConstraintModeField(
 
 export function getCanvasConstraintSizeValueField(
   field: CanvasConstraintField,
-):
-  | 'minWidthSizingValue'
-  | 'maxWidthSizingValue'
-  | 'minHeightSizingValue'
-  | 'maxHeightSizingValue' {
+): 'minWidthSizingValue' | 'maxWidthSizingValue' | 'minHeightSizingValue' | 'maxHeightSizingValue' {
   switch (field) {
     case 'minWidth':
       return 'minWidthSizingValue';

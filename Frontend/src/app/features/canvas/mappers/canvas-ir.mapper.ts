@@ -428,7 +428,11 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
   return style;
 }
 
-function applyNodeDimensionStyle(style: IRStyle, element: CanvasElement, axis: 'width' | 'height'): void {
+function applyNodeDimensionStyle(
+  style: IRStyle,
+  element: CanvasElement,
+  axis: 'width' | 'height',
+): void {
   const mode = getCanvasSizeMode(element, axis);
   const sizingValue = getCanvasSizingValue(element, axis);
 
@@ -667,7 +671,10 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     name: readOptionalStringProp(node.props, 'name'),
     x: readLength(node.position?.x, DEFAULT_POSITION),
     y: readLength(node.position?.y, DEFAULT_POSITION),
-    width: importedWidthMode === 'fixed' ? readLength(node.style?.width, defaults.width) : defaults.width,
+    width:
+      importedWidthMode === 'fixed'
+        ? readLength(node.style?.width, defaults.width)
+        : defaults.width,
     widthMode: importedWidthMode === 'fixed' ? undefined : importedWidthMode,
     widthSizingValue: readImportedSizeValue(node.style?.width, importedWidthMode),
     minWidth: readOptionalLength(node.style?.minWidth),
@@ -677,7 +684,9 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     maxWidthMode: readConstraintModeFromLength(node.style?.maxWidth),
     maxWidthSizingValue: readImportedConstraintValue(node.style?.maxWidth),
     height:
-      importedHeightMode === 'fixed' ? readLength(node.style?.height, defaults.height) : defaults.height,
+      importedHeightMode === 'fixed'
+        ? readLength(node.style?.height, defaults.height)
+        : defaults.height,
     heightMode: importedHeightMode === 'fixed' ? undefined : importedHeightMode,
     heightSizingValue: readImportedSizeValue(node.style?.height, importedHeightMode),
     minHeight: readOptionalLength(node.style?.minHeight),
