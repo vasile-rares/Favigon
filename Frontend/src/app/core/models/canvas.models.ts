@@ -10,6 +10,8 @@ export type CanvasOverflowMode = 'clip' | 'visible';
 export type CanvasShadowPreset = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 export type CanvasPageViewportPreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
 export type CanvasLinkType = 'page' | 'url';
+export type CanvasSizeMode = 'fixed' | 'relative' | 'fill' | 'fit-content' | 'viewport';
+export type CanvasConstraintSizeMode = 'fixed' | 'relative';
 export type CanvasSemanticTag =
   | 'a'
   | 'article'
@@ -76,7 +78,23 @@ export interface CanvasElement {
   x: number;
   y: number;
   width: number;
+  widthMode?: CanvasSizeMode;
+  widthSizingValue?: number;
+  minWidth?: number;
+  minWidthMode?: CanvasConstraintSizeMode;
+  minWidthSizingValue?: number;
+  maxWidth?: number;
+  maxWidthMode?: CanvasConstraintSizeMode;
+  maxWidthSizingValue?: number;
   height: number;
+  heightMode?: CanvasSizeMode;
+  heightSizingValue?: number;
+  minHeight?: number;
+  minHeightMode?: CanvasConstraintSizeMode;
+  minHeightSizingValue?: number;
+  maxHeight?: number;
+  maxHeightMode?: CanvasConstraintSizeMode;
+  maxHeightSizingValue?: number;
   rotation?: number;
   rotationMode?: CanvasRotationMode;
   scaleX?: number;

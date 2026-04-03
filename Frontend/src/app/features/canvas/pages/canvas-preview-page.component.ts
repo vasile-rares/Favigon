@@ -140,11 +140,35 @@ export class CanvasPreviewPage {
   }
 
   getRenderedX(element: CanvasElement): number {
-    return this.el.getAbsoluteBounds(element, this.currentPage()?.elements ?? []).x;
+    return this.el.getAbsoluteBounds(element, this.currentPage()?.elements ?? [], this.currentPage()).x;
   }
 
   getRenderedY(element: CanvasElement): number {
-    return this.el.getAbsoluteBounds(element, this.currentPage()?.elements ?? []).y;
+    return this.el.getAbsoluteBounds(element, this.currentPage()?.elements ?? [], this.currentPage()).y;
+  }
+
+  getRenderedWidthStyle(element: CanvasElement): string {
+    return this.el.getRenderedWidthStyle(element, this.currentPage()?.elements ?? [], this.currentPage());
+  }
+
+  getRenderedHeightStyle(element: CanvasElement): string {
+    return this.el.getRenderedHeightStyle(element, this.currentPage()?.elements ?? [], this.currentPage());
+  }
+
+  getRenderedMinWidthStyle(element: CanvasElement): string | null {
+    return this.el.getRenderedMinWidthStyle(element, this.currentPage()?.elements ?? [], this.currentPage());
+  }
+
+  getRenderedMaxWidthStyle(element: CanvasElement): string | null {
+    return this.el.getRenderedMaxWidthStyle(element, this.currentPage()?.elements ?? [], this.currentPage());
+  }
+
+  getRenderedMinHeightStyle(element: CanvasElement): string | null {
+    return this.el.getRenderedMinHeightStyle(element, this.currentPage()?.elements ?? [], this.currentPage());
+  }
+
+  getRenderedMaxHeightStyle(element: CanvasElement): string | null {
+    return this.el.getRenderedMaxHeightStyle(element, this.currentPage()?.elements ?? [], this.currentPage());
   }
 
   getElementBorderStyle(element: CanvasElement): string {

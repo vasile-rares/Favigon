@@ -25,6 +25,18 @@ import {
   buildCanvasElementTransformOrigin,
   buildCanvasElementTransformStyle,
 } from '../utils/canvas-transform.util';
+import {
+  CanvasConstraintField,
+  CanvasSizeAxis,
+  getCanvasConstraintAxis,
+  getCanvasConstraintMode,
+  getCanvasConstraintSizingValue,
+  getCanvasConstraintValue,
+  getCanvasSizeMode,
+  getCanvasSizingValue,
+  resolveCanvasConstraintPixels,
+  resolveCanvasPixelsFromMode,
+} from '../utils/canvas-sizing.util';
 import { Bounds, Point } from '../canvas.types';
 
 const IMAGE_PLACEHOLDER_URL = 'https://placehold.co/300x200?text=Image';
@@ -271,24 +283,204 @@ export class CanvasElementService {
     return elements.find((element) => element.id === id) ?? null;
   }
 
-  getAbsoluteBounds(element: CanvasElement, elements: CanvasElement[]): Bounds {
+  getRenderedWidth(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    page?: CanvasPageModel | null,
+  ): number {
+    return this.getRenderedSizePx(element, elements, 'width', page);
+  }
+
+  getRenderedHeight(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    page?: CanvasPageModel | null,
+  ): number {
+    return this.getRenderedSizePx(element, elements, 'height', page);
+  }
+
+  getRenderedWidthStyle(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    page?: CanvasPageModel | null,
+  ): string {
+    return this.getRenderedSizeStyle(element, elements, 'width', page);
+  }
+
+  getRenderedHeightStyle(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    page?: CanvasPageModel | null,
+  ): string {
+    return this.getRenderedSizeStyle(element, elements, 'height', page);
+  }
+
+  getRenderedMinWidthStyle(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    page?: CanvasPageModel | null,
+  ): string | null {
+    return this.getRenderedConstraintStyle(element, elements, 'minWidth', page);
+  }
+
+  getRenderedMaxWidthStyle(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    page?: CanvasPageModel | null,
+  ): string | null {
+    return this.getRenderedConstraintStyle(element, elements, 'maxWidth', page);
+  }
+
+  getRenderedMinHeightStyle(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    page?: CanvasPageModel | null,
+  ): string | null {
+    return this.getRenderedConstraintStyle(element, elements, 'minHeight', page);
+  }
+
+  getRenderedMaxHeightStyle(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    page?: CanvasPageModel | null,
+  ): string | null {
+    return this.getRenderedConstraintStyle(element, elements, 'maxHeight', page);
+  }
+
+  getAbsoluteBounds(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    page?: CanvasPageModel | null,
+  ): Bounds {
     const parent = this.findElementById(element.parentId ?? null, elements);
+    const width = this.getRenderedSizePx(element, elements, 'width', page);
+    const height = this.getRenderedSizePx(element, elements, 'height', page);
+
     if (!parent || element.type === 'frame') {
       return {
         x: roundToTwoDecimals(element.x),
         y: roundToTwoDecimals(element.y),
-        width: roundToTwoDecimals(element.width),
-        height: roundToTwoDecimals(element.height),
+        width,
+        height,
       };
     }
 
-    const parentBounds = this.getAbsoluteBounds(parent, elements);
+    const parentBounds = this.getAbsoluteBounds(parent, elements, page);
     return {
       x: roundToTwoDecimals(parentBounds.x + element.x),
       y: roundToTwoDecimals(parentBounds.y + element.y),
-      width: roundToTwoDecimals(element.width),
-      height: roundToTwoDecimals(element.height),
+      width,
+      height,
     };
+  }
+
+  private getRenderedSizePx(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    axis: CanvasSizeAxis,
+    page?: CanvasPageModel | null,
+  ): number {
+    const fallbackPixels = axis === 'width' ? element.width : element.height;
+    const mode = getCanvasSizeMode(element, axis);
+    let resolvedPixels = fallbackPixels;
+
+    const parent = this.findElementById(element.parentId ?? null, elements);
+    const parentBounds = parent ? this.getAbsoluteBounds(parent, elements, page) : null;
+
+    if (mode !== 'fixed' && mode !== 'fit-content') {
+      if (mode === 'viewport' && !page) {
+        resolvedPixels = fallbackPixels;
+      } else {
+        resolvedPixels = resolveCanvasPixelsFromMode(
+          mode,
+          fallbackPixels,
+          axis,
+          getCanvasSizingValue(element, axis),
+          parentBounds ? { width: parentBounds.width, height: parentBounds.height } : null,
+          page,
+        );
+      }
+    }
+
+    const minConstraint = this.getRenderedConstraintPx(
+      element,
+      elements,
+      axis === 'width' ? 'minWidth' : 'minHeight',
+      page,
+    );
+    const maxConstraint = this.getRenderedConstraintPx(
+      element,
+      elements,
+      axis === 'width' ? 'maxWidth' : 'maxHeight',
+      page,
+    );
+
+    let normalizedMin = minConstraint;
+    let normalizedMax = maxConstraint;
+    if (
+      normalizedMin !== undefined &&
+      normalizedMax !== undefined &&
+      normalizedMax < normalizedMin
+    ) {
+      normalizedMax = normalizedMin;
+    }
+
+    if (normalizedMin !== undefined) {
+      resolvedPixels = Math.max(resolvedPixels, normalizedMin);
+    }
+
+    if (normalizedMax !== undefined) {
+      resolvedPixels = Math.min(resolvedPixels, normalizedMax);
+    }
+
+    return roundToTwoDecimals(resolvedPixels);
+  }
+
+  private getRenderedSizeStyle(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    axis: CanvasSizeAxis,
+    page?: CanvasPageModel | null,
+  ): string {
+    return getCanvasSizeMode(element, axis) === 'fit-content'
+      ? 'fit-content'
+      : `${this.getRenderedSizePx(element, elements, axis, page)}px`;
+  }
+
+  private getRenderedConstraintPx(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    field: CanvasConstraintField,
+    page?: CanvasPageModel | null,
+  ): number | undefined {
+    const fallbackPixels = getCanvasConstraintValue(element, field);
+    if (!Number.isFinite(fallbackPixels ?? Number.NaN)) {
+      return undefined;
+    }
+
+    const parent = this.findElementById(element.parentId ?? null, elements);
+    const parentBounds = parent ? this.getAbsoluteBounds(parent, elements, page) : null;
+    const axis = getCanvasConstraintAxis(field);
+
+    return roundToTwoDecimals(
+      resolveCanvasConstraintPixels(
+        getCanvasConstraintMode(element, field),
+        fallbackPixels as number,
+        axis,
+        getCanvasConstraintSizingValue(element, field),
+        parentBounds ? { width: parentBounds.width, height: parentBounds.height } : null,
+      ),
+    );
+  }
+
+  private getRenderedConstraintStyle(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    field: CanvasConstraintField,
+    page?: CanvasPageModel | null,
+  ): string | null {
+    const pixels = this.getRenderedConstraintPx(element, elements, field, page);
+    return pixels === undefined ? null : `${pixels}px`;
   }
 
   isElementEffectivelyVisible(elementId: string, elements: CanvasElement[]): boolean {

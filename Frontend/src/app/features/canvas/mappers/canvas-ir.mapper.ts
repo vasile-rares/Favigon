@@ -10,6 +10,7 @@
   CanvasPageModel,
   CanvasPositionMode,
   CanvasProjectDocument,
+  CanvasSizeMode,
   CanvasSpacing,
   CanvasTextSpacingUnit,
 } from '../../../core/models/canvas.models';
@@ -43,6 +44,13 @@ import {
   normalizeCanvasAccessibilityLabel,
   normalizeStoredCanvasTag,
 } from '../utils/canvas-accessibility.util';
+import {
+  getCanvasConstraintMode,
+  getCanvasConstraintSizingValue,
+  getCanvasConstraintValue,
+  getCanvasSizeMode,
+  getCanvasSizingValue,
+} from '../utils/canvas-sizing.util';
 
 const ROOT_ROLE = 'canvas-root';
 const ROOT_TYPE = 'Container';
@@ -59,6 +67,8 @@ const MANAGED_PROP_KEYS = [
   'tag',
   'ariaLabel',
   'alt',
+  'widthMode',
+  'heightMode',
   'href',
   'target',
   'linkType',
@@ -316,10 +326,13 @@ function buildNodeMeta(element: CanvasElement): IRMeta {
 }
 
 function buildNodeStyle(element: CanvasElement): IRStyle {
-  const style: IRStyle = {
-    width: px(element.width),
-    height: px(element.height),
-  };
+  const style: IRStyle = {};
+  applyNodeDimensionStyle(style, element, 'width');
+  applyNodeDimensionStyle(style, element, 'height');
+  applyNodeConstraintStyle(style, element, 'minWidth');
+  applyNodeConstraintStyle(style, element, 'maxWidth');
+  applyNodeConstraintStyle(style, element, 'minHeight');
+  applyNodeConstraintStyle(style, element, 'maxHeight');
 
   if (element.fill) {
     style.background = element.fill;
@@ -415,6 +428,51 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
   return style;
 }
 
+function applyNodeDimensionStyle(style: IRStyle, element: CanvasElement, axis: 'width' | 'height'): void {
+  const mode = getCanvasSizeMode(element, axis);
+  const sizingValue = getCanvasSizingValue(element, axis);
+
+  if (mode === 'fit-content') {
+    return;
+  }
+
+  if (mode === 'fixed') {
+    style[axis] = px(axis === 'width' ? element.width : element.height);
+    return;
+  }
+
+  if (mode === 'fill') {
+    style[axis] = length(100, '%');
+    return;
+  }
+
+  if (mode === 'relative') {
+    style[axis] = length(sizingValue ?? 100, '%');
+    return;
+  }
+
+  style[axis] = length(sizingValue ?? 100, axis === 'width' ? 'vw' : 'vh');
+}
+
+function applyNodeConstraintStyle(
+  style: IRStyle,
+  element: CanvasElement,
+  field: 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight',
+): void {
+  const pixels = getCanvasConstraintValue(element, field);
+  if (!Number.isFinite(pixels ?? Number.NaN)) {
+    return;
+  }
+
+  const mode = getCanvasConstraintMode(element, field);
+  if (mode === 'relative') {
+    style[field] = length(getCanvasConstraintSizingValue(element, field) ?? 100, '%');
+    return;
+  }
+
+  style[field] = px(pixels as number);
+}
+
 function buildNodeProps(element: CanvasElement, primitiveType: string): Record<string, unknown> {
   const props: Record<string, unknown> = {
     ...(element.irMeta?.props ?? {}),
@@ -446,6 +504,14 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
 
   if (typeof element.name === 'string') {
     props['name'] = element.name;
+  }
+
+  if (element.widthMode && element.widthMode !== 'fixed') {
+    props['widthMode'] = element.widthMode;
+  }
+
+  if (element.heightMode && element.heightMode !== 'fixed') {
+    props['heightMode'] = element.heightMode;
   }
 
   if (tag) {
@@ -575,6 +641,8 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
   const defaults = mappedType === 'text' ? DEFAULT_ELEMENT_SIZE.text : DEFAULT_ELEMENT_SIZE.generic;
   const linkType = readLinkTypeFromProps(node.props);
   const importedTag = readOptionalStringProp(node.props, 'tag');
+  const importedWidthMode = readSizeModeFromProps(node.props, 'widthMode');
+  const importedHeightMode = readSizeModeFromProps(node.props, 'heightMode');
   const importedAriaLabel =
     mappedType === 'image'
       ? (readOptionalStringProp(node.props, 'alt') ??
@@ -599,8 +667,25 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     name: readOptionalStringProp(node.props, 'name'),
     x: readLength(node.position?.x, DEFAULT_POSITION),
     y: readLength(node.position?.y, DEFAULT_POSITION),
-    width: readLength(node.style?.width, defaults.width),
-    height: readLength(node.style?.height, defaults.height),
+    width: importedWidthMode === 'fixed' ? readLength(node.style?.width, defaults.width) : defaults.width,
+    widthMode: importedWidthMode === 'fixed' ? undefined : importedWidthMode,
+    widthSizingValue: readImportedSizeValue(node.style?.width, importedWidthMode),
+    minWidth: readOptionalLength(node.style?.minWidth),
+    minWidthMode: readConstraintModeFromLength(node.style?.minWidth),
+    minWidthSizingValue: readImportedConstraintValue(node.style?.minWidth),
+    maxWidth: readOptionalLength(node.style?.maxWidth),
+    maxWidthMode: readConstraintModeFromLength(node.style?.maxWidth),
+    maxWidthSizingValue: readImportedConstraintValue(node.style?.maxWidth),
+    height:
+      importedHeightMode === 'fixed' ? readLength(node.style?.height, defaults.height) : defaults.height,
+    heightMode: importedHeightMode === 'fixed' ? undefined : importedHeightMode,
+    heightSizingValue: readImportedSizeValue(node.style?.height, importedHeightMode),
+    minHeight: readOptionalLength(node.style?.minHeight),
+    minHeightMode: readConstraintModeFromLength(node.style?.minHeight),
+    minHeightSizingValue: readImportedConstraintValue(node.style?.minHeight),
+    maxHeight: readOptionalLength(node.style?.maxHeight),
+    maxHeightMode: readConstraintModeFromLength(node.style?.maxHeight),
+    maxHeightSizingValue: readImportedConstraintValue(node.style?.maxHeight),
     visible: !(node.meta?.hidden ?? false),
     fill:
       mappedType !== 'text'
@@ -854,6 +939,53 @@ function readLengthUnit<TUnit extends string>(
   }
 
   return allowedUnits.includes(len.unit as TUnit) ? (len.unit as TUnit) : fallback;
+}
+
+function readSizeModeFromProps(
+  props: Record<string, unknown> | undefined,
+  key: 'widthMode' | 'heightMode',
+): CanvasSizeMode {
+  const value = props?.[key];
+  if (value === 'relative' || value === 'fill' || value === 'fit-content' || value === 'viewport') {
+    return value;
+  }
+
+  return 'fixed';
+}
+
+function readImportedSizeValue(
+  len: IRLength | undefined,
+  mode: CanvasSizeMode,
+): number | undefined {
+  if (mode === 'fixed' || mode === 'fit-content') {
+    return undefined;
+  }
+
+  if (mode === 'fill') {
+    return 100;
+  }
+
+  return Number.isFinite(len?.value ?? Number.NaN) ? len?.value : undefined;
+}
+
+function readOptionalLength(len: IRLength | undefined): number | undefined {
+  return Number.isFinite(len?.value ?? Number.NaN) ? len?.value : undefined;
+}
+
+function readConstraintModeFromLength(len: IRLength | undefined): 'fixed' | 'relative' | undefined {
+  if (!len) {
+    return undefined;
+  }
+
+  return len.unit === '%' ? 'relative' : 'fixed';
+}
+
+function readImportedConstraintValue(len: IRLength | undefined): number | undefined {
+  if (!len || len.unit !== '%') {
+    return undefined;
+  }
+
+  return Number.isFinite(len.value) ? len.value : undefined;
 }
 
 function readOptionalStringStyle(

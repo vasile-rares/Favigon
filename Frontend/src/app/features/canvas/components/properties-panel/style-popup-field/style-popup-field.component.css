@@ -182,6 +182,14 @@
   }
 }
 
+.style-popup-field__mode-toggle {
+  --canvas-panel-font-size: 0.66rem;
+  --toggle-group-height: 32px;
+  --toggle-group-padding: 0.16rem;
+  --toggle-group-button-padding: 0.2rem 0.18rem;
+  --toggle-group-button-radius: 6px;
+}
+
 .style-popup-field__popup-text-input-shell {
   position: relative;
   width: 100%;
@@ -210,6 +218,72 @@
   }
 }
 
+.style-popup-field__popup-color-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: stretch;
+}
+
+.style-popup-field__screen-pick-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-100));
+  font-size: var(--canvas-panel-font-size, 0.8rem);
+  font-weight: 500;
+  padding: 0.5rem;
+  cursor: pointer;
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: rgba(0, 0, 0, 0.45);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.05),
+      inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.style-popup-field__screen-pick-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.style-popup-field__popup-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.12) 12%,
+    rgba(255, 255, 255, 0.12) 88%,
+    rgba(255, 255, 255, 0)
+  );
+}
+
 .style-popup-field__popup-text-input {
   width: 100%;
   min-width: 0;
@@ -225,6 +299,10 @@
 
 .style-popup-field__popup-dropdown {
   display: block;
+}
+
+.style-popup-field__popup-dropdown--color-format {
+  min-width: 0;
 }
 
 .style-popup-field__popup-dropdown ::ng-deep .dropdown-select {

@@ -37,6 +37,7 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
   @Input() appearance: NumberInputAppearance = 'default';
   @Input() ariaLabel = 'Numeric input';
   @Input() suffix: string | null = null;
+  @Input() disabled = false;
 
   @Output() valueChange = new EventEmitter<number>();
   @Output() gestureStarted = new EventEmitter<void>();
@@ -95,6 +96,10 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
   }
 
   onInputChange(event: Event): void {
+    if (this.disabled) {
+      return;
+    }
+
     const value = Number((event.target as HTMLInputElement).value);
     if (!Number.isFinite(value)) {
       return;
@@ -104,6 +109,10 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
   }
 
   onStepperPointerDown(direction: 1 | -1, event: PointerEvent): void {
+    if (this.disabled) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
 

@@ -6,6 +6,7 @@ import { TextInputComponent } from '../text-input/text-input.component';
 export interface DropdownSelectOption {
   label: string;
   value: string | number | boolean;
+  disabled?: boolean;
 }
 
 @Component({
@@ -98,6 +99,10 @@ export class DropdownSelectComponent implements ControlValueAccessor {
   }
 
   selectOption(option: DropdownSelectOption): void {
+    if (option.disabled) {
+      return;
+    }
+
     this.selectedValue = option.value;
     this.onChange(option.value);
     this.onTouched();

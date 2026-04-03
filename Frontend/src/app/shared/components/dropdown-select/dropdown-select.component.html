@@ -54,6 +54,7 @@
               type="button"
               class="dropdown-select__item"
               [class.dropdown-select__item--selected]="option.value === selectedValue"
+              [disabled]="option.disabled === true"
               (click)="selectOption(option)">
               {{ option.label }}
             </button>

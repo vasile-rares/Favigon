@@ -18,11 +18,21 @@ import {
   DropdownSelectComponent,
   DropdownSelectOption,
 } from '../../../../../shared/components/dropdown-select/dropdown-select.component';
+import {
+  ToggleGroupComponent,
+  ToggleGroupOption,
+  ToggleGroupValue,
+} from '../../../../../shared/components/toggle-group/toggle-group.component';
 import { NumberInputComponent } from '../number-input/number-input.component';
 import { StylePopupOverlayComponent } from '../style-popup-overlay/style-popup-overlay.component';
 
 type StylePopupFieldKind = 'fill' | 'stroke' | 'shadow';
 type ColorPickerDragTarget = 'surface' | 'hue' | 'alpha' | null;
+type ColorPickerFormat = 'hex' | 'rgb' | 'hsl';
+type ColorPickerMode = 'solid' | 'linear' | 'radial' | 'conic' | 'image';
+type EyeDropperResult = { sRGBHex: string };
+type EyeDropperInstance = { open(): Promise<EyeDropperResult> };
+type EyeDropperConstructor = new () => EyeDropperInstance;
 
 @Component({
   selector: 'app-style-popup-field',
@@ -33,6 +43,7 @@ type ColorPickerDragTarget = 'surface' | 'hue' | 'alpha' | null;
     NumberInputComponent,
     StylePopupOverlayComponent,
     DropdownSelectComponent,
+    ToggleGroupComponent,
   ],
   templateUrl: './style-popup-field.component.html',
   styleUrl: './style-popup-field.component.css',
@@ -71,6 +82,21 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
   pickerValue = 0;
   pickerAlpha = 1;
   selectedStrokeStyleOption: string | null = null;
+  selectedColorFormat: ColorPickerFormat = 'hex';
+  selectedColorMode: ColorPickerMode = 'solid';
+  isScreenPickerActive = false;
+  readonly colorFormatOptions: DropdownSelectOption[] = [
+    { label: 'HEX', value: 'hex' },
+    { label: 'RGB', value: 'rgb' },
+    { label: 'HSL', value: 'hsl' },
+  ];
+  readonly colorModeOptions: readonly ToggleGroupOption[] = [
+    { label: '', value: 'solid', icon: 'paint-solid', ariaLabel: 'Solid', title: 'Solid' },
+    { label: '', value: 'linear', icon: 'paint-linear', ariaLabel: 'Linear', title: 'Linear' },
+    { label: '', value: 'radial', icon: 'paint-radial', ariaLabel: 'Radial', title: 'Radial' },
+    { label: '', value: 'conic', icon: 'paint-conic', ariaLabel: 'Conic', title: 'Conic' },
+    { label: '', value: 'image', icon: 'paint-image', ariaLabel: 'Image', title: 'Image' },
+  ];
 
   private colorPickerDragTarget: ColorPickerDragTarget = null;
   private activePopupAnchor: HTMLElement | null = null;
@@ -214,7 +240,12 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     }
 
     if (this.isColorKind()) {
-      this.syncPickerFromColor(this.getInitialPickerColor());
+      const initialColor = this.getInitialPickerColor();
+      this.syncPickerFromColor(initialColor);
+      this.selectedColorFormat =
+        inferCssColorFormat(this.kind === 'fill' && this.isTransparent ? initialColor : this.colorValue) ??
+        inferCssColorFormat(initialColor) ??
+        this.selectedColorFormat;
     }
 
     this.activePopupAnchor = event.currentTarget as HTMLElement;
@@ -259,6 +290,56 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
         ? { fill: this.pickerColorValue() }
         : { stroke: this.pickerColorValue() },
     );
+  }
+
+  onColorFormatValueChange(value: string | number | boolean | null): void {
+    if (!this.isColorKind() || typeof value !== 'string' || !isColorPickerFormat(value)) {
+      return;
+    }
+
+    this.selectedColorFormat = value;
+    if (this.kind === 'fill' && this.isTransparent) {
+      return;
+    }
+
+    this.commitPickerColor();
+  }
+
+  onColorModeValueChange(value: ToggleGroupValue): void {
+    if (typeof value !== 'string' || !isColorPickerMode(value)) {
+      return;
+    }
+
+    this.selectedColorMode = value;
+  }
+
+  async onScreenPickerClick(): Promise<void> {
+    if (!this.isColorKind() || this.isScreenPickerActive) {
+      return;
+    }
+
+    const EyeDropperApi = getEyeDropperConstructor();
+    if (!EyeDropperApi) {
+      return;
+    }
+
+    this.isScreenPickerActive = true;
+
+    try {
+      const result = await new EyeDropperApi().open();
+      if (!result.sRGBHex) {
+        return;
+      }
+
+      this.syncPickerFromColor(result.sRGBHex);
+      this.commitPickerColor();
+    } catch (error) {
+      if (!isEyeDropperAbortError(error)) {
+        return;
+      }
+    } finally {
+      this.isScreenPickerActive = false;
+    }
   }
 
   onColorSurfacePointerDown(event: PointerEvent): void {
@@ -337,11 +418,17 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
 
   pickerColorValue(): string {
     const { r, g, b } = hsvToRgb(this.pickerHue, this.pickerSaturation, this.pickerValue);
-    if (this.pickerAlpha >= 0.999) {
-      return rgbToHex(r, g, b).toUpperCase();
+    switch (this.selectedColorFormat) {
+      case 'rgb':
+        return toRgbString(r, g, b, this.pickerAlpha);
+      case 'hsl': {
+        const { h, s, l } = rgbToHsl(r, g, b);
+        return toHslString(h, s, l, this.pickerAlpha);
+      }
+      case 'hex':
+      default:
+        return rgbToHex(r, g, b, this.pickerAlpha).toUpperCase();
     }
-
-    return toRgbaString(r, g, b, this.pickerAlpha);
   }
 
   pickerSaturationPercent(): number {
@@ -362,6 +449,18 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
 
   get strokeStyleDropdownOptions(): DropdownSelectOption[] {
     return this.borderStyleOptions.map((option) => ({ label: option, value: option }));
+  }
+
+  get isScreenPickerSupported(): boolean {
+    return getEyeDropperConstructor() !== null;
+  }
+
+  get screenPickerButtonLabel(): string {
+    if (this.isScreenPickerActive) {
+      return 'Picking...';
+    }
+
+    return this.isScreenPickerSupported ? 'Pick From Screen' : 'Screen Picker Unavailable';
   }
 
   alphaTrackBackground(): string {
@@ -517,15 +616,47 @@ function parseCssColor(color: string): { r: number; g: number; b: number; a: num
   const rgbMatch = normalized.match(
     /^rgba?\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})(?:\s*,\s*(\d*\.?\d+))?\s*\)$/i,
   );
-  if (!rgbMatch) {
+  if (rgbMatch) {
+    const red = Number(rgbMatch[1]);
+    const green = Number(rgbMatch[2]);
+    const blue = Number(rgbMatch[3]);
+    const alpha = rgbMatch[4] === undefined ? 1 : Number(rgbMatch[4]);
+    if (
+      [red, green, blue].some((channel) => Number.isNaN(channel) || channel < 0 || channel > 255)
+    ) {
+      return null;
+    }
+
+    if (Number.isNaN(alpha) || alpha < 0 || alpha > 1) {
+      return null;
+    }
+
+    return {
+      r: red,
+      g: green,
+      b: blue,
+      a: roundToTwoDecimals(alpha),
+    };
+  }
+
+  const hslMatch = normalized.match(
+    /^hsla?\(\s*([+-]?\d*\.?\d+)\s*(?:deg)?\s*,\s*(\d*\.?\d+)%\s*,\s*(\d*\.?\d+)%(?:\s*,\s*(\d*\.?\d+))?\s*\)$/i,
+  );
+  if (!hslMatch) {
     return null;
   }
 
-  const red = Number(rgbMatch[1]);
-  const green = Number(rgbMatch[2]);
-  const blue = Number(rgbMatch[3]);
-  const alpha = rgbMatch[4] === undefined ? 1 : Number(rgbMatch[4]);
-  if ([red, green, blue].some((channel) => Number.isNaN(channel) || channel < 0 || channel > 255)) {
+  const hue = Number(hslMatch[1]);
+  const saturation = Number(hslMatch[2]);
+  const lightness = Number(hslMatch[3]);
+  const alpha = hslMatch[4] === undefined ? 1 : Number(hslMatch[4]);
+  if (
+    [hue, saturation, lightness].some((channel) => Number.isNaN(channel)) ||
+    saturation < 0 ||
+    saturation > 100 ||
+    lightness < 0 ||
+    lightness > 100
+  ) {
     return null;
   }
 
@@ -533,10 +664,12 @@ function parseCssColor(color: string): { r: number; g: number; b: number; a: num
     return null;
   }
 
+  const { r, g, b } = hslToRgb(hue, saturation / 100, lightness / 100);
+
   return {
-    r: red,
-    g: green,
-    b: blue,
+    r,
+    g,
+    b,
     a: roundToTwoDecimals(alpha),
   };
 }
@@ -552,15 +685,41 @@ function expandHex(hex: string): string {
   return hex;
 }
 
-function rgbToHex(r: number, g: number, b: number): string {
-  return `#${[r, g, b]
+function rgbToHex(r: number, g: number, b: number, a = 1): string {
+  const channels = [r, g, b];
+  if (a < 0.999) {
+    channels.push(a * 255);
+  }
+
+  return `#${channels
     .map((channel) => Math.round(channel).toString(16).padStart(2, '0'))
     .join('')}`;
 }
 
-function toRgbaString(r: number, g: number, b: number, a: number): string {
-  const alpha = Number(roundToTwoDecimals(a).toFixed(2).replace(/0+$/, '').replace(/\.$/, ''));
-  return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, ${alpha})`;
+function toRgbString(r: number, g: number, b: number, a: number): string {
+  const red = Math.round(r);
+  const green = Math.round(g);
+  const blue = Math.round(b);
+  if (a >= 0.999) {
+    return `rgb(${red}, ${green}, ${blue})`;
+  }
+
+  return `rgba(${red}, ${green}, ${blue}, ${formatCssNumber(a)})`;
+}
+
+function toHslString(h: number, s: number, l: number, a: number): string {
+  const hue = formatCssNumber(normalizeHue(h));
+  const saturation = formatCssNumber(s * 100);
+  const lightness = formatCssNumber(l * 100);
+  if (a >= 0.999) {
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  }
+
+  return `hsla(${hue}, ${saturation}%, ${lightness}%, ${formatCssNumber(a)})`;
+}
+
+function formatCssNumber(value: number): string {
+  return roundToTwoDecimals(value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function rgbToHsv(r: number, g: number, b: number): { h: number; s: number; v: number } {
@@ -590,6 +749,74 @@ function rgbToHsv(r: number, g: number, b: number): { h: number; s: number; v: n
     h,
     s: max === 0 ? 0 : delta / max,
     v: max,
+  };
+}
+
+function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
+  const red = r / 255;
+  const green = g / 255;
+  const blue = b / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const delta = max - min;
+  const lightness = (max + min) / 2;
+
+  if (delta === 0) {
+    return { h: 0, s: 0, l: lightness };
+  }
+
+  let hue = 0;
+  if (max === red) {
+    hue = ((green - blue) / delta) % 6;
+  } else if (max === green) {
+    hue = (blue - red) / delta + 2;
+  } else {
+    hue = (red - green) / delta + 4;
+  }
+
+  hue *= 60;
+  if (hue < 0) {
+    hue += 360;
+  }
+
+  const saturation = delta / (1 - Math.abs(2 * lightness - 1));
+  return { h: hue, s: saturation, l: lightness };
+}
+
+function hslToRgb(h: number, s: number, l: number): { r: number; g: number; b: number } {
+  const hue = normalizeHue(h);
+  const chroma = (1 - Math.abs(2 * l - 1)) * s;
+  const intermediate = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const match = l - chroma / 2;
+
+  let red = 0;
+  let green = 0;
+  let blue = 0;
+
+  if (hue < 60) {
+    red = chroma;
+    green = intermediate;
+  } else if (hue < 120) {
+    red = intermediate;
+    green = chroma;
+  } else if (hue < 180) {
+    green = chroma;
+    blue = intermediate;
+  } else if (hue < 240) {
+    green = intermediate;
+    blue = chroma;
+  } else if (hue < 300) {
+    red = intermediate;
+    blue = chroma;
+  } else {
+    red = chroma;
+    blue = intermediate;
+  }
+
+  return {
+    r: (red + match) * 255,
+    g: (green + match) * 255,
+    b: (blue + match) * 255,
   };
 }
 
@@ -627,4 +854,57 @@ function hsvToRgb(h: number, s: number, v: number): { r: number; g: number; b: n
     g: (green + m) * 255,
     b: (blue + m) * 255,
   };
+}
+
+function normalizeHue(value: number): number {
+  const hue = value % 360;
+  return hue < 0 ? hue + 360 : hue;
+}
+
+function inferCssColorFormat(value: string | null | undefined): ColorPickerFormat | null {
+  const normalized = value?.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized.startsWith('#')) {
+    return 'hex';
+  }
+
+  if (/^rgba?\(/i.test(normalized)) {
+    return 'rgb';
+  }
+
+  if (/^hsla?\(/i.test(normalized)) {
+    return 'hsl';
+  }
+
+  return null;
+}
+
+function isColorPickerFormat(value: string): value is ColorPickerFormat {
+  return value === 'hex' || value === 'rgb' || value === 'hsl';
+}
+
+function isColorPickerMode(value: string): value is ColorPickerMode {
+  return (
+    value === 'solid' ||
+    value === 'linear' ||
+    value === 'radial' ||
+    value === 'conic' ||
+    value === 'image'
+  );
+}
+
+function getEyeDropperConstructor(): EyeDropperConstructor | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const eyeDropperApi = (window as Window & { EyeDropper?: EyeDropperConstructor }).EyeDropper;
+  return eyeDropperApi ?? null;
+}
+
+function isEyeDropperAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
 }

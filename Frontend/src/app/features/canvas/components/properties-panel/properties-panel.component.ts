@@ -17,12 +17,14 @@ import {
   CanvasFlexWrap,
   CanvasJustifyContent,
   CanvasBackfaceVisibility,
+  CanvasConstraintSizeMode,
   CanvasLinkType,
   CanvasOverflowMode,
   CanvasPageModel,
   CanvasPositionMode,
   CanvasRotationMode,
   CanvasSemanticTag,
+  CanvasSizeMode,
   CanvasShadowPreset,
   CanvasSpacing,
   CanvasTransformOption,
@@ -56,11 +58,39 @@ import {
   normalizeStoredCanvasTag,
   supportsCustomAccessibilityTag,
 } from '../../utils/canvas-accessibility.util';
+import {
+  CanvasConstraintField,
+  CanvasSizeAxis,
+  deriveCanvasConstraintValueFromPixels,
+  getCanvasConstraintMode,
+  getCanvasConstraintModeField,
+  getCanvasConstraintSizeValueField,
+  getCanvasConstraintSizingValue,
+  getCanvasConstraintSuffix,
+  getCanvasConstraintValue,
+  deriveCanvasSizeValueFromPixels,
+  getCanvasFixedSize,
+  getCanvasSizeMode,
+  getCanvasSizeModeField,
+  getCanvasSizeValueField,
+  getCanvasSizingValue,
+  getCanvasSizeSuffix,
+  normalizeCanvasConstraintMode,
+  normalizeCanvasConstraintValue,
+  normalizeCanvasSizeMode,
+  normalizeCanvasSizeValue,
+  resolveCanvasConstraintPixels,
+  resolveCanvasPixelsFromMode,
+  shouldDisableCanvasSizeInput,
+  supportsCanvasConstraintSizeMode,
+  supportsCanvasSizeMode,
+} from '../../utils/canvas-sizing.util';
 import { SupportedFramework } from '../../canvas.types';
 type PropertiesTab = 'design' | 'prototype';
 type CornerRadiusMode = 'full' | 'per-corner';
 type PaddingMode = 'full' | 'per-side';
 type AccessibilityField = 'tag' | 'ariaLabel';
+type DimensionConstraintField = 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight';
 
 type EditableNumericField =
   | 'x'
@@ -113,6 +143,21 @@ interface AccessibilityFieldDefinition {
   label: string;
 }
 
+interface DimensionModeDefinition {
+  mode: CanvasSizeMode;
+  label: string;
+}
+
+interface DimensionConstraintModeDefinition {
+  mode: CanvasConstraintSizeMode;
+  label: string;
+}
+
+interface DimensionConstraintFieldDefinition {
+  id: DimensionConstraintField;
+  label: string;
+}
+
 const TRANSFORM_OPTION_DEFINITIONS: readonly TransformOptionDefinition[] = [
   { id: 'scale', label: 'Scale' },
   { id: 'rotate', label: 'Rotate' },
@@ -141,6 +186,26 @@ const PADDING_FIELD_DEFINITIONS: readonly PaddingFieldDefinition[] = [
 const ACCESSIBILITY_FIELD_DEFINITIONS: readonly AccessibilityFieldDefinition[] = [
   { id: 'tag', label: 'Tag' },
   { id: 'ariaLabel', label: 'Aria Label' },
+] as const;
+
+const DIMENSION_MODE_DEFINITIONS: readonly DimensionModeDefinition[] = [
+  { mode: 'fixed', label: 'Fixed' },
+  { mode: 'relative', label: 'Relative' },
+  { mode: 'fill', label: 'Fill' },
+  { mode: 'fit-content', label: 'Fit Content' },
+  { mode: 'viewport', label: 'Viewport' },
+] as const;
+
+const DIMENSION_CONSTRAINT_MODE_DEFINITIONS: readonly DimensionConstraintModeDefinition[] = [
+  { mode: 'fixed', label: 'Fixed' },
+  { mode: 'relative', label: 'Relative' },
+] as const;
+
+const DIMENSION_CONSTRAINT_FIELD_DEFINITIONS: readonly DimensionConstraintFieldDefinition[] = [
+  { id: 'minWidth', label: 'Min Width' },
+  { id: 'maxWidth', label: 'Max Width' },
+  { id: 'minHeight', label: 'Min Height' },
+  { id: 'maxHeight', label: 'Max Height' },
 ] as const;
 
 const TRANSFORM_DEPTH_MIN = -1000;
@@ -190,6 +255,9 @@ export class PropertiesPanelComponent {
   transformMenuItems: ContextMenuItem[] = [];
   transformMenuX = 0;
   transformMenuY = 0;
+  dimensionMenuItems: ContextMenuItem[] = [];
+  dimensionMenuX = 0;
+  dimensionMenuY = 0;
   accessibilityMenuItems: ContextMenuItem[] = [];
   accessibilityMenuX = 0;
   accessibilityMenuY = 0;
@@ -407,6 +475,8 @@ export class PropertiesPanelComponent {
     { label: 'Fixed', value: 'fixed' },
     { label: 'Sticky', value: 'sticky' },
   ];
+  readonly dimensionModeDefinitions = DIMENSION_MODE_DEFINITIONS;
+  readonly dimensionConstraintModeDefinitions = DIMENSION_CONSTRAINT_MODE_DEFINITIONS;
 
   readonly frameTemplates: FrameTemplate[] = [
     {
@@ -436,6 +506,7 @@ export class PropertiesPanelComponent {
   selectTab(tab: PropertiesTab): void {
     this.activeTab = tab;
     this.closeTransformMenu();
+    this.closeDimensionMenu();
     this.closeAccessibilityMenu();
   }
 
@@ -521,6 +592,15 @@ export class PropertiesPanelComponent {
     this.onTransformSectionHeaderClick(event);
   }
 
+  onDimensionSectionHeaderClick(event: MouseEvent): void {
+    this.openDimensionMenu(event, this.resolveSectionHeaderTrigger(event));
+  }
+
+  onDimensionSectionToggleClick(event: MouseEvent): void {
+    event.stopPropagation();
+    this.onDimensionSectionHeaderClick(event);
+  }
+
   onAccessibilitySectionHeaderClick(event: MouseEvent): void {
     this.openAccessibilityMenu(event, this.resolveSectionHeaderTrigger(event));
   }
@@ -537,6 +617,7 @@ export class PropertiesPanelComponent {
       return;
     }
 
+    this.closeDimensionMenu();
     this.closeAccessibilityMenu();
 
     if (this.transformMenuItems.length > 0) {
@@ -556,6 +637,7 @@ export class PropertiesPanelComponent {
     }
 
     this.closeTransformMenu();
+    this.closeDimensionMenu();
 
     if (this.accessibilityMenuItems.length > 0) {
       return;
@@ -564,6 +646,25 @@ export class PropertiesPanelComponent {
     this.accessibilityMenuItems = this.buildAccessibilityMenuItems(element);
     this.accessibilityMenuX = position.x;
     this.accessibilityMenuY = position.y;
+  }
+
+  private openDimensionMenu(event: MouseEvent | null, trigger: HTMLElement | null): void {
+    const element = this.selectedElement;
+    const position = this.resolveTransformMenuPosition(event, trigger);
+    if (!element || !position) {
+      return;
+    }
+
+    this.closeTransformMenu();
+    this.closeAccessibilityMenu();
+
+    if (this.dimensionMenuItems.length > 0) {
+      return;
+    }
+
+    this.dimensionMenuItems = this.buildDimensionMenuItems(element);
+    this.dimensionMenuX = position.x;
+    this.dimensionMenuY = position.y;
   }
 
   private resolveTransformMenuPosition(
@@ -602,6 +703,10 @@ export class PropertiesPanelComponent {
 
   closeTransformMenu(): void {
     this.transformMenuItems = [];
+  }
+
+  closeDimensionMenu(): void {
+    this.dimensionMenuItems = [];
   }
 
   closeAccessibilityMenu(): void {
@@ -815,6 +920,254 @@ export class PropertiesPanelComponent {
     }
 
     this.emitPatch({ [field]: value } as Partial<CanvasElement>);
+  }
+
+  dimensionModeValue(element: CanvasElement, axis: CanvasSizeAxis): CanvasSizeMode {
+    return normalizeCanvasSizeMode(getCanvasSizeMode(element, axis), element, this.parentElement(element));
+  }
+
+  dimensionModeOptions(element: CanvasElement, axis: CanvasSizeAxis): DropdownSelectOption[] {
+    const parent = this.parentElement(element);
+    return this.dimensionModeDefinitions.map((definition) => ({
+      label: definition.label,
+      value: definition.mode,
+      disabled: !supportsCanvasSizeMode(definition.mode, element, parent),
+    }));
+  }
+
+  dimensionInputValue(element: CanvasElement, axis: CanvasSizeAxis): number {
+    const mode = this.dimensionModeValue(element, axis);
+    const parent = this.parentElement(element);
+    const page = this.currentPageModel();
+    const fixedPixels = getCanvasFixedSize(element, axis);
+    const sizingValue = getCanvasSizingValue(element, axis);
+
+    if (mode === 'fixed' || mode === 'fit-content') {
+      return fixedPixels;
+    }
+
+    if (mode === 'fill') {
+      return 100;
+    }
+
+    return sizingValue ?? deriveCanvasSizeValueFromPixels(mode, fixedPixels, axis, parent, page) ?? 100;
+  }
+
+  dimensionInputSuffix(element: CanvasElement, axis: CanvasSizeAxis): string | null {
+    return getCanvasSizeSuffix(this.dimensionModeValue(element, axis), axis);
+  }
+
+  isDimensionInputDisabled(element: CanvasElement, axis: CanvasSizeAxis): boolean {
+    return shouldDisableCanvasSizeInput(this.dimensionModeValue(element, axis));
+  }
+
+  onDimensionValueChange(axis: CanvasSizeAxis, value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const mode = this.dimensionModeValue(element, axis);
+    if (shouldDisableCanvasSizeInput(mode)) {
+      return;
+    }
+
+    const parent = this.parentElement(element);
+    const page = this.currentPageModel();
+    const normalizedValue = Math.max(1, roundToTwoDecimals(value));
+
+    if (mode === 'fixed') {
+      this.emitPatch({ [axis]: normalizedValue } as Partial<CanvasElement>);
+      return;
+    }
+
+    this.emitPatch({
+      [axis]: resolveCanvasPixelsFromMode(
+        mode,
+        getCanvasFixedSize(element, axis),
+        axis,
+        normalizedValue,
+        parent,
+        page,
+      ),
+      [getCanvasSizeValueField(axis)]: normalizeCanvasSizeValue(mode, normalizedValue),
+    } as Partial<CanvasElement>);
+  }
+
+  onDimensionModeChange(axis: CanvasSizeAxis, value: string | number | boolean | null): void {
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const parent = this.parentElement(element);
+    const nextMode = normalizeCanvasSizeMode(value, element, parent);
+    const currentMode = this.dimensionModeValue(element, axis);
+    if (nextMode === currentMode) {
+      return;
+    }
+
+    const page = this.currentPageModel();
+    const fixedPixels = getCanvasFixedSize(element, axis);
+    const nextSizingValue =
+      nextMode === 'fixed' || nextMode === 'fit-content'
+        ? undefined
+        : nextMode === 'fill'
+          ? 100
+          : deriveCanvasSizeValueFromPixels(nextMode, fixedPixels, axis, parent, page) ?? 100;
+
+    this.emitPatch({
+      [axis]: resolveCanvasPixelsFromMode(nextMode, fixedPixels, axis, nextSizingValue, parent, page),
+      [getCanvasSizeModeField(axis)]: nextMode === 'fixed' ? undefined : nextMode,
+      [getCanvasSizeValueField(axis)]: normalizeCanvasSizeValue(nextMode, nextSizingValue),
+    } as Partial<CanvasElement>);
+  }
+
+  hasDimensionConstraintField(element: CanvasElement, field: DimensionConstraintField): boolean {
+    return Number.isFinite(getCanvasConstraintValue(element, field) ?? Number.NaN);
+  }
+
+  dimensionConstraintModeValue(
+    element: CanvasElement,
+    field: DimensionConstraintField,
+  ): CanvasConstraintSizeMode {
+    return normalizeCanvasConstraintMode(
+      getCanvasConstraintMode(element, field),
+      element,
+      this.parentElement(element),
+    );
+  }
+
+  dimensionConstraintModeOptions(
+    element: CanvasElement,
+    field: DimensionConstraintField,
+  ): DropdownSelectOption[] {
+    const parent = this.parentElement(element);
+    return this.dimensionConstraintModeDefinitions.map((definition) => ({
+      label: definition.label,
+      value: definition.mode,
+      disabled: !supportsCanvasConstraintSizeMode(definition.mode, element, parent),
+    }));
+  }
+
+  dimensionConstraintInputValue(element: CanvasElement, field: DimensionConstraintField): number {
+    const pixels = getCanvasConstraintValue(element, field);
+    const mode = this.dimensionConstraintModeValue(element, field);
+    if (!Number.isFinite(pixels ?? Number.NaN)) {
+      return 0;
+    }
+
+    if (mode === 'fixed') {
+      return pixels as number;
+    }
+
+    return (
+      getCanvasConstraintSizingValue(element, field) ??
+      deriveCanvasConstraintValueFromPixels(
+        'relative',
+        pixels as number,
+        field === 'minWidth' || field === 'maxWidth' ? 'width' : 'height',
+        this.parentElement(element),
+      ) ??
+      100
+    );
+  }
+
+  dimensionConstraintInputSuffix(
+    element: CanvasElement,
+    field: DimensionConstraintField,
+  ): string | null {
+    return getCanvasConstraintSuffix(this.dimensionConstraintModeValue(element, field));
+  }
+
+  onDimensionConstraintValueChange(field: DimensionConstraintField, value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const mode = this.dimensionConstraintModeValue(element, field);
+    const axis: CanvasSizeAxis =
+      field === 'minWidth' || field === 'maxWidth' ? 'width' : 'height';
+    const normalizedValue = Math.max(1, roundToTwoDecimals(value));
+
+    if (mode === 'fixed') {
+      this.emitPatch({
+        [field]: normalizedValue,
+        [getCanvasConstraintModeField(field)]: undefined,
+        [getCanvasConstraintSizeValueField(field)]: undefined,
+      } as Partial<CanvasElement>);
+      return;
+    }
+
+    this.emitPatch({
+      [field]: resolveCanvasConstraintPixels(
+        mode,
+        getCanvasConstraintValue(element, field) ?? normalizedValue,
+        axis,
+        normalizedValue,
+        this.parentElement(element),
+      ),
+      [getCanvasConstraintSizeValueField(field)]: normalizeCanvasConstraintValue(mode, normalizedValue),
+    } as Partial<CanvasElement>);
+  }
+
+  onDimensionConstraintModeChange(
+    field: DimensionConstraintField,
+    value: string | number | boolean | null,
+  ): void {
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const parent = this.parentElement(element);
+    const nextMode = normalizeCanvasConstraintMode(value, element, parent);
+    const currentMode = this.dimensionConstraintModeValue(element, field);
+    if (nextMode === currentMode) {
+      return;
+    }
+
+    const currentPixels = getCanvasConstraintValue(element, field);
+    if (!Number.isFinite(currentPixels ?? Number.NaN)) {
+      return;
+    }
+
+    const axis: CanvasSizeAxis =
+      field === 'minWidth' || field === 'maxWidth' ? 'width' : 'height';
+    const nextSizingValue =
+      nextMode === 'fixed'
+        ? undefined
+        : deriveCanvasConstraintValueFromPixels(nextMode, currentPixels as number, axis, parent) ??
+          100;
+
+    this.emitPatch({
+      [field]:
+        nextMode === 'fixed'
+          ? roundToTwoDecimals(currentPixels as number)
+          : resolveCanvasConstraintPixels(nextMode, currentPixels as number, axis, nextSizingValue, parent),
+      [getCanvasConstraintModeField(field)]: nextMode === 'fixed' ? undefined : nextMode,
+      [getCanvasConstraintSizeValueField(field)]: normalizeCanvasConstraintValue(
+        nextMode,
+        nextSizingValue,
+      ),
+    } as Partial<CanvasElement>);
   }
 
   onNumberInputGestureStarted(): void {
@@ -1592,6 +1945,59 @@ export class PropertiesPanelComponent {
     this.elementPatch.emit(patch);
   }
 
+  private currentPageModel(): CanvasPageModel | null {
+    const currentPageId = this.currentPageId;
+    if (!currentPageId) {
+      return this.pages[0] ?? null;
+    }
+
+    return this.pages.find((page) => page.id === currentPageId) ?? this.pages[0] ?? null;
+  }
+
+  private parentElement(element: CanvasElement): CanvasElement | null {
+    if (!element.parentId) {
+      return null;
+    }
+
+    return this.currentPageModel()?.elements.find((candidate) => candidate.id === element.parentId) ?? null;
+  }
+
+  private buildDimensionMenuItems(element: CanvasElement): ContextMenuItem[] {
+    return DIMENSION_CONSTRAINT_FIELD_DEFINITIONS.map((field) => ({
+      id: field.id,
+      label: field.label,
+      checked: this.hasDimensionConstraintField(element, field.id),
+      showCheckSlot: true,
+      action: () => this.toggleDimensionConstraintField(field.id),
+    }));
+  }
+
+  private toggleDimensionConstraintField(field: DimensionConstraintField): void {
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    if (this.hasDimensionConstraintField(element, field)) {
+      this.emitPatch({
+        [field]: undefined,
+        [getCanvasConstraintModeField(field)]: undefined,
+        [getCanvasConstraintSizeValueField(field)]: undefined,
+      } as Partial<CanvasElement>);
+      this.closeDimensionMenu();
+      return;
+    }
+
+    const axis: CanvasSizeAxis =
+      field === 'minWidth' || field === 'maxWidth' ? 'width' : 'height';
+    this.emitPatch({
+      [field]: getCanvasFixedSize(element, axis),
+      [getCanvasConstraintModeField(field)]: undefined,
+      [getCanvasConstraintSizeValueField(field)]: undefined,
+    } as Partial<CanvasElement>);
+    this.closeDimensionMenu();
+  }
+
   private buildAccessibilityMenuItems(element: CanvasElement): ContextMenuItem[] {
     return ACCESSIBILITY_FIELD_DEFINITIONS.map((field) => ({
       id: field.id,
@@ -1896,6 +2302,9 @@ export class PropertiesPanelComponent {
       /^#([A-Fa-f0-9]{3}|[A-Fa-f0-9]{4}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})$/.test(normalized) ||
       /^rgba?\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(
         normalized,
+      ) ||
+      /^hsla?\(\s*[+-]?\d*\.?\d+\s*(?:deg)?\s*,\s*\d*\.?\d+%\s*,\s*\d*\.?\d+%(?:\s*,\s*(?:0|1|0?\.\d+))?\s*\)$/i.test(
+        normalized,
       )
     ) {
       return normalized;
@@ -1922,9 +2331,16 @@ function isTransparentColor(value: string): boolean {
   const rgbaMatch = value.match(
     /^rgba\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(\d*\.?\d+)\s*\)$/i,
   );
-  if (!rgbaMatch) {
+  if (rgbaMatch) {
+    return Number(rgbaMatch[1]) === 0;
+  }
+
+  const hslaMatch = value.match(
+    /^hsla\(\s*[+-]?\d*\.?\d+\s*(?:deg)?\s*,\s*\d*\.?\d+%\s*,\s*\d*\.?\d+%\s*,\s*(\d*\.?\d+)\s*\)$/i,
+  );
+  if (!hslaMatch) {
     return false;
   }
 
-  return Number(rgbaMatch[1]) === 0;
+  return Number(hslaMatch[1]) === 0;
 }

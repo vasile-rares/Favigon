@@ -18,7 +18,12 @@ export type ToggleGroupIcon =
   | 'radius-full'
   | 'radius-corners'
   | 'spacing-all'
-  | 'spacing-sides';
+  | 'spacing-sides'
+  | 'paint-solid'
+  | 'paint-linear'
+  | 'paint-radial'
+  | 'paint-conic'
+  | 'paint-image';
 
 export interface ToggleGroupOption {
   label: string;

@@ -1102,7 +1102,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return 0;
     }
 
-    return layout.x + this.el.getAbsoluteBounds(element, page.elements).x;
+    return layout.x + this.el.getAbsoluteBounds(element, page.elements, page).x;
   }
 
   getRenderedYForPage(element: CanvasElement, pageId: string): number {
@@ -1112,7 +1112,79 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return 0;
     }
 
-    return layout.y + this.el.getAbsoluteBounds(element, page.elements).y;
+    return layout.y + this.el.getAbsoluteBounds(element, page.elements, page).y;
+  }
+
+  getRenderedWidthForPage(element: CanvasElement, pageId: string): number {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return element.width;
+    }
+
+    return this.el.getRenderedWidth(element, page.elements, page);
+  }
+
+  getRenderedHeightForPage(element: CanvasElement, pageId: string): number {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return element.height;
+    }
+
+    return this.el.getRenderedHeight(element, page.elements, page);
+  }
+
+  getRenderedMinWidthStyleForPage(element: CanvasElement, pageId: string): string | null {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return null;
+    }
+
+    return this.el.getRenderedMinWidthStyle(element, page.elements, page);
+  }
+
+  getRenderedMaxWidthStyleForPage(element: CanvasElement, pageId: string): string | null {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return null;
+    }
+
+    return this.el.getRenderedMaxWidthStyle(element, page.elements, page);
+  }
+
+  getRenderedMinHeightStyleForPage(element: CanvasElement, pageId: string): string | null {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return null;
+    }
+
+    return this.el.getRenderedMinHeightStyle(element, page.elements, page);
+  }
+
+  getRenderedMaxHeightStyleForPage(element: CanvasElement, pageId: string): string | null {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return null;
+    }
+
+    return this.el.getRenderedMaxHeightStyle(element, page.elements, page);
+  }
+
+  getRenderedWidthStyleForPage(element: CanvasElement, pageId: string): string {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return `${element.width}px`;
+    }
+
+    return this.el.getRenderedWidthStyle(element, page.elements, page);
+  }
+
+  getRenderedHeightStyleForPage(element: CanvasElement, pageId: string): string {
+    const page = this.getPageById(pageId);
+    if (!page) {
+      return `${element.height}px`;
+    }
+
+    return this.el.getRenderedHeightStyle(element, page.elements, page);
   }
 
   private getPageShellTopPadding(): number {
@@ -1140,14 +1212,14 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return { minX: 0, minY: 0, maxX: fallbackWidth, maxY: fallbackHeight };
     }
 
-    const firstBounds = this.el.getAbsoluteBounds(rootFrames[0], page.elements);
+    const firstBounds = this.el.getAbsoluteBounds(rootFrames[0], page.elements, page);
     let minX = firstBounds.x;
     let minY = firstBounds.y;
     let maxX = firstBounds.x + firstBounds.width;
     let maxY = firstBounds.y + firstBounds.height;
 
     for (const frame of rootFrames) {
-      const bounds = this.el.getAbsoluteBounds(frame, page.elements);
+      const bounds = this.el.getAbsoluteBounds(frame, page.elements, page);
       minX = Math.min(minX, bounds.x);
       minY = Math.min(minY, bounds.y);
       maxX = Math.max(maxX, bounds.x + bounds.width);
@@ -1245,7 +1317,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     const targetContainer = this.resolveInsertionContainer(pointer);
     const containerBounds = targetContainer
-      ? this.el.getAbsoluteBounds(targetContainer, this.elements())
+      ? this.el.getAbsoluteBounds(targetContainer, this.elements(), this.currentPage())
       : null;
 
     const newElement = this.createElementAtCanvasPoint(
@@ -1333,7 +1405,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    let bounds = this.el.getAbsoluteBounds(element, this.elements());
+    let bounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
 
     // Detect flow child inside layout container — use visual position from cache
     const parent = this.el.findElementById(element.parentId ?? null, this.elements());
@@ -1392,7 +1464,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const bounds = this.el.getAbsoluteBounds(element, this.elements());
+    const bounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
     this.beginGestureHistory();
     this.hasMovedElementDuringDrag = false;
     this.isDragging = true;
@@ -1519,7 +1591,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const bounds = this.el.getAbsoluteBounds(element, this.elements());
+    const bounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
     this.captureResizeSubtreeSnapshot(id, this.elements());
     this.selectedElementId.set(id);
     this.beginGestureHistory();
@@ -1554,7 +1626,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const bounds = this.el.getAbsoluteBounds(element, this.elements());
+    const bounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
     const centerX = bounds.x + element.width / 2;
     const centerY = bounds.y + element.height / 2;
     const startAngle = Math.atan2(pointer.y - centerY, pointer.x - centerX) * (180 / Math.PI);
@@ -1589,7 +1661,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     const bounds =
       this.getLiveElementCanvasBounds(element) ??
-      this.el.getAbsoluteBounds(element, this.elements());
+      this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
     this.selectedElementId.set(id);
     this.beginGestureHistory();
     this.isDragging = false;
@@ -1810,7 +1882,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       this.currentTool.set('select');
     });
 
-    const bounds = this.el.getAbsoluteBounds(frame, [...this.elements()]);
+    const bounds = this.el.getAbsoluteBounds(frame, [...this.elements()], this.currentPage());
     this.viewport.focusElement(frame, bounds, this.getCanvasElement());
   }
 
@@ -1966,7 +2038,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     const { xCandidates, yCandidates } = buildSnapCandidates(selectedId, elements, (el, els) =>
-      this.el.getAbsoluteBounds(el, els),
+      this.el.getAbsoluteBounds(el, els, this.currentPage()),
     );
     const pageWidth = this.currentViewportWidth();
     const pageHeight = this.currentViewportHeight();
@@ -2030,7 +2102,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
           };
         }
 
-        const parentBounds = this.el.getAbsoluteBounds(parent, elements);
+        const parentBounds = this.el.getAbsoluteBounds(parent, elements, this.currentPage());
         return {
           ...element,
           x: clamp(absoluteX - parentBounds.x, 0, parent.width - element.width),
@@ -2259,7 +2331,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
     if (cached) return cached.x;
     const layout = this.activePageLayout();
-    return this.el.getAbsoluteBounds(element, this.elements()).x + (layout?.x ?? 0);
+    return this.el.getAbsoluteBounds(element, this.elements(), this.currentPage()).x + (layout?.x ?? 0);
   }
 
   getRenderedY(element: CanvasElement): number {
@@ -2267,7 +2339,39 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
     if (cached) return cached.y;
     const layout = this.activePageLayout();
-    return this.el.getAbsoluteBounds(element, this.elements()).y + (layout?.y ?? 0);
+    return this.el.getAbsoluteBounds(element, this.elements(), this.currentPage()).y + (layout?.y ?? 0);
+  }
+
+  getRenderedWidth(element: CanvasElement): number {
+    return this.el.getRenderedWidth(element, this.elements(), this.currentPage());
+  }
+
+  getRenderedHeight(element: CanvasElement): number {
+    return this.el.getRenderedHeight(element, this.elements(), this.currentPage());
+  }
+
+  getRenderedMinWidthStyle(element: CanvasElement): string | null {
+    return this.el.getRenderedMinWidthStyle(element, this.elements(), this.currentPage());
+  }
+
+  getRenderedMaxWidthStyle(element: CanvasElement): string | null {
+    return this.el.getRenderedMaxWidthStyle(element, this.elements(), this.currentPage());
+  }
+
+  getRenderedMinHeightStyle(element: CanvasElement): string | null {
+    return this.el.getRenderedMinHeightStyle(element, this.elements(), this.currentPage());
+  }
+
+  getRenderedMaxHeightStyle(element: CanvasElement): string | null {
+    return this.el.getRenderedMaxHeightStyle(element, this.elements(), this.currentPage());
+  }
+
+  getRenderedWidthStyle(element: CanvasElement): string {
+    return this.el.getRenderedWidthStyle(element, this.elements(), this.currentPage());
+  }
+
+  getRenderedHeightStyle(element: CanvasElement): string {
+    return this.el.getRenderedHeightStyle(element, this.elements(), this.currentPage());
   }
 
   getFrameTitle(element: CanvasElement): string {
@@ -2475,7 +2579,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     if (!parent) return;
 
     const parentBounds =
-      this.getLiveElementCanvasBounds(parent) ?? this.el.getAbsoluteBounds(parent, elements);
+      this.getLiveElementCanvasBounds(parent) ??
+      this.el.getAbsoluteBounds(parent, elements, this.currentPage());
     const layout = this.activePageLayout();
     const currentPreview = this.flowDragPlaceholder();
     const previewWidth =
@@ -2644,7 +2749,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
               width: preview.bounds.width,
               height: preview.bounds.height,
             }
-          : this.el.getAbsoluteBounds(dragged, elements);
+          : this.el.getAbsoluteBounds(dragged, elements, this.currentPage());
       return elements.map((el) =>
         el.id === draggedId
           ? {
@@ -2708,7 +2813,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const container = this.el.findElementById(target.containerId, elements);
     if (!container) return null;
 
-    const containerBounds = this.el.getAbsoluteBounds(container, elements);
+    const containerBounds = this.el.getAbsoluteBounds(container, elements, this.currentPage());
     const layout = this.activePageLayout();
     const offsetX = layout?.x ?? 0;
     const offsetY = layout?.y ?? 0;
@@ -2871,12 +2976,12 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     const layout = this.activePageLayout();
-    const absolute = this.el.getAbsoluteBounds(element, this.elements());
+    const absolute = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
     return {
       x: roundToTwoDecimals(absolute.x + (layout?.x ?? 0)),
       y: roundToTwoDecimals(absolute.y + (layout?.y ?? 0)),
-      width: roundToTwoDecimals(element.width),
-      height: roundToTwoDecimals(element.height),
+      width: absolute.width,
+      height: absolute.height,
     };
   }
 
@@ -3242,7 +3347,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
         }
 
         const parent = this.el.findElementById(element.parentId ?? null, elements);
-        const parentBounds = parent ? this.el.getAbsoluteBounds(parent, elements) : null;
+        const parentBounds = parent
+          ? this.el.getAbsoluteBounds(parent, elements, this.currentPage())
+          : null;
         const bounds = this.calculateResizedBounds(
           element,
           parentBounds,
@@ -3711,7 +3818,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     const container = this.el.findElementById(state.containerId, this.elements());
     const containerBounds = container
-      ? this.el.getAbsoluteBounds(container, this.elements())
+      ? this.el.getAbsoluteBounds(container, this.elements(), this.currentPage())
       : null;
     const clampedPoint = containerBounds
       ? {
@@ -3735,7 +3842,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     const container = this.el.findElementById(state.containerId, this.elements());
     const containerBounds = container
-      ? this.el.getAbsoluteBounds(container, this.elements())
+      ? this.el.getAbsoluteBounds(container, this.elements(), this.currentPage())
       : null;
     const bounds = this.buildRectangleDrawBounds(state.startPoint, state.currentPoint);
     const distance = Math.hypot(
@@ -3785,7 +3892,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const absoluteBounds = this.el.getAbsoluteBounds(element, this.elements());
+    const absoluteBounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
     const layout = this.activePageLayout();
     this.flowDragPlaceholder.set({
       elementId: element.id,
@@ -4090,7 +4197,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       };
     }
 
-    return this.el.getAbsoluteBounds(element, this.elements());
+    return this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
   }
 
   private didContainerLayoutStateChange(
@@ -4190,7 +4297,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       };
     }
 
-    return this.el.getAbsoluteBounds(element, elements);
+    return this.el.getAbsoluteBounds(element, elements, this.currentPage());
   }
 
   private normalizeDraggedElementAfterLayerMove(
@@ -4294,7 +4401,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
         return false;
       }
 
-      const bounds = this.el.getAbsoluteBounds(element, elements);
+      const bounds = this.el.getAbsoluteBounds(element, elements, this.currentPage());
       return (
         pointer.x >= bounds.x &&
         pointer.x <= bounds.x + bounds.width &&
@@ -4321,7 +4428,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const container = this.resolveInsertionContainer(pointer);
     return {
       container,
-      containerBounds: container ? this.el.getAbsoluteBounds(container, this.elements()) : null,
+      containerBounds: container
+        ? this.el.getAbsoluteBounds(container, this.elements(), this.currentPage())
+        : null,
     };
   }
 
@@ -4354,7 +4463,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const resolvedContainer = targetContainer ?? this.resolveInsertionContainer(pointer);
     const resolvedContainerBounds =
       containerBounds ??
-      (resolvedContainer ? this.el.getAbsoluteBounds(resolvedContainer, this.elements()) : null);
+      (resolvedContainer
+        ? this.el.getAbsoluteBounds(resolvedContainer, this.elements(), this.currentPage())
+        : null);
 
     const result = this.el.createElementAtPoint(
       tool,
@@ -4409,7 +4520,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const element = this.el.findElementById(id, elements);
     if (!element || element.type === 'frame' || element.parentId) return;
 
-    const elementBounds = this.el.getAbsoluteBounds(element, elements);
+    const elementBounds = this.el.getAbsoluteBounds(element, elements, this.currentPage());
     const centerX = elementBounds.x + elementBounds.width / 2;
     const centerY = elementBounds.y + elementBounds.height / 2;
 
@@ -4418,7 +4529,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const candidateContainers = elements.filter((el) => {
       if (el.id === id) return false;
       if (!this.el.isContainerElement(el)) return false;
-      const fb = this.el.getAbsoluteBounds(el, elements);
+      const fb = this.el.getAbsoluteBounds(el, elements, this.currentPage());
       const centerInside =
         centerX >= fb.x &&
         centerX <= fb.x + fb.width &&
@@ -4435,7 +4546,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       current.width * current.height < best.width * best.height ? current : best,
     );
 
-    const fb = this.el.getAbsoluteBounds(target, elements);
+    const fb = this.el.getAbsoluteBounds(target, elements, this.currentPage());
     const isTargetLayout = this.isLayoutContainer(target);
     this.updateCurrentPageElements((els) =>
       els.map((el) =>
