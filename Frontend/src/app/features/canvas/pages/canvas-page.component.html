@@ -292,7 +292,7 @@
               [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
               [style.color]="el.type === 'text' ? el.fill : null"
               [style.border]="getRenderedBorderStyle(el)"
-              [style.box-shadow]="isNested ? null : getElementBoxShadow(el)"
+              [style.box-shadow]="getElementBoxShadow(el)"
               [style.outline]="isNested ? null : getElementOutlineStyle(el)"
               [style.outline-offset.px]="isNested ? null : getElementOutlineOffset(el)"
               [style.opacity]="el.opacity ?? 1"

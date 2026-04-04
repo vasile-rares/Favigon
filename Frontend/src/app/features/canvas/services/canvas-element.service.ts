@@ -5,7 +5,6 @@ import {
   CanvasOverflowMode,
   CanvasPageModel,
   CanvasPositionMode,
-  CanvasShadowPreset,
 } from '../../../core/models/canvas.models';
 import {
   clamp,
@@ -37,6 +36,7 @@ import {
   resolveCanvasConstraintPixels,
   resolveCanvasPixelsFromMode,
 } from '../utils/canvas-sizing.util';
+import { getCanvasShadowCss } from '../utils/canvas-shadow.util';
 import { Bounds, Point } from '../canvas.types';
 
 const IMAGE_PLACEHOLDER_URL = 'https://placehold.co/300x200?text=Image';
@@ -46,14 +46,6 @@ const DEFAULT_TEXT_FONT_SIZE = 16;
 const ROOT_FONT_SIZE_PX = 16;
 const MIN_ELEMENT_SIZE = 24;
 const FRAME_INSERT_GAP = 48;
-const SHADOW_MAP: Record<CanvasShadowPreset, string> = {
-  none: 'none',
-  sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-  md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
-  lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
-  xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-};
-
 const DEFAULT_ELEMENT_DIMENSIONS: Record<CanvasElementType, { width: number; height: number }> = {
   frame: { width: 390, height: 844 },
   text: { width: 150, height: 40 },
@@ -680,7 +672,7 @@ export class CanvasElementService {
   }
 
   getElementBoxShadow(element: CanvasElement): string {
-    return SHADOW_MAP[element.shadow ?? 'none'] ?? SHADOW_MAP.none;
+    return getCanvasShadowCss(element.shadow);
   }
 
   getElementOverflowMode(element: CanvasElement): CanvasOverflowMode {

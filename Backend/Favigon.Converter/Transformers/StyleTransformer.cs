@@ -43,8 +43,12 @@ public static class StyleTransformer
     if (style.LetterSpacing is not null) css["letter-spacing"] = style.LetterSpacing.ToString();
     if (style.Overflow is not null) css["overflow"] = style.Overflow;
 
-    if (style.Shadow is not null && ShadowMap.TryGetValue(style.Shadow, out var shadow))
-      css["box-shadow"] = shadow;
+    if (!string.IsNullOrWhiteSpace(style.Shadow))
+    {
+      css["box-shadow"] = ShadowMap.TryGetValue(style.Shadow, out var shadow)
+        ? shadow
+        : style.Shadow;
+    }
 
     if (style.Opacity is not null) css["opacity"] = style.Opacity.Value.ToString("G");
 

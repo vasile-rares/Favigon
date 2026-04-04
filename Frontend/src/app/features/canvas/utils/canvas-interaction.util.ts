@@ -18,6 +18,7 @@ import {
   resolveCanvasConstraintPixels,
   resolveCanvasPixelsFromMode,
 } from './canvas-sizing.util';
+import { normalizeCanvasShadowValue } from './canvas-shadow.util';
 
 const MIN_SIZE = 24;
 
@@ -145,6 +146,7 @@ export function getElementBorderRadiusCss(
 export function mutateNormalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
   element.width = Math.max(MIN_SIZE, element.width);
   element.height = Math.max(MIN_SIZE, element.height);
+  element.shadow = normalizeCanvasShadowValue(element.shadow);
 
   const hasLink = hasCanvasElementLink(element);
   element.tag = normalizeStoredCanvasTag(element.type, element.tag, hasLink);

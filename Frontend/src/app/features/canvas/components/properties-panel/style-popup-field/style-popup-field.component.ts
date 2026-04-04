@@ -12,8 +12,15 @@ import {
   Output,
   SimpleChanges,
 } from '@angular/core';
-import { CanvasElement, CanvasShadowPreset } from '../../../../../core/models/canvas.models';
+import { CanvasElement } from '../../../../../core/models/canvas.models';
 import { roundToTwoDecimals } from '../../../utils/canvas-interaction.util';
+import {
+  buildCanvasShadowCss,
+  CanvasShadowPosition,
+  DEFAULT_EDITABLE_CANVAS_SHADOW,
+  getCanvasShadowCss,
+  resolveEditableCanvasShadow,
+} from '../../../utils/canvas-shadow.util';
 import {
   DropdownSelectComponent,
   DropdownSelectOption,
@@ -30,6 +37,7 @@ type StylePopupFieldKind = 'fill' | 'stroke' | 'shadow';
 type ColorPickerDragTarget = 'surface' | 'hue' | 'alpha' | null;
 type ColorPickerFormat = 'hex' | 'rgb' | 'hsl';
 type ColorPickerMode = 'solid' | 'linear' | 'radial' | 'conic' | 'image';
+type ShadowNumericField = 'x' | 'y' | 'blur' | 'spread';
 type EyeDropperResult = { sRGBHex: string };
 type EyeDropperInstance = { open(): Promise<EyeDropperResult> };
 type EyeDropperConstructor = new () => EyeDropperInstance;
@@ -54,13 +62,12 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
   @Input() triggerText = '';
   @Input() swatchColor: string | null = null;
   @Input() isTransparent = false;
-  @Input() shadowPreview: CanvasShadowPreset | 'none' = 'none';
+  @Input() shadowValue: string | null = null;
   @Input() colorValue = '#000000';
   @Input() pickerColor = '#000000';
   @Input() strokeWidth = 1;
   @Input() strokeStyle = 'Solid';
   @Input() borderStyleOptions: string[] = [];
-  @Input() shadowOptions: CanvasShadowPreset[] = ['sm', 'md', 'lg', 'xl'];
   @Input() activationPatch: Partial<CanvasElement> | null = null;
   @Input() clearPatch: Partial<CanvasElement> | null = null;
 
@@ -84,6 +91,11 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
   selectedStrokeStyleOption: string | null = null;
   selectedColorFormat: ColorPickerFormat = 'hex';
   selectedColorMode: ColorPickerMode = 'solid';
+  shadowPosition: CanvasShadowPosition = DEFAULT_EDITABLE_CANVAS_SHADOW.position;
+  shadowX = DEFAULT_EDITABLE_CANVAS_SHADOW.x;
+  shadowY = DEFAULT_EDITABLE_CANVAS_SHADOW.y;
+  shadowBlur = DEFAULT_EDITABLE_CANVAS_SHADOW.blur;
+  shadowSpread = DEFAULT_EDITABLE_CANVAS_SHADOW.spread;
   isScreenPickerActive = false;
   readonly colorFormatOptions: DropdownSelectOption[] = [
     { label: 'HEX', value: 'hex' },
@@ -96,6 +108,10 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     { label: '', value: 'radial', icon: 'paint-radial', ariaLabel: 'Radial', title: 'Radial' },
     { label: '', value: 'conic', icon: 'paint-conic', ariaLabel: 'Conic', title: 'Conic' },
     { label: '', value: 'image', icon: 'paint-image', ariaLabel: 'Image', title: 'Image' },
+  ];
+  readonly shadowPositionOptions: readonly ToggleGroupOption[] = [
+    { label: 'Outside', value: 'outside', ariaLabel: 'Outside shadow', title: 'Outside' },
+    { label: 'Inside', value: 'inside', ariaLabel: 'Inside shadow', title: 'Inside' },
   ];
 
   private colorPickerDragTarget: ColorPickerDragTarget = null;
@@ -126,6 +142,10 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     if (changes['strokeStyle']) {
       this.selectedStrokeStyleOption = this.strokeStyle;
     }
+
+    if (changes['shadowValue'] && this.kind === 'shadow') {
+      this.syncShadowEditorFromValue(this.shadowValue);
+    }
   }
 
   ngOnDestroy(): void {
@@ -141,7 +161,7 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
       case 'stroke':
         return 'Border';
       case 'shadow':
-        return 'Shadows';
+        return 'Shadow';
       default:
         return '';
     }
@@ -239,6 +259,12 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
       this.patchRequested.emit(this.activationPatch);
     }
 
+    if (this.kind === 'shadow') {
+      this.syncShadowEditorFromValue(
+        this.shadowValue ?? buildCanvasShadowCss(DEFAULT_EDITABLE_CANVAS_SHADOW),
+      );
+    }
+
     if (this.isColorKind()) {
       const initialColor = this.getInitialPickerColor();
       this.syncPickerFromColor(initialColor);
@@ -287,11 +313,7 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     }
 
     this.syncPickerFromColor(normalized);
-    this.patchRequested.emit(
-      this.kind === 'fill'
-        ? { fill: this.pickerColorValue() }
-        : { stroke: this.pickerColorValue() },
-    );
+    this.commitPickerColor();
   }
 
   onColorFormatValueChange(value: string | number | boolean | null): void {
@@ -396,8 +418,39 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     this.patchRequested.emit({ strokeStyle: value });
   }
 
-  onShadowSelected(value: CanvasShadowPreset): void {
-    this.patchRequested.emit({ shadow: value });
+  onShadowPositionChange(value: string | number | boolean | null): void {
+    if (value !== 'outside' && value !== 'inside') {
+      return;
+    }
+
+    this.shadowPosition = value;
+    this.emitShadowPatch();
+  }
+
+  onShadowNumberChange(field: ShadowNumericField, value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const normalized =
+      field === 'blur' ? Math.max(0, roundToTwoDecimals(value)) : roundToTwoDecimals(value);
+
+    switch (field) {
+      case 'x':
+        this.shadowX = normalized;
+        break;
+      case 'y':
+        this.shadowY = normalized;
+        break;
+      case 'blur':
+        this.shadowBlur = normalized;
+        break;
+      case 'spread':
+        this.shadowSpread = normalized;
+        break;
+    }
+
+    this.emitShadowPatch();
   }
 
   onNumberGestureStarted(): void {
@@ -470,8 +523,20 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     return `linear-gradient(90deg, rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 0) 0%, rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 1) 100%)`;
   }
 
+  get shadowPreviewCss(): string {
+    return getCanvasShadowCss(this.shadowValue);
+  }
+
+  get shadowSwatchColor(): string {
+    return resolveEditableCanvasShadow(this.shadowValue).color;
+  }
+
+  get isShadowSwatchTransparent(): boolean {
+    return (parseCssColor(this.shadowSwatchColor)?.a ?? 1) <= 0.001;
+  }
+
   private isColorKind(): boolean {
-    return this.kind === 'fill' || this.kind === 'stroke';
+    return this.kind === 'fill' || this.kind === 'stroke' || this.kind === 'shadow';
   }
 
   private beginColorGesture(): void {
@@ -497,6 +562,10 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
   }
 
   private getInitialPickerColor(): string {
+    if (this.kind === 'shadow') {
+      return resolveEditableCanvasShadow(this.shadowValue).color;
+    }
+
     if (this.pickerColor) {
       return this.pickerColor;
     }
@@ -552,7 +621,17 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
 
   private commitPickerColor(): void {
     const colorValue = this.pickerColorValue();
-    this.patchRequested.emit(this.kind === 'fill' ? { fill: colorValue } : { stroke: colorValue });
+    if (this.kind === 'fill') {
+      this.patchRequested.emit({ fill: colorValue });
+      return;
+    }
+
+    if (this.kind === 'stroke') {
+      this.patchRequested.emit({ stroke: colorValue });
+      return;
+    }
+
+    this.emitShadowPatch(colorValue);
   }
 
   private syncPickerFromColor(color: string): void {
@@ -573,10 +652,39 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     this.popupTop = null;
     this.popupBottom = 12;
 
-    this.popupWidth = Math.min(248, Math.max(220, window.innerWidth - 24));
+    const preferredWidth = 248;
+    this.popupWidth = Math.min(preferredWidth, Math.max(220, window.innerWidth - 24));
     const desiredLeft = panelBounds.left - this.popupWidth - 12;
     const maxLeft = Math.max(12, window.innerWidth - this.popupWidth - 12);
     this.popupLeft = Math.min(maxLeft, Math.max(12, desiredLeft));
+  }
+
+  private syncShadowEditorFromValue(value: string | null): void {
+    const shadow = resolveEditableCanvasShadow(value);
+    this.shadowPosition = shadow.position;
+    this.shadowX = shadow.x;
+    this.shadowY = shadow.y;
+    this.shadowBlur = shadow.blur;
+    this.shadowSpread = shadow.spread;
+    this.syncPickerFromColor(shadow.color);
+
+    const nextFormat = inferCssColorFormat(shadow.color);
+    if (nextFormat) {
+      this.selectedColorFormat = nextFormat;
+    }
+  }
+
+  private emitShadowPatch(colorOverride?: string): void {
+    this.patchRequested.emit({
+      shadow: buildCanvasShadowCss({
+        position: this.shadowPosition,
+        x: this.shadowX,
+        y: this.shadowY,
+        blur: this.shadowBlur,
+        spread: this.shadowSpread,
+        color: colorOverride ?? this.pickerColorValue(),
+      }),
+    });
   }
 }
 

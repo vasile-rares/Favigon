@@ -479,11 +479,12 @@
               kind="shadow"
               [hasValue]="hasActiveShadow(element)"
               [triggerText]="shadowSummary(element)"
-              [shadowPreview]="shadowValue(element)"
-              [shadowOptions]="shadowOptions"
-              [activationPatch]="{ shadow: 'md' }"
-              [clearPatch]="{ shadow: 'none' }"
-              (patchRequested)="elementPatch.emit($event)">
+              [shadowValue]="shadowValue(element)"
+              [activationPatch]="shadowActivationPatch"
+              [clearPatch]="shadowClearPatch"
+              (patchRequested)="elementPatch.emit($event)"
+              (numberGestureStarted)="onNumberInputGestureStarted()"
+              (numberGestureCommitted)="onNumberInputGestureCommitted()">
             </app-style-popup-field>
           </div>
         </div>

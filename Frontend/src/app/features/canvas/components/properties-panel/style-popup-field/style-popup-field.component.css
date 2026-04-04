@@ -366,6 +366,40 @@
   gap: 0.55rem;
 }
 
+.style-popup-field__stroke-metric {
+  position: relative;
+  min-width: 0;
+}
+
+.style-popup-field__stroke-metric > app-number-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.style-popup-field__stroke-metric > app-number-input ::ng-deep .number-input__field {
+  padding-right: 2.6rem;
+}
+
+.style-popup-field__stroke-metric-tag {
+  position: absolute;
+  top: 50%;
+  right: 0.65rem;
+  transform: translateY(-50%);
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-500));
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.14s ease;
+}
+
+.style-popup-field__stroke-metric:hover > .style-popup-field__stroke-metric-tag,
+.style-popup-field__stroke-metric:focus-within > .style-popup-field__stroke-metric-tag {
+  opacity: 0;
+}
+
 .style-popup-field__color-picker {
   display: flex;
   flex-direction: column;
@@ -507,72 +541,80 @@
   pointer-events: none;
 }
 
-.style-popup-field__shadow-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.style-popup-field__shadow-option {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--color-zinc-200);
-  border-radius: 10px;
-  padding: 0.45rem 0.55rem;
-  cursor: pointer;
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.3),
-    0 1px 0 rgba(255, 255, 255, 0.05);
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    box-shadow 0.2s ease,
-    color 0.2s ease;
-
-  &:hover {
-    background: rgba(0, 0, 0, 0.35);
-    border-color: rgba(255, 255, 255, 0.08);
-  }
-
-  &.active {
-    background: rgba(0, 0, 0, 0.45);
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow:
-      0 0 0 2px rgba(255, 255, 255, 0.05),
-      inset 0 1px 2px rgba(0, 0, 0, 0.5);
-    color: var(--color-zinc-100);
-  }
-}
-
 .style-popup-field__shadow-preview {
   width: 28px;
   height: 18px;
   border-radius: 6px;
   background: rgba(255, 255, 255, 0.9);
   flex-shrink: 0;
+  box-shadow: none;
 }
 
-.style-popup-field__shadow-preview--sm {
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+.style-popup-field__shadow-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
 }
 
-.style-popup-field__shadow-preview--md {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -2px rgba(0, 0, 0, 0.1);
+.style-popup-field__shadow-row,
+.style-popup-field__shadow-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
 }
 
-.style-popup-field__shadow-preview--lg {
-  box-shadow:
-    0 10px 15px -3px rgba(0, 0, 0, 0.1),
-    0 4px 6px -4px rgba(0, 0, 0, 0.1);
+.style-popup-field__shadow-metric {
+  position: relative;
+  min-width: 0;
 }
 
-.style-popup-field__shadow-preview--xl {
-  box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.1),
-    0 8px 10px -6px rgba(0, 0, 0, 0.1);
+.style-popup-field__shadow-metric > app-number-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.style-popup-field__shadow-metric > app-number-input ::ng-deep .number-input__field {
+  padding-right: 1.05rem;
+}
+
+.style-popup-field__shadow-metric--blur > app-number-input ::ng-deep .number-input__field {
+  padding-right: 2.25rem;
+}
+
+.style-popup-field__shadow-metric--spread > app-number-input ::ng-deep .number-input__field {
+  padding-right: 2.9rem;
+}
+
+.style-popup-field__shadow-metric-tag {
+  position: absolute;
+  top: 50%;
+  right: 0.65rem;
+  transform: translateY(-50%);
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-500));
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.14s ease;
+}
+
+.style-popup-field__shadow-metric:hover > .style-popup-field__shadow-metric-tag,
+.style-popup-field__shadow-metric:focus-within > .style-popup-field__shadow-metric-tag {
+  opacity: 0;
+}
+
+.style-popup-field__shadow-position-toggle {
+  --canvas-panel-font-size: 0.72rem;
+  --toggle-group-height: 34px;
+  --toggle-group-padding: 0.16rem;
+  --toggle-group-button-padding: 0.24rem 0.45rem;
+  --toggle-group-button-radius: 7px;
+}
+
+.style-popup-field__shadow-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem 0.55rem;
 }

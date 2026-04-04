@@ -2446,8 +2446,10 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
   private setSelectedElements(ids: string[], primaryId: string | null = null): void {
     const normalizedIds = this.normalizeSelectedElementIds(ids);
-    const fallbackPrimaryId = normalizedIds.length > 0 ? normalizedIds[normalizedIds.length - 1] : null;
-    const nextPrimaryId = primaryId && normalizedIds.includes(primaryId) ? primaryId : fallbackPrimaryId;
+    const fallbackPrimaryId =
+      normalizedIds.length > 0 ? normalizedIds[normalizedIds.length - 1] : null;
+    const nextPrimaryId =
+      primaryId && normalizedIds.includes(primaryId) ? primaryId : fallbackPrimaryId;
 
     this.selectedElementIds.set(normalizedIds);
     this.selectedElementId.set(nextPrimaryId);
@@ -2458,7 +2460,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     if (selectedIds.includes(id)) {
       const nextIds = selectedIds.filter((selectedId) => selectedId !== id);
       const nextPrimaryId =
-        this.selectedElementId() === id ? (nextIds.length > 0 ? nextIds[nextIds.length - 1] : null) : this.selectedElementId();
+        this.selectedElementId() === id
+          ? nextIds.length > 0
+            ? nextIds[nextIds.length - 1]
+            : null
+          : this.selectedElementId();
       this.setSelectedElements(nextIds, nextPrimaryId);
       return;
     }
@@ -2498,10 +2504,15 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     this.dragSelectionIds = dragIds;
     this.dragSelectionStartBounds = new Map(
-      dragIds.map((id) => {
-        const element = this.el.findElementById(id, elements);
-        return [id, element ? this.el.getAbsoluteBounds(element, elements, this.currentPage()) : null];
-      }).filter((entry): entry is [string, Bounds] => entry[1] !== null),
+      dragIds
+        .map((id) => {
+          const element = this.el.findElementById(id, elements);
+          return [
+            id,
+            element ? this.el.getAbsoluteBounds(element, elements, this.currentPage()) : null,
+          ];
+        })
+        .filter((entry): entry is [string, Bounds] => entry[1] !== null),
     );
   }
 
@@ -4894,7 +4905,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     this.pages.set(structuredClone(snapshot.pages));
     this.currentPageId.set(snapshot.currentPageId);
     this.setSelectedElements(
-      snapshot.selectedElementIds ?? (snapshot.selectedElementId ? [snapshot.selectedElementId] : []),
+      snapshot.selectedElementIds ??
+        (snapshot.selectedElementId ? [snapshot.selectedElementId] : []),
       snapshot.selectedElementId,
     );
     this.currentTool.set('select');
@@ -5081,7 +5093,9 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       onDelete: (id) => {
         const selectedIds = this.getSelectionRootIds();
         const targetIds =
-          selectedIds.length > 1 && selectedIds.includes(id) ? selectedIds : this.getSelectionRootIds([id]);
+          selectedIds.length > 1 && selectedIds.includes(id)
+            ? selectedIds
+            : this.getSelectionRootIds([id]);
 
         this.runWithHistory(() => {
           this.updateCurrentPageElements((elements) => {

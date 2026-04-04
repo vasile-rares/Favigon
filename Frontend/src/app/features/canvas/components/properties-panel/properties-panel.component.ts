@@ -25,7 +25,6 @@ import {
   CanvasRotationMode,
   CanvasSemanticTag,
   CanvasSizeMode,
-  CanvasShadowPreset,
   CanvasSpacing,
   CanvasTransformOption,
   CanvasTextSpacingUnit,
@@ -85,6 +84,13 @@ import {
   supportsCanvasConstraintSizeMode,
   supportsCanvasSizeMode,
 } from '../../utils/canvas-sizing.util';
+import {
+  buildCanvasShadowCss,
+  DEFAULT_EDITABLE_CANVAS_SHADOW,
+  hasCanvasShadow,
+  normalizeCanvasShadowValue,
+  resolveEditableCanvasShadow,
+} from '../../utils/canvas-shadow.util';
 import { SupportedFramework } from '../../canvas.types';
 type PropertiesTab = 'design' | 'prototype';
 type CornerRadiusMode = 'full' | 'per-corner';
@@ -351,7 +357,10 @@ export class PropertiesPanelComponent {
     { label: 'No', value: false },
   ];
   readonly overflowOptions: CanvasOverflowMode[] = ['clip', 'visible'];
-  readonly shadowOptions: CanvasShadowPreset[] = ['sm', 'md', 'lg', 'xl'];
+  readonly shadowActivationPatch: Partial<CanvasElement> = {
+    shadow: buildCanvasShadowCss(DEFAULT_EDITABLE_CANVAS_SHADOW),
+  };
+  readonly shadowClearPatch: Partial<CanvasElement> = { shadow: undefined };
   readonly visibleOptions: readonly ToggleGroupOption[] = [
     { label: 'Yes', value: true },
     { label: 'No', value: false },
@@ -1073,9 +1082,7 @@ export class PropertiesPanelComponent {
     }));
   }
 
-  private getDimensionModeTriggerLabel(
-    mode: CanvasSizeMode | CanvasConstraintSizeMode,
-  ): string {
+  private getDimensionModeTriggerLabel(mode: CanvasSizeMode | CanvasConstraintSizeMode): string {
     switch (mode) {
       case 'fixed':
         return 'Fixed';
@@ -1257,8 +1264,8 @@ export class PropertiesPanelComponent {
     return element.overflow ?? 'clip';
   }
 
-  shadowValue(element: CanvasElement): CanvasShadowPreset {
-    return element.shadow ?? 'none';
+  shadowValue(element: CanvasElement): string | null {
+    return normalizeCanvasShadowValue(element.shadow) ?? null;
   }
 
   isVisible(element: CanvasElement): boolean {
@@ -1270,7 +1277,7 @@ export class PropertiesPanelComponent {
   }
 
   hasActiveShadow(element: CanvasElement): boolean {
-    return (element.shadow ?? 'none') !== 'none';
+    return hasCanvasShadow(element.shadow);
   }
 
   fillInputValue(element: CanvasElement): string {
@@ -1430,7 +1437,12 @@ export class PropertiesPanelComponent {
   }
 
   shadowSummary(element: CanvasElement): string {
-    return (element.shadow ?? 'none').toUpperCase();
+    if (!hasCanvasShadow(element.shadow)) {
+      return 'None';
+    }
+
+    const shadow = resolveEditableCanvasShadow(element.shadow);
+    return `${this.formatShadowMetric(shadow.x)}, ${this.formatShadowMetric(shadow.y)}, ${this.formatShadowMetric(shadow.spread)}`;
   }
 
   isTransparentFill(element: CanvasElement): boolean {
@@ -1444,6 +1456,10 @@ export class PropertiesPanelComponent {
 
   strokeSwatchBackground(element: CanvasElement): string {
     return this.strokeInputValue(element);
+  }
+
+  private formatShadowMetric(value: number): string {
+    return roundToTwoDecimals(value).toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   }
 
   setVisible(visible: boolean): void {

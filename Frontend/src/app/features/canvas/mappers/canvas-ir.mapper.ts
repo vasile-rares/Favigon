@@ -51,6 +51,7 @@ import {
   getCanvasSizeMode,
   getCanvasSizingValue,
 } from '../utils/canvas-sizing.util';
+import { normalizeCanvasShadowValue } from '../utils/canvas-shadow.util';
 
 const ROOT_ROLE = 'canvas-root';
 const ROOT_TYPE = 'Container';
@@ -361,8 +362,9 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     style.overflow = element.overflow;
   }
 
-  if (element.shadow) {
-    style.shadow = element.shadow;
+  const shadow = normalizeCanvasShadowValue(element.shadow);
+  if (shadow) {
+    style.shadow = shadow;
   }
 
   if (typeof element.cornerRadius === 'number') {
@@ -713,7 +715,7 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
       mappedType === 'frame'
         ? readOverflow(node.style?.overflow, readOverflowFromProps(node.props, 'clip'))
         : undefined,
-    shadow: readShadow(node.style?.shadow, 'none'),
+    shadow: readShadow(node.style?.shadow),
     text: mappedType === 'text' ? readStringProp(node.props, 'content', 'New text') : undefined,
     fontSize: mappedType === 'text' ? readLength(node.style?.fontSize, 16) : undefined,
     fontSizeUnit:
@@ -1092,13 +1094,8 @@ function normalizeExternalLinkUrl(value: string | undefined): string | undefined
   return `https://${normalized}`;
 }
 
-function readShadow(
-  value: unknown,
-  fallback: 'none' | 'sm' | 'md' | 'lg' | 'xl',
-): 'none' | 'sm' | 'md' | 'lg' | 'xl' {
-  return value === 'none' || value === 'sm' || value === 'md' || value === 'lg' || value === 'xl'
-    ? value
-    : fallback;
+function readShadow(value: unknown): string | undefined {
+  return normalizeCanvasShadowValue(value);
 }
 
 function readNumber(value: unknown, fallback: number): number {

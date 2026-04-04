@@ -8,6 +8,7 @@ export type CanvasFontSizeUnit = 'px' | 'rem';
 export type CanvasTextSpacingUnit = 'px' | 'em';
 export type CanvasOverflowMode = 'clip' | 'visible';
 export type CanvasShadowPreset = 'none' | 'sm' | 'md' | 'lg' | 'xl';
+export type CanvasShadow = string;
 export type CanvasPageViewportPreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
 export type CanvasLinkType = 'page' | 'url';
 export type CanvasSizeMode = 'fixed' | 'relative' | 'fill' | 'fit-content' | 'viewport';
@@ -117,7 +118,7 @@ export interface CanvasElement {
   cornerRadius?: number;
   cornerRadii?: CanvasCornerRadii;
   overflow?: CanvasOverflowMode;
-  shadow?: CanvasShadowPreset;
+  shadow?: CanvasShadow;
   text?: string;
   fontSize?: number;
   fontSizeUnit?: CanvasFontSizeUnit;
