@@ -934,6 +934,7 @@ export class PropertiesPanelComponent {
     const parent = this.parentElement(element);
     return this.dimensionModeDefinitions.map((definition) => ({
       label: definition.label,
+      triggerLabel: this.getDimensionModeTriggerLabel(definition.mode),
       value: definition.mode,
       disabled: !supportsCanvasSizeMode(definition.mode, element, parent),
     }));
@@ -1066,9 +1067,29 @@ export class PropertiesPanelComponent {
     const parent = this.parentElement(element);
     return this.dimensionConstraintModeDefinitions.map((definition) => ({
       label: definition.label,
+      triggerLabel: this.getDimensionModeTriggerLabel(definition.mode),
       value: definition.mode,
       disabled: !supportsCanvasConstraintSizeMode(definition.mode, element, parent),
     }));
+  }
+
+  private getDimensionModeTriggerLabel(
+    mode: CanvasSizeMode | CanvasConstraintSizeMode,
+  ): string {
+    switch (mode) {
+      case 'fixed':
+        return 'Fixed';
+      case 'relative':
+        return 'Rel';
+      case 'fill':
+        return 'Fill';
+      case 'fit-content':
+        return 'Fit';
+      case 'viewport':
+        return 'View';
+      default:
+        return 'Fixed';
+    }
   }
 
   dimensionConstraintInputValue(element: CanvasElement, field: DimensionConstraintField): number {

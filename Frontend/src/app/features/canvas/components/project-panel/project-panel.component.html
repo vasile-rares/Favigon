@@ -113,7 +113,7 @@
               <div
                 class="project-layer-item"
                 *ngFor="let layer of getLayerEntriesForPage(page.id); trackBy: trackByLayerId"
-                [class.active]="selectedElementId === layer.id"
+                [class.active]="isLayerSelected(layer.id)"
                 [class.hidden]="layer.isEffectivelyHidden"
                 [class.is-dragging]="isLayerDragging(page.id, layer.id)"
                 [class.is-drop-before]="isLayerDropTarget(page.id, layer.id, 'before')"
@@ -125,7 +125,7 @@
                 (dragover)="onLayerDragOver(page.id, layer, $event)"
                 (drop)="onLayerDrop(page.id, layer, $event)"
                 (dragend)="onLayerDragEnd()"
-                (click)="onLayerSelected(page.id, layer.id)"
+                (click)="onLayerSelected(page.id, layer.id, $event)"
                 (contextmenu)="onLayerContextMenu(page.id, layer.id, $event)">
                 <button
                   *ngIf="layer.hasChildren"

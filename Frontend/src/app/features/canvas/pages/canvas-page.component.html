@@ -10,6 +10,7 @@
       [canPastePage]="hasCopiedPage()"
       [elements]="elements()"
       [selectedElementId]="selectedElementId()"
+      [selectedElementIds]="selectedElementIds()"
       (pageSelected)="selectPage($event)"
       (pageLayerSelected)="selectPageWithoutFocus($event)"
       (pageCreateRequested)="addPage()"
@@ -233,7 +234,7 @@
               class="frame-title"
               *ngIf="el.type === 'frame' && !isNested && !isFrameTitleHiddenByHeader(el)"
               [class.frame-title-hovered]="hoveredFrameTitleId() === el.id && !isDraggingEl()"
-              [class.frame-title-selected]="selectedElementId() === el.id"
+              [class.frame-title-selected]="!hasMultipleElementSelection() && isElementSelected(el.id)"
               [style.left.px]="getRenderedX(el)"
               [style.top.px]="getRenderedY(el) + getFrameTitleOffset()"
               [style.width.px]="getRenderedWidth(el)"
@@ -249,12 +250,12 @@
               [class.layout-child]="isNested"
               [class.flow-child]="isFlow"
               [class.has-independent-stroke-surface]="usesIndependentStrokeSurface(el)"
-              [class.selected]="selectedElementId() === el.id"
+              [class.selected]="isPartOfMultipleSelection(el.id)"
               [class.editing]="isTextEditing(el.id)"
               [class.has-text]="el.type === 'text' && !!el.text"
               [class.frame]="el.type === 'frame'"
               [class.frame-hovered]="el.type === 'frame' && hoveredElementId() === el.id && !isDraggingEl()"
-              [class.frame-selected-body]="el.type === 'frame' && selectedElementId() === el.id"
+              [class.frame-selected-body]="el.type === 'frame' && !hasMultipleElementSelection() && isElementSelected(el.id)"
               [class.frame-reorder-animating]="!isNested && isRootFrame(el) && isFrameReorderAnimating() && selectedElementId() !== el.id"
               [class.frame-reorder-live]="!isNested && isRootFrame(el) && isDraggingEl() && selectedElementId() !== el.id"
               [class.rectangle]="el.type === 'rectangle'"
@@ -523,7 +524,7 @@
 
         <!-- Page shell selection outline (no resize handles) -->
         <div
-          *ngIf="selectedCanvasPageId() && !selectedElementId() && !isDraggingEl()"
+          *ngIf="selectedCanvasPageId() && selectedElementIds().length === 0 && !isDraggingEl()"
           class="page-shell-selection-outline"
           [style.left.px]="getPageShellSelectionLeft(selectedCanvasPageId()!)"
           [style.top.px]="getPageShellSelectionTop(selectedCanvasPageId()!)"
@@ -535,10 +536,25 @@
              Handles use fixed integer pixel sizes: no sub-pixel squishing. -->
         <ng-container *ngIf="!isDraggingEl()">
 
+          <ng-container *ngIf="hasMultipleElementSelection()">
+            <ng-container *ngFor="let el of visibleElements(); trackBy: trackByElementId">
+              <div
+                *ngIf="isPartOfMultipleSelection(el.id) && !isTextEditing(el.id)"
+                class="overlay-hover-outline overlay-hover-outline--selected"
+                [style.left.px]="getSelectionLeft(el)"
+                [style.top.px]="getSelectionTop(el)"
+                [style.width.px]="getSelectionWidth(el)"
+                [style.height.px]="getSelectionHeight(el)"
+                [style.transform]="getElementTransform(el)"
+                [style.transform-origin]="getElementTransformOrigin(el)">
+              </div>
+            </ng-container>
+          </ng-container>
+
           <!-- Hover outline (visual only, no pointer events) -->
           <ng-container *ngFor="let el of visibleElements(); trackBy: trackByElementId">
             <div
-              *ngIf="hoveredElementId() === el.id && el.type !== 'frame' && !isTextEditing(el.id)"
+              *ngIf="hoveredElementId() === el.id && el.type !== 'frame' && !isTextEditing(el.id) && !isPartOfMultipleSelection(el.id)"
               class="overlay-hover-outline"
               [style.left.px]="getSelectionLeft(el)"
               [style.top.px]="getSelectionTop(el)"

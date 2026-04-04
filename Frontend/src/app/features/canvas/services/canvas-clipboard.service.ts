@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { CanvasElement, CanvasElementType } from '../../../core/models/canvas.models';
 import { roundToTwoDecimals, clamp, collectSubtreeIds } from '../utils/canvas-interaction.util';
-import { CanvasClipboardSnapshot, Bounds } from '../canvas.types';
+import { CanvasClipboardPasteResult, CanvasClipboardSnapshot, Bounds } from '../canvas.types';
 import { CanvasElementService } from './canvas-element.service';
 
 const PASTE_OFFSET = 24;
@@ -17,18 +17,23 @@ export class CanvasClipboardService {
 
   // ── Copy ──────────────────────────────────────────────────
 
-  copySubtree(selectedId: string, elements: CanvasElement[], currentPageId: string | null): void {
-    const subtreeIds = new Set(collectSubtreeIds(elements, selectedId));
+  copySelection(
+    selectedIds: string[],
+    elements: CanvasElement[],
+    currentPageId: string | null,
+  ): void {
+    const rootIds = this.getSelectionRootIds(selectedIds, elements);
+    const subtreeIds = new Set(rootIds.flatMap((id) => collectSubtreeIds(elements, id)));
     const copiedElements = elements
       .filter((element) => subtreeIds.has(element.id))
       .map((element) => structuredClone(element));
 
-    if (copiedElements.length === 0) {
+    if (copiedElements.length === 0 || rootIds.length === 0) {
       return;
     }
 
     this.snapshot = {
-      rootId: selectedId,
+      rootIds,
       sourcePageId: currentPageId,
       pasteCount: 0,
       elements: copiedElements,
@@ -37,19 +42,24 @@ export class CanvasClipboardService {
 
   // ── Paste ─────────────────────────────────────────────────
 
-  paste(currentElements: CanvasElement[], targetParentId: string | null): CanvasElement[] | null {
+  paste(
+    currentElements: CanvasElement[],
+    targetParentId: string | null,
+  ): CanvasClipboardPasteResult | null {
     const clipboard = this.snapshot;
     if (!clipboard) {
       return null;
     }
 
-    const rootElement = clipboard.elements.find((element) => element.id === clipboard.rootId);
-    if (!rootElement) {
+    const rootElements = clipboard.rootIds
+      .map((rootId) => clipboard.elements.find((element) => element.id === rootId) ?? null)
+      .filter((element): element is CanvasElement => element !== null);
+    if (rootElements.length === 0) {
       return null;
     }
 
     const pastedElements = this.createPastedElements(clipboard, currentElements, targetParentId);
-    if (pastedElements.length === 0) {
+    if (!pastedElements || pastedElements.elements.length === 0) {
       return null;
     }
 
@@ -70,23 +80,27 @@ export class CanvasClipboardService {
       return { parentId: null, error: null };
     }
 
-    const rootElement = clipboard.elements.find((element) => element.id === clipboard.rootId);
-    if (!rootElement) {
+    const rootElements = clipboard.rootIds
+      .map((rootId) => clipboard.elements.find((element) => element.id === rootId) ?? null)
+      .filter((element): element is CanvasElement => element !== null);
+    if (rootElements.length === 0) {
       return { parentId: null, error: null };
     }
 
-    if (rootElement.type === 'frame') {
-      return { parentId: null, error: null };
-    }
-
-    const originalParentId = rootElement.parentId ?? null;
+    const sharedOriginalParentId = this.getSharedParentId(rootElements);
     if (
-      originalParentId &&
+      sharedOriginalParentId !== undefined &&
+      sharedOriginalParentId !== null &&
       currentElements.some(
-        (element) => element.id === originalParentId && this.canContainPastedChildren(element.type),
+        (element) =>
+          element.id === sharedOriginalParentId && this.canContainPastedChildren(element.type),
       )
     ) {
-      return { parentId: originalParentId, error: null };
+      return { parentId: sharedOriginalParentId, error: null };
+    }
+
+    if (sharedOriginalParentId === null) {
+      return { parentId: null, error: null };
     }
 
     if (selectedContainer) {
@@ -95,7 +109,10 @@ export class CanvasClipboardService {
 
     return {
       parentId: null,
-      error: 'Select a destination frame or container before pasting this element.',
+      error:
+        rootElements.length > 1
+          ? 'Select a destination frame or container before pasting these elements.'
+          : 'Select a destination frame or container before pasting this element.',
     };
   }
 
@@ -105,35 +122,65 @@ export class CanvasClipboardService {
     clipboard: CanvasClipboardSnapshot,
     currentElements: CanvasElement[],
     targetParentId: string | null,
-  ): CanvasElement[] {
-    const rootElement = clipboard.elements.find((element) => element.id === clipboard.rootId);
-    if (!rootElement) {
-      return [];
+  ): CanvasClipboardPasteResult | null {
+    const rootElements = clipboard.rootIds
+      .map((rootId) => clipboard.elements.find((element) => element.id === rootId) ?? null)
+      .filter((element): element is CanvasElement => element !== null);
+    if (rootElements.length === 0) {
+      return null;
     }
 
     const idMap = new Map(clipboard.elements.map((element) => [element.id, crypto.randomUUID()]));
     const targetParent = targetParentId
       ? (currentElements.find((element) => element.id === targetParentId) ?? null)
       : null;
+    const sharedOriginalParentId = this.getSharedParentId(rootElements);
+    const rootBoundsById = new Map(
+      rootElements.map((element) => [
+        element.id,
+        this.elementService.getAbsoluteBounds(element, clipboard.elements),
+      ]),
+    );
+    const groupBounds = this.getCombinedBounds(Array.from(rootBoundsById.values()));
+    if (!groupBounds) {
+      return null;
+    }
     const offset = PASTE_OFFSET * (clipboard.pasteCount + 1);
+    const rootIds = new Set(clipboard.rootIds);
 
-    return clipboard.elements.map((element) => {
+    const pastedElements = clipboard.elements.map((element) => {
       const cloned = structuredClone(element);
       cloned.id = idMap.get(element.id) ?? crypto.randomUUID();
 
-      if (element.id === clipboard.rootId) {
+      if (rootIds.has(element.id)) {
+        const rootBounds = rootBoundsById.get(element.id);
+        if (!rootBounds) {
+          return cloned;
+        }
+
         cloned.parentId = targetParentId;
         cloned.position = this.elementService.getDefaultPositionForPlacement(
           cloned.type,
           targetParent,
         );
 
+        const shouldPreserveLocalOffset = sharedOriginalParentId === targetParentId;
+        const relativeX = shouldPreserveLocalOffset
+          ? element.x + offset
+          : rootBounds.x - groupBounds.x + offset;
+        const relativeY = shouldPreserveLocalOffset
+          ? element.y + offset
+          : rootBounds.y - groupBounds.y + offset;
+
         if (targetParent) {
-          cloned.x = clamp(element.x + offset, 0, targetParent.width - element.width);
-          cloned.y = clamp(element.y + offset, 0, targetParent.height - element.height);
-        } else {
+          cloned.x = clamp(relativeX, 0, targetParent.width - element.width);
+          cloned.y = clamp(relativeY, 0, targetParent.height - element.height);
+        } else if (shouldPreserveLocalOffset) {
           cloned.x = roundToTwoDecimals(element.x + offset);
           cloned.y = roundToTwoDecimals(element.y + offset);
+        } else {
+          cloned.x = roundToTwoDecimals(rootBounds.x - groupBounds.x + offset);
+          cloned.y = roundToTwoDecimals(rootBounds.y - groupBounds.y + offset);
         }
 
         return cloned;
@@ -142,9 +189,68 @@ export class CanvasClipboardService {
       cloned.parentId = element.parentId ? (idMap.get(element.parentId) ?? null) : null;
       return cloned;
     });
+
+    const pastedRootIds: string[] = [];
+    for (const rootId of clipboard.rootIds) {
+      const pastedRootId = idMap.get(rootId);
+      if (pastedRootId) {
+        pastedRootIds.push(pastedRootId);
+      }
+    }
+
+    return {
+      elements: pastedElements,
+      rootIds: pastedRootIds,
+    };
   }
 
   private canContainPastedChildren(type: CanvasElementType): boolean {
     return type === 'frame' || type === 'rectangle';
+  }
+
+  private getSelectionRootIds(selectedIds: string[], elements: CanvasElement[]): string[] {
+    const selectedIdSet = new Set(selectedIds);
+
+    return selectedIds.filter((selectedId) => {
+      let parentId = elements.find((element) => element.id === selectedId)?.parentId ?? null;
+      while (parentId) {
+        if (selectedIdSet.has(parentId)) {
+          return false;
+        }
+
+        parentId = elements.find((element) => element.id === parentId)?.parentId ?? null;
+      }
+
+      return true;
+    });
+  }
+
+  private getSharedParentId(elements: CanvasElement[]): string | null | undefined {
+    if (elements.length === 0) {
+      return undefined;
+    }
+
+    const firstParentId = elements[0].parentId ?? null;
+    return elements.every((element) => (element.parentId ?? null) === firstParentId)
+      ? firstParentId
+      : undefined;
+  }
+
+  private getCombinedBounds(boundsList: Bounds[]): Bounds | null {
+    if (boundsList.length === 0) {
+      return null;
+    }
+
+    const left = Math.min(...boundsList.map((bounds) => bounds.x));
+    const top = Math.min(...boundsList.map((bounds) => bounds.y));
+    const right = Math.max(...boundsList.map((bounds) => bounds.x + bounds.width));
+    const bottom = Math.max(...boundsList.map((bounds) => bounds.y + bounds.height));
+
+    return {
+      x: roundToTwoDecimals(left),
+      y: roundToTwoDecimals(top),
+      width: roundToTwoDecimals(right - left),
+      height: roundToTwoDecimals(bottom - top),
+    };
   }
 }

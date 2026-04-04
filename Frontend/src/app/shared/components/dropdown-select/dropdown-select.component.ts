@@ -5,6 +5,7 @@ import { TextInputComponent } from '../text-input/text-input.component';
 
 export interface DropdownSelectOption {
   label: string;
+  triggerLabel?: string;
   value: string | number | boolean;
   disabled?: boolean;
 }
@@ -29,6 +30,7 @@ export class DropdownSelectComponent implements ControlValueAccessor {
   isOpen = false;
   isClosing = false;
   openDirection: 'below' | 'above' = 'below';
+  openAlignment: 'start' | 'end' = 'start';
   searchQuery = '';
   selectedValue: string | number | boolean | null = null;
 
@@ -52,9 +54,9 @@ export class DropdownSelectComponent implements ControlValueAccessor {
     return !!control && control.invalid && (control.dirty || control.touched);
   }
 
-  get selectedLabel(): string {
+  get selectedTriggerLabel(): string {
     const selectedOption = this.options.find((option) => option.value === this.selectedValue);
-    return selectedOption?.label ?? '';
+    return selectedOption?.triggerLabel ?? selectedOption?.label ?? '';
   }
 
   get filteredOptions(): DropdownSelectOption[] {
@@ -171,9 +173,17 @@ export class DropdownSelectComponent implements ControlValueAccessor {
       const availableBelow = Math.max(0, window.innerHeight - triggerRect.bottom - 12);
       const availableAbove = Math.max(0, triggerRect.top - 12);
       const desiredHeight = Math.min(panel.scrollHeight, window.innerHeight - 24);
+      const desiredWidth = Math.min(
+        Math.max(panel.scrollWidth, triggerRect.width),
+        window.innerWidth - 24,
+      );
+      const availableRight = Math.max(0, window.innerWidth - triggerRect.left - 12);
+      const availableLeft = Math.max(0, triggerRect.right - 12);
 
       this.openDirection =
         availableBelow < desiredHeight && availableAbove > availableBelow ? 'above' : 'below';
+      this.openAlignment =
+        availableRight < desiredWidth && availableLeft > availableRight ? 'end' : 'start';
     });
   }
 }

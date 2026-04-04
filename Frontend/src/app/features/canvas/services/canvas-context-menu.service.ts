@@ -42,7 +42,7 @@ export class CanvasContextMenuService {
 
   private buildItems(callbacks: ContextMenuActionCallbacks): ContextMenuItem[] {
     const element = this.editorState.selectedElement();
-    const hasElement = !!element;
+    const hasElement = this.editorState.selectedElementIds().length > 0;
     const isVisible = element?.visible !== false;
     const isRootFrame = element?.type === 'frame' && !element.parentId;
     const otherPages = this.editorState

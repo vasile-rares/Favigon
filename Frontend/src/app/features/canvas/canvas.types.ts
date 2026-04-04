@@ -90,6 +90,7 @@ export interface HistorySnapshot {
   pages: CanvasPageModel[];
   currentPageId: string | null;
   selectedElementId: string | null;
+  selectedElementIds: string[];
 }
 
 export interface SnapLine {
@@ -98,8 +99,13 @@ export interface SnapLine {
 }
 
 export interface CanvasClipboardSnapshot {
-  rootId: string;
+  rootIds: string[];
   sourcePageId: string | null;
   pasteCount: number;
   elements: CanvasElement[];
+}
+
+export interface CanvasClipboardPasteResult {
+  elements: CanvasElement[];
+  rootIds: string[];
 }

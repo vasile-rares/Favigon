@@ -103,7 +103,10 @@
   position: absolute;
   top: calc(100% + 0.4rem);
   left: 0;
-  right: 0;
+  right: auto;
+  width: max-content;
+  min-width: 100%;
+  max-width: min(22rem, calc(100vw - 24px));
   border-radius: 16px;
   background: linear-gradient(137deg, rgba(17, 18, 20, 0.75) 4.87%, rgba(12, 13, 15, 0.9) 75.88%);
   backdrop-filter: blur(10px);
@@ -115,6 +118,11 @@
   z-index: 40;
   overflow: hidden;
   transform-origin: top center;
+}
+
+.dropdown-select__panel--align-end {
+  left: auto;
+  right: 0;
 }
 
 .dropdown-select__panel--above {
@@ -159,6 +167,7 @@
 }
 
 .dropdown-select__list {
+  min-width: 100%;
   max-height: 220px;
   overflow-y: auto;
   padding: 0.35rem; /* slightly bulkier padding for modern aesthetic */
@@ -176,7 +185,8 @@
 }
 
 .dropdown-select__item {
-  width: 100%;
+  width: auto;
+  min-width: 100%;
   border: none;
   background: transparent;
   color: var(--canvas-panel-section-body-color, var(--color-text-light));
@@ -185,6 +195,7 @@
   text-align: left;
   font-size: var(--canvas-panel-font-size, 0.875rem);
   font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
   transition: background-color 0.2s;
 }

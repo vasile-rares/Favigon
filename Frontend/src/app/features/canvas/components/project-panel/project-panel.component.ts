@@ -80,6 +80,7 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
   @Input() canPastePage = false;
   @Input() elements: CanvasElement[] = [];
   @Input() selectedElementId: string | null = null;
+  @Input() selectedElementIds: string[] = [];
 
   @Output() pageSelected = new EventEmitter<string>();
   @Output() pageLayerSelected = new EventEmitter<string>();
@@ -89,7 +90,7 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
   @Output() pageDuplicateRequested = new EventEmitter<string>();
   @Output() pageDeleteRequested = new EventEmitter<string>();
   @Output() pageNameChanged = new EventEmitter<{ id: string; name: string }>();
-  @Output() layerSelected = new EventEmitter<{ pageId: string; id: string }>();
+  @Output() layerSelected = new EventEmitter<{ pageId: string; id: string; additive: boolean }>();
   @Output() layerNameChanged = new EventEmitter<{ pageId: string; id: string; name: string }>();
   @Output() layerVisibilityToggled = new EventEmitter<{ pageId: string; id: string }>();
   @Output() layerMoved = new EventEmitter<{
@@ -388,9 +389,9 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
     this.pageDeleteRequested.emit(pageId);
   }
 
-  onLayerSelected(pageId: string, id: string): void {
+  onLayerSelected(pageId: string, id: string, event?: MouseEvent): void {
     this.closePageMenu();
-    this.layerSelected.emit({ pageId, id });
+    this.layerSelected.emit({ pageId, id, additive: !!event?.shiftKey });
   }
 
   onLayerNameInput(event: Event): void {
@@ -400,8 +401,12 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
   onLayerNameClick(pageId: string, id: string, event: MouseEvent): void {
     event.stopPropagation();
     if (this.editingLayerId !== id) {
-      this.layerSelected.emit({ pageId, id });
+      this.layerSelected.emit({ pageId, id, additive: event.shiftKey });
     }
+  }
+
+  isLayerSelected(id: string): boolean {
+    return this.selectedElementIds.includes(id) || this.selectedElementId === id;
   }
 
   startRename(id: string, event?: MouseEvent): void {

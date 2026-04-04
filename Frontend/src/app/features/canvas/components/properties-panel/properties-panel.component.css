@@ -384,6 +384,21 @@
   width: 100%;
 }
 
+.pp-dimension-mode-control ::ng-deep .dropdown-select__trigger {
+  gap: 0.2rem;
+  padding-left: 0.5rem;
+  padding-right: 0.15rem;
+}
+
+.pp-dimension-mode-control ::ng-deep .dropdown-select__trigger-text {
+  font-size: var(--canvas-panel-font-size);
+  text-align: left;
+}
+
+.pp-dimension-mode-control ::ng-deep .dropdown-select__trigger-icon {
+  padding: 0.05rem;
+}
+
 .pp-style-control--dropdown app-dropdown-select {
   display: block;
   width: 100%;

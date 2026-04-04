@@ -382,6 +382,14 @@
     0 8px 22px rgba(0, 0, 0, 0.28);
 }
 
+.canvas-element.selected:not(.frame-selected-body) {
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.55);
+}
+
+.canvas-element.text.selected {
+  border-radius: 2px;
+}
+
 .frame-title {
   position: absolute;
   max-width: 100%;
@@ -458,7 +466,7 @@
   width: 12px;
   height: 12px;
   padding: 0;
-  cursor: nesw-resize;
+  cursor: nesw-resize !important;
   pointer-events: auto;
   z-index: 2;
 }
@@ -477,16 +485,16 @@
 }
 
 .handle-nw {
-  cursor: nwse-resize;
+  cursor: nwse-resize !important;
 }
 .handle-ne {
-  cursor: nesw-resize;
+  cursor: nesw-resize !important;
 }
 .handle-sw {
-  cursor: nesw-resize;
+  cursor: nesw-resize !important;
 }
 .handle-se {
-  cursor: nwse-resize;
+  cursor: nwse-resize !important;
 }
 
 .corner-zone {
@@ -496,32 +504,31 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: grab;
   pointer-events: auto;
-
-  &:active {
-    cursor: grabbing;
-  }
 }
 
 .corner-zone-nw {
   top: -12px;
   left: -12px;
+  cursor: nwse-resize !important;
 }
 
 .corner-zone-ne {
   top: -12px;
   right: -12px;
+  cursor: nesw-resize !important;
 }
 
 .corner-zone-sw {
   bottom: -12px;
   left: -12px;
+  cursor: nesw-resize !important;
 }
 
 .corner-zone-se {
   bottom: -12px;
   right: -12px;
+  cursor: nwse-resize !important;
 }
 
 .edge-hit {
@@ -535,7 +542,7 @@
   height: 8px;
   left: 16px;
   right: 16px;
-  cursor: ns-resize;
+  cursor: ns-resize !important;
 }
 
 .edge-hit-s {
@@ -543,7 +550,7 @@
   height: 8px;
   left: 16px;
   right: 16px;
-  cursor: ns-resize;
+  cursor: ns-resize !important;
 }
 
 .edge-hit-e {
@@ -551,7 +558,7 @@
   width: 8px;
   top: 16px;
   bottom: 16px;
-  cursor: ew-resize;
+  cursor: ew-resize !important;
 }
 
 .edge-hit-w {
@@ -559,7 +566,7 @@
   width: 8px;
   top: 16px;
   bottom: 16px;
-  cursor: ew-resize;
+  cursor: ew-resize !important;
 }
 
 /* ── Smart Snap Guide Lines ───────────────────────────────── */
@@ -589,5 +596,9 @@
   position: absolute;
   pointer-events: none;
   border: 2px solid var(--color-brand-primary);
+  z-index: 9;
+}
+
+.overlay-hover-outline--selected {
   z-index: 9;
 }

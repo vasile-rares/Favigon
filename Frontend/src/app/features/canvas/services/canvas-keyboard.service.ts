@@ -97,7 +97,7 @@ export class CanvasKeyboardService {
     }
 
     if (event.key === 'Delete' || event.key === 'Backspace') {
-      if (!this.editorState.selectedElementId()) {
+      if (this.editorState.selectedElementIds().length === 0) {
         return;
       }
       callbacks.onDelete();

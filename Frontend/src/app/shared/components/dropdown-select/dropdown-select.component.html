@@ -16,8 +16,8 @@
     [attr.aria-expanded]="isOpen"
     [attr.aria-haspopup]="'listbox'"
     (click)="toggleOpen()">
-    <span class="dropdown-select__trigger-text" [class.dropdown-select__trigger-text--placeholder]="!selectedLabel">
-      {{ selectedLabel || placeholder }}
+    <span class="dropdown-select__trigger-text" [class.dropdown-select__trigger-text--placeholder]="!selectedTriggerLabel">
+      {{ selectedTriggerLabel || placeholder }}
     </span>
     <span class="dropdown-select__trigger-icon" [class.dropdown-select__trigger-icon--open]="isOpen" aria-hidden="true">
       <svg class="dropdown-select__trigger-icon-svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -30,6 +30,7 @@
     <div
       class="dropdown-select__panel"
       [class.dropdown-select__panel--above]="openDirection === 'above'"
+      [class.dropdown-select__panel--align-end]="openAlignment === 'end'"
       [class.dropdown-select__panel--open]="isOpen && !isClosing"
       [class.dropdown-select__panel--closing]="isClosing"
       role="listbox">

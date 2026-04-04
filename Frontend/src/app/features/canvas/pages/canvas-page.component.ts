@@ -153,6 +153,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   readonly currentPageId = this.editorState.currentPageId;
   readonly editingCanvasHeaderPageId = signal<string | null>(null);
   readonly selectedElementId = this.editorState.selectedElementId;
+  readonly selectedElementIds = this.editorState.selectedElementIds;
   readonly editingTextElementId = this.editorState.editingTextElementId;
   readonly currentTool = this.editorState.currentTool;
   readonly layersFocusedPageId = signal<string | null>(null);
@@ -191,6 +192,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   readonly currentPage = this.editorState.currentPage;
   readonly elements = this.editorState.elements;
   readonly selectedElement = this.editorState.selectedElement;
+  readonly selectedElements = this.editorState.selectedElements;
 
   readonly visibleElements = computed<CanvasElement[]>(() =>
     this.elements().filter((element) =>
@@ -283,6 +285,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private dragOffset: Point = { x: 0, y: 0 };
   private dragStartAbsolute: Point = { x: 0, y: 0 };
+  private dragSelectionIds: string[] = [];
+  private dragSelectionStartBounds = new Map<string, Bounds>();
   private _isDragging = false;
   private get isDragging(): boolean {
     return this._isDragging;
@@ -1301,7 +1305,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
           this.editingTextElementId.set(null);
         }
         this.clearSelectedPageLayer();
-        this.selectedElementId.set(null);
+        this.clearElementSelection();
         this.layersFocusedPageId.set(null);
       }
       return;
@@ -1364,18 +1368,34 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     this.clearSelectedPageLayer();
 
-    if (elementForTypeCheck?.type === 'frame' && this.selectedElementId() !== id) {
+    if (event.shiftKey && this.currentTool() === 'select') {
       event.preventDefault();
       event.stopPropagation();
       this.layersFocusedPageId.set(this.currentPageId());
-      this.selectedElementId.set(null);
+      this.toggleElementSelection(id);
+      return;
+    }
+
+    if (
+      elementForTypeCheck?.type === 'frame' &&
+      !elementForTypeCheck.parentId &&
+      !this.isElementSelected(id)
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.layersFocusedPageId.set(this.currentPageId());
+      this.clearElementSelection();
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
     this.layersFocusedPageId.set(this.currentPageId());
-    this.selectedElementId.set(id);
+    if (!this.isElementSelected(id)) {
+      this.selectOnlyElement(id);
+    } else {
+      this.selectedElementId.set(id);
+    }
 
     if (this.currentTool() !== 'select') {
       const selectedContainer = this.el.getSelectedContainer(this.selectedElement());
@@ -1406,10 +1426,12 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     let bounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
+    this.captureDragSelectionState(id);
+    const isGroupDrag = this.dragSelectionIds.length > 1;
 
     // Detect flow child inside layout container — use visual position from cache
     const parent = this.el.findElementById(element.parentId ?? null, this.elements());
-    if (parent && this.isLayoutContainer(parent) && this.isChildInFlow(element)) {
+    if (!isGroupDrag && parent && this.isLayoutContainer(parent) && this.isChildInFlow(element)) {
       this.draggingFlowChildId.set(element.id);
       const liveSceneBounds = this.getLiveOverlaySceneBounds(element);
       const liveCanvasBounds = this.getLiveElementCanvasBounds(element);
@@ -1446,7 +1468,18 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     this.clearSelectedPageLayer();
-    this.selectedElementId.set(id);
+    if (event.shiftKey && this.currentTool() === 'select') {
+      event.preventDefault();
+      this.layersFocusedPageId.set(this.currentPageId());
+      this.toggleElementSelection(id);
+      return;
+    }
+
+    if (!this.isElementSelected(id)) {
+      this.selectOnlyElement(id);
+    } else {
+      this.selectedElementId.set(id);
+    }
     this.layersFocusedPageId.set(this.currentPageId());
 
     if (this.currentTool() !== 'select') {
@@ -1465,6 +1498,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     const bounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
+    this.captureDragSelectionState(id);
     this.beginGestureHistory();
     this.hasMovedElementDuringDrag = false;
     this.isDragging = true;
@@ -1480,7 +1514,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
     this.clearSelectedPageLayer();
     this.layersFocusedPageId.set(this.currentPageId());
-    this.selectedElementId.set(id);
+    this.selectOnlyElement(id);
     this.editingTextElementId.set(id);
     this.focusInlineTextEditor(id);
   }
@@ -1593,7 +1627,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     const bounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
     this.captureResizeSubtreeSnapshot(id, this.elements());
-    this.selectedElementId.set(id);
+    this.selectOnlyElement(id);
     this.beginGestureHistory();
     this.isDragging = false;
     this.isResizing = true;
@@ -1631,7 +1665,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const centerY = bounds.y + element.height / 2;
     const startAngle = Math.atan2(pointer.y - centerY, pointer.x - centerX) * (180 / Math.PI);
 
-    this.selectedElementId.set(id);
+    this.selectOnlyElement(id);
     this.beginGestureHistory();
     this.isDragging = false;
     this.isResizing = false;
@@ -1662,7 +1696,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const bounds =
       this.getLiveElementCanvasBounds(element) ??
       this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
-    this.selectedElementId.set(id);
+    this.selectOnlyElement(id);
     this.beginGestureHistory();
     this.isDragging = false;
     this.isResizing = false;
@@ -1764,7 +1798,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     this.history.commitGestureHistory(() => this.createHistorySnapshot());
   }
 
-  onLayerSelected(event: { pageId: string; id: string }): void {
+  onLayerSelected(event: { pageId: string; id: string; additive: boolean }): void {
     const shouldPreserveAllPagesView = this.layersFocusedPageId() === null;
 
     if (event.pageId !== this.currentPageId()) {
@@ -1776,7 +1810,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     this.clearSelectedPageLayer();
-    this.selectedElementId.set(event.id);
+    if (event.additive) {
+      this.toggleElementSelection(event.id);
+    } else {
+      this.selectOnlyElement(event.id);
+    }
     this.currentTool.set('select');
   }
 
@@ -1878,7 +1916,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) => [...elements, frame]);
-      this.selectedElementId.set(frame.id);
+      this.selectOnlyElement(frame.id);
       this.currentTool.set('select');
     });
 
@@ -1901,7 +1939,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     event.preventDefault();
     event.stopPropagation();
     this.clearSelectedPageLayer();
-    this.selectedElementId.set(id);
+    if (!this.isElementSelected(id)) {
+      this.selectOnlyElement(id);
+    } else {
+      this.selectedElementId.set(id);
+    }
     this.contextMenu.open(event.clientX, event.clientY, this.buildContextMenuCallbacks());
   }
 
@@ -1917,7 +1959,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     this.clearSelectedPageLayer();
-    this.selectedElementId.set(event.id);
+    if (!this.isElementSelected(event.id)) {
+      this.selectOnlyElement(event.id);
+    } else {
+      this.selectedElementId.set(event.id);
+    }
     this.contextMenu.open(event.x, event.y, this.buildContextMenuCallbacks());
   }
 
@@ -2007,6 +2053,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
+    const isGroupDrag = this.dragSelectionIds.length > 1;
+
     let absoluteX = pointer.x - this.dragOffset.x;
     let absoluteY = pointer.y - this.dragOffset.y;
     const dragDistance = Math.hypot(
@@ -2029,6 +2077,46 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       } else {
         absoluteX = this.dragStartAbsolute.x;
       }
+    }
+
+    if (isGroupDrag) {
+      this.snapLines.set([]);
+
+      const deltaX = absoluteX - this.dragStartAbsolute.x;
+      const deltaY = absoluteY - this.dragStartAbsolute.y;
+
+      this.updateCurrentPageElements((elements) =>
+        elements.map((element) => {
+          if (!this.dragSelectionIds.includes(element.id)) {
+            return element;
+          }
+
+          const startBounds = this.dragSelectionStartBounds.get(element.id);
+          if (!startBounds) {
+            return element;
+          }
+
+          const nextAbsoluteX = startBounds.x + deltaX;
+          const nextAbsoluteY = startBounds.y + deltaY;
+          const parent = this.el.findElementById(element.parentId ?? null, elements);
+
+          if (!parent) {
+            return {
+              ...element,
+              x: roundToTwoDecimals(nextAbsoluteX),
+              y: roundToTwoDecimals(nextAbsoluteY),
+            };
+          }
+
+          const parentBounds = this.el.getAbsoluteBounds(parent, elements, this.currentPage());
+          return {
+            ...element,
+            x: clamp(nextAbsoluteX - parentBounds.x, 0, parent.width - element.width),
+            y: clamp(nextAbsoluteY - parentBounds.y, 0, parent.height - element.height),
+          };
+        }),
+      );
+      return;
     }
 
     // ── Flow child drag (reorder within layout container) ──
@@ -2148,6 +2236,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     const selectedOnDrop = this.selectedElement();
     const prevParentId = selectedOnDrop?.parentId ?? null;
+    const isGroupDrag = this.dragSelectionIds.length > 1;
     const shouldCommitGestureHistory =
       this.isDragging ||
       this.isResizing ||
@@ -2159,22 +2248,23 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       // ── Flow child drop (reorder or detach) ──
       if (this.draggingFlowChildId()) {
         this.commitFlowChildDrop();
-      } else {
+      } else if (!isGroupDrag) {
         this.autoGroupOnDrop();
-      }
-      if (selectedOnDrop?.type === 'frame' && !selectedOnDrop.parentId) {
-        this.alignRootFramesOnDrop();
-      }
-      if (selectedOnDrop) {
-        this.updateCurrentPageElements((elements) =>
-          this.breakSyncOnParentChange(selectedOnDrop.id, prevParentId, elements),
-        );
+        if (selectedOnDrop?.type === 'frame' && !selectedOnDrop.parentId) {
+          this.alignRootFramesOnDrop();
+        }
+        if (selectedOnDrop) {
+          this.updateCurrentPageElements((elements) =>
+            this.breakSyncOnParentChange(selectedOnDrop.id, prevParentId, elements),
+          );
+        }
       }
     }
 
     if (
       (this.isResizing || (this.isDragging && this.hasMovedElementDuringDrag)) &&
-      selectedOnDrop
+      selectedOnDrop &&
+      !isGroupDrag
     ) {
       this.updateCurrentPageElements((elements) => {
         const freshEl = elements.find((e) => e.id === selectedOnDrop.id) ?? null;
@@ -2212,6 +2302,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     this.flowDragPlaceholder.set(null);
     this.draggingFlowChildId.set(null);
     this.layoutDropTarget.set(null);
+    this.dragSelectionIds = [];
+    this.dragSelectionStartBounds = new Map();
 
     if (shouldCommitGestureHistory) {
       this.history.commitGestureHistory(() => this.createHistorySnapshot());
@@ -2316,14 +2408,117 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   getSelectionOverlayElement(): CanvasElement | null {
+    if (this.selectedElementIds().length !== 1) {
+      return null;
+    }
+
     const sel = this.selectedElement();
     if (!sel) return null;
     if (sel.type === 'text' && !sel.text?.length) return null;
     return sel;
   }
 
+  isElementSelected(id: string): boolean {
+    return this.selectedElementIds().includes(id);
+  }
+
+  hasMultipleElementSelection(): boolean {
+    return this.selectedElementIds().length > 1;
+  }
+
+  isPartOfMultipleSelection(id: string): boolean {
+    return this.hasMultipleElementSelection() && this.isElementSelected(id);
+  }
+
   showSelectionHandles(element: CanvasElement): boolean {
     return element.type !== 'text';
+  }
+
+  private clearElementSelection(): void {
+    this.selectedElementIds.set([]);
+    this.selectedElementId.set(null);
+  }
+
+  private selectOnlyElement(id: string): void {
+    this.selectedElementIds.set([id]);
+    this.selectedElementId.set(id);
+  }
+
+  private setSelectedElements(ids: string[], primaryId: string | null = null): void {
+    const normalizedIds = this.normalizeSelectedElementIds(ids);
+    const fallbackPrimaryId = normalizedIds.length > 0 ? normalizedIds[normalizedIds.length - 1] : null;
+    const nextPrimaryId = primaryId && normalizedIds.includes(primaryId) ? primaryId : fallbackPrimaryId;
+
+    this.selectedElementIds.set(normalizedIds);
+    this.selectedElementId.set(nextPrimaryId);
+  }
+
+  private toggleElementSelection(id: string): void {
+    const selectedIds = this.selectedElementIds();
+    if (selectedIds.includes(id)) {
+      const nextIds = selectedIds.filter((selectedId) => selectedId !== id);
+      const nextPrimaryId =
+        this.selectedElementId() === id ? (nextIds.length > 0 ? nextIds[nextIds.length - 1] : null) : this.selectedElementId();
+      this.setSelectedElements(nextIds, nextPrimaryId);
+      return;
+    }
+
+    this.setSelectedElements([...selectedIds, id], id);
+  }
+
+  private normalizeSelectedElementIds(ids: string[]): string[] {
+    const availableIds = new Set(this.elements().map((element) => element.id));
+    return [...new Set(ids)].filter((id) => availableIds.has(id));
+  }
+
+  private getSelectionRootIds(
+    ids: string[] = this.selectedElementIds(),
+    elements: CanvasElement[] = this.elements(),
+  ): string[] {
+    const selectedIdSet = new Set(ids);
+
+    return ids.filter((id) => {
+      let parentId = elements.find((element) => element.id === id)?.parentId ?? null;
+      while (parentId) {
+        if (selectedIdSet.has(parentId)) {
+          return false;
+        }
+
+        parentId = elements.find((element) => element.id === parentId)?.parentId ?? null;
+      }
+
+      return true;
+    });
+  }
+
+  private captureDragSelectionState(anchorId: string): void {
+    const elements = this.elements();
+    const candidateIds = this.isElementSelected(anchorId) ? this.getSelectionRootIds() : [anchorId];
+    const dragIds = this.canUseGroupDrag(candidateIds, elements) ? candidateIds : [anchorId];
+
+    this.dragSelectionIds = dragIds;
+    this.dragSelectionStartBounds = new Map(
+      dragIds.map((id) => {
+        const element = this.el.findElementById(id, elements);
+        return [id, element ? this.el.getAbsoluteBounds(element, elements, this.currentPage()) : null];
+      }).filter((entry): entry is [string, Bounds] => entry[1] !== null),
+    );
+  }
+
+  private canUseGroupDrag(ids: string[], elements: CanvasElement[]): boolean {
+    if (ids.length <= 1) {
+      return false;
+    }
+
+    return ids.every((id) => {
+      const element = this.el.findElementById(id, elements);
+      if (!element) {
+        return false;
+      }
+
+      const parent = this.el.findElementById(element.parentId ?? null, elements);
+      return !(parent && this.isLayoutContainer(parent) && this.isChildInFlow(element));
+    });
   }
 
   getRenderedX(element: CanvasElement): number {
@@ -4691,13 +4886,17 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       pages: structuredClone(this.pages()),
       currentPageId: this.currentPageId(),
       selectedElementId: this.selectedElementId(),
+      selectedElementIds: structuredClone(this.selectedElementIds()),
     };
   }
 
   private applyHistorySnapshot(snapshot: HistorySnapshot): void {
     this.pages.set(structuredClone(snapshot.pages));
     this.currentPageId.set(snapshot.currentPageId);
-    this.selectedElementId.set(snapshot.selectedElementId);
+    this.setSelectedElements(
+      snapshot.selectedElementIds ?? (snapshot.selectedElementId ? [snapshot.selectedElementId] : []),
+      snapshot.selectedElementId,
+    );
     this.currentTool.set('select');
     this.editingTextElementId.set(null);
   }
@@ -4705,11 +4904,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   // ── Private: Clipboard ────────────────────────────────────
 
   private copySelectedElement(): void {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) {
+    const selectedIds = this.selectedElementIds();
+    if (selectedIds.length === 0) {
       return;
     }
-    this.clipboard.copySubtree(selectedId, this.elements(), this.currentPageId());
+    this.clipboard.copySelection(selectedIds, this.elements(), this.currentPageId());
     this.apiError.set(null);
   }
 
@@ -4729,14 +4928,14 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const pastedElements = this.clipboard.paste(this.elements(), targetParentId);
-    if (!pastedElements || pastedElements.length === 0) {
+    const pasted = this.clipboard.paste(this.elements(), targetParentId);
+    if (!pasted || pasted.elements.length === 0) {
       return;
     }
 
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => [...elements, ...pastedElements]);
-      this.selectedElementId.set(pastedElements[0]?.id ?? null);
+      this.updateCurrentPageElements((elements) => [...elements, ...pasted.elements]);
+      this.setSelectedElements(pasted.rootIds, pasted.rootIds[pasted.rootIds.length - 1] ?? null);
       this.editingTextElementId.set(null);
       this.currentTool.set('select');
     });
@@ -4745,16 +4944,19 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   private deleteSelectedElement(): void {
-    const selectedId = this.selectedElementId();
-    if (!selectedId) {
+    const selectedIds = this.getSelectionRootIds();
+    if (selectedIds.length === 0) {
       return;
     }
+
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) => {
-        const withoutElement = this.el.removeElementWithChildren(elements, selectedId);
-        return withoutElement.filter((el) => el.primarySyncId !== selectedId);
+        return selectedIds.reduce((nextElements, selectedId) => {
+          const withoutElement = this.el.removeElementWithChildren(nextElements, selectedId);
+          return withoutElement.filter((el) => el.primarySyncId !== selectedId);
+        }, elements);
       });
-      this.selectedElementId.set(null);
+      this.clearElementSelection();
     });
   }
 
@@ -4877,12 +5079,18 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       onCopy: () => this.copySelectedElement(),
       onPaste: () => this.pasteClipboard(),
       onDelete: (id) => {
+        const selectedIds = this.getSelectionRootIds();
+        const targetIds =
+          selectedIds.length > 1 && selectedIds.includes(id) ? selectedIds : this.getSelectionRootIds([id]);
+
         this.runWithHistory(() => {
           this.updateCurrentPageElements((elements) => {
-            const withoutElement = this.el.removeElementWithChildren(elements, id);
-            return withoutElement.filter((el) => el.primarySyncId !== id);
+            return targetIds.reduce((nextElements, targetId) => {
+              const withoutElement = this.el.removeElementWithChildren(nextElements, targetId);
+              return withoutElement.filter((el) => el.primarySyncId !== targetId);
+            }, elements);
           });
-          this.selectedElementId.set(null);
+          this.clearElementSelection();
         });
       },
       onBringToFront: (id) => this.bringToFront(id),
