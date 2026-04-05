@@ -1,21 +1,21 @@
 <header class="header-bar" [class.header-bar--canvas]="appearance === 'canvas'">
-  <!-- Left: Brand + Breadcrumb -->
+  <!-- Left: Brand -->
   <div class="header-section header-section--left">
     <nav class="breadcrumb-nav" aria-label="Context breadcrumb">
       <img src="/favigon-text.svg" alt="Favigon" class="header-brand-logo" />
     </nav>
   </div>
 
-  @if (isProjectContext && currentProjectName) {
+  @if (isProjectContext && currentProjectName && currentProjectId !== null) {
     <div class="header-project-center" #projectMenuContainer>
       <button
         type="button"
         class="header-project-title"
-        [class.is-saving]="isProjectUpdating()"
+        [class.is-saving]="projectMenu?.isUpdating()"
         (click)="toggleProjectMenu()"
-        [attr.aria-expanded]="isProjectMenuOpen()"
+        [attr.aria-expanded]="projectMenu?.isOpen()"
         aria-haspopup="dialog"
-        [attr.title]="projectUpdateError() || 'Edit project settings'"
+        [attr.title]="projectMenu?.updateError() || 'Edit project settings'"
         aria-label="Edit project settings">
         <span class="breadcrumb-text">{{ currentProjectName }}</span>
       </button>
@@ -29,63 +29,20 @@
           [attr.aria-label]="currentProjectIsPublic ? 'Public project' : 'Private project'"></span>
       }
 
+      <app-project-menu
+        #projectMenu
+        [projectId]="currentProjectId"
+        [projectName]="currentProjectName"
+        [projectIsPublic]="currentProjectIsPublic ?? false"
+        (projectRenamed)="onProjectRenamed($event)"
+        (visibilityChanged)="onProjectVisibilityChanged($event)"></app-project-menu>
     </div>
   }
 
   <!-- Right: Search + Actions + User menu -->
   <div class="header-section header-section--right">
     @if (!isProjectContext) {
-      <!-- Search -->
-      <div class="header-search" #searchContainer>
-        <div class="header-search__input-wrap">
-          <span class="header-search__icon" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-          </span>
-          <input
-            type="text"
-            class="header-search__input"
-            placeholder="Search profiles..."
-            autocomplete="off"
-            [ngModel]="searchQuery()"
-            (ngModelChange)="onSearchInput($event)"
-            (focus)="onSearchFocus()"
-            aria-label="Search users" />
-          @if (searchQuery().length > 0) {
-            <button type="button" class="header-search__clear" (click)="clearSearch()" aria-label="Clear search">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-            </button>
-          }
-        </div>
-
-        @if (isSearchOpen()) {
-          <div class="header-search__dropdown" role="listbox" aria-label="Search results">
-            @if (isSearchLoading()) {
-              <div class="header-search__loading">Searching...</div>
-            } @else if (searchResults().length === 0 && searchQuery().trim().length >= 2) {
-              <div class="header-search__empty">No users found for "{{ searchQuery() }}"</div>
-            } @else {
-              @for (result of searchResults(); track result.userId) {
-                <button
-                  type="button"
-                  class="header-search__item"
-                  role="option"
-                  (click)="selectSearchResult(result)">
-                  <img
-                    class="header-search__avatar"
-                    [src]="result.profilePictureUrl || 'https://github.com/shadcn.png'"
-                    [alt]="result.displayName" />
-                  <div class="header-search__user">
-                    <span class="header-search__display-name">{{ result.displayName }}</span>
-                    <span class="header-search__username">&#64;{{ result.username }}</span>
-                  </div>
-                </button>
-              }
-            }
-          </div>
-        }
-      </div>
+      <app-project-search #projectSearch></app-project-search>
     }
 
     @if (!isProjectContext) {
@@ -111,7 +68,7 @@
         type="button"
         title="Run preview"
         aria-label="Run preview"
-        (click)="openProjectPreview()">
+        (click)="projectMenu?.openPreview()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       </button>
     }
@@ -146,62 +103,6 @@
   [isOpen]="isUserMenuOpen"
   (closeRequested)="closeUserMenu()"
   (logoutClicked)="onLogout()"></app-user-menu-dropdown>
-
-@if (isProjectContext && currentProjectName && showProjectMenu()) {
-  <div
-    class="header-project-menu"
-    #projectMenuEl
-    [class.header-project-menu--open]="!isProjectMenuClosing()"
-    [class.header-project-menu--closing]="isProjectMenuClosing()"
-    role="dialog"
-    aria-label="Project settings">
-    <app-text-input
-      #projectNameInput
-      class="header-project-menu__input"
-      id="header-project-menu-name"
-      label="Project name"
-      placeholder="Project name"
-      [maxLength]="100"
-      [errorText]="projectUpdateError() || ''"
-      [forceInvalid]="!!projectUpdateError()"
-      [ngModel]="projectNameDraft()"
-      (ngModelChange)="projectNameDraft.set($event)"
-      (keydown.enter)="$event.preventDefault(); saveProjectSettings()"
-      (keydown.escape)="$event.preventDefault(); closeProjectMenu()"></app-text-input>
-
-    <div class="header-project-menu__field">
-      <span class="header-project-menu__label">Visibility</span>
-      <app-toggle-group
-        [options]="projectVisibilityOptions"
-        [value]="projectVisibilityDraft()"
-        [stretch]="true"
-        [minWidth]="null"
-        ariaLabel="Project visibility"
-        (valueChange)="projectVisibilityDraft.set($event === true)"></app-toggle-group>
-    </div>
-
-    <div class="header-project-menu__actions">
-      <app-action-button
-        class="header-project-menu__action"
-        type="button"
-        variant="outline"
-        [fullWidth]="false"
-        [disabled]="isProjectUpdating()"
-        (clicked)="closeProjectMenu()">
-        Cancel
-      </app-action-button>
-      <app-action-button
-        class="header-project-menu__action"
-        type="button"
-        variant="primary"
-        [fullWidth]="false"
-        [disabled]="isProjectUpdating()"
-        (clicked)="saveProjectSettings()">
-        {{ isProjectUpdating() ? 'Saving...' : 'Save' }}
-      </app-action-button>
-    </div>
-  </div>
-}
 
 @if (isCreateDialogOpen()) {
   <app-dialog-box

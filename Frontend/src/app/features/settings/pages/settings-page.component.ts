@@ -1,17 +1,17 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { TextInputComponent } from '../../../shared/components/text-input/text-input.component';
-import { ActionButtonComponent } from '../../../shared/components/action-button/action-button.component';
-import { DIALOG_BOX_IMPORTS } from '../../../shared/components/dialog-box/dialog-box.component';
-import { UserService } from '../../../core/services/user.service';
-import { CurrentUserService } from '../../../core/services/current-user.service';
-import { UserMe } from '../../../core/models/user.models';
+import { UserService, CurrentUserService, extractApiErrorMessage } from '@app/core';
+import type { UserMe } from '@app/core';
 import { environment } from '../../../../environments/environment';
-import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
+import {
+  HeaderBarComponent,
+  TextInputComponent,
+  ActionButtonComponent,
+  DIALOG_BOX_IMPORTS,
+} from '@app/shared';
 
 @Component({
   selector: 'app-settings-page',

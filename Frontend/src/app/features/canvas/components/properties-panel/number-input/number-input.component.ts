@@ -10,7 +10,7 @@ import {
   Output,
   SimpleChanges,
 } from '@angular/core';
-import { roundToTwoDecimals } from '../../../utils/canvas-interaction.util';
+import { roundToTwoDecimals } from '../../../utils/canvas-math.util';
 
 type NumberInputAppearance = 'default' | 'boxed' | 'compact' | 'popup';
 

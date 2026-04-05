@@ -5,19 +5,15 @@ import {
   CanvasOverflowMode,
   CanvasPageModel,
   CanvasPositionMode,
-} from '../../../core/models/canvas.models';
+} from '@app/core';
 import {
-  clamp,
-  roundToTwoDecimals,
   getDefaultCornerRadius,
   getElementBorderRadiusCss,
   getStrokeWidth,
   hasPerCornerRadius,
-  mutateNormalizeElement,
-  removeWithChildren,
-  collectSubtreeIds,
 } from '../utils/canvas-interaction.util';
-import { formatCanvasElementTypeLabel } from '../utils/canvas-label.util';
+import { clamp, roundToTwoDecimals } from '../utils/canvas-math.util';
+import { collectSubtreeIds, formatCanvasElementTypeLabel } from '../utils/canvas-interaction.util';
 import {
   buildCanvasElementBackfaceVisibility,
   buildCanvasElementTransform,
@@ -42,8 +38,6 @@ import { Bounds, Point } from '../canvas.types';
 const IMAGE_PLACEHOLDER_URL = 'https://placehold.co/300x200?text=Image';
 const DEFAULT_FRAME_FILL = '#ffffff';
 const DEFAULT_ELEMENT_FILL = '#e0e0e0';
-const DEFAULT_TEXT_FONT_SIZE = 16;
-const ROOT_FONT_SIZE_PX = 16;
 const MIN_ELEMENT_SIZE = 24;
 const FRAME_INSERT_GAP = 48;
 const DEFAULT_ELEMENT_DIMENSIONS: Record<CanvasElementType, { width: number; height: number }> = {
@@ -745,93 +739,4 @@ export class CanvasElementService {
     // so CSS top/right = radius - handleRadius. Clamped for small elements.
     return roundToTwoDecimals(clamp(radius - handleRadius, 0, maxInset));
   }
-
-  // ── Text Rendering Helpers ───────────────────────────────
-
-  getTextFontFamily(element: CanvasElement): string {
-    return element.fontFamily ?? 'Inter';
-  }
-
-  getTextFontWeight(element: CanvasElement): number {
-    return element.fontWeight ?? 400;
-  }
-
-  getTextFontStyle(element: CanvasElement): string {
-    return element.fontStyle ?? 'normal';
-  }
-
-  getTextFontSize(element: CanvasElement): string {
-    return formatTextMetricValue(
-      element.fontSize,
-      element.fontSizeUnit ?? 'px',
-      DEFAULT_TEXT_FONT_SIZE,
-    );
-  }
-
-  getTextLineHeight(element: CanvasElement): string {
-    return formatTextMetricValue(element.lineHeight, element.lineHeightUnit ?? 'em', 1.2);
-  }
-
-  getTextLetterSpacing(element: CanvasElement): string {
-    return formatTextMetricValue(element.letterSpacing, element.letterSpacingUnit ?? 'px', 0);
-  }
-
-  getTextFontSizeInPixels(element: CanvasElement): number {
-    const fontSize = Number.isFinite(element.fontSize ?? Number.NaN)
-      ? (element.fontSize as number)
-      : DEFAULT_TEXT_FONT_SIZE;
-
-    return (element.fontSizeUnit ?? 'px') === 'rem' ? fontSize * ROOT_FONT_SIZE_PX : fontSize;
-  }
-
-  getTextJustifyContent(element: CanvasElement): string {
-    switch (element.textAlign) {
-      case 'left':
-        return 'flex-start';
-      case 'right':
-        return 'flex-end';
-      default:
-        return 'center';
-    }
-  }
-
-  getTextAlignItems(element: CanvasElement): string {
-    switch (element.textVerticalAlign) {
-      case 'top':
-        return 'flex-start';
-      case 'bottom':
-        return 'flex-end';
-      default:
-        return 'center';
-    }
-  }
-
-  getTextAlignValue(element: CanvasElement): string {
-    return element.textAlign ?? 'center';
-  }
-
-  getFrameTitle(element: CanvasElement): string {
-    const name = element.name?.trim() || 'Frame';
-    const primary = element.isPrimary ? ' · Primary' : '';
-    return `${name}${primary}  ${Math.round(element.width)} × ${Math.round(element.height)}`;
-  }
-
-  // ── Normalize / Remove Delegates ─────────────────────────
-
-  normalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
-    mutateNormalizeElement(element, elements);
-  }
-
-  removeElementWithChildren(elements: CanvasElement[], rootId: string): CanvasElement[] {
-    return removeWithChildren(elements, rootId);
-  }
-}
-
-function formatTextMetricValue(
-  value: number | undefined,
-  unit: 'px' | 'rem' | 'em',
-  fallback: number,
-): string {
-  const normalizedValue = Number.isFinite(value ?? Number.NaN) ? (value as number) : fallback;
-  return `${normalizedValue}${unit}`;
 }

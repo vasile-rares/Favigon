@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard } from './core/guards/auth.guard';
+import { authGuard } from '@app/core';
 
 export const routes: Routes = [
   { path: '', redirectTo: '/login', pathMatch: 'full' },
@@ -26,7 +26,7 @@ export const routes: Routes = [
   {
     path: 'project/:id',
     loadComponent: () =>
-      import('./features/canvas/pages/canvas-page.component').then((m) => m.ProjectPage),
+      import('./features/canvas/pages/canvas-page.component').then((m) => m.CanvasPage),
     canActivate: [authGuard],
   },
   {

@@ -9,14 +9,9 @@ import {
   Validators,
 } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import { AuthService } from '../../../core/services/auth.service';
-import { UserService } from '../../../core/services/user.service';
-import { CurrentUserService } from '../../../core/services/current-user.service';
+import { AuthService, UserService, CurrentUserService, extractApiErrorMessage } from '@app/core';
 import { environment } from '../../../../environments/environment';
-import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
-import { TextInputComponent } from '../../../shared/components/text-input/text-input.component';
-import { ActionButtonComponent } from '../../../shared/components/action-button/action-button.component';
-import { DIALOG_BOX_IMPORTS } from '../../../shared/components/dialog-box/dialog-box.component';
+import { TextInputComponent, ActionButtonComponent, DIALOG_BOX_IMPORTS } from '@app/shared';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const CREDENTIAL_MAX_LENGTH = 100;

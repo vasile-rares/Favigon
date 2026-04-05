@@ -8,8 +8,7 @@ import { provideRouter } from '@angular/router';
 import { provideAnimations } from '@angular/platform-browser/animations';
 
 import { routes } from './app.routes';
-import { apiCredentialsInterceptor } from './core/interceptors/api-credentials.interceptor';
-import { authRefreshInterceptor } from './core/interceptors/auth-refresh.interceptor';
+import { apiCredentialsInterceptor, authRefreshInterceptor } from '@app/core';
 
 export const appConfig: ApplicationConfig = {
   providers: [

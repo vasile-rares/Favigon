@@ -1,5 +1,6 @@
-import { CanvasElement, CanvasPageModel } from '../../../core/models/canvas.models';
-import { getAbsolutePos, getResolvedCornerRadii } from './canvas-interaction.util';
+import { CanvasElement, CanvasPageModel } from '@app/core';
+import { getResolvedCornerRadii } from './canvas-interaction.util';
+import { getAbsolutePos } from './canvas-interaction.util';
 
 const THUMB_W = 300;
 const THUMB_H = 168;

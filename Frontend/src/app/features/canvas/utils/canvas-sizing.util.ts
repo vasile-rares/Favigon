@@ -3,7 +3,7 @@ import {
   CanvasElement,
   CanvasPageModel,
   CanvasSizeMode,
-} from '../../../core/models/canvas.models';
+} from '@app/core';
 import { roundToTwoDecimals } from './canvas-math.util';
 
 export type CanvasSizeAxis = 'width' | 'height';

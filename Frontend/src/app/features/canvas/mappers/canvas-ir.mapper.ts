@@ -13,8 +13,6 @@
   CanvasSizeMode,
   CanvasSpacing,
   CanvasTextSpacingUnit,
-} from '../../../core/models/canvas.models';
-import {
   AlignItems,
   BorderStyle,
   FlexDirection,
@@ -31,7 +29,7 @@ import {
   length,
   PositionMode,
   px,
-} from '../../../core/models/ir.models';
+} from '@app/core';
 import {
   buildCanvasElementBackfaceVisibility,
   buildCanvasElementTransform,

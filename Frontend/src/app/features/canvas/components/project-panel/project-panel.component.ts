@@ -11,21 +11,11 @@ import {
   Output,
   SimpleChanges,
 } from '@angular/core';
-import {
-  CanvasElement,
-  CanvasElementType,
-  CanvasPageModel,
-} from '../../../../core/models/canvas.models';
-import {
-  ContextMenuComponent,
-  ContextMenuItem,
-} from '../../../../shared/components/context-menu/context-menu.component';
-import {
-  ToggleGroupComponent,
-  ToggleGroupOption,
-} from '../../../../shared/components/toggle-group/toggle-group.component';
+import { CanvasElement, CanvasElementType, CanvasPageModel } from '@app/core';
+import { ContextMenuComponent, ToggleGroupComponent } from '@app/shared';
+import type { ContextMenuItem, ToggleGroupOption } from '@app/shared';
 import { DeviceFramePreset, VIEWPORT_PRESET_OPTIONS } from '../../canvas.types';
-import { formatCanvasElementTypeLabel } from '../../utils/canvas-label.util';
+import { formatCanvasElementTypeLabel } from '../../utils/canvas-interaction.util';
 
 interface LayerEntry {
   pageId: string;

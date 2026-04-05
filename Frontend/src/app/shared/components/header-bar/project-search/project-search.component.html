@@ -1,0 +1,50 @@
+<div class="header-search" #searchContainer>
+  <div class="header-search__input-wrap">
+    <span class="header-search__icon" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+    </span>
+    <input
+      type="text"
+      class="header-search__input"
+      placeholder="Search profiles..."
+      autocomplete="off"
+      [ngModel]="searchQuery()"
+      (ngModelChange)="onSearchInput($event)"
+      (focus)="onSearchFocus()"
+      aria-label="Search users" />
+    @if (searchQuery().length > 0) {
+      <button type="button" class="header-search__clear" (click)="clearSearch()" aria-label="Clear search">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    }
+  </div>
+
+  @if (isSearchOpen()) {
+    <div class="header-search__dropdown" role="listbox" aria-label="Search results">
+      @if (isSearchLoading()) {
+        <div class="header-search__loading">Searching...</div>
+      } @else if (searchResults().length === 0 && searchQuery().trim().length >= 2) {
+        <div class="header-search__empty">No users found for "{{ searchQuery() }}"</div>
+      } @else {
+        @for (result of searchResults(); track result.userId) {
+          <button
+            type="button"
+            class="header-search__item"
+            role="option"
+            (click)="selectSearchResult(result)">
+            <img
+              class="header-search__avatar"
+              [src]="result.profilePictureUrl || 'https://github.com/shadcn.png'"
+              [alt]="result.displayName" />
+            <div class="header-search__user">
+              <span class="header-search__display-name">{{ result.displayName }}</span>
+              <span class="header-search__username">&#64;{{ result.username }}</span>
+            </div>
+          </button>
+        }
+      }
+    </div>
+  }
+</div>

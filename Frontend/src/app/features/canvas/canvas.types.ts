@@ -1,8 +1,4 @@
-import {
-  CanvasElement,
-  CanvasPageModel,
-  CanvasPageViewportPreset,
-} from '../../core/models/canvas.models';
+import { CanvasElement, CanvasPageModel, CanvasPageViewportPreset } from '@app/core';
 
 export type SupportedFramework = 'html' | 'react' | 'angular';
 export type HandlePosition = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';

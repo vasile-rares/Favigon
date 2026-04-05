@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
-import { CanvasElement, CanvasPageModel } from '../../../core/models/canvas.models';
-import { ContextMenuItem } from '../../../shared/components/context-menu/context-menu.component';
+import { CanvasElement, CanvasPageModel } from '@app/core';
+import type { ContextMenuItem } from '@app/shared';
 import { CanvasEditorStateService } from './canvas-editor-state.service';
 
 export interface ContextMenuActionCallbacks {

@@ -1,8 +1,4 @@
-import {
-  CanvasElement,
-  CanvasElementType,
-  CanvasSemanticTag,
-} from '../../../core/models/canvas.models';
+import { CanvasElement, CanvasElementType, CanvasSemanticTag } from '@app/core';
 
 const CONTAINER_TAGS: readonly CanvasSemanticTag[] = [
   'div',

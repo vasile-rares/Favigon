@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { CanvasElementType } from '../../../../core/models/canvas.models';
+import { CanvasElementType } from '@app/core';
 
 type ToolbarTool = CanvasElementType | 'select';
 

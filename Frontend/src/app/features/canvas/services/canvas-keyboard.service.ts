@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { CanvasElementType } from '../../../core/models/canvas.models';
+import { CanvasElementType } from '@app/core';
 import { CanvasEditorStateService } from './canvas-editor-state.service';
 
 export interface KeyboardActionCallbacks {

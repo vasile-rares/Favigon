@@ -12,42 +12,41 @@ import {
   signal,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 import {
   CanvasElement,
   CanvasElementType,
   CanvasPageModel,
-  CanvasPageViewportPreset,
-} from '../../../core/models/canvas.models';
+  IRNode,
+  extractApiErrorMessage,
+} from '@app/core';
 import { buildCanvasIR, buildCanvasProjectDocument } from '../mappers/canvas-ir.mapper';
-import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
+import { HeaderBarComponent, ContextMenuComponent, DialogBoxComponent } from '@app/shared';
+import type { ContextMenuItem } from '@app/shared';
 import { ToolbarComponent } from '../components/toolbar/toolbar.component';
 import { ProjectPanelComponent } from '../components/project-panel/project-panel.component';
 import { PropertiesPanelComponent } from '../components/properties-panel/properties-panel.component';
-import { IRNode } from '../../../core/models/ir.models';
-import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
-import {
-  clamp,
-  roundToTwoDecimals,
-  getStrokeWidth,
-  collectSubtreeIds,
-} from '../utils/canvas-interaction.util';
+import { getStrokeWidth, mutateNormalizeElement } from '../utils/canvas-interaction.util';
+import { clamp, roundToTwoDecimals } from '../utils/canvas-math.util';
+import { collectSubtreeIds, removeWithChildren } from '../utils/canvas-interaction.util';
 import {
   buildSnapCandidates,
   computeSnappedPosition,
   SNAP_THRESHOLD,
 } from '../utils/canvas-snap.util';
 import { generateThumbnail } from '../utils/canvas-thumbnail.util';
-import { ConverterService } from '../../../core/services/converter.service';
-import { CanvasPersistenceService } from '../services/canvas-persistence.service';
+import { calculateResizedBounds } from '../utils/canvas-resize.util';
 import {
-  ContextMenuComponent,
-  ContextMenuItem,
-} from '../../../shared/components/context-menu/context-menu.component';
-import {
-  DialogBoxComponent,
-  DialogBoxField,
-} from '../../../shared/components/dialog-box/dialog-box.component';
+  getTextFontFamily,
+  getTextFontWeight,
+  getTextFontStyle,
+  getTextFontSize,
+  getTextLineHeight,
+  getTextLetterSpacing,
+  getTextAlignValue,
+  getFrameTitle,
+} from '../utils/canvas-text.util';
+import { CanvasPersistenceService, CanvasGenerationService } from '../services/canvas-api.service';
 import {
   SupportedFramework,
   HandlePosition,
@@ -60,11 +59,8 @@ import {
   CornerRadiusState,
   HistorySnapshot,
   SnapLine,
-  ViewportPresetOption,
   PageCanvasLayout,
   PageDragState,
-  DeviceFramePreset,
-  VIEWPORT_PRESET_OPTIONS,
 } from '../canvas.types';
 import { CanvasViewportService } from '../services/canvas-viewport.service';
 import { CanvasHistoryService } from '../services/canvas-history.service';
@@ -79,19 +75,13 @@ import {
   ContextMenuActionCallbacks,
 } from '../services/canvas-context-menu.service';
 import { CanvasEditorStateService } from '../services/canvas-editor-state.service';
+import { CanvasPageService } from '../services/canvas-page.service';
+import { CanvasPageGeometryService } from '../services/canvas-page-geometry.service';
 
-const DEVICE_FRAME_OPTIONS = VIEWPORT_PRESET_OPTIONS;
-
-const MIN_CUSTOM_VIEWPORT_SIZE = 100;
-const PAGE_CANVAS_GAP = 120;
 const ROOT_FRAME_INSERT_GAP = 48;
-const PAGE_SHELL_SIDE_PADDING = 28;
-const PAGE_SHELL_BOTTOM_PADDING = 28;
-const PAGE_SHELL_HEADER_TOP_PADDING = 10;
-const PAGE_SHELL_HEADER_HEIGHT = 32;
 const PAGE_SHELL_HEADER_TO_FRAME_TITLE_GAP = 52;
 const PAGE_FRAME_TITLE_OFFSET = 24;
-const PAGE_SHELL_HEADER_HORIZONTAL_INSET = 8;
+const PAGE_SHELL_HEADER_HEIGHT = 32;
 const FRAME_TITLE_MIN_ZOOM = 0.62;
 const ELEMENT_DRAG_START_THRESHOLD = 3;
 
@@ -122,15 +112,17 @@ interface RectangleDrawState {
     CanvasKeyboardService,
     CanvasContextMenuService,
     CanvasPersistenceService,
+    CanvasGenerationService,
+    CanvasPageGeometryService,
+    CanvasPageService,
   ],
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
 })
-export class ProjectPage implements OnDestroy, AfterViewChecked {
+export class CanvasPage implements OnDestroy, AfterViewChecked {
   private readonly route = inject(ActivatedRoute);
-  private readonly router = inject(Router);
-  private readonly converterService = inject(ConverterService);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
+  readonly gen = inject(CanvasGenerationService);
   private readonly zone = inject(NgZone);
 
   readonly viewport = inject(CanvasViewportService);
@@ -140,6 +132,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   private readonly keyboard = inject(CanvasKeyboardService);
   readonly contextMenu = inject(CanvasContextMenuService);
   readonly editorState = inject(CanvasEditorStateService);
+  readonly page = inject(CanvasPageService);
+  readonly pageLayout = inject(CanvasPageGeometryService);
   private isPropertyNumberGestureActive = false;
 
   @ViewChild('canvasScene', { static: false }) canvasSceneRef?: ElementRef<HTMLElement>;
@@ -151,41 +145,10 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
   readonly pages = this.editorState.pages;
   readonly currentPageId = this.editorState.currentPageId;
-  readonly editingCanvasHeaderPageId = signal<string | null>(null);
   readonly selectedElementId = this.editorState.selectedElementId;
   readonly selectedElementIds = this.editorState.selectedElementIds;
   readonly editingTextElementId = this.editorState.editingTextElementId;
   readonly currentTool = this.editorState.currentTool;
-  readonly layersFocusedPageId = signal<string | null>(null);
-  readonly selectedPageLayerId = signal<string | null>(null);
-  readonly copiedPageSnapshot = signal<CanvasPageModel | null>(null);
-  readonly selectedCanvasPageId = computed<string | null>(
-    () => this.layersFocusedPageId() ?? this.selectedPageLayerId(),
-  );
-  readonly hasCopiedPage = computed(() => this.copiedPageSnapshot() !== null);
-  readonly isViewportMenuOpen = signal(false);
-  readonly isDeviceMenuOpen = signal(false);
-  readonly deviceMenuX = signal(0);
-  readonly deviceMenuY = signal(0);
-  readonly deviceMenuItems = signal<ContextMenuItem[]>([]);
-  readonly deviceMenuTargetPageId = signal<string | null>(null);
-  readonly isCustomFrameDialogOpen = signal(false);
-  readonly customFrameWidth = signal(480);
-  readonly customFrameHeight = signal(800);
-  readonly customFrameDialogFields = computed<DialogBoxField[]>(() => [
-    {
-      key: 'width',
-      label: 'Width',
-      type: 'number',
-      initialValue: String(this.customFrameWidth()),
-    },
-    {
-      key: 'height',
-      label: 'Height',
-      type: 'number',
-      initialValue: String(this.customFrameHeight()),
-    },
-  ]);
 
   // ── Computed Signals ──────────────────────────────────────
 
@@ -207,66 +170,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   });
 
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
-  readonly editingCanvasHeaderPageName = signal('');
-  readonly pageLayouts = computed<PageCanvasLayout[]>(() => {
-    const pages = this.pages();
-    let cursorX = 0;
-    return pages.map((page) => {
-      const width = this.normalizeViewportSize(page.viewportWidth, 1280);
-      const height = this.normalizeViewportSize(page.viewportHeight, 720);
-      const pageX =
-        typeof page.canvasX === 'number' && Number.isFinite(page.canvasX) ? page.canvasX : cursorX;
-      const pageY =
-        typeof page.canvasY === 'number' && Number.isFinite(page.canvasY) ? page.canvasY : 0;
-      const layout: PageCanvasLayout = {
-        pageId: page.id,
-        x: pageX,
-        y: pageY,
-        width,
-        height,
-      };
-      cursorX = Math.max(cursorX, pageX + width + PAGE_CANVAS_GAP);
-      return layout;
-    });
-  });
-  readonly activePageLayout = computed<PageCanvasLayout | null>(() => {
-    const activeId = this.currentPageId();
-    if (!activeId) {
-      return null;
-    }
-    return this.pageLayouts().find((layout) => layout.pageId === activeId) ?? null;
-  });
-  readonly inactivePageLayouts = computed<PageCanvasLayout[]>(() => {
-    const activeId = this.currentPageId();
-    return this.pageLayouts().filter((layout) => layout.pageId !== activeId);
-  });
-  readonly deviceFrameOptions = DEVICE_FRAME_OPTIONS;
-  readonly viewportPresetOptions = VIEWPORT_PRESET_OPTIONS;
-  readonly currentViewportPreset = computed<CanvasPageViewportPreset>(
-    () => this.currentPage()?.viewportPreset ?? 'desktop',
-  );
-  readonly currentViewportWidth = computed<number>(() =>
-    this.normalizeViewportSize(this.currentPage()?.viewportWidth, 1280),
-  );
-  readonly currentViewportHeight = computed<number>(() =>
-    this.normalizeViewportSize(this.currentPage()?.viewportHeight, 720),
-  );
-  readonly currentViewportLabel = computed<string>(() => {
-    const preset = this.currentViewportPreset();
-    const matchedOption = this.viewportPresetOptions.find((option) => option.id === preset);
-    return matchedOption ? matchedOption.label : 'Custom';
-  });
   readonly cornerHandles: CornerHandle[] = ['nw', 'ne', 'sw', 'se'];
 
   // ── API / Generation State ────────────────────────────────
 
-  readonly selectedFramework = signal<SupportedFramework>('html');
-  readonly validationResult = signal<boolean | null>(null);
-  readonly apiError = signal<string | null>(null);
-  readonly isValidating = signal(false);
-  readonly isGenerating = signal(false);
-  readonly generatedHtml = signal('');
-  readonly generatedCss = signal('');
+  readonly apiError = this.page.apiError;
   readonly isLoadingDesign = signal(false);
   readonly isSavingDesign = signal(false);
   readonly lastSavedAt = signal<string | null>(null);
@@ -378,6 +286,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   ngAfterViewChecked(): void {
+    this.page.setCanvasElement(this.getCanvasElement());
+
     if (this.flowBoundsDirty) {
       this.flowBoundsDirty = false;
       this.zone.runOutsideAngular(() => this.updateFlowBoundsCache());
@@ -405,7 +315,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
   onToolbarToolSelected(tool: CanvasElementType | 'select'): void {
     if (tool === 'frame') {
-      this.addPage();
+      this.page.addPage();
       return;
     }
 
@@ -426,172 +336,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
   }
 
-  // ── Page Management ───────────────────────────────────────
-
-  addPage(): void {
-    this.runWithHistory(() => {
-      const position = this.getNextPageCanvasPosition();
-      const basePage = this.el.createPage(this.el.getNextPageName(this.pages()));
-      const desktopWidth = this.normalizeViewportSize(basePage.viewportWidth, 1280);
-      const desktopHeight = this.normalizeViewportSize(basePage.viewportHeight, 720);
-      const desktopFrame = {
-        ...this.el.createFrameAtCenter(
-          {
-            x: desktopWidth / 2,
-            y: desktopHeight / 2,
-          },
-          desktopWidth,
-          desktopHeight,
-          'Desktop',
-          [],
-        ),
-        name: 'Desktop',
-        x: 0,
-        y: 0,
-        isPrimary: true,
-      };
-      const page = {
-        ...basePage,
-        canvasX: position.x,
-        canvasY: position.y,
-        elements: [desktopFrame],
-      };
-      this.pages.update((pages) => [...pages, page]);
-      this.currentPageId.set(page.id);
-      this.layersFocusedPageId.set(page.id);
-      this.selectedElementId.set(null);
-      this.currentTool.set('select');
-    });
-  }
-
-  duplicatePage(pageId: string): void {
-    const sourcePage = this.getPageById(pageId);
-    if (!sourcePage) {
-      return;
-    }
-
-    this.apiError.set(null);
-    this.runWithHistory(() => {
-      const position = this.getNextPageCanvasPosition();
-      const duplicatedPage: CanvasPageModel = {
-        ...sourcePage,
-        id: crypto.randomUUID(),
-        name: this.getNextDuplicatedPageName(sourcePage.name),
-        canvasX: position.x,
-        canvasY: position.y,
-        elements: this.clonePageElements(sourcePage.elements),
-      };
-
-      this.pages.update((pages) => {
-        const sourceIndex = pages.findIndex((entry) => entry.id === pageId);
-        if (sourceIndex === -1) {
-          return [...pages, duplicatedPage];
-        }
-
-        const nextPages = [...pages];
-        nextPages.splice(sourceIndex + 1, 0, duplicatedPage);
-        return nextPages;
-      });
-
-      this.currentPageId.set(duplicatedPage.id);
-      this.layersFocusedPageId.set(duplicatedPage.id);
-      this.selectedElementId.set(null);
-      this.currentTool.set('select');
-    });
-  }
-
-  copyPage(pageId: string): void {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return;
-    }
-
-    this.copiedPageSnapshot.set(structuredClone(page));
-    this.apiError.set(null);
-  }
-
-  pastePage(targetPageId: string): void {
-    const sourcePage = this.copiedPageSnapshot();
-    if (!sourcePage) {
-      return;
-    }
-
-    this.apiError.set(null);
-    this.runWithHistory(() => {
-      const position = this.getNextPageCanvasPosition();
-      const pastedPage: CanvasPageModel = {
-        ...structuredClone(sourcePage),
-        id: crypto.randomUUID(),
-        name: this.getNextDuplicatedPageName(sourcePage.name),
-        canvasX: position.x,
-        canvasY: position.y,
-        elements: this.clonePageElements(sourcePage.elements),
-      };
-
-      this.pages.update((pages) => {
-        const targetIndex = pages.findIndex((entry) => entry.id === targetPageId);
-        if (targetIndex === -1) {
-          return [...pages, pastedPage];
-        }
-
-        const nextPages = [...pages];
-        nextPages.splice(targetIndex + 1, 0, pastedPage);
-        return nextPages;
-      });
-
-      const shouldPreserveAllPagesView = this.layersFocusedPageId() === null;
-      this.currentPageId.set(pastedPage.id);
-
-      if (shouldPreserveAllPagesView) {
-        this.selectedPageLayerId.set(pastedPage.id);
-      } else {
-        this.layersFocusedPageId.set(pastedPage.id);
-        this.clearSelectedPageLayer();
-      }
-
-      this.selectedElementId.set(null);
-      this.currentTool.set('select');
-    });
-  }
-
-  selectPage(pageId: string): void {
-    this.applyPageSelection(pageId, true);
-  }
-
-  selectPageWithoutFocus(pageId: string): void {
-    if (this.layersFocusedPageId() === null) {
-      if (pageId !== this.currentPageId()) {
-        this.currentPageId.set(pageId);
-      }
-
-      this.selectedPageLayerId.set(pageId);
-      this.closeViewportMenu();
-      this.closeDeviceFrameMenu();
-      this.selectedElementId.set(null);
-      this.currentTool.set('select');
-      return;
-    }
-
-    this.clearSelectedPageLayer();
-    this.applyPageSelection(pageId, false);
-  }
-
-  private applyPageSelection(pageId: string, shouldFocus: boolean): void {
-    if (pageId !== this.currentPageId()) {
-      this.currentPageId.set(pageId);
-    }
-
-    this.clearSelectedPageLayer();
-    this.closeViewportMenu();
-    this.closeDeviceFrameMenu();
-    this.layersFocusedPageId.set(pageId);
-    this.selectedElementId.set(null);
-    this.currentTool.set('select');
-
-    if (shouldFocus) {
-      this.focusPageSmooth(pageId);
-    }
-  }
+  // ── Page Management (gesture-coupled handlers stay here) ──
 
   onActivePageShellClick(pageId: string): void {
     if (this.suppressNextPageShellClick) {
@@ -599,15 +344,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    this.clearSelectedPageLayer();
-    this.layersFocusedPageId.set(pageId);
-    this.selectedElementId.set(null);
-  }
-
-  private clearSelectedPageLayer(): void {
-    if (this.selectedPageLayerId() !== null) {
-      this.selectedPageLayerId.set(null);
-    }
+    this.page.onActivePageShellClick(pageId);
   }
 
   onInactivePageShellClick(pageId: string): void {
@@ -616,111 +353,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    this.selectPage(pageId);
-  }
-
-  deletePage(pageId: string): void {
-    const pages = this.pages();
-    if (pages.length <= 1) {
-      this.apiError.set('A project must contain at least one page.');
-      return;
-    }
-
-    const page = pages.find((entry) => entry.id === pageId);
-    if (!page) {
-      return;
-    }
-
-    const shouldDelete = window.confirm(`Delete page "${page.name}"?`);
-    if (!shouldDelete) {
-      return;
-    }
-
-    this.apiError.set(null);
-    this.runWithHistory(() => {
-      const currentPages = this.pages();
-      const pageIndex = currentPages.findIndex((entry) => entry.id === pageId);
-      const nextPages = currentPages.filter((entry) => entry.id !== pageId);
-      const fallbackPage =
-        nextPages[Math.min(pageIndex, nextPages.length - 1)] ?? nextPages[0] ?? null;
-
-      this.pages.set(nextPages);
-      if (this.currentPageId() === pageId) {
-        this.currentPageId.set(fallbackPage?.id ?? null);
-      }
-
-      if (this.layersFocusedPageId() === pageId) {
-        this.layersFocusedPageId.set(fallbackPage?.id ?? null);
-      }
-
-      if (this.selectedPageLayerId() === pageId) {
-        this.selectedPageLayerId.set(fallbackPage?.id ?? null);
-      }
-
-      this.selectedElementId.set(null);
-      this.editingTextElementId.set(null);
-      this.currentTool.set('select');
-    });
-  }
-
-  toggleViewportMenu(): void {
-    this.isViewportMenuOpen.update((open) => !open);
-  }
-
-  closeViewportMenu(): void {
-    this.isViewportMenuOpen.set(false);
-  }
-
-  openDeviceFrameMenu(event: MouseEvent, pageId?: string): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const target = event.currentTarget as HTMLElement | null;
-    if (!target) {
-      return;
-    }
-
-    const bounds = target.getBoundingClientRect();
-    const targetId = pageId ?? this.currentPageId();
-    this.deviceMenuTargetPageId.set(targetId);
-    const targetPage = targetId ? this.getPageById(targetId) : null;
-    const rootFrames = targetPage?.elements.filter((e) => e.type === 'frame' && !e.parentId) ?? [];
-    const hasMobile = rootFrames.some((f) => (f.name ?? '').toLowerCase().startsWith('mobile'));
-    const hasTablet = rootFrames.some((f) => (f.name ?? '').toLowerCase().startsWith('tablet'));
-    this.deviceMenuItems.set([
-      {
-        id: 'device-mobile',
-        label: 'Mobile',
-        disabled: hasMobile,
-        action: () => this.addDeviceFrame('mobile'),
-      },
-      {
-        id: 'device-tablet',
-        label: 'Tablet',
-        disabled: hasTablet,
-        action: () => this.addDeviceFrame('tablet'),
-      },
-      {
-        id: 'device-custom',
-        label: 'Custom...',
-        action: () => this.addDeviceFrame('custom'),
-      },
-    ]);
-    this.deviceMenuX.set(Math.round(bounds.left));
-    this.deviceMenuY.set(Math.round(bounds.bottom + 6));
-    this.isDeviceMenuOpen.set(true);
-  }
-
-  closeDeviceFrameMenu(clearTarget = true): void {
-    this.isDeviceMenuOpen.set(false);
-    this.deviceMenuItems.set([]);
-    if (clearTarget) {
-      this.deviceMenuTargetPageId.set(null);
-    }
+    this.page.selectPage(pageId);
   }
 
   onPageNamePointerDown(event: MouseEvent, pageId: string): void {
-    if (this.editingCanvasHeaderPageId() === pageId) {
+    if (this.page.editingCanvasHeaderPageId() === pageId) {
       event.stopPropagation();
       return;
     }
@@ -729,54 +366,12 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const layout = this.getPageLayoutById(pageId);
+    const layout = this.page.getPageLayoutById(pageId);
     if (!layout) {
       return;
     }
 
     this.startPageDrag(event, pageId, layout);
-  }
-
-  onCanvasHeaderPageNameDoubleClick(event: MouseEvent, pageId: string): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return;
-    }
-
-    this.editingCanvasHeaderPageId.set(pageId);
-    this.editingCanvasHeaderPageName.set(page.name);
-    setTimeout(() => {
-      const input = document.querySelector<HTMLInputElement>(
-        `[data-canvas-page-name-id="${pageId}"]`,
-      );
-      input?.focus();
-      input?.select();
-    });
-  }
-
-  onCanvasHeaderPageNameInput(event: Event): void {
-    this.editingCanvasHeaderPageName.set((event.target as HTMLInputElement).value);
-  }
-
-  onCanvasHeaderPageNameBlur(pageId: string): void {
-    this.commitCanvasHeaderPageRename(pageId);
-  }
-
-  onCanvasHeaderPageNameKeyDown(pageId: string, event: KeyboardEvent): void {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      (event.target as HTMLInputElement).blur();
-      return;
-    }
-
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      this.editingCanvasHeaderPageId.set(null);
-      this.editingCanvasHeaderPageName.set('');
-    }
   }
 
   onPageShellPointerDown(event: MouseEvent, pageId: string): void {
@@ -797,7 +392,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const layout = this.getPageLayoutById(pageId);
+    const layout = this.page.getPageLayoutById(pageId);
     if (!layout) {
       return;
     }
@@ -825,449 +420,13 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     };
   }
 
-  addDeviceFrame(preset: DeviceFramePreset): void {
-    const targetPageId = this.deviceMenuTargetPageId() ?? this.currentPageId();
-    if (!targetPageId) {
-      this.closeDeviceFrameMenu();
-      return;
-    }
-
-    if (preset === 'custom') {
-      this.closeDeviceFrameMenu(false);
-      this.openCustomFrameDialog();
-      return;
-    }
-
-    this.closeDeviceFrameMenu();
-
-    const option = this.deviceFrameOptions.find((entry) => entry.id === preset);
-    if (!option) {
-      return;
-    }
-
-    const desktopFrame = this.getDesktopFrameForPage(targetPageId);
-    const forcedHeight = desktopFrame
-      ? desktopFrame.height
-      : this.normalizeViewportSize(this.getPageById(targetPageId)?.viewportHeight, option.height);
-    const forcedY = desktopFrame ? desktopFrame.y : 0;
-
-    this.insertFrameIntoPage(targetPageId, option.label, option.width, option.height, {
-      forcedHeight,
-      forcedY,
-    });
-  }
-
-  openCustomFrameDialog(): void {
-    this.customFrameWidth.set(480);
-    this.customFrameHeight.set(800);
-    this.isCustomFrameDialogOpen.set(true);
-  }
-
-  closeCustomFrameDialog(): void {
-    this.isCustomFrameDialogOpen.set(false);
-  }
-
-  onCustomFrameWidthInput(event: Event): void {
-    const value = Number.parseInt((event.target as HTMLInputElement | null)?.value ?? '', 10);
-    if (!Number.isFinite(value)) {
-      return;
-    }
-    this.customFrameWidth.set(this.normalizeViewportSize(value, this.customFrameWidth()));
-  }
-
-  onCustomFrameHeightInput(event: Event): void {
-    const value = Number.parseInt((event.target as HTMLInputElement | null)?.value ?? '', 10);
-    if (!Number.isFinite(value)) {
-      return;
-    }
-    this.customFrameHeight.set(this.normalizeViewportSize(value, this.customFrameHeight()));
-  }
-
-  submitCustomFrameDialog(): void {
-    const targetPageId = this.deviceMenuTargetPageId() ?? this.currentPageId();
-    if (targetPageId) {
-      this.insertFrameIntoPage(
-        targetPageId,
-        'Custom',
-        this.customFrameWidth(),
-        this.customFrameHeight(),
-      );
-    }
-    this.deviceMenuTargetPageId.set(null);
-    this.closeCustomFrameDialog();
-  }
-
-  onCustomFrameDialogPrimary(values: Record<string, string>): void {
-    const width = Number.parseInt(values['width'] ?? '', 10);
-    const height = Number.parseInt(values['height'] ?? '', 10);
-
-    if (Number.isFinite(width)) {
-      this.customFrameWidth.set(this.normalizeViewportSize(width, this.customFrameWidth()));
-    }
-
-    if (Number.isFinite(height)) {
-      this.customFrameHeight.set(this.normalizeViewportSize(height, this.customFrameHeight()));
-    }
-
-    this.submitCustomFrameDialog();
-  }
-
-  applyViewportPreset(preset: CanvasPageViewportPreset): void {
-    const option = this.viewportPresetOptions.find((entry) => entry.id === preset);
-    if (!option) {
-      return;
-    }
-
-    this.runWithHistory(() => {
-      this.updateCurrentPage((page) => ({
-        ...page,
-        viewportPreset: preset,
-        viewportWidth: option.width,
-        viewportHeight: option.height,
-      }));
-    });
-
-    this.closeViewportMenu();
-  }
-
-  updateCustomViewportWidth(value: string): void {
-    const parsed = Number.parseInt(value, 10);
-    if (!Number.isFinite(parsed)) {
-      return;
-    }
-
-    this.runWithHistory(() => {
-      this.updateCurrentPage((page) => ({
-        ...page,
-        viewportPreset: 'custom',
-        viewportWidth: this.normalizeViewportSize(parsed, this.currentViewportWidth()),
-      }));
-    });
-  }
-
-  updateCustomViewportWidthFromEvent(event: Event): void {
-    const value = (event.target as HTMLInputElement | null)?.value ?? '';
-    this.updateCustomViewportWidth(value);
-  }
-
-  updateCustomViewportHeight(value: string): void {
-    const parsed = Number.parseInt(value, 10);
-    if (!Number.isFinite(parsed)) {
-      return;
-    }
-
-    this.runWithHistory(() => {
-      this.updateCurrentPage((page) => ({
-        ...page,
-        viewportPreset: 'custom',
-        viewportHeight: this.normalizeViewportSize(parsed, this.currentViewportHeight()),
-      }));
-    });
-  }
-
-  updateCustomViewportHeightFromEvent(event: Event): void {
-    const value = (event.target as HTMLInputElement | null)?.value ?? '';
-    this.updateCustomViewportHeight(value);
-  }
-
-  openPreview(): void {
-    const currentPageId = this.currentPageId();
-    const urlTree = this.router.createUrlTree(['project', this.projectId, 'preview'], {
-      queryParams: currentPageId ? { pageId: currentPageId } : undefined,
-    });
-    const url = this.router.serializeUrl(urlTree);
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }
-
-  openPreviewForPage(pageId: string): void {
-    const urlTree = this.router.createUrlTree(['project', this.projectId, 'preview'], {
-      queryParams: { pageId },
-    });
-    const url = this.router.serializeUrl(urlTree);
-    window.open(url, '_blank', 'noopener,noreferrer');
-  }
-
-  getPageById(pageId: string): CanvasPageModel | null {
-    return this.pages().find((page) => page.id === pageId) ?? null;
-  }
-
-  getPageLayoutById(pageId: string): PageCanvasLayout | null {
-    return this.pageLayouts().find((layout) => layout.pageId === pageId) ?? null;
-  }
-
-  getVisibleElementsForPage(pageId: string): CanvasElement[] {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return [];
-    }
-
-    return page.elements.filter((element) =>
-      this.el.isElementEffectivelyVisible(element.id, page.elements),
-    );
-  }
-
-  getTopLevelVisibleElementsForPage(pageId: string): CanvasElement[] {
-    const all = this.getVisibleElementsForPage(pageId);
-    return all.filter((el) => !this.hasContainerAncestor(el, all));
-  }
-
-  getLayoutChildrenForPage(element: CanvasElement, pageId: string): CanvasElement[] {
-    return this.getVisibleElementsForPage(pageId).filter((el) => el.parentId === element.id);
-  }
-
-  getPreviewNestedX(element: CanvasElement): number | null {
-    return this.isChildInFlow(element) ? null : element.x;
-  }
-
-  getPreviewNestedY(element: CanvasElement): number | null {
-    return this.isChildInFlow(element) ? null : element.y;
-  }
-
-  getPreviewNestedPositionStyle(element: CanvasElement): string | null {
-    if (this.isChildInFlow(element)) {
-      return this.isContainerElement(element) ? 'relative' : null;
-    }
-    return element.position ?? 'absolute';
-  }
-
-  getPageShellLeft(pageId: string): number {
-    const layout = this.getPageLayoutById(pageId);
-    if (!layout) {
-      return 0;
-    }
-
-    const bounds = this.getPageContentBounds(pageId, layout.width, layout.height);
-    return roundToTwoDecimals(layout.x + bounds.minX - PAGE_SHELL_SIDE_PADDING);
-  }
-
-  getPageShellTop(pageId: string): number {
-    const layout = this.getPageLayoutById(pageId);
-    if (!layout) {
-      return 0;
-    }
-
-    const bounds = this.getPageContentBounds(pageId, layout.width, layout.height);
-    return roundToTwoDecimals(layout.y + bounds.minY - this.getPageShellTopPadding());
-  }
-
-  getPageShellWidth(pageId: string): number {
-    const layout = this.getPageLayoutById(pageId);
-    if (!layout) {
-      return 0;
-    }
-
-    const bounds = this.getPageContentBounds(pageId, layout.width, layout.height);
-    return roundToTwoDecimals(bounds.maxX - bounds.minX + PAGE_SHELL_SIDE_PADDING * 2);
-  }
-
-  getPageShellHeight(pageId: string): number {
-    const layout = this.getPageLayoutById(pageId);
-    if (!layout) {
-      return 0;
-    }
-
-    const bounds = this.getPageContentBounds(pageId, layout.width, layout.height);
-    return roundToTwoDecimals(
-      bounds.maxY - bounds.minY + this.getPageShellTopPadding() + PAGE_SHELL_BOTTOM_PADDING,
-    );
-  }
-
-  getPageShellHeaderLeft(pageId: string): number {
-    return roundToTwoDecimals(this.getPageShellLeft(pageId) + PAGE_SHELL_HEADER_HORIZONTAL_INSET);
-  }
-
-  getPageShellHeaderTop(pageId: string): number {
-    return roundToTwoDecimals(this.getPageShellTop(pageId) - PAGE_SHELL_HEADER_HEIGHT - 8);
-  }
-
-  getPageShellHeaderWidth(pageId: string): number {
-    return roundToTwoDecimals(
-      Math.max(120, this.getPageShellWidth(pageId) - PAGE_SHELL_HEADER_HORIZONTAL_INSET * 2),
-    );
-  }
-
-  getPageShellHeaderScreenLeft(pageId: string): number {
-    return roundToTwoDecimals(this.getPageShellLeft(pageId) * this.viewport.zoomLevel());
-  }
-
-  getPageShellHeaderScreenTop(pageId: string): number {
-    const shellScreenTop = this.getPageShellTop(pageId) * this.viewport.zoomLevel();
-    return roundToTwoDecimals(shellScreenTop - PAGE_SHELL_HEADER_HEIGHT - 8);
-  }
-
-  getPageShellHeaderScreenWidth(pageId: string): number {
-    return roundToTwoDecimals(this.getPageShellWidth(pageId) * this.viewport.zoomLevel());
-  }
-
-  getRenderedXForPage(element: CanvasElement, pageId: string): number {
-    const page = this.getPageById(pageId);
-    const layout = this.getPageLayoutById(pageId);
-    if (!page || !layout) {
-      return 0;
-    }
-
-    return layout.x + this.el.getAbsoluteBounds(element, page.elements, page).x;
-  }
-
-  getRenderedYForPage(element: CanvasElement, pageId: string): number {
-    const page = this.getPageById(pageId);
-    const layout = this.getPageLayoutById(pageId);
-    if (!page || !layout) {
-      return 0;
-    }
-
-    return layout.y + this.el.getAbsoluteBounds(element, page.elements, page).y;
-  }
-
-  getRenderedWidthForPage(element: CanvasElement, pageId: string): number {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return element.width;
-    }
-
-    return this.el.getRenderedWidth(element, page.elements, page);
-  }
-
-  getRenderedHeightForPage(element: CanvasElement, pageId: string): number {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return element.height;
-    }
-
-    return this.el.getRenderedHeight(element, page.elements, page);
-  }
-
-  getRenderedMinWidthStyleForPage(element: CanvasElement, pageId: string): string | null {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return null;
-    }
-
-    return this.el.getRenderedMinWidthStyle(element, page.elements, page);
-  }
-
-  getRenderedMaxWidthStyleForPage(element: CanvasElement, pageId: string): string | null {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return null;
-    }
-
-    return this.el.getRenderedMaxWidthStyle(element, page.elements, page);
-  }
-
-  getRenderedMinHeightStyleForPage(element: CanvasElement, pageId: string): string | null {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return null;
-    }
-
-    return this.el.getRenderedMinHeightStyle(element, page.elements, page);
-  }
-
-  getRenderedMaxHeightStyleForPage(element: CanvasElement, pageId: string): string | null {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return null;
-    }
-
-    return this.el.getRenderedMaxHeightStyle(element, page.elements, page);
-  }
-
-  getRenderedWidthStyleForPage(element: CanvasElement, pageId: string): string {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return `${element.width}px`;
-    }
-
-    return this.el.getRenderedWidthStyle(element, page.elements, page);
-  }
-
-  getRenderedHeightStyleForPage(element: CanvasElement, pageId: string): string {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return `${element.height}px`;
-    }
-
-    return this.el.getRenderedHeightStyle(element, page.elements, page);
-  }
-
-  private getPageShellTopPadding(): number {
-    // Use the same canvas-unit padding as the sides so the shell extends
-    // proportionally on all sides when zooming. The minimum is clamped to
-    // whatever canvas-units are needed to always keep the frame title inside.
-    const minForTitle = (PAGE_FRAME_TITLE_OFFSET + 10) / this.viewport.zoomLevel();
-    return Math.max(PAGE_SHELL_SIDE_PADDING, minForTitle);
-  }
-
-  private getPageContentBounds(
-    pageId: string,
-    fallbackWidth: number,
-    fallbackHeight: number,
-  ): { minX: number; minY: number; maxX: number; maxY: number } {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return { minX: 0, minY: 0, maxX: fallbackWidth, maxY: fallbackHeight };
-    }
-
-    const rootFrames = page.elements.filter(
-      (element) => element.type === 'frame' && !element.parentId,
-    );
-    if (rootFrames.length === 0) {
-      return { minX: 0, minY: 0, maxX: fallbackWidth, maxY: fallbackHeight };
-    }
-
-    const firstBounds = this.el.getAbsoluteBounds(rootFrames[0], page.elements, page);
-    let minX = firstBounds.x;
-    let minY = firstBounds.y;
-    let maxX = firstBounds.x + firstBounds.width;
-    let maxY = firstBounds.y + firstBounds.height;
-
-    for (const frame of rootFrames) {
-      const bounds = this.el.getAbsoluteBounds(frame, page.elements, page);
-      minX = Math.min(minX, bounds.x);
-      minY = Math.min(minY, bounds.y);
-      maxX = Math.max(maxX, bounds.x + bounds.width);
-      maxY = Math.max(maxY, bounds.y + bounds.height);
-    }
-
-    return { minX, minY, maxX, maxY };
-  }
-
-  getElementClipPathForPage(element: CanvasElement, pageId: string): string {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return 'none';
-    }
-
-    return this.el.getElementClipPath(element, page.elements);
-  }
-
-  isElementClippedOutForPage(element: CanvasElement, pageId: string): boolean {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return false;
-    }
-
-    return this.el.isElementClippedOut(element, page.elements);
-  }
-
-  getSnapLineX(position: number): number {
-    const layout = this.activePageLayout();
-    return position + (layout?.x ?? 0);
-  }
-
-  getSnapLineY(position: number): number {
-    const layout = this.activePageLayout();
-    return position + (layout?.y ?? 0);
-  }
-
   // ── Canvas Events ─────────────────────────────────────────
 
   onCanvasPointerDown(event: MouseEvent): void {
     const target = event.target as HTMLElement;
     if (this.isCanvasBackgroundTarget(target)) {
-      this.clearSelectedPageLayer();
-      this.layersFocusedPageId.set(null);
+      this.page.clearSelectedPageLayer();
+      this.page.layersFocusedPageId.set(null);
     }
     if (!this.shouldStartPanning(event, target)) {
       if (this.startRectangleDraw(event)) {
@@ -1304,15 +463,15 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
           this.discardEmptyTextElement(editingId);
           this.editingTextElementId.set(null);
         }
-        this.clearSelectedPageLayer();
+        this.page.clearSelectedPageLayer();
         this.clearElementSelection();
-        this.layersFocusedPageId.set(null);
+        this.page.layersFocusedPageId.set(null);
       }
       return;
     }
 
-    this.clearSelectedPageLayer();
-    this.layersFocusedPageId.set(this.currentPageId());
+    this.page.clearSelectedPageLayer();
+    this.page.layersFocusedPageId.set(this.currentPageId());
 
     const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) {
@@ -1366,12 +525,12 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     const elementForTypeCheck = this.el.findElementById(id, this.elements());
 
-    this.clearSelectedPageLayer();
+    this.page.clearSelectedPageLayer();
 
     if (event.shiftKey && this.currentTool() === 'select') {
       event.preventDefault();
       event.stopPropagation();
-      this.layersFocusedPageId.set(this.currentPageId());
+      this.page.layersFocusedPageId.set(this.currentPageId());
       this.toggleElementSelection(id);
       return;
     }
@@ -1383,14 +542,14 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     ) {
       event.preventDefault();
       event.stopPropagation();
-      this.layersFocusedPageId.set(this.currentPageId());
+      this.page.layersFocusedPageId.set(this.currentPageId());
       this.clearElementSelection();
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    this.layersFocusedPageId.set(this.currentPageId());
+    this.page.layersFocusedPageId.set(this.currentPageId());
     if (!this.isElementSelected(id)) {
       this.selectOnlyElement(id);
     } else {
@@ -1467,10 +626,10 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    this.clearSelectedPageLayer();
+    this.page.clearSelectedPageLayer();
     if (event.shiftKey && this.currentTool() === 'select') {
       event.preventDefault();
-      this.layersFocusedPageId.set(this.currentPageId());
+      this.page.layersFocusedPageId.set(this.currentPageId());
       this.toggleElementSelection(id);
       return;
     }
@@ -1480,7 +639,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     } else {
       this.selectedElementId.set(id);
     }
-    this.layersFocusedPageId.set(this.currentPageId());
+    this.page.layersFocusedPageId.set(this.currentPageId());
 
     if (this.currentTool() !== 'select') {
       this.currentTool.set('select');
@@ -1512,8 +671,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     if (element?.type !== 'text') {
       return;
     }
-    this.clearSelectedPageLayer();
-    this.layersFocusedPageId.set(this.currentPageId());
+    this.page.clearSelectedPageLayer();
+    this.page.layersFocusedPageId.set(this.currentPageId());
     this.selectOnlyElement(id);
     this.editingTextElementId.set(id);
     this.focusInlineTextEditor(id);
@@ -1728,7 +887,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
             return element;
           }
           let nextElement: CanvasElement = { ...element, ...patch };
-          this.el.normalizeElement(nextElement, elements);
+          mutateNormalizeElement(nextElement, elements);
 
           if (this.didContainerLayoutStateChange(element, nextElement)) {
             layoutTransitionContainerIds = [element.id];
@@ -1799,36 +958,23 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   onLayerSelected(event: { pageId: string; id: string; additive: boolean }): void {
-    const shouldPreserveAllPagesView = this.layersFocusedPageId() === null;
+    const shouldPreserveAllPagesView = this.page.layersFocusedPageId() === null;
 
     if (event.pageId !== this.currentPageId()) {
       this.currentPageId.set(event.pageId);
     }
 
     if (!shouldPreserveAllPagesView) {
-      this.layersFocusedPageId.set(event.pageId);
+      this.page.layersFocusedPageId.set(event.pageId);
     }
 
-    this.clearSelectedPageLayer();
+    this.page.clearSelectedPageLayer();
     if (event.additive) {
       this.toggleElementSelection(event.id);
     } else {
       this.selectOnlyElement(event.id);
     }
     this.currentTool.set('select');
-  }
-
-  onPageNameChanged(change: { id: string; name: string }): void {
-    this.runWithHistory(() => {
-      this.pages.update((pages) =>
-        pages.map((p) => (p.id === change.id ? { ...p, name: change.name } : p)),
-      );
-    });
-
-    if (this.editingCanvasHeaderPageId() === change.id) {
-      this.editingCanvasHeaderPageId.set(null);
-      this.editingCanvasHeaderPageName.set('');
-    }
   }
 
   onLayerNameChanged(change: { pageId: string; id: string; name: string }): void {
@@ -1925,7 +1071,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   setFramework(framework: SupportedFramework): void {
-    this.selectedFramework.set(framework);
+    this.gen.setFramework(framework);
   }
 
   // ── Context Menu ──────────────────────────────────────────
@@ -1938,7 +1084,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   onElementContextMenu(event: MouseEvent, id: string): void {
     event.preventDefault();
     event.stopPropagation();
-    this.clearSelectedPageLayer();
+    this.page.clearSelectedPageLayer();
     if (!this.isElementSelected(id)) {
       this.selectOnlyElement(id);
     } else {
@@ -1948,17 +1094,17 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   onLayerContextMenuRequested(event: { pageId: string; id: string; x: number; y: number }): void {
-    const shouldPreserveAllPagesView = this.layersFocusedPageId() === null;
+    const shouldPreserveAllPagesView = this.page.layersFocusedPageId() === null;
 
     if (event.pageId !== this.currentPageId()) {
       this.currentPageId.set(event.pageId);
     }
 
     if (!shouldPreserveAllPagesView) {
-      this.layersFocusedPageId.set(event.pageId);
+      this.page.layersFocusedPageId.set(event.pageId);
     }
 
-    this.clearSelectedPageLayer();
+    this.page.clearSelectedPageLayer();
     if (!this.isElementSelected(event.id)) {
       this.selectOnlyElement(event.id);
     } else {
@@ -2128,8 +1274,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const { xCandidates, yCandidates } = buildSnapCandidates(selectedId, elements, (el, els) =>
       this.el.getAbsoluteBounds(el, els, this.currentPage()),
     );
-    const pageWidth = this.currentViewportWidth();
-    const pageHeight = this.currentViewportHeight();
+    const pageWidth = this.page.currentViewportWidth();
+    const pageHeight = this.page.currentViewportHeight();
     xCandidates.push(0, pageWidth / 2, pageWidth);
     yCandidates.push(0, pageHeight / 2, pageHeight);
     const snap = computeSnappedPosition(
@@ -2215,12 +1361,12 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     const viewportControl = target.closest('.canvas-viewport-control');
     if (!viewportControl) {
-      this.closeViewportMenu();
+      this.page.closeViewportMenu();
     }
 
     const deviceControl = target.closest('.page-device-add');
     if (!deviceControl) {
-      this.closeDeviceFrameMenu();
+      this.page.closeDeviceFrameMenu();
     }
   }
 
@@ -2435,13 +1581,11 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   private clearElementSelection(): void {
-    this.selectedElementIds.set([]);
-    this.selectedElementId.set(null);
+    this.editorState.clearElementSelection();
   }
 
   private selectOnlyElement(id: string): void {
-    this.selectedElementIds.set([id]);
-    this.selectedElementId.set(id);
+    this.editorState.selectOnlyElement(id);
   }
 
   private setSelectedElements(ids: string[], primaryId: string | null = null): void {
@@ -2536,7 +1680,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     void this.flowCacheVersion(); // track for overlay reactivity
     const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
     if (cached) return cached.x;
-    const layout = this.activePageLayout();
+    const layout = this.page.activePageLayout();
     return (
       this.el.getAbsoluteBounds(element, this.elements(), this.currentPage()).x + (layout?.x ?? 0)
     );
@@ -2546,7 +1690,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     void this.flowCacheVersion(); // track for overlay reactivity
     const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
     if (cached) return cached.y;
-    const layout = this.activePageLayout();
+    const layout = this.page.activePageLayout();
     return (
       this.el.getAbsoluteBounds(element, this.elements(), this.currentPage()).y + (layout?.y ?? 0)
     );
@@ -2585,7 +1729,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   getFrameTitle(element: CanvasElement): string {
-    return this.el.getFrameTitle(element);
+    return getFrameTitle(element);
   }
 
   isRootFrame(element: CanvasElement): boolean {
@@ -2791,7 +1935,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     const parentBounds =
       this.getLiveElementCanvasBounds(parent) ??
       this.el.getAbsoluteBounds(parent, elements, this.currentPage());
-    const layout = this.activePageLayout();
+    const layout = this.page.activePageLayout();
     const currentPreview = this.flowDragPlaceholder();
     const previewWidth =
       currentPreview?.elementId === dragged.id ? currentPreview.bounds.width : dragged.width;
@@ -2843,7 +1987,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       (el) => el.parentId === container.id && el.id !== draggedId && this.isChildInFlow(el),
     );
 
-    const layout = this.activePageLayout();
+    const layout = this.page.activePageLayout();
     const offsetX = layout?.x ?? 0;
     const offsetY = layout?.y ?? 0;
 
@@ -2950,7 +2094,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       if (!dragged) return elements;
 
       const preview = this.flowDragPlaceholder();
-      const layout = this.activePageLayout();
+      const layout = this.page.activePageLayout();
       const absBounds =
         preview && preview.elementId === draggedId
           ? {
@@ -3024,7 +2168,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     if (!container) return null;
 
     const containerBounds = this.el.getAbsoluteBounds(container, elements, this.currentPage());
-    const layout = this.activePageLayout();
+    const layout = this.page.activePageLayout();
     const offsetX = layout?.x ?? 0;
     const offsetY = layout?.y ?? 0;
 
@@ -3105,14 +2249,15 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   isFrameTitleHiddenByHeader(element: CanvasElement): boolean {
-    const layout = this.activePageLayout();
+    const layout = this.page.activePageLayout();
     if (!layout) return false;
     const zoom = this.viewport.zoomLevel();
     // Title is always 24px above the frame top in screen-space (inside scaled canvas-scene)
     const titleScreenRelY = this.getRenderedY(element) * zoom - 24;
     // Header bottom in screen-space (header is fixed-size, not scaled)
     const headerScreenBottom =
-      this.getPageShellHeaderScreenTop(layout.pageId) + PAGE_SHELL_HEADER_HEIGHT;
+      this.pageLayout.getPageShellHeaderScreenTop(layout.pageId, this.page.pageLayouts()) +
+      PAGE_SHELL_HEADER_HEIGHT;
     return titleScreenRelY < headerScreenBottom;
   }
 
@@ -3185,7 +2330,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return cached;
     }
 
-    const layout = this.activePageLayout();
+    const layout = this.page.activePageLayout();
     const absolute = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
     return {
       x: roundToTwoDecimals(absolute.x + (layout?.x ?? 0)),
@@ -3201,7 +2346,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       return null;
     }
 
-    const layout = this.activePageLayout();
+    const layout = this.page.activePageLayout();
     return {
       x: roundToTwoDecimals(sceneBounds.x - (layout?.x ?? 0)),
       y: roundToTwoDecimals(sceneBounds.y - (layout?.y ?? 0)),
@@ -3245,31 +2390,31 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   getTextFontFamily(element: CanvasElement): string {
-    return this.el.getTextFontFamily(element);
+    return getTextFontFamily(element);
   }
 
   getTextFontWeight(element: CanvasElement): number {
-    return this.el.getTextFontWeight(element);
+    return getTextFontWeight(element);
   }
 
   getTextFontStyle(element: CanvasElement): string {
-    return this.el.getTextFontStyle(element);
+    return getTextFontStyle(element);
   }
 
   getTextFontSize(element: CanvasElement): string {
-    return this.el.getTextFontSize(element);
+    return getTextFontSize(element);
   }
 
   getTextLineHeight(element: CanvasElement): string {
-    return this.el.getTextLineHeight(element);
+    return getTextLineHeight(element);
   }
 
   getTextLetterSpacing(element: CanvasElement): string {
-    return this.el.getTextLetterSpacing(element);
+    return getTextLetterSpacing(element);
   }
 
   getTextAlignValue(element: CanvasElement): string {
-    return this.el.getTextAlignValue(element);
+    return getTextAlignValue(element);
   }
 
   trackByElementId(_: number, element: CanvasElement): string {
@@ -3384,43 +2529,12 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
   validateIR(): void {
     this.apiError.set(null);
-    this.validationResult.set(null);
-    this.isValidating.set(true);
-
-    this.converterService
-      .validate({ framework: this.selectedFramework(), ir: this.irPreview() })
-      .subscribe({
-        next: (response) => {
-          this.validationResult.set(response.isValid);
-          this.isValidating.set(false);
-        },
-        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-          this.apiError.set(extractApiErrorMessage(error, 'IR validation failed.'));
-          this.isValidating.set(false);
-        },
-      });
+    this.gen.validate(this.irPreview());
   }
 
   generateCode(): void {
     this.apiError.set(null);
-    this.generatedHtml.set('');
-    this.generatedCss.set('');
-    this.isGenerating.set(true);
-
-    this.converterService
-      .generate({ framework: this.selectedFramework(), ir: this.irPreview() })
-      .subscribe({
-        next: (response) => {
-          this.generatedHtml.set(response.html);
-          this.generatedCss.set(response.css);
-          this.validationResult.set(response.isValid);
-          this.isGenerating.set(false);
-        },
-        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-          this.apiError.set(extractApiErrorMessage(error, 'Code generation failed.'));
-          this.isGenerating.set(false);
-        },
-      });
+    this.gen.generate(this.irPreview());
   }
 
   // ── Private: Persistence ──────────────────────────────────
@@ -3560,8 +2674,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
         const parentBounds = parent
           ? this.el.getAbsoluteBounds(parent, elements, this.currentPage())
           : null;
-        const bounds = this.calculateResizedBounds(
-          element,
+        const bounds = calculateResizedBounds(
+          this.resizeStart,
           parentBounds,
           pointer,
           event.shiftKey,
@@ -3576,7 +2690,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
           height: bounds.height,
         };
 
-        this.el.normalizeElement(nextElement, elements);
+        mutateNormalizeElement(nextElement, elements);
         return nextElement;
       });
 
@@ -3667,157 +2781,6 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     );
   }
 
-  private calculateResizedBounds(
-    element: CanvasElement,
-    parentBounds: Bounds | null,
-    pointer: Point,
-    preserveAspectRatio: boolean,
-    scaleFromCenter: boolean,
-  ): Bounds {
-    const start = this.resizeStart;
-    const minSize = 24;
-    const deltaX = pointer.x - start.pointerX;
-    const deltaY = pointer.y - start.pointerY;
-    const isEdgeHandle =
-      start.handle === 'n' || start.handle === 's' || start.handle === 'e' || start.handle === 'w';
-    const isNS = start.handle === 'n' || start.handle === 's';
-    const isEW = start.handle === 'e' || start.handle === 'w';
-    const lockVerticalResize = false;
-    const effectiveDeltaX = isNS ? 0 : deltaX;
-    const effectiveDeltaY = isEW ? 0 : deltaY;
-    const xDirection = start.handle.includes('w') ? -1 : 1;
-    const yDirection = start.handle.includes('n') ? -1 : 1;
-    const shouldPreserveAspectRatio = !isEdgeHandle && preserveAspectRatio;
-    const aspectRatio = shouldPreserveAspectRatio
-      ? start.aspectRatio || 1
-      : start.width / Math.max(start.height, 1);
-
-    let left = start.absoluteX;
-    let top = start.absoluteY;
-    let right = start.absoluteX + start.width;
-    let bottom = start.absoluteY + start.height;
-
-    const minLeft = parentBounds ? parentBounds.x : Number.NEGATIVE_INFINITY;
-    const minTop = parentBounds ? parentBounds.y : Number.NEGATIVE_INFINITY;
-    const maxRight = parentBounds ? parentBounds.x + parentBounds.width : Number.POSITIVE_INFINITY;
-    const maxBottom = parentBounds
-      ? parentBounds.y + parentBounds.height
-      : Number.POSITIVE_INFINITY;
-
-    if (scaleFromCenter) {
-      const candidateHalfWidth = start.width / 2 + xDirection * effectiveDeltaX;
-      const candidateHalfHeight = start.height / 2 + yDirection * effectiveDeltaY;
-      const maxHalfWidth = Math.max(
-        minSize / 2,
-        Math.min(start.centerX - minLeft, maxRight - start.centerX),
-      );
-      const maxHalfHeight = Math.max(
-        minSize / 2,
-        Math.min(start.centerY - minTop, maxBottom - start.centerY),
-      );
-
-      if (shouldPreserveAspectRatio) {
-        const scaleX = candidateHalfWidth / Math.max(start.width / 2, 1);
-        const scaleY = candidateHalfHeight / Math.max(start.height / 2, 1);
-        const dominantScale = Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY;
-        const minScale = Math.max(
-          minSize / Math.max(start.width, 1),
-          minSize / Math.max(start.height, 1),
-        );
-        const maxScale = Math.min(
-          (maxHalfWidth * 2) / Math.max(start.width, 1),
-          (maxHalfHeight * 2) / Math.max(start.height, 1),
-        );
-        const scale = clamp(dominantScale, minScale, Math.max(minScale, maxScale));
-        const width = roundToTwoDecimals(start.width * scale);
-        const height = roundToTwoDecimals(width / aspectRatio);
-
-        return {
-          x: roundToTwoDecimals(start.centerX - width / 2),
-          y: roundToTwoDecimals(start.centerY - height / 2),
-          width,
-          height,
-        };
-      }
-
-      const halfWidth = clamp(candidateHalfWidth, minSize / 2, maxHalfWidth);
-      const halfHeight = clamp(candidateHalfHeight, minSize / 2, maxHalfHeight);
-
-      return {
-        x: roundToTwoDecimals(start.centerX - halfWidth),
-        y: roundToTwoDecimals(start.centerY - halfHeight),
-        width: roundToTwoDecimals(halfWidth * 2),
-        height: roundToTwoDecimals(halfHeight * 2),
-      };
-    }
-
-    if (shouldPreserveAspectRatio) {
-      const candidateWidth = start.handle.includes('w')
-        ? start.width - deltaX
-        : start.width + deltaX;
-      const candidateHeight = start.handle.includes('n')
-        ? start.height - deltaY
-        : start.height + deltaY;
-      const scaleX = candidateWidth / Math.max(start.width, 1);
-      const scaleY = candidateHeight / Math.max(start.height, 1);
-      const dominantScale = Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY;
-      const minScale = Math.max(
-        minSize / Math.max(start.width, 1),
-        minSize / Math.max(start.height, 1),
-      );
-      const maxScale = Math.min(
-        (start.handle.includes('w') ? right - minLeft : maxRight - left) / Math.max(start.width, 1),
-        (start.handle.includes('n') ? bottom - minTop : maxBottom - top) /
-          Math.max(start.height, 1),
-      );
-      const scale = clamp(dominantScale, minScale, Math.max(minScale, maxScale));
-      const width = roundToTwoDecimals(start.width * scale);
-      const height = roundToTwoDecimals(width / aspectRatio);
-
-      if (start.handle.includes('w')) {
-        left = right - width;
-      } else {
-        right = left + width;
-      }
-
-      if (start.handle.includes('n')) {
-        top = bottom - height;
-      } else {
-        bottom = top + height;
-      }
-
-      return {
-        x: roundToTwoDecimals(left),
-        y: roundToTwoDecimals(top),
-        width: roundToTwoDecimals(right - left),
-        height: roundToTwoDecimals(bottom - top),
-      };
-    }
-
-    if (start.handle.includes('w')) {
-      left = clamp(start.absoluteX + deltaX, minLeft, right - minSize);
-    }
-
-    if (start.handle.includes('e')) {
-      right = clamp(start.absoluteX + start.width + deltaX, left + minSize, maxRight);
-    }
-
-    if (start.handle.includes('n') && !lockVerticalResize) {
-      top = clamp(start.absoluteY + deltaY, minTop, bottom - minSize);
-    }
-
-    if (start.handle.includes('s') && !lockVerticalResize) {
-      bottom = clamp(start.absoluteY + start.height + deltaY, top + minSize, maxBottom);
-    }
-
-    return {
-      x: roundToTwoDecimals(left),
-      y: roundToTwoDecimals(top),
-      width: roundToTwoDecimals(right - left),
-      height: roundToTwoDecimals(bottom - top),
-    };
-  }
-
   private captureResizeSubtreeSnapshot(elementId: string, elements: CanvasElement[]): void {
     const subtreeIds = new Set(collectSubtreeIds(elements, elementId));
     this.resizeSubtreeSnapshot = new Map(
@@ -3897,7 +2860,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
         }
       }
 
-      this.el.normalizeElement(updatedElement, nextElements);
+      mutateNormalizeElement(updatedElement, nextElements);
       nextById.set(updatedElement.id, updatedElement);
 
       const index = nextElements.findIndex((element) => element.id === updatedElement.id);
@@ -3912,42 +2875,22 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   // ── Private: Helpers ──────────────────────────────────────
 
   private updateCurrentPageElements(updater: (elements: CanvasElement[]) => CanvasElement[]): void {
-    const currentPageId = this.currentPageId();
-    if (!currentPageId) {
-      return;
-    }
-
-    this.updatePageElements(currentPageId, updater);
+    this.editorState.updateCurrentPageElements(updater);
   }
 
   private updatePageElements(
     pageId: string,
     updater: (elements: CanvasElement[]) => CanvasElement[],
   ): void {
-    this.pages.update((pages) => this.el.updatePageElements(pages, pageId, updater));
+    this.editorState.updatePageElements(pageId, updater);
   }
 
   private updateCurrentPage(updater: (page: CanvasPageModel) => CanvasPageModel): void {
-    const currentPageId = this.currentPageId();
-    if (!currentPageId) {
-      return;
-    }
-
-    this.pages.update((pages) =>
-      pages.map((page) => (page.id === currentPageId ? updater(page) : page)),
-    );
-  }
-
-  private normalizeViewportSize(value: number | undefined, fallback: number): number {
-    if (typeof value !== 'number' || !Number.isFinite(value)) {
-      return fallback;
-    }
-
-    return Math.max(MIN_CUSTOM_VIEWPORT_SIZE, Math.round(value));
+    this.editorState.updateCurrentPage(updater);
   }
 
   private getActivePageOffset(): Point {
-    const layout = this.activePageLayout();
+    const layout = this.page.activePageLayout();
     if (!layout) {
       return { x: 0, y: 0 };
     }
@@ -3997,8 +2940,8 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
 
     this.commitActiveTextEditor();
     this.apiError.set(null);
-    this.clearSelectedPageLayer();
-    this.layersFocusedPageId.set(this.currentPageId());
+    this.page.clearSelectedPageLayer();
+    this.page.layersFocusedPageId.set(this.currentPageId());
     this.selectedElementId.set(null);
 
     this.rectangleDrawState = {
@@ -4103,7 +3046,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     const absoluteBounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
-    const layout = this.activePageLayout();
+    const layout = this.page.activePageLayout();
     this.flowDragPlaceholder.set({
       elementId: element.id,
       bounds: {
@@ -4120,231 +3063,6 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       this.suppressNextCanvasClick = false;
       this.suppressNextPageShellClick = false;
     }, 0);
-  }
-
-  private getNextPageCanvasPosition(): Point {
-    const layouts = this.pageLayouts();
-    if (layouts.length === 0) {
-      return { x: 0, y: 0 };
-    }
-
-    const rightMost = layouts.reduce((acc, layout) => {
-      const currentRight = layout.x + layout.width;
-      const bestRight = acc.x + acc.width;
-      return currentRight > bestRight ? layout : acc;
-    }, layouts[0]);
-
-    return {
-      x: Math.round(rightMost.x + rightMost.width + PAGE_CANVAS_GAP),
-      y: Math.round(rightMost.y),
-    };
-  }
-
-  private clonePageElements(elements: CanvasElement[]): CanvasElement[] {
-    const idMap = new Map<string, string>();
-    for (const element of elements) {
-      idMap.set(element.id, crypto.randomUUID());
-    }
-
-    return elements.map((element) => ({
-      ...element,
-      id: idMap.get(element.id) ?? crypto.randomUUID(),
-      parentId: element.parentId ? (idMap.get(element.parentId) ?? null) : null,
-      primarySyncId: element.primarySyncId ? idMap.get(element.primarySyncId) : undefined,
-    }));
-  }
-
-  private getNextDuplicatedPageName(sourceName: string): string {
-    const trimmed = sourceName.trim() || 'Page';
-    const baseName = `${trimmed} Copy`;
-    const names = new Set(this.pages().map((page) => page.name.trim().toLowerCase()));
-
-    if (!names.has(baseName.toLowerCase())) {
-      return baseName;
-    }
-
-    let suffix = 2;
-    while (names.has(`${baseName} ${suffix}`.toLowerCase())) {
-      suffix += 1;
-    }
-
-    return `${baseName} ${suffix}`;
-  }
-
-  getPageShellSelectionLeft(pageId: string): number {
-    return roundToTwoDecimals(this.getPageShellLeft(pageId) * this.viewport.zoomLevel());
-  }
-
-  getPageShellSelectionTop(pageId: string): number {
-    return roundToTwoDecimals(this.getPageShellTop(pageId) * this.viewport.zoomLevel());
-  }
-
-  getPageShellSelectionWidth(pageId: string): number {
-    return roundToTwoDecimals(this.getPageShellWidth(pageId) * this.viewport.zoomLevel());
-  }
-
-  getPageShellSelectionHeight(pageId: string): number {
-    return roundToTwoDecimals(this.getPageShellHeight(pageId) * this.viewport.zoomLevel());
-  }
-
-  private focusPageSmooth(pageId: string): void {
-    const canvas = this.getCanvasElement();
-    if (!canvas) {
-      return;
-    }
-
-    // Use shell bounds so all device frames are visible
-    const shellLeft = this.getPageShellLeft(pageId);
-    const shellTop = this.getPageShellTop(pageId) - PAGE_SHELL_HEADER_HEIGHT - 8;
-    const shellWidth = this.getPageShellWidth(pageId);
-    const shellHeight = this.getPageShellHeight(pageId) + PAGE_SHELL_HEADER_HEIGHT + 8;
-
-    if (!shellWidth || !shellHeight) {
-      return;
-    }
-
-    // Insets for the overlapping panels so focused content is not hidden behind them
-    const leftInset = 316; // project-panel: 12 + 280 + 24 gap
-    const rightInset = 316; // properties-panel: 12 + 280 + 24 gap
-    const topInset = 84; // header: 60 + 24 margin
-    const bottomInset = 24;
-
-    const safeWidth = canvas.clientWidth - leftInset - rightInset;
-    const safeHeight = canvas.clientHeight - topInset - bottomInset;
-    const safeCenterX = leftInset + safeWidth / 2;
-    const safeCenterY = topInset + safeHeight / 2;
-
-    const padding = 40;
-    const minSize = 24;
-    const horizontalZoom = (safeWidth - padding) / Math.max(shellWidth, minSize);
-    const verticalZoom = (safeHeight - padding) / Math.max(shellHeight, minSize);
-    const targetZoom = clamp(Math.min(horizontalZoom, verticalZoom), 0.25, 3);
-    const targetOffset: Point = {
-      x: roundToTwoDecimals(safeCenterX - (shellLeft + shellWidth / 2) * targetZoom),
-      y: roundToTwoDecimals(safeCenterY - (shellTop + shellHeight / 2) * targetZoom),
-    };
-
-    const startZoom = this.viewport.zoomLevel();
-    const startOffset = this.viewport.viewportOffset();
-    const durationMs = 240;
-    const startTs = performance.now();
-
-    const animate = (now: number) => {
-      const t = Math.min(1, (now - startTs) / durationMs);
-      const eased = 1 - Math.pow(1 - t, 3);
-
-      const zoom = startZoom + (targetZoom - startZoom) * eased;
-      const x = startOffset.x + (targetOffset.x - startOffset.x) * eased;
-      const y = startOffset.y + (targetOffset.y - startOffset.y) * eased;
-
-      this.viewport.zoomLevel.set(roundToTwoDecimals(zoom));
-      this.viewport.viewportOffset.set({
-        x: roundToTwoDecimals(x),
-        y: roundToTwoDecimals(y),
-      });
-
-      if (t < 1) {
-        requestAnimationFrame(animate);
-      }
-    };
-
-    requestAnimationFrame(animate);
-  }
-
-  private insertFrameIntoPage(
-    pageId: string,
-    name: string,
-    width: number,
-    height: number,
-    options?: {
-      forcedHeight?: number;
-      forcedY?: number;
-    },
-  ): void {
-    const normalizedWidth = this.normalizeViewportSize(width, 1280);
-    const normalizedHeight = this.normalizeViewportSize(
-      options?.forcedHeight ?? height,
-      options?.forcedHeight ?? 720,
-    );
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return;
-    }
-
-    this.runWithHistory(() => {
-      const currentElements = page.elements;
-      const position = this.el.getNextFramePosition(
-        currentElements,
-        normalizedWidth,
-        normalizedHeight,
-      );
-      const frame = this.el.createFrameAtCenter(
-        {
-          x: position?.x ?? 80 + normalizedWidth / 2,
-          y:
-            options?.forcedY != null
-              ? options.forcedY + normalizedHeight / 2
-              : (position?.y ?? 60 + normalizedHeight / 2),
-        },
-        normalizedWidth,
-        normalizedHeight,
-        name,
-        currentElements,
-      );
-      frame.name = name;
-
-      if (options?.forcedY != null) {
-        frame.y = roundToTwoDecimals(options.forcedY);
-      }
-
-      this.pages.update((pages) =>
-        this.el.updatePageElements(pages, pageId, (elements) => {
-          const primaryFrame = this.getPrimaryFrame(elements);
-          const primaryChildren = primaryFrame
-            ? elements.filter((el) => el.parentId === primaryFrame.id)
-            : [];
-          const copies = primaryChildren.map((child) => ({
-            ...child,
-            id: crypto.randomUUID(),
-            parentId: frame.id,
-            primarySyncId: child.primarySyncId ?? child.id,
-            x:
-              primaryFrame!.width > 0
-                ? roundToTwoDecimals((child.x / primaryFrame!.width) * normalizedWidth)
-                : child.x,
-            y:
-              primaryFrame!.height > 0
-                ? roundToTwoDecimals((child.y / primaryFrame!.height) * normalizedHeight)
-                : child.y,
-            width: child.width,
-            height: child.height,
-          }));
-          return [...elements, frame, ...copies];
-        }),
-      );
-      if (this.currentPageId() === pageId) {
-        this.selectedElementId.set(frame.id);
-      }
-      this.currentTool.set('select');
-    });
-  }
-
-  private getDesktopFrameForPage(pageId: string): CanvasElement | null {
-    const page = this.getPageById(pageId);
-    if (!page) {
-      return null;
-    }
-
-    return (
-      page.elements.find(
-        (element) =>
-          element.type === 'frame' &&
-          !element.parentId &&
-          this.getFrameTitle(element) === 'Desktop',
-      ) ??
-      page.elements.find((element) => element.type === 'frame' && !element.parentId) ??
-      null
-    );
   }
 
   private shouldStartPanning(event: MouseEvent, target: HTMLElement): boolean {
@@ -4398,7 +3116,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   private getElementHitTestBounds(element: CanvasElement): Bounds {
     const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
     if (cached) {
-      const layout = this.activePageLayout();
+      const layout = this.page.activePageLayout();
       return {
         x: roundToTwoDecimals(cached.x - (layout?.x ?? 0)),
         y: roundToTwoDecimals(cached.y - (layout?.y ?? 0)),
@@ -4498,7 +3216,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   private getFlowAwareBounds(element: CanvasElement, elements: CanvasElement[]): Bounds {
     const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
     if (cached) {
-      const layout = this.activePageLayout();
+      const layout = this.page.activePageLayout();
       return {
         x: roundToTwoDecimals(cached.x - (layout?.x ?? 0)),
         y: roundToTwoDecimals(cached.y - (layout?.y ?? 0)),
@@ -4584,21 +3302,6 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     return depth;
-  }
-
-  private commitCanvasHeaderPageRename(pageId: string): void {
-    if (this.editingCanvasHeaderPageId() !== pageId) {
-      return;
-    }
-
-    const trimmed = this.editingCanvasHeaderPageName().trim();
-    if (trimmed) {
-      this.onPageNameChanged({ id: pageId, name: trimmed });
-      return;
-    }
-
-    this.editingCanvasHeaderPageId.set(null);
-    this.editingCanvasHeaderPageName.set('');
   }
 
   private resolveInsertionContainer(pointer: Point): CanvasElement | null {
@@ -4801,12 +3504,12 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
       'visibility:hidden',
       'white-space:pre',
       'display:inline-block',
-      `font-size:${this.el.getTextFontSize(element)}`,
-      `font-family:${this.el.getTextFontFamily(element)}`,
-      `font-weight:${this.el.getTextFontWeight(element)}`,
-      `font-style:${this.el.getTextFontStyle(element)}`,
-      `line-height:${this.el.getTextLineHeight(element)}`,
-      `letter-spacing:${this.el.getTextLetterSpacing(element)}`,
+      `font-size:${getTextFontSize(element)}`,
+      `font-family:${getTextFontFamily(element)}`,
+      `font-weight:${getTextFontWeight(element)}`,
+      `font-style:${getTextFontStyle(element)}`,
+      `line-height:${getTextLineHeight(element)}`,
+      `letter-spacing:${getTextLetterSpacing(element)}`,
     ].join(';');
     // Append a non-breaking space after any trailing newlines so each Enter
     // counts as a real line in the span's layout (trailing \n has no height otherwise).
@@ -4830,7 +3533,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     }
 
     this.updateCurrentPageElements((elements) => {
-      const withoutElement = this.el.removeElementWithChildren(elements, id);
+      const withoutElement = removeWithChildren(elements, id);
       return withoutElement.filter((el) => el.primarySyncId !== id);
     });
 
@@ -4893,12 +3596,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
   }
 
   private createHistorySnapshot(): HistorySnapshot {
-    return {
-      pages: structuredClone(this.pages()),
-      currentPageId: this.currentPageId(),
-      selectedElementId: this.selectedElementId(),
-      selectedElementIds: structuredClone(this.selectedElementIds()),
-    };
+    return this.editorState.createHistorySnapshot();
   }
 
   private applyHistorySnapshot(snapshot: HistorySnapshot): void {
@@ -4964,7 +3662,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) => {
         return selectedIds.reduce((nextElements, selectedId) => {
-          const withoutElement = this.el.removeElementWithChildren(nextElements, selectedId);
+          const withoutElement = removeWithChildren(nextElements, selectedId);
           return withoutElement.filter((el) => el.primarySyncId !== selectedId);
         }, elements);
       });
@@ -5100,7 +3798,7 @@ export class ProjectPage implements OnDestroy, AfterViewChecked {
         this.runWithHistory(() => {
           this.updateCurrentPageElements((elements) => {
             return targetIds.reduce((nextElements, targetId) => {
-              const withoutElement = this.el.removeElementWithChildren(nextElements, targetId);
+              const withoutElement = removeWithChildren(nextElements, targetId);
               return withoutElement.filter((el) => el.primarySyncId !== targetId);
             }, elements);
           });

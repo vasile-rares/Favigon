@@ -1,9 +1,6 @@
 import { Injectable, computed, effect, signal } from '@angular/core';
-import {
-  CanvasElement,
-  CanvasElementType,
-  CanvasPageModel,
-} from '../../../core/models/canvas.models';
+import { CanvasElement, CanvasElementType, CanvasPageModel } from '@app/core';
+import { HistorySnapshot } from '../canvas.types';
 
 @Injectable()
 export class CanvasEditorStateService {
@@ -77,6 +74,50 @@ export class CanvasEditorStateService {
 
     return this.elements().filter((element) => selectedIds.has(element.id));
   });
+
+  // ── Mutation Helpers ──────────────────────────────────────
+
+  updateCurrentPageElements(updater: (elements: CanvasElement[]) => CanvasElement[]): void {
+    const pageId = this.currentPageId();
+    if (!pageId) return;
+    this.updatePageElements(pageId, updater);
+  }
+
+  updatePageElements(
+    pageId: string,
+    updater: (elements: CanvasElement[]) => CanvasElement[],
+  ): void {
+    this.pages.update((pages) =>
+      pages.map((page) =>
+        page.id === pageId ? { ...page, elements: updater(page.elements) } : page,
+      ),
+    );
+  }
+
+  updateCurrentPage(updater: (page: CanvasPageModel) => CanvasPageModel): void {
+    const pageId = this.currentPageId();
+    if (!pageId) return;
+    this.pages.update((pages) => pages.map((page) => (page.id === pageId ? updater(page) : page)));
+  }
+
+  selectOnlyElement(id: string): void {
+    this.selectedElementIds.set([id]);
+    this.selectedElementId.set(id);
+  }
+
+  clearElementSelection(): void {
+    this.selectedElementIds.set([]);
+    this.selectedElementId.set(null);
+  }
+
+  createHistorySnapshot(): HistorySnapshot {
+    return {
+      pages: structuredClone(this.pages()),
+      currentPageId: this.currentPageId(),
+      selectedElementId: this.selectedElementId(),
+      selectedElementIds: structuredClone(this.selectedElementIds()),
+    };
+  }
 }
 
 function sameStringArray(left: string[], right: string[]): boolean {

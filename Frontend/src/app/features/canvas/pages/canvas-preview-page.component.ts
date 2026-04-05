@@ -1,10 +1,18 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CanvasElement, CanvasPageModel } from '../../../core/models/canvas.models';
-import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
+import { CanvasElement, CanvasPageModel, extractApiErrorMessage } from '@app/core';
 import { CanvasElementService } from '../services/canvas-element.service';
-import { CanvasPersistenceService } from '../services/canvas-persistence.service';
+import { CanvasPersistenceService } from '../services/canvas-api.service';
+import {
+  getTextFontFamily,
+  getTextFontWeight,
+  getTextFontStyle,
+  getTextFontSize,
+  getTextLineHeight,
+  getTextLetterSpacing,
+  getTextAlignValue,
+} from '../utils/canvas-text.util';
 
 type PreviewDevicePreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
 
@@ -252,31 +260,31 @@ export class CanvasPreviewPage {
   }
 
   getTextFontFamily(element: CanvasElement): string {
-    return this.el.getTextFontFamily(element);
+    return getTextFontFamily(element);
   }
 
   getTextFontWeight(element: CanvasElement): number {
-    return this.el.getTextFontWeight(element);
+    return getTextFontWeight(element);
   }
 
   getTextFontStyle(element: CanvasElement): string {
-    return this.el.getTextFontStyle(element);
+    return getTextFontStyle(element);
   }
 
   getTextFontSize(element: CanvasElement): string {
-    return this.el.getTextFontSize(element);
+    return getTextFontSize(element);
   }
 
   getTextLineHeight(element: CanvasElement): string {
-    return this.el.getTextLineHeight(element);
+    return getTextLineHeight(element);
   }
 
   getTextLetterSpacing(element: CanvasElement): string {
-    return this.el.getTextLetterSpacing(element);
+    return getTextLetterSpacing(element);
   }
 
   getTextAlignValue(element: CanvasElement): string {
-    return this.el.getTextAlignValue(element);
+    return getTextAlignValue(element);
   }
 
   trackByElementId(_: number, element: CanvasElement): string {

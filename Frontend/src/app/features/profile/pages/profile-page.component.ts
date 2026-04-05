@@ -4,19 +4,16 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { forkJoin, switchMap } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
-import { ProjectService } from '../../../core/services/project.service';
-import { UserService } from '../../../core/services/user.service';
-import { CurrentUserService } from '../../../core/services/current-user.service';
-import { UserProfile } from '../../../core/models/user.models';
-import { extractApiErrorMessage } from '../../../core/utils/api-error.util';
-import { ActionButtonComponent } from '../../../shared/components/action-button/action-button.component';
-import { DIALOG_BOX_IMPORTS } from '../../../shared/components/dialog-box/dialog-box.component';
-import { TextInputComponent } from '../../../shared/components/text-input/text-input.component';
+import { ProjectService, UserService, CurrentUserService, extractApiErrorMessage } from '@app/core';
+import type { UserProfile } from '@app/core';
 import {
+  HeaderBarComponent,
+  ActionButtonComponent,
+  DIALOG_BOX_IMPORTS,
+  TextInputComponent,
   DropdownSelectComponent,
-  DropdownSelectOption,
-} from '../../../shared/components/dropdown-select/dropdown-select.component';
+} from '@app/shared';
+import type { DropdownSelectOption } from '@app/shared';
 import {
   ProjectCardComponent,
   ProjectCardViewModel,

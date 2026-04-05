@@ -1,10 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import {
-  DropdownSelectComponent,
-  DropdownSelectOption,
-} from '../../../../shared/components/dropdown-select/dropdown-select.component';
+import { DropdownSelectComponent, ToggleGroupComponent, ContextMenuComponent } from '@app/shared';
+import type { DropdownSelectOption, ToggleGroupOption, ContextMenuItem } from '@app/shared';
 import {
   CanvasAlignItems,
   CanvasDisplayMode,
@@ -30,24 +28,16 @@ import {
   CanvasTextSpacingUnit,
   CanvasTextAlign,
   CanvasTextVerticalAlign,
-} from '../../../../core/models/canvas.models';
-import { IRNode } from '../../../../core/models/ir.models';
+  IRNode,
+} from '@app/core';
 import { NumberInputComponent } from './number-input/number-input.component';
 import { StylePopupFieldComponent } from './style-popup-field/style-popup-field.component';
-import {
-  ToggleGroupComponent,
-  ToggleGroupOption,
-} from '../../../../shared/components/toggle-group/toggle-group.component';
-import {
-  ContextMenuComponent,
-  ContextMenuItem,
-} from '../../../../shared/components/context-menu/context-menu.component';
 import {
   getDefaultCornerRadius,
   getResolvedCornerRadii,
   hasPerCornerRadius,
-  roundToTwoDecimals,
 } from '../../utils/canvas-interaction.util';
+import { roundToTwoDecimals } from '../../utils/canvas-math.util';
 import {
   getAllowedCustomAccessibilityTags,
   getDefaultAccessibilityTag,

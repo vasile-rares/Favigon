@@ -5,25 +5,25 @@
     <app-project-panel
       [pages]="pages()"
       [currentPageId]="currentPageId()"
-      [focusedPageId]="layersFocusedPageId()"
-      [selectedPageLayerId]="selectedPageLayerId()"
-      [canPastePage]="hasCopiedPage()"
+      [focusedPageId]="page.layersFocusedPageId()"
+      [selectedPageLayerId]="page.selectedPageLayerId()"
+      [canPastePage]="page.hasCopiedPage()"
       [elements]="elements()"
       [selectedElementId]="selectedElementId()"
       [selectedElementIds]="selectedElementIds()"
-      (pageSelected)="selectPage($event)"
-      (pageLayerSelected)="selectPageWithoutFocus($event)"
-      (pageCreateRequested)="addPage()"
-      (pageCopyRequested)="copyPage($event)"
-      (pagePasteRequested)="pastePage($event)"
-      (pageDuplicateRequested)="duplicatePage($event)"
-      (pageDeleteRequested)="deletePage($event)"
+      (pageSelected)="page.selectPage($event)"
+      (pageLayerSelected)="page.selectPageWithoutFocus($event)"
+      (pageCreateRequested)="page.addPage()"
+      (pageCopyRequested)="page.copyPage($event)"
+      (pagePasteRequested)="page.pastePage($event)"
+      (pageDuplicateRequested)="page.duplicatePage($event)"
+      (pageDeleteRequested)="page.deletePage($event)"
       (layerSelected)="onLayerSelected($event)"
       (layerNameChanged)="onLayerNameChanged($event)"
       (layerMoved)="onLayerMoved($event)"
       (layerVisibilityToggled)="onLayerVisibilityToggled($event)"
       (layerContextMenuRequested)="onLayerContextMenuRequested($event)"
-      (pageNameChanged)="onPageNameChanged($event)"></app-project-panel>
+      (pageNameChanged)="page.onPageNameChanged($event)"></app-project-panel>
 
     <app-toolbar
       [activeTool]="currentTool()"
@@ -61,19 +61,19 @@
               [class.image]="previewEl.type === 'image'"
               [class.layout-container]="isLayoutContainer(previewEl)"
               [style.--canvas-element-surface-border]="getElementSurfaceBorderStyle(previewEl)"
-              [style.left.px]="isNested ? getPreviewNestedX(previewEl) : getRenderedXForPage(previewEl, previewPageId)"
-              [style.top.px]="isNested ? getPreviewNestedY(previewEl) : getRenderedYForPage(previewEl, previewPageId)"
-              [style.width]="getRenderedWidthStyleForPage(previewEl, previewPageId)"
-              [style.height]="getRenderedHeightStyleForPage(previewEl, previewPageId)"
-              [style.min-width]="getRenderedMinWidthStyleForPage(previewEl, previewPageId)"
-              [style.max-width]="getRenderedMaxWidthStyleForPage(previewEl, previewPageId)"
-              [style.min-height]="getRenderedMinHeightStyleForPage(previewEl, previewPageId)"
-              [style.max-height]="getRenderedMaxHeightStyleForPage(previewEl, previewPageId)"
+              [style.left.px]="isNested ? pageLayout.getPreviewNestedX(previewEl) : pageLayout.getRenderedXForPage(previewEl, previewPageId, page.pageLayouts())"
+              [style.top.px]="isNested ? pageLayout.getPreviewNestedY(previewEl) : pageLayout.getRenderedYForPage(previewEl, previewPageId, page.pageLayouts())"
+              [style.width]="pageLayout.getRenderedWidthStyleForPage(previewEl, previewPageId)"
+              [style.height]="pageLayout.getRenderedHeightStyleForPage(previewEl, previewPageId)"
+              [style.min-width]="pageLayout.getRenderedMinWidthStyleForPage(previewEl, previewPageId)"
+              [style.max-width]="pageLayout.getRenderedMaxWidthStyleForPage(previewEl, previewPageId)"
+              [style.min-height]="pageLayout.getRenderedMinHeightStyleForPage(previewEl, previewPageId)"
+              [style.max-height]="pageLayout.getRenderedMaxHeightStyleForPage(previewEl, previewPageId)"
               [style.transform]="getElementTransform(previewEl)"
               [style.transform-origin]="getElementTransformOrigin(previewEl)"
               [style.backface-visibility]="getElementBackfaceVisibility(previewEl)"
               [style.transform-style]="getElementTransformStyle(previewEl)"
-              [style.position]="isNested ? getPreviewNestedPositionStyle(previewEl) : null"
+              [style.position]="isNested ? pageLayout.getPreviewNestedPositionStyle(previewEl) : null"
               [style.display]="getElementLayoutDisplay(previewEl)"
               [style.flex-direction]="getElementLayoutFlexDirection(previewEl)"
               [style.flex-wrap]="getElementLayoutFlexWrap(previewEl)"
@@ -88,8 +88,8 @@
               [style.color]="previewEl.type === 'text' ? previewEl.fill : null"
               [style.border]="getRenderedBorderStyle(previewEl)"
               [style.opacity]="previewEl.opacity ?? 1"
-              [style.clip-path]="isNested ? null : getElementClipPathForPage(previewEl, previewPageId)"
-              [style.visibility]="!isNested && isElementClippedOutForPage(previewEl, previewPageId) ? 'hidden' : 'visible'"
+              [style.clip-path]="isNested ? null : pageLayout.getElementClipPathForPage(previewEl, previewPageId)"
+              [style.visibility]="!isNested && pageLayout.isElementClippedOutForPage(previewEl, previewPageId) ? 'hidden' : 'visible'"
               [style.border-radius]="getElementBorderRadius(previewEl)">
 
               <ng-container *ngIf="previewEl.type === 'text'">
@@ -111,7 +111,7 @@
               </ng-container>
 
               <ng-container *ngIf="isContainerElement(previewEl)">
-                <ng-container *ngFor="let child of getLayoutChildrenForPage(previewEl, previewPageId); trackBy: trackByElementId">
+                <ng-container *ngFor="let child of pageLayout.getLayoutChildrenForPage(previewEl, previewPageId); trackBy: trackByElementId">
                   <ng-container
                     *ngTemplateOutlet="previewElementTpl; context: { element: child, pageId: previewPageId, isNested: true }"></ng-container>
                 </ng-container>
@@ -131,8 +131,8 @@
               [class.image]="previewChild.type === 'image'"
               [class.layout-container]="isLayoutContainer(previewChild)"
               [style.--canvas-element-surface-border]="getElementSurfaceBorderStyle(previewChild)"
-              [style.left.px]="getPreviewNestedX(previewChild)"
-              [style.top.px]="getPreviewNestedY(previewChild)"
+              [style.left.px]="pageLayout.getPreviewNestedX(previewChild)"
+              [style.top.px]="pageLayout.getPreviewNestedY(previewChild)"
               [style.width]="getRenderedWidthStyle(previewChild)"
               [style.height]="getRenderedHeightStyle(previewChild)"
               [style.min-width]="getRenderedMinWidthStyle(previewChild)"
@@ -143,7 +143,7 @@
               [style.transform-origin]="getElementTransformOrigin(previewChild)"
               [style.backface-visibility]="getElementBackfaceVisibility(previewChild)"
               [style.transform-style]="getElementTransformStyle(previewChild)"
-              [style.position]="getPreviewNestedPositionStyle(previewChild)"
+              [style.position]="pageLayout.getPreviewNestedPositionStyle(previewChild)"
               [style.display]="getElementLayoutDisplay(previewChild)"
               [style.flex-direction]="getElementLayoutFlexDirection(previewChild)"
               [style.flex-wrap]="getElementLayoutFlexWrap(previewChild)"
@@ -187,32 +187,32 @@
             </div>
           </ng-template>
 
-          <ng-container *ngFor="let layout of inactivePageLayouts()">
+          <ng-container *ngFor="let layout of page.inactivePageLayouts()">
             <div
               class="page-shell page-shell--inactive"
-              [style.left.px]="getPageShellLeft(layout.pageId)"
-              [style.top.px]="getPageShellTop(layout.pageId)"
-              [style.width.px]="getPageShellWidth(layout.pageId)"
-              [style.height.px]="getPageShellHeight(layout.pageId)"
+              [style.left.px]="pageLayout.getPageShellLeft(layout.pageId, page.pageLayouts())"
+              [style.top.px]="pageLayout.getPageShellTop(layout.pageId, page.pageLayouts())"
+              [style.width.px]="pageLayout.getPageShellWidth(layout.pageId, page.pageLayouts())"
+              [style.height.px]="pageLayout.getPageShellHeight(layout.pageId, page.pageLayouts())"
               [style.border-radius.px]="getShellBorderRadius()"
               [style.border-width.px]="getShellBorderWidth()"
               (pointerdown)="onPageShellPointerDown($event, layout.pageId)"
               (click)="onInactivePageShellClick(layout.pageId)">
             </div>
 
-            <ng-container *ngFor="let pageElement of getTopLevelVisibleElementsForPage(layout.pageId); trackBy: trackByElementId">
+            <ng-container *ngFor="let pageElement of pageLayout.getTopLevelVisibleElementsForPage(layout.pageId); trackBy: trackByElementId">
               <ng-container
                 *ngTemplateOutlet="previewElementTpl; context: { element: pageElement, pageId: layout.pageId, isNested: false }"></ng-container>
             </ng-container>
           </ng-container>
 
-          <ng-container *ngIf="activePageLayout() as activeLayout">
+          <ng-container *ngIf="page.activePageLayout() as activeLayout">
             <div
               class="page-shell page-shell--active"
-              [style.left.px]="getPageShellLeft(activeLayout.pageId)"
-              [style.top.px]="getPageShellTop(activeLayout.pageId)"
-              [style.width.px]="getPageShellWidth(activeLayout.pageId)"
-              [style.height.px]="getPageShellHeight(activeLayout.pageId)"
+              [style.left.px]="pageLayout.getPageShellLeft(activeLayout.pageId, page.pageLayouts())"
+              [style.top.px]="pageLayout.getPageShellTop(activeLayout.pageId, page.pageLayouts())"
+              [style.width.px]="pageLayout.getPageShellWidth(activeLayout.pageId, page.pageLayouts())"
+              [style.height.px]="pageLayout.getPageShellHeight(activeLayout.pageId, page.pageLayouts())"
               [style.border-radius.px]="getShellBorderRadius()"
               [style.border-width.px]="getShellBorderWidth()"
               (pointerdown)="onPageShellPointerDown($event, activeLayout.pageId)"
@@ -458,43 +458,43 @@
             <div
               *ngIf="line.type === 'vertical'"
               class="snap-line snap-line-v"
-              [style.left.px]="getSnapLineX(line.position)"></div>
+              [style.left.px]="pageLayout.getSnapLineX(line.position, page.activePageLayout())"></div>
             <div
               *ngIf="line.type === 'horizontal'"
               class="snap-line snap-line-h"
-              [style.top.px]="getSnapLineY(line.position)"></div>
+              [style.top.px]="pageLayout.getSnapLineY(line.position, page.activePageLayout())"></div>
           </ng-container>
 
         </div>
 
         <div class="page-shell-toolbar-layer">
-          <ng-container *ngFor="let layout of pageLayouts()">
+          <ng-container *ngFor="let layout of page.pageLayouts()">
             <div
               class="page-shell-header"
               [class.page-shell-header--active]="layout.pageId === currentPageId()"
               [class.page-shell-header--inactive]="layout.pageId !== currentPageId()"
-              [style.left.px]="getPageShellHeaderScreenLeft(layout.pageId)"
-              [style.top.px]="getPageShellHeaderScreenTop(layout.pageId)"
-              [style.width.px]="getPageShellHeaderScreenWidth(layout.pageId)"
+              [style.left.px]="pageLayout.getPageShellHeaderScreenLeft(layout.pageId, page.pageLayouts())"
+              [style.top.px]="pageLayout.getPageShellHeaderScreenTop(layout.pageId, page.pageLayouts())"
+              [style.width.px]="pageLayout.getPageShellHeaderScreenWidth(layout.pageId, page.pageLayouts())"
               (click)="$event.stopPropagation()">
               <div class="page-shell-header-content">
                 <div class="page-shell-header-left">
                   <button
                     type="button"
                     class="page-run-preview"
-                    (click)="openPreviewForPage(layout.pageId); $event.stopPropagation()"
+                    (click)="page.openPreviewForPage(projectId, layout.pageId); $event.stopPropagation()"
                     aria-label="Run preview">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                   </button>
-                  <ng-container *ngIf="editingCanvasHeaderPageId() === layout.pageId; else canvasHeaderPageNameReadonly">
+                  <ng-container *ngIf="page.editingCanvasHeaderPageId() === layout.pageId; else canvasHeaderPageNameReadonly">
                     <input
                       type="text"
                       class="page-name-input"
                       [attr.data-canvas-page-name-id]="layout.pageId"
-                      [value]="editingCanvasHeaderPageName()"
-                      (input)="onCanvasHeaderPageNameInput($event)"
-                      (blur)="onCanvasHeaderPageNameBlur(layout.pageId)"
-                      (keydown)="onCanvasHeaderPageNameKeyDown(layout.pageId, $event)"
+                      [value]="page.editingCanvasHeaderPageName()"
+                      (input)="page.onCanvasHeaderPageNameInput($event)"
+                      (blur)="page.onCanvasHeaderPageNameBlur(layout.pageId)"
+                      (keydown)="page.onCanvasHeaderPageNameKeyDown(layout.pageId, $event)"
                       (pointerdown)="$event.stopPropagation()"
                       (dblclick)="$event.stopPropagation()" />
                   </ng-container>
@@ -502,8 +502,8 @@
                     <span
                       class="page-name-readonly"
                       (pointerdown)="onPageNamePointerDown($event, layout.pageId)"
-                      (dblclick)="onCanvasHeaderPageNameDoubleClick($event, layout.pageId)">
-                      {{ getPageById(layout.pageId)?.name }}
+                      (dblclick)="page.onCanvasHeaderPageNameDoubleClick($event, layout.pageId)">
+                      {{ page.getPageById(layout.pageId)?.name }}
                     </span>
                   </ng-template>
                 </div>
@@ -513,7 +513,7 @@
                     type="button"
                     class="page-device-add-btn"
                     aria-label="Add device frame"
-                    (click)="openDeviceFrameMenu($event, layout.pageId)">
+                    (click)="page.openDeviceFrameMenu($event, layout.pageId)">
                     +
                   </button>
                 </div>
@@ -524,12 +524,12 @@
 
         <!-- Page shell selection outline (no resize handles) -->
         <div
-          *ngIf="selectedCanvasPageId() && selectedElementIds().length === 0 && !isDraggingEl()"
+          *ngIf="page.selectedCanvasPageId() && selectedElementIds().length === 0 && !isDraggingEl()"
           class="page-shell-selection-outline"
-          [style.left.px]="getPageShellSelectionLeft(selectedCanvasPageId()!)"
-          [style.top.px]="getPageShellSelectionTop(selectedCanvasPageId()!)"
-          [style.width.px]="getPageShellSelectionWidth(selectedCanvasPageId()!)"
-          [style.height.px]="getPageShellSelectionHeight(selectedCanvasPageId()!)"></div>
+          [style.left.px]="pageLayout.getPageShellSelectionLeft(page.selectedCanvasPageId()!, page.pageLayouts())"
+          [style.top.px]="pageLayout.getPageShellSelectionTop(page.selectedCanvasPageId()!, page.pageLayouts())"
+          [style.width.px]="pageLayout.getPageShellSelectionWidth(page.selectedCanvasPageId()!, page.pageLayouts())"
+          [style.height.px]="pageLayout.getPageShellSelectionHeight(page.selectedCanvasPageId()!, page.pageLayouts())"></div>
 
         <!-- Selection UI overlay — lives in .canvas-viewport (pans with content)
              but NOT in .canvas-scene, so no scale() transform applies.
@@ -618,13 +618,13 @@
       [pages]="pages()"
       [currentPageId]="currentPageId()"
       [currentTool]="currentTool()"
-      [selectedFramework]="selectedFramework()"
-      [validationResult]="validationResult()"
-      [apiError]="apiError()"
-      [isValidating]="isValidating()"
-      [isGenerating]="isGenerating()"
-      [generatedHtml]="generatedHtml()"
-      [generatedCss]="generatedCss()"
+      [selectedFramework]="gen.selectedFramework()"
+      [validationResult]="gen.validationResult()"
+      [apiError]="apiError() || gen.error()"
+      [isValidating]="gen.isValidating()"
+      [isGenerating]="gen.isGenerating()"
+      [generatedHtml]="gen.generatedHtml()"
+      [generatedCss]="gen.generatedCss()"
       [irPreview]="irPreview()"
       (frameworkChanged)="setFramework($event)"
       (validateRequested)="validateIR()"
@@ -644,22 +644,22 @@
     (closed)="closeContextMenu()"></app-context-menu>
 }
 
-@if (isDeviceMenuOpen()) {
+@if (page.isDeviceMenuOpen()) {
   <app-context-menu
-    [x]="deviceMenuX()"
-    [y]="deviceMenuY()"
-    [items]="deviceMenuItems()"
-    (closed)="closeDeviceFrameMenu()"></app-context-menu>
+    [x]="page.deviceMenuX()"
+    [y]="page.deviceMenuY()"
+    [items]="page.deviceMenuItems()"
+    (closed)="page.closeDeviceFrameMenu()"></app-context-menu>
 }
 
-@if (isCustomFrameDialogOpen()) {
+@if (page.isCustomFrameDialogOpen()) {
   <app-dialog-box
     title="Custom Frame"
     description="Set custom width and height for the new frame."
-    [fields]="customFrameDialogFields()"
+    [fields]="page.customFrameDialogFields()"
     [primaryAction]="{ label: 'Add Frame', variant: 'primary' }"
     [secondaryAction]="{ label: 'Cancel', variant: 'outline' }"
-    (primaryClicked)="onCustomFrameDialogPrimary($event)"
-    (secondaryClicked)="closeCustomFrameDialog()"
-    (closed)="closeCustomFrameDialog()"></app-dialog-box>
+    (primaryClicked)="page.onCustomFrameDialogPrimary($event)"
+    (secondaryClicked)="page.closeCustomFrameDialog()"
+    (closed)="page.closeCustomFrameDialog()"></app-dialog-box>
 }

@@ -4,9 +4,12 @@ import {
   buildCanvasProjectDocumentFromUnknown,
   buildPersistedCanvasDesign,
 } from '../mappers/canvas-ir.mapper';
-import { CanvasPageModel, CanvasProjectDocument } from '../../../core/models/canvas.models';
-import { ProjectDesignResponse } from '../../../core/models/project.models';
-import { ProjectService } from '../../../core/services/project.service';
+import {
+  CanvasPageModel,
+  CanvasProjectDocument,
+  ProjectDesignResponse,
+  ProjectService,
+} from '@app/core';
 import { withRoundedPrecision } from '../utils/canvas-interaction.util';
 
 @Injectable()

@@ -1,9 +1,5 @@
-import {
-  CanvasBackfaceVisibility,
-  CanvasElement,
-  CanvasTransformOption,
-} from '../../../core/models/canvas.models';
-import { roundToTwoDecimals } from './canvas-interaction.util';
+import { CanvasBackfaceVisibility, CanvasElement, CanvasTransformOption } from '@app/core';
+import { roundToTwoDecimals } from './canvas-math.util';
 
 export interface CanvasTransformStyleProperties {
   transform?: string | null;

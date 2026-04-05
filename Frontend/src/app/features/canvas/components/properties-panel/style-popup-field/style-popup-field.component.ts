@@ -12,8 +12,8 @@ import {
   Output,
   SimpleChanges,
 } from '@angular/core';
-import { CanvasElement } from '../../../../../core/models/canvas.models';
-import { roundToTwoDecimals } from '../../../utils/canvas-interaction.util';
+import { CanvasElement } from '@app/core';
+import { roundToTwoDecimals } from '../../../utils/canvas-math.util';
 import {
   buildCanvasShadowCss,
   CanvasShadowPosition,
@@ -21,15 +21,8 @@ import {
   getCanvasShadowCss,
   resolveEditableCanvasShadow,
 } from '../../../utils/canvas-shadow.util';
-import {
-  DropdownSelectComponent,
-  DropdownSelectOption,
-} from '../../../../../shared/components/dropdown-select/dropdown-select.component';
-import {
-  ToggleGroupComponent,
-  ToggleGroupOption,
-  ToggleGroupValue,
-} from '../../../../../shared/components/toggle-group/toggle-group.component';
+import { DropdownSelectComponent, ToggleGroupComponent } from '@app/shared';
+import type { DropdownSelectOption, ToggleGroupOption, ToggleGroupValue } from '@app/shared';
 import { NumberInputComponent } from '../number-input/number-input.component';
 import { StylePopupOverlayComponent } from '../style-popup-overlay/style-popup-overlay.component';
 

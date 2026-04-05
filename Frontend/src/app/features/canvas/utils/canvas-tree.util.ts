@@ -1,4 +1,4 @@
-import { CanvasElement } from '../../../core/models/canvas.models';
+import { CanvasElement } from '@app/core';
 
 export function getAbsolutePos(
   element: CanvasElement,

@@ -1,6 +1,7 @@
 import { inject, Injectable } from '@angular/core';
-import { CanvasElement, CanvasElementType } from '../../../core/models/canvas.models';
-import { roundToTwoDecimals, clamp, collectSubtreeIds } from '../utils/canvas-interaction.util';
+import { CanvasElement, CanvasElementType } from '@app/core';
+import { clamp, roundToTwoDecimals } from '../utils/canvas-math.util';
+import { collectSubtreeIds } from '../utils/canvas-interaction.util';
 import { CanvasClipboardPasteResult, CanvasClipboardSnapshot, Bounds } from '../canvas.types';
 import { CanvasElementService } from './canvas-element.service';
 
