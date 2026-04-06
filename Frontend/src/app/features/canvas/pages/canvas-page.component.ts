@@ -212,6 +212,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private dragStartAbsolute: Point = { x: 0, y: 0 };
   private dragSelectionIds: string[] = [];
   private dragSelectionStartBounds = new Map<string, Bounds>();
+  private dragSelectionStartParentIds = new Map<string, string | null>();
   private isElementDragPrimed = false;
   private _isDragging = false;
   private get isDragging(): boolean {
@@ -1420,21 +1421,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
           const nextAbsoluteX = startBounds.x + deltaX;
           const nextAbsoluteY = startBounds.y + deltaY;
-          const parent = this.el.findElementById(element.parentId ?? null, elements);
-
-          if (!parent) {
-            return {
-              ...element,
-              x: roundToTwoDecimals(nextAbsoluteX),
-              y: roundToTwoDecimals(nextAbsoluteY),
-            };
-          }
-
-          const parentBounds = this.el.getAbsoluteBounds(parent, elements, this.currentPage());
           return {
             ...element,
-            x: clamp(nextAbsoluteX - parentBounds.x, 0, parent.width - element.width),
-            y: clamp(nextAbsoluteY - parentBounds.y, 0, parent.height - element.height),
+            ...this.resolveDraggedElementPatch(element, elements, nextAbsoluteX, nextAbsoluteY),
           };
         }),
       );
@@ -1503,20 +1492,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
           };
         }
 
-        const parent = this.el.findElementById(element.parentId ?? null, elements);
-        if (!parent) {
-          return {
-            ...element,
-            x: roundToTwoDecimals(absoluteX),
-            y: roundToTwoDecimals(absoluteY),
-          };
-        }
-
-        const parentBounds = this.el.getAbsoluteBounds(parent, elements, this.currentPage());
         return {
           ...element,
-          x: clamp(absoluteX - parentBounds.x, 0, parent.width - element.width),
-          y: clamp(absoluteY - parentBounds.y, 0, parent.height - element.height),
+          ...this.resolveDraggedElementPatch(element, elements, absoluteX, absoluteY),
         };
       });
       const movedEl = mapped.find((e) => e.id === selectedId) ?? null;
@@ -1562,7 +1540,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     const selectedOnDrop = this.selectedElement();
-    const prevParentId = selectedOnDrop?.parentId ?? null;
+    const prevParentId = selectedOnDrop
+      ? (this.dragSelectionStartParentIds.get(selectedOnDrop.id) ?? selectedOnDrop.parentId ?? null)
+      : null;
     const isGroupDrag = this.dragSelectionIds.length > 1;
     const shouldCommitGestureHistory =
       this.isDragging ||
@@ -1632,6 +1612,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.layoutDropTarget.set(null);
     this.dragSelectionIds = [];
     this.dragSelectionStartBounds = new Map();
+    this.dragSelectionStartParentIds = new Map();
 
     if (shouldCommitGestureHistory) {
       this.history.commitGestureHistory(() => this.createHistorySnapshot());
@@ -1768,6 +1749,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const dragIds = this.canUseGroupDrag(candidateIds, elements) ? candidateIds : [anchorId];
 
     this.dragSelectionIds = dragIds;
+    this.dragSelectionStartParentIds = new Map(
+      dragIds.map((id) => [id, this.el.findElementById(id, elements)?.parentId ?? null]),
+    );
     this.dragSelectionStartBounds = new Map(
       dragIds
         .map((id) => {
@@ -2801,22 +2785,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const container = this.el.findElementById(state.containerId, this.elements());
-    const containerBounds = container
-      ? this.el.getAbsoluteBounds(container, this.elements(), this.currentPage())
-      : null;
-    const clampedPoint = containerBounds
-      ? {
-          x: clamp(pointer.x, containerBounds.x, containerBounds.x + containerBounds.width),
-          y: clamp(pointer.y, containerBounds.y, containerBounds.y + containerBounds.height),
-        }
-      : pointer;
-
     this.rectangleDrawState = {
       ...state,
-      currentPoint: clampedPoint,
+      currentPoint: pointer,
     };
-    this.rectangleDrawPreview.set(this.buildRectangleDrawBounds(state.startPoint, clampedPoint));
+    this.rectangleDrawPreview.set(this.buildRectangleDrawBounds(state.startPoint, pointer));
   }
 
   private commitRectangleDraw(): void {
@@ -2824,11 +2797,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if (!state) {
       return;
     }
-
-    const container = this.el.findElementById(state.containerId, this.elements());
-    const containerBounds = container
-      ? this.el.getAbsoluteBounds(container, this.elements(), this.currentPage())
-      : null;
     const bounds = this.buildRectangleDrawBounds(state.startPoint, state.currentPoint);
     const distance = Math.hypot(
       state.currentPoint.x - state.startPoint.x,
@@ -2836,9 +2804,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
 
     if (distance < ELEMENT_DRAG_START_THRESHOLD) {
-      this.createElementAtCanvasPoint('rectangle', state.startPoint, container, containerBounds);
+      this.createElementAtCanvasPoint('rectangle', state.startPoint);
       return;
     }
+
+    const container = this.resolveInsertionContainerForBounds(bounds);
+    const containerBounds = container
+      ? this.el.getAbsoluteBounds(container, this.elements(), this.currentPage())
+      : null;
 
     const result = this.el.createRectangleFromBounds(
       bounds,
@@ -3137,7 +3110,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     let bestId: string | null = null;
     let bestDepth = -1;
 
-    for (let i = elements.length - 1; i >= 0; i--) {
+    for (let i = 0; i < elements.length; i++) {
       const el = elements[i];
       if (el.type === 'frame') continue;
       const b = this.getElementHitTestBounds(el);
@@ -3344,7 +3317,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return depth;
   }
 
-  private resolveInsertionContainer(pointer: Point): CanvasElement | null {
+  private resolveInsertionContainer(
+    pointer: Point,
+    requiredSize?: { width: number; height: number },
+  ): CanvasElement | null {
     const elements = this.elements();
     const hoveredContainers = elements.filter((element) => {
       if (
@@ -3359,31 +3335,133 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
         pointer.x >= bounds.x &&
         pointer.x <= bounds.x + bounds.width &&
         pointer.y >= bounds.y &&
-        pointer.y <= bounds.y + bounds.height
+        pointer.y <= bounds.y + bounds.height &&
+        this.canContainerFitSize(element, requiredSize)
       );
     });
 
     if (hoveredContainers.length > 0) {
-      return hoveredContainers.reduce((best, candidate) => {
-        const bestArea = best.width * best.height;
-        const candidateArea = candidate.width * candidate.height;
-        return candidateArea < bestArea ? candidate : best;
-      });
+      return this.getSmallestContainer(hoveredContainers);
     }
 
-    return this.el.getSelectedContainer(this.selectedElement());
+    const selectedContainer = this.el.getSelectedContainer(this.selectedElement());
+    return selectedContainer && this.canContainerFitSize(selectedContainer, requiredSize)
+      ? selectedContainer
+      : null;
+  }
+
+  private resolveInsertionContainerForBounds(
+    bounds: Bounds,
+    excludedRootId?: string | null,
+  ): CanvasElement | null {
+    const elements = this.elements();
+    const excludedIds = excludedRootId ? new Set(collectSubtreeIds(elements, excludedRootId)) : null;
+    const hoveredContainers = elements.filter((element) => {
+      if (
+        !this.el.isContainerElement(element) ||
+        !this.el.isElementEffectivelyVisible(element.id, elements) ||
+        excludedIds?.has(element.id)
+      ) {
+        return false;
+      }
+
+      const containerBounds = this.el.getAbsoluteBounds(element, elements, this.currentPage());
+      return this.isBoundsFullyInsideBounds(bounds, containerBounds);
+    });
+
+    return this.getSmallestContainer(hoveredContainers);
   }
 
   private resolveInsertionContext(pointer: Point): {
     container: CanvasElement | null;
     containerBounds: Bounds | null;
+  };
+  private resolveInsertionContext(
+    pointer: Point,
+    requiredSize?: { width: number; height: number },
+  ): {
+    container: CanvasElement | null;
+    containerBounds: Bounds | null;
   } {
-    const container = this.resolveInsertionContainer(pointer);
+    const container = this.resolveInsertionContainer(pointer, requiredSize);
     return {
       container,
       containerBounds: container
         ? this.el.getAbsoluteBounds(container, this.elements(), this.currentPage())
         : null,
+    };
+  }
+
+  private getSmallestContainer(containers: CanvasElement[]): CanvasElement | null {
+    if (containers.length === 0) {
+      return null;
+    }
+
+    return containers.reduce((best, candidate) => {
+      const bestArea = best.width * best.height;
+      const candidateArea = candidate.width * candidate.height;
+      return candidateArea < bestArea ? candidate : best;
+    });
+  }
+
+  private canContainerFitSize(
+    container: CanvasElement,
+    requiredSize?: { width: number; height: number },
+  ): boolean {
+    if (!requiredSize) {
+      return true;
+    }
+
+    return container.width >= requiredSize.width && container.height >= requiredSize.height;
+  }
+
+  private isBoundsFullyInsideBounds(inner: Bounds, outer: Bounds): boolean {
+    return (
+      inner.x >= outer.x &&
+      inner.y >= outer.y &&
+      inner.x + inner.width <= outer.x + outer.width &&
+      inner.y + inner.height <= outer.y + outer.height
+    );
+  }
+
+  private resolveDraggedElementPatch(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    nextAbsoluteX: number,
+    nextAbsoluteY: number,
+  ): Partial<CanvasElement> {
+    const parent = this.el.findElementById(element.parentId ?? null, elements);
+    if (!parent) {
+      return {
+        x: roundToTwoDecimals(nextAbsoluteX),
+        y: roundToTwoDecimals(nextAbsoluteY),
+      };
+    }
+
+    const parentBounds = this.el.getAbsoluteBounds(parent, elements, this.currentPage());
+    const nextBounds: Bounds = {
+      x: nextAbsoluteX,
+      y: nextAbsoluteY,
+      width: element.width,
+      height: element.height,
+    };
+
+    if (
+      this.isContainerElement(parent) &&
+      !this.isLayoutContainer(parent) &&
+      !this.isBoundsFullyInsideBounds(nextBounds, parentBounds)
+    ) {
+      return {
+        parentId: null,
+        position: this.el.getDefaultPositionForPlacement(element.type, null),
+        x: roundToTwoDecimals(nextAbsoluteX),
+        y: roundToTwoDecimals(nextAbsoluteY),
+      };
+    }
+
+    return {
+      x: clamp(nextAbsoluteX - parentBounds.x, 0, parent.width - element.width),
+      y: clamp(nextAbsoluteY - parentBounds.y, 0, parent.height - element.height),
     };
   }
 
@@ -3411,12 +3489,21 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     targetContainer?: CanvasElement | null,
     containerBounds?: Bounds | null,
   ): CanvasElement | null {
-    const resolvedContainer = targetContainer ?? this.resolveInsertionContainer(pointer);
-    const resolvedContainerBounds =
-      containerBounds ??
-      (resolvedContainer
-        ? this.el.getAbsoluteBounds(resolvedContainer, this.elements(), this.currentPage())
-        : null);
+    const requiredSize = this.el.getDefaultElementDimensions(tool, this.viewport.frameTemplate());
+    const preferredContainer =
+      tool === 'frame' || !targetContainer || !this.canContainerFitSize(targetContainer, requiredSize)
+        ? null
+        : targetContainer;
+    const resolvedContainer =
+      tool === 'frame'
+        ? null
+        : preferredContainer ?? this.resolveInsertionContainer(pointer, requiredSize);
+    const resolvedContainerBounds = resolvedContainer
+      ? targetContainer && resolvedContainer.id === targetContainer.id
+        ? (containerBounds ??
+          this.el.getAbsoluteBounds(resolvedContainer, this.elements(), this.currentPage()))
+        : this.el.getAbsoluteBounds(resolvedContainer, this.elements(), this.currentPage())
+      : null;
 
     const result = this.el.createElementAtPoint(
       tool,
@@ -3460,41 +3547,19 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return newElement;
   }
 
-  /** After a drag, if a free element was dropped inside a container that is larger
-   *  than the element, auto-reparent it to that container. */
+  /** After a drag, reparent the element to the smallest container that fully contains it. */
   private autoGroupOnDrop(): void {
     const id = this.selectedElementId();
     if (!id) return;
 
     const elements = this.elements();
     const element = this.el.findElementById(id, elements);
-    if (!element || element.type === 'frame' || element.parentId) return;
+    if (!element || element.type === 'frame') return;
 
     const elementBounds = this.el.getAbsoluteBounds(element, elements, this.currentPage());
-    const centerX = elementBounds.x + elementBounds.width / 2;
-    const centerY = elementBounds.y + elementBounds.height / 2;
+    const target = this.resolveInsertionContainerForBounds(elementBounds, id);
 
-    // Find all containers (frames or rectangles) whose bounds contain
-    // the element's center and that are strictly larger in both dimensions.
-    const candidateContainers = elements.filter((el) => {
-      if (el.id === id) return false;
-      if (!this.el.isContainerElement(el)) return false;
-      const fb = this.el.getAbsoluteBounds(el, elements, this.currentPage());
-      const centerInside =
-        centerX >= fb.x &&
-        centerX <= fb.x + fb.width &&
-        centerY >= fb.y &&
-        centerY <= fb.y + fb.height;
-      const containerLarger = el.width > element.width && el.height > element.height;
-      return centerInside && containerLarger;
-    });
-
-    if (candidateContainers.length === 0) return;
-
-    // Pick the smallest qualifying container (the most specific).
-    const target = candidateContainers.reduce((best, current) =>
-      current.width * current.height < best.width * best.height ? current : best,
-    );
+    if (!target || target.id === element.parentId) return;
 
     const fb = this.el.getAbsoluteBounds(target, elements, this.currentPage());
     const isTargetLayout = this.isLayoutContainer(target);

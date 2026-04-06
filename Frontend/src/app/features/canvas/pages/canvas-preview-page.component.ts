@@ -67,7 +67,9 @@ export class CanvasPreviewPage {
 
   readonly visibleElements = computed<CanvasElement[]>(() => {
     const elements = this.currentPage()?.elements ?? [];
-    return elements.filter((element) => this.el.isElementEffectivelyVisible(element.id, elements));
+    return elements
+      .filter((element) => this.el.isElementEffectivelyVisible(element.id, elements))
+      .reverse();
   });
 
   readonly viewportWidth = computed<number>(() => {

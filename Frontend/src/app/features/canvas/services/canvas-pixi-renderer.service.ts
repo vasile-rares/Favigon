@@ -124,7 +124,7 @@ export class CanvasPixiRendererService {
 
     // Render top-level elements recursively
     const topLevel = childrenMap.get(null) ?? [];
-    for (const el of topLevel) {
+    for (const el of this.getRenderStackOrder(topLevel)) {
       const node = this.renderElement(
         el,
         elements,
@@ -435,7 +435,7 @@ export class CanvasPixiRendererService {
       }
     }
 
-    for (const child of children) {
+    for (const child of this.getRenderStackOrder(children)) {
       // Skip dragged element — it renders floating
       if (flowDragState && child.id === flowDragState.draggingElementId) continue;
 
@@ -544,6 +544,10 @@ export class CanvasPixiRendererService {
     this.addChildElements(node, element, allElements, childrenMap, layout, undefined, zoom);
 
     return node;
+  }
+
+  private getRenderStackOrder(elements: CanvasElement[]): CanvasElement[] {
+    return [...elements].reverse();
   }
 
   private syncTextNodePresentation(

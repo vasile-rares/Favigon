@@ -67,10 +67,10 @@ export class CanvasElementService {
     containerBounds: Bounds | null,
     frameTemplateSize: { width: number; height: number },
   ): { element: CanvasElement | null; error: string | null } {
-    const defaultWidth =
-      tool === 'frame' ? frameTemplateSize.width : DEFAULT_ELEMENT_DIMENSIONS[tool].width;
-    const defaultHeight =
-      tool === 'frame' ? frameTemplateSize.height : DEFAULT_ELEMENT_DIMENSIONS[tool].height;
+    const { width: defaultWidth, height: defaultHeight } = this.getDefaultElementDimensions(
+      tool,
+      frameTemplateSize,
+    );
 
     let x = roundToTwoDecimals(pointer.x - defaultWidth / 2);
     let y = roundToTwoDecimals(pointer.y - defaultHeight / 2);
@@ -149,6 +149,17 @@ export class CanvasElementService {
         parentId,
       },
       error: null,
+    };
+  }
+
+  getDefaultElementDimensions(
+    tool: CanvasElementType,
+    frameTemplateSize: { width: number; height: number },
+  ): { width: number; height: number } {
+    return {
+      width: tool === 'frame' ? frameTemplateSize.width : DEFAULT_ELEMENT_DIMENSIONS[tool].width,
+      height:
+        tool === 'frame' ? frameTemplateSize.height : DEFAULT_ELEMENT_DIMENSIONS[tool].height,
     };
   }
 
