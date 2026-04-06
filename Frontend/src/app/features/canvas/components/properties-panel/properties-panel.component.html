@@ -16,7 +16,7 @@
   <div class="properties-panel-content">
 
   <!-- -- Design Tab --------------------------------------- -->
-  <ng-container *ngIf="isTabActive('design'); else prototypeTab">
+  <ng-container *ngIf="isTabActive('design'); else generationTab">
 
     <!-- Frame templates -->
     <section class="properties-section" *ngIf="isFrameToolSelected()">
@@ -1081,63 +1081,20 @@
     </ng-container>
   </ng-container>
 
-  <!-- -- Prototype Tab -------------------------------------- -->
-  <ng-template #prototypeTab>
-
-    <section class="properties-section">
-      <p class="properties-section-title">Framework</p>
-      <div class="pp-field">
-        <select [value]="selectedFramework" (change)="onFrameworkChange($event)">
-          <option value="html">HTML / CSS</option>
-          <option value="react">React</option>
-          <option value="angular">Angular</option>
-        </select>
-      </div>
-    </section>
-
-    <section class="properties-section">
-      <p class="properties-section-title">IR Builder</p>
-
-      <div class="pp-proto-actions">
-        <button type="button" class="pp-proto-btn" (click)="validateRequested.emit()" [disabled]="isValidating || isGenerating">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M2 6.5 5 9.5l6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          {{ isValidating ? 'Validating\u2026' : 'Validate IR' }}
-        </button>
-        <button type="button" class="pp-proto-btn pp-proto-btn--primary" (click)="generateRequested.emit()" [disabled]="isGenerating || isValidating">
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <path d="M4 3.5 7.5 6.5 4 9.5M8 9.5h1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          {{ isGenerating ? 'Generating\u2026' : 'Generate Code' }}
-        </button>
-      </div>
-
-      <p class="prototype-status prototype-status--ok" *ngIf="validationResult === true">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6 4.5 8.5 10 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        IR is valid
-      </p>
-      <p class="prototype-status prototype-status--error" *ngIf="validationResult === false">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        IR is not valid
-      </p>
-      <p class="prototype-status prototype-status--error" *ngIf="apiError">{{ apiError }}</p>
-    </section>
-
-    <section class="properties-section">
-      <p class="properties-section-title">IR Preview</p>
-      <pre>{{ irPreview | json }}</pre>
-    </section>
-
-    <section class="properties-section" *ngIf="generatedHtml">
-      <p class="properties-section-title">Generated HTML</p>
-      <pre>{{ generatedHtml }}</pre>
-    </section>
-
-    <section class="properties-section" *ngIf="generatedCss">
-      <p class="properties-section-title">Generated CSS</p>
-      <pre>{{ generatedCss }}</pre>
-    </section>
+  <!-- -- Generation Tab ------------------------------------- -->
+  <ng-template #generationTab>
+    <app-generation-tab
+      [selectedFramework]="selectedFramework"
+      [validationResult]="validationResult"
+      [apiError]="apiError"
+      [isValidating]="isValidating"
+      [isGenerating]="isGenerating"
+      [generatedHtml]="generatedHtml"
+      [generatedCss]="generatedCss"
+      [irPreview]="irPreview"
+      (frameworkChanged)="frameworkChanged.emit($event)"
+      (validateRequested)="validateRequested.emit()"
+        (generateRequested)="generateRequested.emit()"></app-generation-tab>
 
   </ng-template>
   </div>

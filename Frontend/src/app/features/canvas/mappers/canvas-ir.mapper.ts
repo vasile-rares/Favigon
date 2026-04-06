@@ -15,6 +15,7 @@
   CanvasTextSpacingUnit,
   AlignItems,
   BorderStyle,
+  ConverterPageRequest,
   FlexDirection,
   IRBorder,
   IRLayout,
@@ -98,6 +99,104 @@ export function buildCanvasIR(
   const rootChildren = resolveRootChildren(elements, nodesById, rootId);
 
   return createRootNode(projectId, rootId, rootChildren, pageName);
+}
+
+export function buildCanvasIRPages(
+  pages: CanvasPageModel[],
+  projectId: string,
+): ConverterPageRequest[] {
+  const requests: ConverterPageRequest[] = [];
+
+  for (const page of pages) {
+    if (page.elements.length === 0) continue;
+
+    const visibleElements = page.elements.filter((e) => e.visible !== false);
+    const rootFrames = visibleElements.filter((e) => e.type === 'frame' && !e.parentId);
+
+    if (rootFrames.length > 0) {
+      const primaryFrame = rootFrames.find((f) => f.isPrimary) ?? rootFrames[0];
+      const primaryElements = collectFrameSubtree(primaryFrame.id, visibleElements);
+
+      requests.push({
+        viewportWidth: primaryFrame.width,
+        pageName: page.name,
+        ir: buildCanvasIR(primaryElements, projectId, page.name),
+      });
+
+      for (const frame of rootFrames) {
+        if (frame.id === primaryFrame.id) continue;
+
+        const frameElements = collectFrameSubtree(frame.id, visibleElements);
+        const syncedElements = syncBreakpointElements(
+          frameElements,
+          frame.id,
+          primaryFrame,
+          primaryElements,
+        );
+        requests.push({
+          viewportWidth: frame.width,
+          pageName: page.name,
+          ir: buildCanvasIR(syncedElements, projectId, page.name),
+        });
+      }
+    } else {
+      requests.push({
+        viewportWidth: page.viewportWidth ?? 1280,
+        pageName: page.name,
+        ir: buildCanvasIR(visibleElements, projectId, page.name),
+      });
+    }
+  }
+
+  return requests.sort((a, b) => b.viewportWidth - a.viewportWidth);
+}
+
+function syncBreakpointElements(
+  breakpointElements: CanvasElement[],
+  breakpointFrameId: string,
+  primaryFrame: CanvasElement,
+  primaryElements: CanvasElement[],
+): CanvasElement[] {
+  const primaryById = new Map<string, CanvasElement>();
+  for (const el of primaryElements) {
+    primaryById.set(el.id, el);
+  }
+
+  return breakpointElements.map((el) => {
+    if (el.id === breakpointFrameId) {
+      return { ...el, id: primaryFrame.id, name: primaryFrame.name };
+    }
+    const syncedParentId = el.parentId === breakpointFrameId ? primaryFrame.id : el.parentId;
+    if (el.primarySyncId) {
+      const primaryEl = primaryById.get(el.primarySyncId);
+      return {
+        ...el,
+        id: el.primarySyncId,
+        name: primaryEl?.name ?? el.name,
+        parentId: syncedParentId,
+      };
+    }
+    return { ...el, parentId: syncedParentId };
+  });
+}
+
+function collectFrameSubtree(frameId: string, allElements: CanvasElement[]): CanvasElement[] {
+  const result: CanvasElement[] = [];
+  const frame = allElements.find((e) => e.id === frameId);
+  if (!frame) return result;
+
+  result.push(frame);
+  const queue = [frameId];
+  while (queue.length > 0) {
+    const parentId = queue.shift()!;
+    for (const el of allElements) {
+      if (el.parentId === parentId) {
+        result.push(el);
+        queue.push(el.id);
+      }
+    }
+  }
+  return result;
 }
 
 export function buildCanvasProjectDocument(
@@ -282,9 +381,15 @@ function mapCanvasElementToIR(element: CanvasElement): IRNode {
 }
 
 function buildNodeLayout(element: CanvasElement): IRLayout | undefined {
-  if (!element.display) return undefined;
-  const mode = mapDisplayMode(element.display);
+  const isText = element.type === 'text';
+  const textVA = isText ? (element.textVerticalAlign ?? 'middle') : null;
+  const needsFlexForVA = textVA !== null && textVA !== 'top';
+
+  if (!element.display && !needsFlexForVA) return undefined;
+
+  const mode: LayoutMode = element.display ? mapDisplayMode(element.display) : 'Flex';
   const layout: IRLayout = { mode };
+
   if (element.display === 'flex') {
     if (element.flexDirection) layout.direction = mapFlexDirection(element.flexDirection);
     if (element.flexWrap !== undefined) layout.wrap = element.flexWrap === 'wrap';
@@ -297,6 +402,12 @@ function buildNodeLayout(element: CanvasElement): IRLayout | undefined {
     if (element.gridTemplateRows) layout.gridTemplateRows = element.gridTemplateRows;
     if (typeof element.gap === 'number') layout.gap = px(element.gap);
   }
+
+  // Text vertical alignment: map onto flex align-items (cross-axis in row layout)
+  if (needsFlexForVA && textVA !== null) {
+    layout.align ??= textVA === 'bottom' ? 'End' : 'Center';
+  }
+
   return layout;
 }
 
@@ -318,6 +429,7 @@ function buildNodePosition(element: CanvasElement): IRPosition {
 
 function buildNodeMeta(element: CanvasElement): IRMeta {
   return {
+    name: element.name || undefined,
     locked: false,
     hidden: element.visible === false,
     selected: false,
@@ -387,6 +499,10 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
 
     if (typeof element.fontWeight === 'number') {
       style.fontWeight = element.fontWeight;
+    }
+
+    if (element.fontStyle) {
+      style.fontStyle = element.fontStyle;
     }
 
     if (element.textAlign) {
@@ -489,9 +605,6 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
   if (element.type === 'text') {
     props['content'] = element.text ?? '';
     props['textVerticalAlign'] = element.textVerticalAlign ?? 'middle';
-    if (element.fontStyle) {
-      props['fontStyle'] = element.fontStyle;
-    }
   }
 
   if (element.type === 'image') {
@@ -535,6 +648,7 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
     if (linkPageId.length > 0) {
       props['linkType'] = 'page';
       props['linkPageId'] = linkPageId;
+      props['href'] = `#${linkPageId}`;
     }
   }
 
@@ -725,10 +839,10 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
         ? (readOptionalStringStyle(node.style, 'fontFamily') ?? 'Inter')
         : undefined,
     fontWeight: mappedType === 'text' ? readNumber(node.style?.fontWeight, 400) : undefined,
-    fontStyle: mappedType === 'text' ? readFontStyleFromProps(node.props, 'normal') : undefined,
+    fontStyle: mappedType === 'text' ? readFontStyleFromStyle(node.style) : undefined,
     textAlign: mappedType === 'text' ? readTextAlign(node.style?.textAlign, 'center') : undefined,
     textVerticalAlign:
-      mappedType === 'text' ? readTextVerticalAlignFromProps(node.props, 'middle') : undefined,
+      mappedType === 'text' ? readTextVerticalAlignFromLayout(node.layout, 'middle') : undefined,
     letterSpacing: mappedType === 'text' ? readLength(node.style?.letterSpacing, 0) : undefined,
     letterSpacingUnit:
       mappedType === 'text'
@@ -1005,6 +1119,10 @@ function readOptionalStringStyle(
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined;
 }
 
+function readFontStyleFromStyle(style: IRStyle | undefined): 'normal' | 'italic' {
+  return style?.fontStyle === 'italic' ? 'italic' : 'normal';
+}
+
 function readFontStyleFromProps(
   props: Record<string, unknown> | undefined,
   fallback: 'normal' | 'italic',
@@ -1020,6 +1138,22 @@ function readTextAlign(
   return value === 'left' || value === 'center' || value === 'right' || value === 'justify'
     ? value
     : fallback;
+}
+
+function readTextVerticalAlignFromLayout(
+  layout: IRLayout | undefined,
+  fallback: 'top' | 'middle' | 'bottom',
+): 'top' | 'middle' | 'bottom' {
+  switch (layout?.align) {
+    case 'Start':
+      return 'top';
+    case 'Center':
+      return 'middle';
+    case 'End':
+      return 'bottom';
+    default:
+      return fallback;
+  }
 }
 
 function readTextVerticalAlignFromProps(

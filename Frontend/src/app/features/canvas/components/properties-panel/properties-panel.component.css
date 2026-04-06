@@ -92,20 +92,6 @@
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: 10px;
   background: rgba(0, 0, 0, 0.2);
-
-  pre {
-    margin: 0;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 6px;
-    padding: 0.6rem;
-    font-size: var(--canvas-panel-font-size);
-    color: var(--color-zinc-300);
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 200px;
-    overflow: auto;
-  }
 }
 
 .properties-section--actionable {
@@ -875,72 +861,6 @@
     line-height: 1;
     display: block;
   }
-}
-
-/* ── Prototype actions ───────────────────────────────────── */
-.pp-proto-actions {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.pp-proto-btn {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--color-zinc-300);
-  border-radius: 7px;
-  padding: 0.42rem 0.5rem;
-  font-size: var(--canvas-panel-font-size);
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background 0.15s,
-    color 0.15s,
-    border-color 0.15s;
-
-  &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--color-zinc-100);
-    border-color: rgba(255, 255, 255, 0.12);
-  }
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
-}
-
-.pp-proto-btn--primary {
-  border-color: var(--color-brand-primary-30);
-  background: var(--color-brand-primary-10);
-  color: var(--color-brand-primary);
-
-  &:hover:not(:disabled) {
-    background: rgba(13, 153, 255, 0.18);
-    border-color: rgba(13, 153, 255, 0.5);
-    color: #4db8ff;
-  }
-}
-
-/* ── Prototype status ────────────────────────────────────── */
-.prototype-status {
-  margin: 0;
-  font-size: var(--canvas-panel-font-size);
-  display: flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.prototype-status--ok {
-  color: var(--color-success-light);
-}
-
-.prototype-status--error {
-  color: var(--color-danger-light);
 }
 
 /* ── Frame templates ─────────────────────────────────────── */

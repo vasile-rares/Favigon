@@ -18,9 +18,14 @@ import {
   CanvasElementType,
   CanvasPageModel,
   IRNode,
+  ConverterPageRequest,
   extractApiErrorMessage,
 } from '@app/core';
-import { buildCanvasIR, buildCanvasProjectDocument } from '../mappers/canvas-ir.mapper';
+import {
+  buildCanvasIR,
+  buildCanvasIRPages,
+  buildCanvasProjectDocument,
+} from '../mappers/canvas-ir.mapper';
 import { HeaderBarComponent, ContextMenuComponent, DialogBoxComponent } from '@app/shared';
 import type { ContextMenuItem } from '@app/shared';
 import { ToolbarComponent } from '../components/toolbar/toolbar.component';
@@ -183,6 +188,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const currentPage = this.currentPage();
     return buildCanvasIR(this.visibleElements(), this.projectId, currentPage?.name);
   });
+
+  readonly irPages = computed<ConverterPageRequest[]>(() =>
+    buildCanvasIRPages(this.pages(), this.projectId),
+  );
 
   readonly projectId = this.route.snapshot.paramMap.get('id') ?? 'new-project';
 
@@ -2529,12 +2538,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   validateIR(): void {
     this.apiError.set(null);
-    this.gen.validate(this.irPreview());
+    this.gen.validate(this.irPages());
   }
 
   generateCode(): void {
     this.apiError.set(null);
-    this.gen.generate(this.irPreview());
+    this.gen.generate(this.irPages());
   }
 
   // ── Private: Persistence ──────────────────────────────────

@@ -40,7 +40,7 @@ export type {
   CanvasProjectDocument,
 } from './canvas.models';
 
-export type { ConverterRequest, ConverterResponse } from './converter.models';
+export type { ConverterPageRequest, ConverterRequest, ConverterResponse } from './converter.models';
 
 export type {
   IRNode,

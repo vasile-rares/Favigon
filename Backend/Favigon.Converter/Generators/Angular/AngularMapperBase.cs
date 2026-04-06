@@ -28,9 +28,7 @@ public abstract class AngularMapperBase : FrameworkMapperBase
         return AppendAriaLabel(node, attrs);
     }
 
-    protected override string OpenNodeComment(IRNode node, EmitContext ctx) =>
-        $"{ctx.Indent}<!-- @favigon-node id=\"{node.Id}\" type=\"{node.Type}\" -->\n";
+    protected override string OpenNodeComment(IRNode node, EmitContext ctx) => string.Empty;
 
-    protected override string CloseNodeComment(IRNode node, EmitContext ctx) =>
-        $"{ctx.Indent}<!-- @favigon-node-end id=\"{node.Id}\" -->\n";
+    protected override string CloseNodeComment(IRNode node, EmitContext ctx) => string.Empty;
 }

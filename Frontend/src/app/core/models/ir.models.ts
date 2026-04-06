@@ -53,6 +53,7 @@ export interface IRStyle {
   fontSize?: IRLength;
   fontWeight?: number;
   fontFamily?: string;
+  fontStyle?: string;
 
   lineHeight?: IRLength;
   letterSpacing?: IRLength;
@@ -100,6 +101,7 @@ export interface IRBorder {
 }
 
 export interface IRMeta {
+  name?: string;
   locked: boolean;
   hidden: boolean;
   selected: boolean;

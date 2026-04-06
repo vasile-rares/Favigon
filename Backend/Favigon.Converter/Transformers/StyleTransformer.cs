@@ -38,6 +38,7 @@ public static class StyleTransformer
     if (style.FontSize is not null) css["font-size"] = style.FontSize.ToString();
     if (style.FontWeight is not null) css["font-weight"] = style.FontWeight.Value.ToString();
     if (style.FontFamily is not null) css["font-family"] = style.FontFamily;
+    if (style.FontStyle is not null) css["font-style"] = style.FontStyle;
     if (style.TextAlign is not null) css["text-align"] = style.TextAlign;
     if (style.LineHeight is not null) css["line-height"] = style.LineHeight.ToString();
     if (style.LetterSpacing is not null) css["letter-spacing"] = style.LetterSpacing.ToString();

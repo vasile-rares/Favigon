@@ -1,8 +1,15 @@
 import { IRNode } from './ir.models';
 
+export interface ConverterPageRequest {
+  viewportWidth: number;
+  pageName: string;
+  ir: IRNode;
+}
+
 export interface ConverterRequest {
   framework: string;
-  ir: IRNode;
+  ir?: IRNode;
+  pages?: ConverterPageRequest[];
 }
 
 export interface ConverterResponse {

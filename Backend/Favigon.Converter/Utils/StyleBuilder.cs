@@ -6,19 +6,19 @@ namespace Favigon.Converter.Transformers;
 
 public sealed class StyleBuilder
 {
-  private readonly List<(string NodeId, Dictionary<string, string> Props)> _baseRules = [];
+  private readonly List<(string CssClass, Dictionary<string, string> Props)> _baseRules = [];
   private readonly List<string> _mediaRules = [];
 
-  public void AddBase(string nodeId, Dictionary<string, string> props)
+  public void AddBase(string cssClass, Dictionary<string, string> props)
   {
     if (props.Count > 0)
-      _baseRules.Add((nodeId, props));
+      _baseRules.Add((cssClass, props));
   }
 
-  public void AddVariants(string nodeId, Dictionary<string, IRVariant> variants)
+  public void AddVariants(string cssClass, Dictionary<string, IRVariant> variants)
   {
     if (variants.Count == 0) return;
-    var media = ResponsiveTransformer.ToCssMediaQueries(variants, $".favigon-{nodeId}");
+    var media = ResponsiveTransformer.ToCssMediaQueries(variants, $".{cssClass}");
     if (!string.IsNullOrWhiteSpace(media))
       _mediaRules.Add(media);
   }
@@ -31,9 +31,9 @@ public sealed class StyleBuilder
 
     var sb = new StringBuilder();
 
-    foreach (var (nodeId, props) in _baseRules)
+    foreach (var (cssClass, props) in _baseRules)
     {
-      sb.Append($".favigon-{nodeId} {{\n");
+      sb.Append($".{cssClass} {{\n");
       foreach (var (k, v) in props)
         sb.Append($"  {k}: {v};\n");
       sb.Append("}\n");

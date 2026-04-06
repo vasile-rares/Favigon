@@ -81,7 +81,7 @@ public class IRStyle
   public IRLength? FontSize { get; set; }
   public int? FontWeight { get; set; }
   public string? FontFamily { get; set; }
-
+  public string? FontStyle { get; set; }
   public IRLength? LineHeight { get; set; }
   public IRLength? LetterSpacing { get; set; }
 
@@ -141,6 +141,7 @@ public class IRVariant
 
 public class IRMeta
 {
+  public string? Name { get; set; }
   public bool Locked { get; set; }
   public bool Hidden { get; set; }
   public bool Selected { get; set; }

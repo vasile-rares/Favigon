@@ -8,6 +8,7 @@ public class ConverterRequest
   [Required]
   public string Framework { get; set; } = "html";
 
-  [Required]
   public IRNode? Ir { get; set; }
+
+  public List<ConverterPageInput>? Pages { get; set; }
 }

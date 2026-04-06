@@ -1,0 +1,130 @@
+<div class="generation-tab">
+  <section class="generation-card">
+    <div class="generation-card__header">
+      <div>
+        <p class="generation-kicker">Framework</p>
+      </div>
+    </div>
+
+    <div class="generation-frameworks">
+      <button
+        *ngFor="let option of frameworkOptions"
+        type="button"
+        class="generation-framework"
+        [class.generation-framework--active]="selectedFramework === option.value"
+        (click)="selectFramework(option.value)">
+        <span class="generation-framework__label">{{ option.label }}</span>
+      </button>
+    </div>
+  </section>
+
+  <section class="generation-card">
+    <div class="generation-status" [attr.data-tone]="getStatusTone()">
+      <span class="generation-status__dot"></span>
+      <div class="generation-status__copy">
+        <strong>{{ getStatusLabel() }}</strong>
+        <span>{{ getStatusHint() }}</span>
+      </div>
+    </div>
+
+    <div class="generation-actions">
+      <button
+        type="button"
+        class="generation-button"
+        [disabled]="isValidating || isGenerating"
+        (click)="validateRequested.emit()">
+        {{ isValidating ? 'Checking…' : 'Validate' }}
+      </button>
+
+      <button
+        type="button"
+        class="generation-button generation-button--primary"
+        [disabled]="isGenerating || isValidating"
+        (click)="generateRequested.emit()">
+        {{ isGenerating ? 'Generating…' : 'Generate' }}
+      </button>
+    </div>
+  </section>
+
+  <section class="generation-card generation-card--code" *ngIf="hasGeneratedCode(); else emptyState">
+    <div class="generation-card__header">
+      <div>
+        <p class="generation-kicker">Output</p>
+        <h4 class="generation-subtitle">Code preview</h4>
+      </div>
+
+      <div class="generation-copy-actions">
+        <button type="button" class="generation-copy-button" (click)="copyCurrentOutput()">
+          {{ getCopyCurrentButtonLabel() }}
+        </button>
+        <button
+          type="button"
+          class="generation-copy-button"
+          [disabled]="!canExportFiles()"
+          (click)="exportCurrentOutput()">
+          {{ getExportCurrentButtonLabel() }}
+        </button>
+        <button
+          *ngIf="hasMultipleExportFiles()"
+          type="button"
+          class="generation-copy-button generation-copy-button--accent"
+          (click)="exportAllOutputs()">
+          {{ getExportAllButtonLabel() }}
+        </button>
+      </div>
+    </div>
+
+    <div class="generation-output-tabs">
+      <button
+        *ngIf="hasGeneratedHtml()"
+        type="button"
+        class="generation-output-tab"
+        [class.generation-output-tab--active]="isOutputTabActive('html')"
+        (click)="selectOutputTab('html')">
+        <span>{{ getMarkupOutputLabel() }}</span>
+        <small>{{ lineCount(generatedHtml) }}L</small>
+      </button>
+
+      <button
+        *ngIf="hasGeneratedCss()"
+        type="button"
+        class="generation-output-tab"
+        [class.generation-output-tab--active]="isOutputTabActive('css')"
+        (click)="selectOutputTab('css')">
+        <span>CSS</span>
+        <small>{{ lineCount(generatedCss) }}L</small>
+      </button>
+    </div>
+
+    <div class="generation-code-shell">
+      <div class="generation-code-shell__meta">
+        <span>{{ getCurrentFileName() }}</span>
+        <span>{{ lineCount(getCurrentOutputCode()) }} lines</span>
+      </div>
+      <pre class="generation-code"><code class="generation-code__content" [innerHTML]="getCurrentHighlightedOutput()"></code></pre>
+    </div>
+  </section>
+
+  <ng-template #emptyState>
+    <section class="generation-card generation-card--empty">
+      <div class="generation-empty-icon" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M6 6h10M6 11h10M6 16h6" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+          <rect x="3" y="3" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.4" />
+        </svg>
+      </div>
+      <p>Generate once to preview HTML and CSS here.</p>
+    </section>
+  </ng-template>
+
+  <details class="generation-debug" *ngIf="irPreview">
+    <summary>
+      <span>IR snapshot</span>
+      <button type="button" class="generation-copy-button" (click)="$event.preventDefault(); copy('ir')">
+        {{ getCopyButtonLabel('ir') }}
+      </button>
+    </summary>
+
+    <pre class="generation-code generation-code--debug"><code class="generation-code__content" [innerHTML]="highlightedIr"></code></pre>
+  </details>
+</div>

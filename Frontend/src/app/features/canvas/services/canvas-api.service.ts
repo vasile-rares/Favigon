@@ -7,6 +7,7 @@ import {
 import {
   CanvasPageModel,
   CanvasProjectDocument,
+  ConverterPageRequest,
   ConverterService,
   IRNode,
   ProjectDesignResponse,
@@ -86,7 +87,9 @@ export class CanvasGenerationService {
     this.selectedFramework.set(framework);
   }
 
-  validate(ir: IRNode): void {
+  validate(pages: ConverterPageRequest[]): void {
+    const ir = pages[0]?.ir;
+    if (!ir) return;
     this.error.set(null);
     this.validationResult.set(null);
     this.isValidating.set(true);
@@ -103,13 +106,19 @@ export class CanvasGenerationService {
     });
   }
 
-  generate(ir: IRNode): void {
+  generate(pages: ConverterPageRequest[]): void {
+    if (pages.length === 0) return;
     this.error.set(null);
     this.generatedHtml.set('');
     this.generatedCss.set('');
     this.isGenerating.set(true);
 
-    this.converterService.generate({ framework: this.selectedFramework(), ir }).subscribe({
+    const request =
+      pages.length === 1
+        ? { framework: this.selectedFramework(), ir: pages[0].ir }
+        : { framework: this.selectedFramework(), ir: pages[0].ir, pages };
+
+    this.converterService.generate(request).subscribe({
       next: (response) => {
         this.generatedHtml.set(response.html);
         this.generatedCss.set(response.css);

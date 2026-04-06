@@ -31,6 +31,7 @@ import {
   IRNode,
 } from '@app/core';
 import { NumberInputComponent } from './number-input/number-input.component';
+import { GenerationTabComponent } from './generation-tab/generation-tab.component';
 import { StylePopupFieldComponent } from './style-popup-field/style-popup-field.component';
 import {
   getDefaultCornerRadius,
@@ -82,7 +83,7 @@ import {
   resolveEditableCanvasShadow,
 } from '../../utils/canvas-shadow.util';
 import { SupportedFramework } from '../../canvas.types';
-type PropertiesTab = 'design' | 'prototype';
+type PropertiesTab = 'design' | 'generation';
 type CornerRadiusMode = 'full' | 'per-corner';
 type PaddingMode = 'full' | 'per-side';
 type AccessibilityField = 'tag' | 'ariaLabel';
@@ -218,6 +219,7 @@ const TRANSFORM_SCALE_STEP = 0.1;
     FormsModule,
     DropdownSelectComponent,
     NumberInputComponent,
+    GenerationTabComponent,
     StylePopupFieldComponent,
     ToggleGroupComponent,
     ContextMenuComponent,
@@ -268,10 +270,10 @@ export class PropertiesPanelComponent {
       title: 'Design',
     },
     {
-      label: 'Prototype',
-      value: 'prototype',
-      ariaLabel: 'Open prototype tab',
-      title: 'Prototype',
+      label: 'Generation',
+      value: 'generation',
+      ariaLabel: 'Open generation tab',
+      title: 'Generation',
     },
   ];
 
@@ -510,18 +512,13 @@ export class PropertiesPanelComponent {
   }
 
   onTabValueChange(value: string | number | boolean): void {
-    if (value === 'design' || value === 'prototype') {
+    if (value === 'design' || value === 'generation') {
       this.selectTab(value);
     }
   }
 
   isTabActive(tab: PropertiesTab): boolean {
     return this.activeTab === tab;
-  }
-
-  onFrameworkChange(event: Event): void {
-    const framework = (event.target as HTMLSelectElement).value as SupportedFramework;
-    this.frameworkChanged.emit(framework);
   }
 
   toDisplayInt(value: number | undefined): string {

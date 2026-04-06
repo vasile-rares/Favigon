@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Favigon.Converter.Abstractions;
 using Favigon.Converter.Models;
 using Favigon.Converter.Transformers;
@@ -17,9 +18,12 @@ public abstract class FrameworkMapperBase : IComponentMapper
 
   public string Emit(IRNode node, EmitContext ctx)
   {
+    var cssClass = Slugify(node);
     var cssProps = StyleTransformer.MergeToProperties(node.Layout, node.Style, node.Position);
-    ctx.Styles.AddBase(node.Id, cssProps);
-    ctx.Styles.AddVariants(node.Id, node.Variants);
+    if (node.Meta.Hidden)
+      cssProps["display"] = "none";
+    ctx.Styles.AddBase(cssClass, cssProps);
+    ctx.Styles.AddVariants(cssClass, node.Variants);
 
     var sb = new StringBuilder();
     sb.Append(OpenNodeComment(node, ctx));
@@ -31,7 +35,18 @@ public abstract class FrameworkMapperBase : IComponentMapper
 
   protected abstract string EmitElement(IRNode node, EmitContext ctx);
 
-  protected string NodeClass(IRNode node) => $" {ClassAttributeName}=\"favigon-{node.Id}\"";
+  protected string NodeClass(IRNode node) => $" {ClassAttributeName}=\"{Slugify(node)}\"";
+
+  private static string Slugify(IRNode node)
+  {
+    if (!string.IsNullOrWhiteSpace(node.Meta.Name))
+    {
+      var slug = Regex.Replace(node.Meta.Name.Trim().ToLowerInvariant(), @"[^a-z0-9]+", "-").Trim('-');
+      if (slug.Length > 0) return slug;
+    }
+
+    return $"{node.Type.ToLowerInvariant()}-{node.Id}";
+  }
 
   protected static string EmitChildren(IRNode node, EmitContext ctx)
   {
