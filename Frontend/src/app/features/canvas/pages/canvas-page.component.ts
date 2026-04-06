@@ -11,7 +11,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
 import {
   CanvasElement,
@@ -31,7 +30,7 @@ import type { ContextMenuItem } from '@app/shared';
 import { ToolbarComponent } from '../components/toolbar/toolbar.component';
 import { ProjectPanelComponent } from '../components/project-panel/project-panel.component';
 import { PropertiesPanelComponent } from '../components/properties-panel/properties-panel.component';
-import { getStrokeWidth, mutateNormalizeElement } from '../utils/canvas-interaction.util';
+import { mutateNormalizeElement } from '../utils/canvas-interaction.util';
 import { clamp, roundToTwoDecimals } from '../utils/canvas-math.util';
 import { collectSubtreeIds, removeWithChildren } from '../utils/canvas-interaction.util';
 import {
@@ -49,7 +48,6 @@ import {
   getTextLineHeight,
   getTextLetterSpacing,
   getTextAlignValue,
-  getFrameTitle,
 } from '../utils/canvas-text.util';
 import { CanvasPersistenceService, CanvasGenerationService } from '../services/canvas-api.service';
 import {
@@ -66,6 +64,7 @@ import {
   SnapLine,
   PageCanvasLayout,
   PageDragState,
+  FlowDragRenderState,
 } from '../canvas.types';
 import { CanvasViewportService } from '../services/canvas-viewport.service';
 import { CanvasHistoryService } from '../services/canvas-history.service';
@@ -82,12 +81,14 @@ import {
 import { CanvasEditorStateService } from '../services/canvas-editor-state.service';
 import { CanvasPageService } from '../services/canvas-page.service';
 import { CanvasPageGeometryService } from '../services/canvas-page-geometry.service';
+import { CanvasPixiApplicationService } from '../services/canvas-pixi-application.service';
+import { CanvasPixiRendererService } from '../services/canvas-pixi-renderer.service';
+import { CanvasPixiOverlaysService } from '../services/canvas-pixi-overlays.service';
+import { CanvasPixiGridService } from '../services/canvas-pixi-grid.service';
+import { CanvasPixiPageShellService } from '../services/canvas-pixi-page-shell.service';
+import { CanvasPixiLayoutService } from '../services/canvas-pixi-layout.service';
 
 const ROOT_FRAME_INSERT_GAP = 48;
-const PAGE_SHELL_HEADER_TO_FRAME_TITLE_GAP = 52;
-const PAGE_FRAME_TITLE_OFFSET = 24;
-const PAGE_SHELL_HEADER_HEIGHT = 32;
-const FRAME_TITLE_MIN_ZOOM = 0.62;
 const ELEMENT_DRAG_START_THRESHOLD = 3;
 
 interface RectangleDrawState {
@@ -100,7 +101,6 @@ interface RectangleDrawState {
   selector: 'app-canvas-page',
   standalone: true,
   imports: [
-    CommonModule,
     HeaderBarComponent,
     ToolbarComponent,
     ProjectPanelComponent,
@@ -120,6 +120,12 @@ interface RectangleDrawState {
     CanvasGenerationService,
     CanvasPageGeometryService,
     CanvasPageService,
+    CanvasPixiApplicationService,
+    CanvasPixiRendererService,
+    CanvasPixiOverlaysService,
+    CanvasPixiGridService,
+    CanvasPixiPageShellService,
+    CanvasPixiLayoutService,
   ],
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
@@ -139,6 +145,15 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly editorState = inject(CanvasEditorStateService);
   readonly page = inject(CanvasPageService);
   readonly pageLayout = inject(CanvasPageGeometryService);
+
+  // ── PixiJS Services ───────────────────────────────────────
+  private readonly pixiApp = inject(CanvasPixiApplicationService);
+  private readonly pixiRenderer = inject(CanvasPixiRendererService);
+  private readonly pixiOverlays = inject(CanvasPixiOverlaysService);
+  private readonly pixiGrid = inject(CanvasPixiGridService);
+  private readonly pixiPageShells = inject(CanvasPixiPageShellService);
+  private readonly pixiLayout = inject(CanvasPixiLayoutService);
+  private pixiInitPending = false;
   private isPropertyNumberGestureActive = false;
 
   @ViewChild('canvasScene', { static: false }) canvasSceneRef?: ElementRef<HTMLElement>;
@@ -168,14 +183,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     ),
   );
 
-  /** Elements rendered at the top level (flat). Excludes children of any container. */
-  readonly topLevelVisibleElements = computed<CanvasElement[]>(() => {
-    const all = this.visibleElements();
-    return all.filter((el) => !this.hasContainerAncestor(el, all));
-  });
-
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
-  readonly cornerHandles: CornerHandle[] = ['nw', 'ne', 'sw', 'se'];
 
   // ── API / Generation State ────────────────────────────────
 
@@ -204,6 +212,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private dragStartAbsolute: Point = { x: 0, y: 0 };
   private dragSelectionIds: string[] = [];
   private dragSelectionStartBounds = new Map<string, Bounds>();
+  private isElementDragPrimed = false;
   private _isDragging = false;
   private get isDragging(): boolean {
     return this._isDragging;
@@ -214,11 +223,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
   readonly isDraggingEl = signal(false);
   readonly hoveredElementId = signal<string | null>(null);
-  readonly hoveredFrameTitleId = signal<string | null>(null);
   readonly snapLines = signal<SnapLine[]>([]);
   readonly rectangleDrawPreview = signal<Bounds | null>(null);
+  readonly editingTextDraft = signal('');
   readonly flowDragPlaceholder = signal<{ elementId: string; bounds: Bounds } | null>(null);
-  readonly isFrameReorderAnimating = signal(false);
   readonly draggingFlowChildId = signal<string | null>(null);
   readonly layoutDropTarget = signal<{ containerId: string; index: number } | null>(null);
   private hasMovedElementDuringDrag = false;
@@ -230,7 +238,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private isDraggingPage = false;
   private hasMovedPageDuringDrag = false;
   private suppressNextPageShellClick = false;
-  private frameReorderAnimationTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private suppressNextWindowMenuClose = false;
   private pageDragState: PageDragState = {
     pageId: '',
     pointerX: 0,
@@ -292,10 +300,178 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.flowBoundsCache = new Map();
       this.flowBoundsDirty = true;
     });
+
+    // ── PixiJS Sync Effects ─────────────────────────────────
+
+    // Sync viewport (pan + zoom) to PixiJS containers
+    effect(() => {
+      const offset = this.viewport.viewportOffset();
+      const zoom = this.viewport.zoomLevel();
+      this.pixiApp.syncViewport(offset.x, offset.y, zoom);
+      this.pixiGrid.syncGrid(offset.x, offset.y, zoom);
+    });
+
+    // Sync elements + page layouts → PixiJS renderer
+    effect(() => {
+      if (!this.pixiApp.ready()) return;
+      const pages = this.pages();
+      const currentPageId = this.currentPageId();
+      const layouts = this.page.pageLayouts();
+      const editingTextId = this.editingTextElementId();
+      const zoom = this.viewport.zoomLevel();
+      const selectedPageId = this.page.selectedCanvasPageId();
+      const selectedElementIds = this.selectedElementIds();
+      const isElementDragging = this.isDraggingEl();
+      const selectedToolbarPageId =
+        !isElementDragging && selectedElementIds.length === 0 ? selectedPageId : null;
+
+      const pixiPages = pages.map((p) => {
+        const layout = layouts.find((l) => l.pageId === p.id);
+        return {
+          pageId: p.id,
+          elements: p.elements,
+          layout: layout ?? {
+            pageId: p.id,
+            x: 0,
+            y: 0,
+            width: p.viewportWidth ?? 1280,
+            height: p.viewportHeight ?? 720,
+          },
+        };
+      });
+
+      // Compute flow-drag render state from transient drag signals
+      this.pixiRenderer.setEditingTextElementId(editingTextId);
+      // Only activate when isDragging is true (after threshold exceeded),
+      // not on pointerdown — so the element stays at its yoga position
+      // and the selection outline remains correct until actual drag starts.
+      const draggingId = this.draggingFlowChildId();
+      const ghostBounds = this.flowDragPlaceholder();
+      const dropTarget = this.layoutDropTarget();
+      const flowDragState: FlowDragRenderState | null =
+        isElementDragging && draggingId && ghostBounds
+          ? {
+              draggingElementId: draggingId,
+              floatingBounds: ghostBounds.bounds,
+              placeholder:
+                this.isFlowDragInsideContainer && dropTarget
+                  ? { containerId: dropTarget.containerId, dropIndex: dropTarget.index }
+                  : null,
+            }
+          : null;
+
+      this.pixiRenderer.syncPages(pixiPages, currentPageId, flowDragState, zoom);
+
+      // Sync page shells
+      const pageNames = new Map(pages.map((p) => [p.id, p.name]));
+      const editingPageId = this.page.editingCanvasHeaderPageId();
+      this.pixiPageShells.syncPageShells(
+        layouts,
+        currentPageId,
+        this.viewport.zoomLevel(),
+        pageNames,
+        selectedToolbarPageId,
+        editingPageId,
+      );
+    });
+
+    // Sync selection overlay
+    effect(() => {
+      if (!this.pixiApp.ready()) return;
+      const selected = this.selectedElement();
+      const elements = this.elements();
+      const zoom = this.viewport.zoomLevel();
+      const layout = this.page.activePageLayout();
+      const isDragging = this.isDraggingEl();
+      const editingText = this.editingTextElementId();
+
+      if (isDragging || editingText) {
+        this.pixiOverlays.drawSelectionOutline(null, elements, zoom, layout, false);
+        return;
+      }
+
+      const showHandles = !!selected && selected.type !== 'frame' && selected.type !== 'text';
+      this.pixiOverlays.drawSelectionOutline(selected, elements, zoom, layout, showHandles);
+
+      // Multi-selection outlines
+      const selectedElements = this.selectedElements();
+      if (selectedElements.length > 1) {
+        this.pixiOverlays.drawMultiSelectionOutlines(selectedElements, elements, zoom, layout);
+      }
+    });
+
+    // Sync hover outline
+    effect(() => {
+      if (!this.pixiApp.ready()) return;
+      const hoveredId = this.hoveredElementId();
+      const elements = this.elements();
+      const zoom = this.viewport.zoomLevel();
+      const layout = this.page.activePageLayout();
+      const isDragging = this.isDraggingEl();
+      const selectedIds = this.selectedElementIds();
+
+      if (!hoveredId || isDragging || selectedIds.includes(hoveredId)) {
+        this.pixiOverlays.drawHoverOutline(null, elements, zoom, layout);
+        return;
+      }
+
+      const hovered = this.el.findElementById(hoveredId, elements);
+      if (hovered?.type === 'frame') {
+        this.pixiOverlays.drawHoverOutline(null, elements, zoom, layout);
+        return;
+      }
+
+      this.pixiOverlays.drawHoverOutline(hovered, elements, zoom, layout);
+    });
+
+    // Sync snap lines
+    effect(() => {
+      if (!this.pixiApp.ready()) return;
+      const lines = this.snapLines();
+      const zoom = this.viewport.zoomLevel();
+      const layout = this.page.activePageLayout();
+      this.pixiOverlays.drawSnapLines(lines, zoom, layout);
+    });
+
+    // Sync rectangle draw preview
+    effect(() => {
+      if (!this.pixiApp.ready()) return;
+      const preview = this.rectangleDrawPreview();
+      const layout = this.page.activePageLayout();
+      this.pixiOverlays.drawRectanglePreview(preview, layout);
+    });
+
+    // Sync page shell selection outline
+    effect(() => {
+      if (!this.pixiApp.ready()) return;
+      const isDragging = this.isDraggingEl();
+      const zoom = this.viewport.zoomLevel();
+
+      void isDragging;
+      void zoom;
+      this.pixiOverlays.drawPageShellSelectionOutline(null, 1);
+    });
   }
 
   ngAfterViewChecked(): void {
     this.page.setCanvasElement(this.getCanvasElement());
+
+    // Initialize PixiJS once the canvas container DOM element is available
+    if (!this.pixiInitPending) {
+      const canvasHost = document.querySelector('.canvas-container') as HTMLElement | null;
+      if (canvasHost) {
+        this.pixiInitPending = true;
+        this.zone.runOutsideAngular(() => {
+          Promise.all([this.pixiApp.init(canvasHost), this.pixiLayout.init()]).then(() => {
+            this.pixiGrid.init();
+            this.pixiRenderer.init();
+            this.pixiOverlays.init();
+            this.pixiPageShells.init();
+            this.setupPixiEventListeners();
+          });
+        });
+      }
+    }
 
     if (this.flowBoundsDirty) {
       this.flowBoundsDirty = false;
@@ -312,12 +488,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.saveTimeoutId = null;
     }
 
-    if (this.frameReorderAnimationTimeoutId) {
-      clearTimeout(this.frameReorderAnimationTimeoutId);
-      this.frameReorderAnimationTimeoutId = null;
-    }
-
     this.persistThumbnailIfDue();
+
+    // Cleanup PixiJS
+    this.pixiRenderer.destroy();
+    this.pixiOverlays.destroy();
+    this.pixiGrid.destroy();
+    this.pixiPageShells.destroy();
+    this.pixiLayout.destroy();
   }
 
   // ── Tool Selection ────────────────────────────────────────
@@ -365,6 +543,17 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.page.selectPage(pageId);
   }
 
+  private selectPageFromToolbar(pageId: string): void {
+    this.suppressNextCanvasClick = true;
+
+    if (pageId === this.currentPageId()) {
+      this.page.onActivePageShellClick(pageId);
+      return;
+    }
+
+    this.page.selectPageWithoutFocus(pageId);
+  }
+
   onPageNamePointerDown(event: MouseEvent, pageId: string): void {
     if (this.page.editingCanvasHeaderPageId() === pageId) {
       event.stopPropagation();
@@ -374,6 +563,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if (event.button !== 0) {
       return;
     }
+
+    this.selectPageFromToolbar(pageId);
 
     const layout = this.page.getPageLayoutById(pageId);
     if (!layout) {
@@ -397,8 +588,26 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    if (pageId === this.currentPageId() && this.startRectangleDraw(event, true)) {
-      return;
+    if (pageId === this.currentPageId()) {
+      if (this.startRectangleDraw(event, true)) {
+        return;
+      }
+
+      const tool = this.currentTool();
+      if (tool !== 'select') {
+        const pointer = this.getActivePageCanvasPoint(event);
+        if (!pointer) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        this.suppressNextPageShellClick = true;
+        this.page.clearSelectedPageLayer();
+        this.page.layersFocusedPageId.set(pageId);
+        this.createElementAtCanvasPoint(tool, pointer);
+        return;
+      }
     }
 
     const layout = this.page.getPageLayoutById(pageId);
@@ -468,9 +677,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
         // commit text editing if active
         const editingId = this.editingTextElementId();
         if (editingId) {
-          this.history.commitTextEditHistory(() => this.createHistorySnapshot());
-          this.discardEmptyTextElement(editingId);
-          this.editingTextElementId.set(null);
+          this.finalizeTextEditing(editingId);
         }
         this.page.clearSelectedPageLayer();
         this.clearElementSelection();
@@ -487,17 +694,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const targetContainer = this.resolveInsertionContainer(pointer);
-    const containerBounds = targetContainer
-      ? this.el.getAbsoluteBounds(targetContainer, this.elements(), this.currentPage())
-      : null;
-
-    const newElement = this.createElementAtCanvasPoint(
-      tool,
-      pointer,
-      targetContainer,
-      containerBounds,
-    );
+    const newElement = this.createElementAtCanvasPoint(tool, pointer);
     if (!newElement) {
       return;
     }
@@ -508,6 +705,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   onElementPointerDown(event: MouseEvent, id: string): void {
     const target = event.target as HTMLElement;
     this.flowDragPlaceholder.set(null);
+    this.suppressNextCanvasClick = true;
 
     if (this.shouldStartPanning(event, target)) {
       this.viewport.startPanning(event);
@@ -527,9 +725,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     // Exit text editing if clicking a different element
     const editingId = this.editingTextElementId();
     if (editingId && editingId !== id) {
-      this.history.commitTextEditHistory(() => this.createHistorySnapshot());
-      this.discardEmptyTextElement(editingId);
-      this.editingTextElementId.set(null);
+      this.finalizeTextEditing(editingId);
     }
 
     const elementForTypeCheck = this.el.findElementById(id, this.elements());
@@ -544,39 +740,34 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    if (
-      elementForTypeCheck?.type === 'frame' &&
-      !elementForTypeCheck.parentId &&
-      !this.isElementSelected(id)
-    ) {
-      event.preventDefault();
-      event.stopPropagation();
-      this.page.layersFocusedPageId.set(this.currentPageId());
-      this.clearElementSelection();
-      return;
-    }
-
     event.preventDefault();
     event.stopPropagation();
     this.page.layersFocusedPageId.set(this.currentPageId());
+
+    const tool = this.currentTool();
+    if (tool !== 'select') {
+      const clickedElement = elementForTypeCheck ?? this.el.findElementById(id, this.elements());
+      const pointer = this.getActivePageCanvasPoint(event);
+      if (!pointer) {
+        return;
+      }
+
+      const targetContainer =
+        clickedElement && this.el.isContainerElement(clickedElement)
+          ? clickedElement
+          : this.resolveInsertionContainer(pointer);
+      const containerBounds = targetContainer
+        ? this.el.getAbsoluteBounds(targetContainer, this.elements(), this.currentPage())
+        : null;
+
+      this.createElementAtCanvasPoint(tool, pointer, targetContainer, containerBounds);
+      return;
+    }
+
     if (!this.isElementSelected(id)) {
       this.selectOnlyElement(id);
     } else {
       this.selectedElementId.set(id);
-    }
-
-    if (this.currentTool() !== 'select') {
-      const selectedContainer = this.el.getSelectedContainer(this.selectedElement());
-      const clickedElement = this.el.findElementById(id, this.elements());
-      if (
-        selectedContainer &&
-        clickedElement?.id === selectedContainer.id &&
-        this.el.isContainerElement(clickedElement)
-      ) {
-        return;
-      }
-      this.currentTool.set('select');
-      return;
     }
 
     const element = elementForTypeCheck ?? this.el.findElementById(id, this.elements());
@@ -613,64 +804,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       bounds = liveCanvasBounds ?? bounds;
     }
 
-    this.beginGestureHistory();
     this.hasMovedElementDuringDrag = false;
-    this.isDragging = true;
+    this.isElementDragPrimed = true;
     this.dragOffset = {
       x: pointer.x - bounds.x,
       y: pointer.y - bounds.y,
     };
-    this.dragStartAbsolute = { x: bounds.x, y: bounds.y };
-  }
-
-  onFrameTitlePointerDown(event: MouseEvent, id: string): void {
-    event.stopPropagation();
-
-    if (this.shouldStartPanning(event, event.target as HTMLElement)) {
-      this.viewport.startPanning(event);
-      return;
-    }
-
-    if (this.isResizing || this.isRotating) {
-      return;
-    }
-
-    this.page.clearSelectedPageLayer();
-    if (event.shiftKey && this.currentTool() === 'select') {
-      event.preventDefault();
-      this.page.layersFocusedPageId.set(this.currentPageId());
-      this.toggleElementSelection(id);
-      return;
-    }
-
-    if (!this.isElementSelected(id)) {
-      this.selectOnlyElement(id);
-    } else {
-      this.selectedElementId.set(id);
-    }
-    this.page.layersFocusedPageId.set(this.currentPageId());
-
-    if (this.currentTool() !== 'select') {
-      this.currentTool.set('select');
-      return;
-    }
-
-    const element = this.el.findElementById(id, this.elements());
-    if (!element) {
-      return;
-    }
-
-    const pointer = this.getActivePageCanvasPoint(event);
-    if (!pointer) {
-      return;
-    }
-
-    const bounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
-    this.captureDragSelectionState(id);
-    this.beginGestureHistory();
-    this.hasMovedElementDuringDrag = false;
-    this.isDragging = true;
-    this.dragOffset = { x: pointer.x - bounds.x, y: pointer.y - bounds.y };
     this.dragStartAbsolute = { x: bounds.x, y: bounds.y };
   }
 
@@ -683,8 +822,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.page.clearSelectedPageLayer();
     this.page.layersFocusedPageId.set(this.currentPageId());
     this.selectOnlyElement(id);
-    this.editingTextElementId.set(id);
-    this.focusInlineTextEditor(id);
+    this.startTextEditing(id);
   }
 
   onTextEditorPointerDown(event: MouseEvent): void {
@@ -693,36 +831,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   onTextEditorInput(id: string, event: Event): void {
     this.history.beginTextEditHistory(() => this.createHistorySnapshot());
-    const value = (event.target as HTMLTextAreaElement).value;
-    this.updateCurrentPageElements((elements) => {
-      let effectivePatch: Partial<CanvasElement> = { text: value };
-      const withText = elements.map((element) => {
-        if (element.id !== id) return element;
-        const updated = { ...element, text: value };
-        if (value) {
-          const size = this.measureTextSize(updated);
-          // Re-center x so the visual midpoint stays fixed as width changes
-          const centerX = element.x + element.width / 2;
-          const newX = roundToTwoDecimals(centerX - size.width / 2);
-          effectivePatch = { text: value, x: newX, width: size.width, height: size.height };
-          return { ...updated, x: newX, width: size.width, height: size.height };
-        }
-        return updated;
-      });
-      const editedEl = withText.find((e) => e.id === id);
-      if (editedEl?.primarySyncId) {
-        return withText.map((e) => (e.id === id ? { ...e, primarySyncId: undefined } : e));
-      }
-      return this.syncElementPatchToPrimary(id, effectivePatch, withText);
-    });
+    this.editingTextDraft.set(this.readInlineTextEditorValue(event.target as HTMLElement | null));
   }
 
   onTextEditorBlur(id: string): void {
-    this.history.commitTextEditHistory(() => this.createHistorySnapshot());
-    if (this.editingTextElementId() === id) {
-      this.editingTextElementId.set(null);
-    }
-    this.discardEmptyTextElement(id);
+    this.finalizeTextEditing(id);
   }
 
   onTextEditorKeyDown(event: KeyboardEvent, id: string): void {
@@ -731,13 +844,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
     event.preventDefault();
-    this.history.commitTextEditHistory(() => this.createHistorySnapshot());
-    const removed = this.discardEmptyTextElement(id);
-    this.editingTextElementId.set(null);
+    const removed = this.finalizeTextEditing(id);
     if (!removed && this.selectedElementId() !== id) {
       this.selectedElementId.set(id);
     }
-    (event.target as HTMLTextAreaElement | null)?.blur();
+    (event.target as HTMLElement | null)?.blur();
   }
 
   // ── Resize / Rotate / Corner Radius Handles ──────────────
@@ -782,6 +893,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   onResizeHandlePointerDown(event: MouseEvent, id: string, handle: HandlePosition): void {
     event.stopPropagation();
     event.preventDefault();
+    this.suppressNextCanvasClick = true;
 
     const element = this.el.findElementById(id, this.elements());
     if (!element) {
@@ -850,6 +962,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   onCornerRadiusHandlePointerDown(event: MouseEvent, id: string): void {
     event.stopPropagation();
     event.preventDefault();
+    this.suppressNextCanvasClick = true;
 
     const element = this.el.findElementById(id, this.elements());
     if (!element || !this.el.supportsCornerRadius(element)) {
@@ -1133,11 +1246,36 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const canvas = this.getCanvasElement();
     if (canvas) {
       const rect = canvas.getBoundingClientRect();
-      const x = event.clientX - rect.left;
-      const y = event.clientY - rect.top;
-      canvas.style.setProperty('--mx', `${x}px`);
-      canvas.style.setProperty('--my', `${y}px`);
+      const insideCanvas =
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom;
+
+      if (insideCanvas) {
+        this.pixiGrid.updatePointerGlow(event.clientX - rect.left, event.clientY - rect.top);
+      } else {
+        this.pixiGrid.hideGlow();
+      }
+    } else {
+      this.pixiGrid.hideGlow();
     }
+
+    const hasActivePointerGesture =
+      this.isDraggingPage ||
+      !!this.rectangleDrawState ||
+      this.viewport.isPanning() ||
+      this.isRotating ||
+      this.isResizing ||
+      this.isAdjustingCornerRadius ||
+      this.isElementDragPrimed ||
+      this.isDragging;
+
+    if (hasActivePointerGesture && event.buttons === 0) {
+      this.onPointerUp(event);
+      return;
+    }
+
     if (this.isDraggingPage) {
       const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
       if (!pointer) {
@@ -1186,6 +1324,35 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if (this.isAdjustingCornerRadius) {
       this.handleCornerRadiusPointerMove(event);
       return;
+    }
+
+    if (this.isElementDragPrimed && !this.isDragging) {
+      const selectedId = this.selectedElementId();
+      if (!selectedId) {
+        this.isElementDragPrimed = false;
+        return;
+      }
+
+      const pointer = this.getActivePageCanvasPoint(event);
+      if (!pointer) {
+        return;
+      }
+
+      const absoluteX = pointer.x - this.dragOffset.x;
+      const absoluteY = pointer.y - this.dragOffset.y;
+      const dragDistance = Math.hypot(
+        absoluteX - this.dragStartAbsolute.x,
+        absoluteY - this.dragStartAbsolute.y,
+      );
+
+      if (dragDistance < ELEMENT_DRAG_START_THRESHOLD) {
+        return;
+      }
+
+      this.beginGestureHistory();
+      this.hasMovedElementDuringDrag = true;
+      this.isDragging = true;
+      this.isElementDragPrimed = false;
     }
 
     if (!this.isDragging) {
@@ -1363,6 +1530,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   @HostListener('window:click', ['$event'])
   onWindowClick(event: MouseEvent): void {
+    if (this.suppressNextWindowMenuClose) {
+      this.suppressNextWindowMenuClose = false;
+      return;
+    }
+
     const target = event.target as HTMLElement | null;
     if (!target) {
       return;
@@ -1428,7 +1600,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
             e.id === freshEl.id ? { ...e, primarySyncId: undefined } : e,
           );
         }
-        if (freshEl?.type === 'frame' && !freshEl.parentId) {
+        if (this.isResizing && freshEl?.type === 'frame' && !freshEl.parentId) {
           return this.syncPrimaryFrameResize(freshEl, elements);
         }
         return this.syncElementMoveToPrimary(freshEl, elements);
@@ -1444,6 +1616,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     this.viewport.endPan();
+    this.isElementDragPrimed = false;
     this.isDragging = false;
     this.isResizing = false;
     this.isRotating = false;
@@ -1496,97 +1669,36 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   // ── Template Delegates (viewport) ─────────────────────────
 
-  canvasViewportTransform(): string {
-    return this.viewport.canvasViewportTransform();
-  }
-
-  canvasSceneTransform(): string {
-    return this.viewport.canvasSceneTransform();
-  }
-
-  canvasBackgroundSize(): string {
-    return this.viewport.canvasBackgroundSize();
-  }
-
-  canvasBackgroundPosition(): string {
-    return this.viewport.canvasBackgroundPosition();
-  }
-
   isPanReady(): boolean {
     return this.currentTool() === 'select' || this.viewport.isSpacePressed();
   }
 
-  // ── Template Delegates (element) ──────────────────────────
+  // ── Page name editor positioning ──────────────────────────
 
-  getElementBorderStyle(element: CanvasElement): string {
-    return this.el.getElementStrokeStyle(element);
+  getPageNameEditorLeft(pageId: string): number {
+    const offset = this.viewport.viewportOffset();
+    const layouts = this.page.pageLayouts();
+    return offset.x + this.pageLayout.getPageShellHeaderScreenLeft(pageId, layouts) + 50;
   }
 
-  usesIndependentStrokeSurface(element: CanvasElement): boolean {
-    return (
-      this.isContainerElement(element) &&
-      !this.isLayoutContainer(element) &&
-      getStrokeWidth(element) > 0
-    );
+  getPageNameEditorTop(pageId: string): number {
+    const offset = this.viewport.viewportOffset();
+    const layouts = this.page.pageLayouts();
+    return offset.y + this.pageLayout.getPageShellHeaderScreenTop(pageId, layouts) + 9;
   }
 
-  getRenderedBorderStyle(element: CanvasElement): string | null {
-    return this.usesIndependentStrokeSurface(element) ? null : this.getElementBorderStyle(element);
+  getPageNameEditorWidth(pageId: string): number {
+    return Math.max(96, this.getPageShellToolbarWidth(pageId) - 120);
   }
 
-  getElementSurfaceBorderStyle(element: CanvasElement): string | null {
-    return this.usesIndependentStrokeSurface(element) ? this.getElementBorderStyle(element) : null;
-  }
-
-  getElementOverflowStyle(element: CanvasElement): string | null {
-    if (!this.isContainerElement(element)) {
-      return null;
-    }
-
-    return this.el.getElementOverflowMode(element) === 'clip' ? 'hidden' : 'visible';
-  }
-
-  getElementBorderRadius(element: CanvasElement): string {
-    return this.el.getElementBorderRadius(element);
-  }
-
-  getElementBoxShadow(element: CanvasElement): string {
-    return this.el.getElementBoxShadow(element);
-  }
-
-  getElementOutlineStyle(_element: CanvasElement): string {
-    return 'none';
-  }
-
-  getElementOutlineOffset(_element: CanvasElement): number {
-    return 0;
-  }
-
-  getSelectionOverlayElement(): CanvasElement | null {
-    if (this.selectedElementIds().length !== 1) {
-      return null;
-    }
-
-    const sel = this.selectedElement();
-    if (!sel) return null;
-    if (sel.type === 'text' && !sel.text?.length) return null;
-    return sel;
+  private getPageShellToolbarWidth(pageId: string): number {
+    const layouts = this.page.pageLayouts();
+    const shellWidth = this.pageLayout.getPageShellHeaderScreenWidth(pageId, layouts);
+    return roundToTwoDecimals(shellWidth);
   }
 
   isElementSelected(id: string): boolean {
     return this.selectedElementIds().includes(id);
-  }
-
-  hasMultipleElementSelection(): boolean {
-    return this.selectedElementIds().length > 1;
-  }
-
-  isPartOfMultipleSelection(id: string): boolean {
-    return this.hasMultipleElementSelection() && this.isElementSelected(id);
-  }
-
-  showSelectionHandles(element: CanvasElement): boolean {
-    return element.type !== 'text';
   }
 
   private clearElementSelection(): void {
@@ -1685,62 +1797,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     });
   }
 
-  getRenderedX(element: CanvasElement): number {
-    void this.flowCacheVersion(); // track for overlay reactivity
-    const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
-    if (cached) return cached.x;
-    const layout = this.page.activePageLayout();
-    return (
-      this.el.getAbsoluteBounds(element, this.elements(), this.currentPage()).x + (layout?.x ?? 0)
-    );
-  }
-
-  getRenderedY(element: CanvasElement): number {
-    void this.flowCacheVersion(); // track for overlay reactivity
-    const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
-    if (cached) return cached.y;
-    const layout = this.page.activePageLayout();
-    return (
-      this.el.getAbsoluteBounds(element, this.elements(), this.currentPage()).y + (layout?.y ?? 0)
-    );
-  }
-
-  getRenderedWidth(element: CanvasElement): number {
-    return this.el.getRenderedWidth(element, this.elements(), this.currentPage());
-  }
-
-  getRenderedHeight(element: CanvasElement): number {
-    return this.el.getRenderedHeight(element, this.elements(), this.currentPage());
-  }
-
-  getRenderedMinWidthStyle(element: CanvasElement): string | null {
-    return this.el.getRenderedMinWidthStyle(element, this.elements(), this.currentPage());
-  }
-
-  getRenderedMaxWidthStyle(element: CanvasElement): string | null {
-    return this.el.getRenderedMaxWidthStyle(element, this.elements(), this.currentPage());
-  }
-
-  getRenderedMinHeightStyle(element: CanvasElement): string | null {
-    return this.el.getRenderedMinHeightStyle(element, this.elements(), this.currentPage());
-  }
-
-  getRenderedMaxHeightStyle(element: CanvasElement): string | null {
-    return this.el.getRenderedMaxHeightStyle(element, this.elements(), this.currentPage());
-  }
-
-  getRenderedWidthStyle(element: CanvasElement): string {
-    return this.el.getRenderedWidthStyle(element, this.elements(), this.currentPage());
-  }
-
-  getRenderedHeightStyle(element: CanvasElement): string {
-    return this.el.getRenderedHeightStyle(element, this.elements(), this.currentPage());
-  }
-
-  getFrameTitle(element: CanvasElement): string {
-    return getFrameTitle(element);
-  }
-
   isRootFrame(element: CanvasElement): boolean {
     return element.type === 'frame' && !element.parentId;
   }
@@ -1768,145 +1824,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if (!parent) return false;
     if (this.isContainerElement(parent)) return true;
     return this.hasContainerAncestor(parent, elements);
-  }
-
-  /** Direct children of a container, visible only. */
-  getLayoutChildren(element: CanvasElement): CanvasElement[] {
-    const draggedId = this.draggingFlowChildId();
-    return this.visibleElements().filter(
-      (el) =>
-        el.parentId === element.id &&
-        !(this.hasMovedElementDuringDrag && draggedId === el.id && this.isChildInFlow(el)),
-    );
-  }
-
-  /** X position for a nested child: no left for flow children, relative x for absolute. */
-  getNestedX(element: CanvasElement): number | null {
-    if (this.isFlowChildDragging(element)) return element.x;
-    return this.isChildInFlow(element) ? null : element.x;
-  }
-
-  getNestedY(element: CanvasElement): number | null {
-    if (this.isFlowChildDragging(element)) return element.y;
-    return this.isChildInFlow(element) ? null : element.y;
-  }
-
-  getElementLayoutDisplay(element: CanvasElement): string | null {
-    if (!element.display) return null;
-    return element.display;
-  }
-
-  getElementLayoutFlexDirection(element: CanvasElement): string | null {
-    if (element.display !== 'flex') return null;
-    return element.flexDirection ?? null;
-  }
-
-  getElementLayoutFlexWrap(element: CanvasElement): string | null {
-    if (element.display !== 'flex') return null;
-    return element.flexWrap ?? null;
-  }
-
-  getElementLayoutJustifyContent(element: CanvasElement): string | null {
-    if (element.display !== 'flex') return null;
-    return element.justifyContent ?? null;
-  }
-
-  getElementLayoutAlignItems(element: CanvasElement): string | null {
-    if (element.display !== 'flex') return null;
-    return element.alignItems ?? null;
-  }
-
-  getElementLayoutGap(element: CanvasElement): string | null {
-    if (!element.display || element.display === 'block') return null;
-    return typeof element.gap === 'number' ? `${element.gap}px` : null;
-  }
-
-  getElementLayoutGridTemplateColumns(element: CanvasElement): string | null {
-    if (element.display !== 'grid') return null;
-    return element.gridTemplateColumns ?? null;
-  }
-
-  getElementLayoutGridTemplateRows(element: CanvasElement): string | null {
-    if (element.display !== 'grid') return null;
-    return element.gridTemplateRows ?? null;
-  }
-
-  getElementLayoutPadding(element: CanvasElement): string | null {
-    if (!element.padding) return null;
-    const p = element.padding;
-    return `${p.top}px ${p.right}px ${p.bottom}px ${p.left}px`;
-  }
-
-  getNestedPositionStyle(element: CanvasElement): string | null {
-    if (this.isFlowChildDragging(element)) return 'absolute';
-    if (this.isChildInFlow(element)) {
-      return this.isContainerElement(element) ? 'relative' : null;
-    }
-    return element.position ?? 'absolute';
-  }
-
-  isFlowChildDragging(element: CanvasElement): boolean {
-    return this.draggingFlowChildId() === element.id && this.hasMovedElementDuringDrag;
-  }
-
-  getFlowDragPlaceholder(): { element: CanvasElement; bounds: Bounds } | null {
-    const placeholder = this.flowDragPlaceholder();
-    if (!placeholder || !this.hasMovedElementDuringDrag) {
-      return null;
-    }
-
-    const draggedId = this.draggingFlowChildId();
-    if (!draggedId || draggedId !== placeholder.elementId) {
-      return null;
-    }
-
-    const element = this.el.findElementById(placeholder.elementId, this.elements());
-    if (!element) {
-      return null;
-    }
-
-    return {
-      element,
-      bounds: placeholder.bounds,
-    };
-  }
-
-  getFlowDragPlaceholderFill(element: CanvasElement): string {
-    if (element.type === 'text' || element.type === 'image') {
-      return 'rgba(255, 255, 255, 0.08)';
-    }
-
-    return element.fill ?? 'rgba(255, 255, 255, 0.08)';
-  }
-
-  getFlowDragLayoutPlaceholder(
-    containerId: string,
-  ): { element: CanvasElement; index: number; bounds: Bounds } | null {
-    const placeholder = this.flowDragPlaceholder();
-    if (!placeholder || !this.hasMovedElementDuringDrag) {
-      return null;
-    }
-
-    const draggedId = this.draggingFlowChildId();
-    const target = this.layoutDropTarget();
-    if (!draggedId || !target || target.containerId !== containerId) {
-      return null;
-    }
-
-    const element = this.el.findElementById(draggedId, this.elements());
-    if (!element || element.parentId !== containerId || !this.isChildInFlow(element)) {
-      return null;
-    }
-
-    return {
-      element,
-      index: target.index,
-      bounds: placeholder.bounds,
-    };
-  }
-
-  markFlowBoundsDirty(): void {
-    this.flowBoundsDirty = true;
   }
 
   private updateFlowBoundsCache(): void {
@@ -1996,20 +1913,17 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       (el) => el.parentId === container.id && el.id !== draggedId && this.isChildInFlow(el),
     );
 
-    const layout = this.page.activePageLayout();
-    const offsetX = layout?.x ?? 0;
-    const offsetY = layout?.y ?? 0;
-
     for (let i = 0; i < siblings.length; i++) {
-      const cached = this.flowBoundsCache.get(siblings[i].id);
-      if (!cached) continue;
-      const sibAbsX = cached.x - offsetX;
-      const sibAbsY = cached.y - offsetY;
+      const siblingBounds =
+        this.getLiveElementCanvasBounds(siblings[i]) ??
+        this.getFlowAwareBounds(siblings[i], elements);
+      const sibAbsX = siblingBounds.x;
+      const sibAbsY = siblingBounds.y;
 
       if (isRow) {
-        if (absoluteX < sibAbsX + cached.width / 2) return i;
+        if (absoluteX < sibAbsX + siblingBounds.width / 2) return i;
       } else {
-        if (absoluteY < sibAbsY + cached.height / 2) return i;
+        if (absoluteY < sibAbsY + siblingBounds.height / 2) return i;
       }
     }
 
@@ -2150,184 +2064,62 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     });
   }
 
-  // ── Drop indicator helpers ────────────────────────────────
-
-  getDropIndicatorLeft(): number | null {
-    return this.getDropIndicatorBounds()?.x ?? null;
-  }
-
-  getDropIndicatorTop(): number | null {
-    return this.getDropIndicatorBounds()?.y ?? null;
-  }
-
-  getDropIndicatorWidth(): number | null {
-    return this.getDropIndicatorBounds()?.width ?? null;
-  }
-
-  getDropIndicatorHeight(): number | null {
-    return this.getDropIndicatorBounds()?.height ?? null;
-  }
-
-  private getDropIndicatorBounds(): Bounds | null {
-    const target = this.layoutDropTarget();
-    if (!target) return null;
-
-    const elements = this.elements();
-    const container = this.el.findElementById(target.containerId, elements);
-    if (!container) return null;
-
-    const containerBounds = this.el.getAbsoluteBounds(container, elements, this.currentPage());
-    const layout = this.page.activePageLayout();
-    const offsetX = layout?.x ?? 0;
-    const offsetY = layout?.y ?? 0;
-
-    const isRow =
-      container.display === 'flex' &&
-      (!container.flexDirection ||
-        container.flexDirection === 'row' ||
-        container.flexDirection === 'row-reverse');
-
-    const draggedId = this.draggingFlowChildId();
-    const siblings = elements.filter(
-      (el) => el.parentId === target.containerId && el.id !== draggedId && this.isChildInFlow(el),
-    );
-
-    if (isRow) {
-      let indicatorX: number;
-      if (siblings.length === 0) {
-        indicatorX = containerBounds.x + (container.padding?.left ?? 0) + offsetX;
-      } else if (target.index >= siblings.length) {
-        const last = siblings[siblings.length - 1];
-        const cached = this.flowBoundsCache.get(last.id);
-        indicatorX = cached
-          ? cached.x + cached.width
-          : containerBounds.x + containerBounds.width - (container.padding?.right ?? 0) + offsetX;
-      } else {
-        const sib = siblings[target.index];
-        const cached = this.flowBoundsCache.get(sib.id);
-        indicatorX = cached
-          ? cached.x
-          : containerBounds.x + (container.padding?.left ?? 0) + offsetX;
-      }
-      return {
-        x: indicatorX,
-        y: containerBounds.y + offsetY,
-        width: 2,
-        height: containerBounds.height,
-      };
-    } else {
-      let indicatorY: number;
-      if (siblings.length === 0) {
-        indicatorY = containerBounds.y + (container.padding?.top ?? 0) + offsetY;
-      } else if (target.index >= siblings.length) {
-        const last = siblings[siblings.length - 1];
-        const cached = this.flowBoundsCache.get(last.id);
-        indicatorY = cached
-          ? cached.y + cached.height
-          : containerBounds.y + containerBounds.height - (container.padding?.bottom ?? 0) + offsetY;
-      } else {
-        const sib = siblings[target.index];
-        const cached = this.flowBoundsCache.get(sib.id);
-        indicatorY = cached
-          ? cached.y
-          : containerBounds.y + (container.padding?.top ?? 0) + offsetY;
-      }
-      return {
-        x: containerBounds.x + offsetX,
-        y: indicatorY,
-        width: containerBounds.width,
-        height: 2,
-      };
-    }
-  }
-
-  getFrameTitleFontSize(): number {
-    return this.viewport.getScreenInvariantSize(12.5);
-  }
-
-  getFrameTitleOffset(): number {
-    return this.viewport.getScreenInvariantSize(-24);
-  }
-
-  getShellBorderRadius(): number {
-    return 14;
-  }
-
-  getShellBorderWidth(): number {
-    return this.viewport.getScreenInvariantSize(2);
-  }
-
-  isFrameTitleHiddenByHeader(element: CanvasElement): boolean {
-    const layout = this.page.activePageLayout();
-    if (!layout) return false;
-    const zoom = this.viewport.zoomLevel();
-    // Title is always 24px above the frame top in screen-space (inside scaled canvas-scene)
-    const titleScreenRelY = this.getRenderedY(element) * zoom - 24;
-    // Header bottom in screen-space (header is fixed-size, not scaled)
-    const headerScreenBottom =
-      this.pageLayout.getPageShellHeaderScreenTop(layout.pageId, this.page.pageLayouts()) +
-      PAGE_SHELL_HEADER_HEIGHT;
-    return titleScreenRelY < headerScreenBottom;
-  }
-
   private alignRootFramesOnDrop(): void {
     this.updateCurrentPageElements((elements) => this.reflowRootFrames(elements));
-
-    this.isFrameReorderAnimating.set(true);
-    if (this.frameReorderAnimationTimeoutId) {
-      clearTimeout(this.frameReorderAnimationTimeoutId);
-    }
-
-    this.frameReorderAnimationTimeoutId = setTimeout(() => {
-      this.isFrameReorderAnimating.set(false);
-      this.frameReorderAnimationTimeoutId = null;
-    }, 260);
-  }
-
-  // With global box-sizing: border-box, the 2px border is drawn INSIDE the div's width/height.
-  // To place ring fully OUTSIDE the element: left/top -= 2, width/height += 4 (2px each side).
-  getSelectionLeft(el: CanvasElement): number {
-    const bounds = this.getLiveOverlaySceneBounds(el) ?? this.getCachedOverlaySceneBounds(el);
-    return roundToTwoDecimals(bounds.x * this.viewport.zoomLevel() - 2);
-  }
-
-  getSelectionTop(el: CanvasElement): number {
-    const bounds = this.getLiveOverlaySceneBounds(el) ?? this.getCachedOverlaySceneBounds(el);
-    return roundToTwoDecimals(bounds.y * this.viewport.zoomLevel() - 2);
-  }
-
-  getSelectionWidth(el: CanvasElement): number {
-    const bounds = this.getLiveOverlaySceneBounds(el) ?? this.getCachedOverlaySceneBounds(el);
-    return roundToTwoDecimals(bounds.width * this.viewport.zoomLevel() + 4);
-  }
-
-  getSelectionHeight(el: CanvasElement): number {
-    const bounds = this.getLiveOverlaySceneBounds(el) ?? this.getCachedOverlaySceneBounds(el);
-    return roundToTwoDecimals(bounds.height * this.viewport.zoomLevel() + 4);
   }
 
   private getLiveOverlaySceneBounds(element: CanvasElement): Bounds | null {
     void this.flowCacheVersion(); // track for overlay reactivity
 
     const sceneEl = this.canvasSceneRef?.nativeElement;
-    if (!sceneEl) {
+    if (sceneEl) {
+      const domEl = sceneEl.querySelector<HTMLElement>(`[data-element-id="${element.id}"]`);
+      if (domEl) {
+        const zoom = this.viewport.zoomLevel();
+        const sceneRect = sceneEl.getBoundingClientRect();
+        const rect = domEl.getBoundingClientRect();
+
+        return {
+          x: roundToTwoDecimals((rect.left - sceneRect.left) / zoom),
+          y: roundToTwoDecimals((rect.top - sceneRect.top) / zoom),
+          width: roundToTwoDecimals(rect.width / zoom),
+          height: roundToTwoDecimals(rect.height / zoom),
+        };
+      }
+    }
+
+    return this.getLivePixiSceneBounds(element);
+  }
+
+  private getLivePixiSceneBounds(element: CanvasElement): Bounds | null {
+    if (!this.pixiApp.ready()) {
       return null;
     }
 
-    const domEl = sceneEl.querySelector<HTMLElement>(`[data-element-id="${element.id}"]`);
-    if (!domEl) {
+    const renderedBounds = this.pixiRenderer.getRenderedNodeSceneBounds(element.id);
+    if (renderedBounds) {
+      return renderedBounds;
+    }
+
+    const container = this.pixiRenderer.getContainerForElement(element.id);
+    if (!container || container.destroyed) {
       return null;
     }
 
-    const zoom = this.viewport.zoomLevel();
-    const sceneRect = sceneEl.getBoundingClientRect();
-    const rect = domEl.getBoundingClientRect();
+    const globalPos = container.toGlobal({ x: 0, y: 0 });
+    const scenePos = this.pixiApp.sceneContainer.toLocal(globalPos);
+    const renderedSize = this.pixiRenderer.getRenderedNodeSize(element.id);
+    const absoluteBounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
 
     return {
-      x: roundToTwoDecimals((rect.left - sceneRect.left) / zoom),
-      y: roundToTwoDecimals((rect.top - sceneRect.top) / zoom),
-      width: roundToTwoDecimals(rect.width / zoom),
-      height: roundToTwoDecimals(rect.height / zoom),
+      x: roundToTwoDecimals(scenePos.x),
+      y: roundToTwoDecimals(scenePos.y),
+      width: roundToTwoDecimals(
+        renderedSize && renderedSize.width > 0 ? renderedSize.width : absoluteBounds.width,
+      ),
+      height: roundToTwoDecimals(
+        renderedSize && renderedSize.height > 0 ? renderedSize.height : absoluteBounds.height,
+      ),
     };
   }
 
@@ -2337,6 +2129,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(element.id);
     if (cached) {
       return cached;
+    }
+
+    const livePixiBounds = this.getLivePixiSceneBounds(element);
+    if (livePixiBounds) {
+      return livePixiBounds;
     }
 
     const layout = this.page.activePageLayout();
@@ -2364,38 +2161,100 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     };
   }
 
-  getOverlayCornerRadiusInset(el: CanvasElement): number {
-    const radius = Number.isFinite(el.cornerRadius ?? Number.NaN)
-      ? (el.cornerRadius as number)
-      : el.type === 'image'
-        ? 6
-        : 0;
-    const zoom = this.viewport.zoomLevel();
-    const liveBounds = this.getLiveOverlaySceneBounds(el);
-    const renderedWidth = liveBounds?.width ?? el.width;
-    const renderedHeight = liveBounds?.height ?? el.height;
-    const handleRadius = 6; // half of 12px handle size
-    // Compute screen-space inset directly: handle center should be at (radius * zoom) px
-    // from the element corner in screen space, so CSS top/right = radius*zoom - handleRadius.
-    // minScreenInset keeps the handle visibly inside the corner even at radius=0.
-    const minScreenInset = 8;
-    const maxScreenInset = Math.max(
-      0,
-      (Math.min(renderedWidth, renderedHeight) * zoom) / 2 - handleRadius,
-    );
-    return roundToTwoDecimals(clamp(radius * zoom - handleRadius, minScreenInset, maxScreenInset));
+  /** Returns the element currently being text-edited, or null. */
+  getTextEditorElement(): CanvasElement | null {
+    const id = this.editingTextElementId();
+    if (!id) return null;
+    return this.el.findElementById(id, this.elements()) ?? null;
   }
 
-  isTextEditing(elementId: string): boolean {
-    return this.editingTextElementId() === elementId;
+  private getTextEditorDisplayBounds(): Bounds | null {
+    const el = this.getTextEditorElement();
+    if (!el) return null;
+
+    const bounds =
+      this.getLiveElementCanvasBounds(el) ?? this.el.getAbsoluteBounds(el, this.elements());
+    const draft = this.editingTextDraft();
+    if (!draft || draft === (el.text ?? '')) {
+      return bounds;
+    }
+
+    const widthConstraint = this.canAutoSizeTextAxis(el, 'width') ? undefined : bounds.width;
+    const size = this.measureTextSize({ ...el, text: draft }, widthConstraint);
+    const nextBounds: Bounds = { ...bounds };
+
+    if (this.canAutoSizeTextAxis(el, 'width')) {
+      const centerX = bounds.x + bounds.width / 2;
+      nextBounds.x = roundToTwoDecimals(centerX - size.width / 2);
+      nextBounds.width = size.width;
+    }
+
+    if (this.canAutoSizeTextAxis(el, 'height')) {
+      nextBounds.height = size.height;
+    }
+
+    return nextBounds;
   }
 
-  getElementClipPath(element: CanvasElement): string {
-    return this.el.getElementClipPath(element, this.elements());
+  private canAutoSizeTextAxis(element: CanvasElement, axis: 'width' | 'height'): boolean {
+    if (element.type !== 'text') {
+      return false;
+    }
+
+    const mode =
+      axis === 'width' ? (element.widthMode ?? 'fixed') : (element.heightMode ?? 'fixed');
+    return mode === 'fixed' || mode === 'fit-content';
   }
 
-  isElementClippedOut(element: CanvasElement): boolean {
-    return this.el.isElementClippedOut(element, this.elements());
+  private buildAutoSizedTextPatch(
+    previousElement: CanvasElement,
+    nextElement: CanvasElement,
+  ): Partial<CanvasElement> | null {
+    const widthConstraint = this.canAutoSizeTextAxis(previousElement, 'width')
+      ? undefined
+      : this.el.getRenderedWidth(previousElement, this.elements(), this.currentPage());
+    const size = this.measureTextSize(nextElement, widthConstraint);
+    const patch: Partial<CanvasElement> = {};
+
+    if (this.canAutoSizeTextAxis(previousElement, 'width')) {
+      const centerX = previousElement.x + previousElement.width / 2;
+      patch.x = roundToTwoDecimals(centerX - size.width / 2);
+      patch.width = size.width;
+    }
+
+    if (this.canAutoSizeTextAxis(previousElement, 'height')) {
+      patch.height = size.height;
+    }
+
+    return Object.keys(patch).length > 0 ? patch : null;
+  }
+
+  getTextEditorScreenLeft(): number {
+    const bounds = this.getTextEditorDisplayBounds();
+    if (!bounds) return 0;
+    const layout = this.page.activePageLayout();
+    const offset = this.viewport.viewportOffset();
+    return (layout!.x + bounds.x) * this.viewport.zoomLevel() + offset.x;
+  }
+
+  getTextEditorScreenTop(): number {
+    const bounds = this.getTextEditorDisplayBounds();
+    if (!bounds) return 0;
+    const layout = this.page.activePageLayout();
+    const offset = this.viewport.viewportOffset();
+    return (layout!.y + bounds.y) * this.viewport.zoomLevel() + offset.y;
+  }
+
+  getTextEditorScreenWidth(): number {
+    const bounds = this.getTextEditorDisplayBounds();
+    if (!bounds) return 0;
+    return bounds.width;
+  }
+
+  getTextEditorScreenHeight(): number {
+    const bounds = this.getTextEditorDisplayBounds();
+    if (!bounds) return 0;
+    return bounds.height;
   }
 
   getTextFontFamily(element: CanvasElement): string {
@@ -2424,14 +2283,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   getTextAlignValue(element: CanvasElement): string {
     return getTextAlignValue(element);
-  }
-
-  trackByElementId(_: number, element: CanvasElement): string {
-    return element.id;
-  }
-
-  supportsCornerRadius(element: CanvasElement): boolean {
-    return this.el.supportsCornerRadius(element);
   }
 
   private getRootFrameCount(elements: CanvasElement[]): number {
@@ -2481,34 +2332,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     });
   }
 
-  getCornerRadiusHandleInset(element: CanvasElement): number {
-    return this.el.getCornerRadiusHandleInset(element);
-  }
-
-  handleClass(handle: CornerHandle): string {
-    return `handle-${handle}`;
-  }
-
-  cornerZoneClass(corner: CornerHandle): string {
-    return `corner-zone-${corner}`;
-  }
-
-  getElementTransform(element: CanvasElement): string | null {
-    return this.el.getElementTransform(element);
-  }
-
-  getElementTransformOrigin(element: CanvasElement): string | null {
-    return this.el.getElementTransformOrigin(element);
-  }
-
-  getElementBackfaceVisibility(element: CanvasElement): string | null {
-    return this.el.getElementBackfaceVisibility(element);
-  }
-
-  getElementTransformStyle(element: CanvasElement): string | null {
-    return this.el.getElementTransformStyle(element);
-  }
-
   // ── Keyboard ──────────────────────────────────────────────
 
   @HostListener('window:keydown', ['$event'])
@@ -2525,13 +2348,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   handleWindowBlur(): void {
     this.viewport.isSpacePressed.set(false);
     this.viewport.endPan();
+    this.pixiGrid.hideGlow();
+    this.isElementDragPrimed = false;
     this.isDragging = false;
     this.isResizing = false;
     this.isRotating = false;
     this.history.commitGestureHistory(() => this.createHistorySnapshot());
-    this.history.commitTextEditHistory(() => this.createHistorySnapshot());
-    this.discardEmptyTextElement(this.editingTextElementId());
-    this.editingTextElementId.set(null);
+    this.finalizeTextEditing(this.editingTextElementId());
   }
 
   // ── Code Generation ───────────────────────────────────────
@@ -3089,6 +2912,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   private isCanvasBackgroundTarget(target: HTMLElement): boolean {
     return (
+      target.tagName === 'CANVAS' ||
       target.classList.contains('canvas-container') ||
       target.classList.contains('canvas-viewport') ||
       target.classList.contains('canvas-scene')
@@ -3097,6 +2921,213 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   private getCanvasElement(): HTMLElement | null {
     return document.querySelector('.canvas-container') as HTMLElement | null;
+  }
+
+  /** Set up PixiJS stage event listeners to forward interactions to existing handlers. */
+  private setupPixiEventListeners(): void {
+    const app = this.pixiApp.pixiApp;
+    if (!app) return;
+
+    // ── Element interactions (pointerdown, hover, dblclick, contextmenu) ──
+    // Listen on the scene container to catch all element events via bubbling.
+    const sceneContainer = this.pixiApp.sceneContainer;
+
+    sceneContainer.eventMode = 'static';
+    sceneContainer.on('pointerdown', (e) => {
+      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
+      if (!elId) return;
+      const native = e.nativeEvent as MouseEvent;
+      // Prevent the canvas-container DOM handler from also firing
+      native.stopPropagation();
+      this.zone.run(() => this.onElementPointerDown(native, elId));
+    });
+
+    // Stop the native click from bubbling to .canvas-container when a PixiJS element
+    // was clicked — otherwise onCanvasClick() would fire and clear the selection.
+    sceneContainer.on('click', (e) => {
+      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
+      if (!elId) return;
+      (e.nativeEvent as MouseEvent).stopPropagation();
+    });
+
+    sceneContainer.on('pointerover', (e) => {
+      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
+      if (!elId) return;
+      this.zone.run(() => this.hoveredElementId.set(elId));
+    });
+
+    sceneContainer.on('pointerout', (e) => {
+      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
+      if (!elId) return;
+      this.zone.run(() => {
+        if (this.hoveredElementId() === elId) {
+          this.hoveredElementId.set(null);
+        }
+      });
+    });
+
+    sceneContainer.on('rightclick', (e) => {
+      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
+      if (!elId) return;
+      const native = e.nativeEvent as MouseEvent;
+      native.stopPropagation();
+      native.preventDefault();
+      this.zone.run(() => this.onElementContextMenu(native, elId));
+    });
+
+    // Double-click for text editing
+    let lastPointerDownTime = 0;
+    let lastPointerDownId: string | null = null;
+    sceneContainer.on('pointerdown', (e) => {
+      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
+      if (!elId) return;
+      const now = Date.now();
+      if (elId === lastPointerDownId && now - lastPointerDownTime < 400) {
+        const native = e.nativeEvent as MouseEvent;
+        this.zone.run(() => this.onElementDoubleClick(native, elId));
+        lastPointerDownId = null;
+        lastPointerDownTime = 0;
+      } else {
+        lastPointerDownId = elId;
+        lastPointerDownTime = now;
+      }
+    });
+
+    // ── Page shell interactions ──
+    this.pixiPageShells.onShellPointerDown((pageId, pixiEvent) => {
+      const native = pixiEvent.nativeEvent as MouseEvent;
+      native.stopPropagation();
+      this.zone.run(() => this.onPageShellPointerDown(native, pageId));
+    });
+
+    this.pixiPageShells.onShellClick((pageId) => {
+      this.zone.run(() => {
+        if (pageId === this.currentPageId()) {
+          this.onActivePageShellClick(pageId);
+        } else {
+          this.onInactivePageShellClick(pageId);
+        }
+      });
+    });
+
+    // ── Page header interactions ──
+    this.pixiPageShells.onHeaderPointerDown((pageId, pixiEvent) => {
+      const native = pixiEvent.nativeEvent as MouseEvent;
+      native.stopPropagation();
+      this.zone.run(() => {
+        if (native.button !== 0) {
+          return;
+        }
+
+        this.selectPageFromToolbar(pageId);
+      });
+    });
+
+    this.pixiPageShells.onHeaderPlayClick((pageId) => {
+      this.zone.run(() => {
+        this.selectPageFromToolbar(pageId);
+        this.page.openPreviewForPage(this.projectId, pageId);
+      });
+    });
+
+    this.pixiPageShells.onHeaderNamePointerDown((pageId, pixiEvent) => {
+      const native = pixiEvent.nativeEvent as MouseEvent;
+      native.stopPropagation();
+      this.zone.run(() => this.onPageNamePointerDown(native, pageId));
+    });
+
+    this.pixiPageShells.onHeaderNameDblClick((pageId) => {
+      this.zone.run(() => {
+        this.selectPageFromToolbar(pageId);
+        const syntheticEvent = {
+          preventDefault: () => {},
+          stopPropagation: () => {},
+        } as MouseEvent;
+        this.page.onCanvasHeaderPageNameDoubleClick(syntheticEvent, pageId);
+      });
+    });
+
+    this.pixiPageShells.onHeaderAddDeviceClick((pageId) => {
+      const canvasEl = this.getCanvasElement();
+      const layouts = this.page.pageLayouts();
+      const offset = this.viewport.viewportOffset();
+      const canvasRect = canvasEl?.getBoundingClientRect() ?? { left: 0, top: 0 };
+      const headerLeft =
+        canvasRect.left + offset.x + this.pageLayout.getPageShellHeaderScreenLeft(pageId, layouts);
+      const headerTop =
+        canvasRect.top + offset.y + this.pageLayout.getPageShellHeaderScreenTop(pageId, layouts);
+      const headerWidth = this.getPageShellToolbarWidth(pageId);
+      const btnLeft = headerLeft + headerWidth - 38;
+      const btnBottom = headerTop + 36;
+      this.suppressNextWindowMenuClose = true;
+      this.zone.run(() => {
+        this.selectPageFromToolbar(pageId);
+        this.page.openDeviceFrameMenuAt(btnLeft, btnBottom, pageId);
+      });
+    });
+
+    this.pixiPageShells.onFrameTitlePointerDown((pageId, frameId) => {
+      this.zone.run(() => {
+        if (this.currentPageId() !== pageId) {
+          this.currentPageId.set(pageId);
+        }
+        this.page.layersFocusedPageId.set(pageId);
+        this.page.selectedPageLayerId.set(null);
+        this.currentTool.set('select');
+        this.suppressNextCanvasClick = true;
+        this.selectOnlyElement(frameId);
+      });
+    });
+
+    // ── Selection overlay handle events ──
+    this.pixiOverlays.onHandlePointerDown((handle, pixiEvent) => {
+      const selEl = this.selectedElement();
+      if (!selEl) return;
+      const nativeEvent = pixiEvent.nativeEvent as MouseEvent;
+      nativeEvent.stopPropagation();
+      nativeEvent.preventDefault();
+      this.zone.run(() => {
+        this.onResizeHandlePointerDown(nativeEvent, selEl.id, handle);
+      });
+    });
+
+    this.pixiOverlays.onCornerRadiusHandlePointerDown((pixiEvent) => {
+      const selEl = this.selectedElement();
+      if (!selEl) return;
+      const nativeEvent = pixiEvent.nativeEvent as MouseEvent;
+      nativeEvent.stopPropagation();
+      nativeEvent.preventDefault();
+      this.zone.run(() => {
+        this.onCornerRadiusHandlePointerDown(nativeEvent, selEl.id);
+      });
+    });
+
+    // ── Selection outline pointerdown (interior click-through + edge resize) ──
+    this.pixiOverlays.onSelectionOutlinePointerDown((pixiEvent) => {
+      const selEl = this.selectedElement();
+      if (!selEl) return;
+      const native = pixiEvent.nativeEvent as MouseEvent;
+      native.stopPropagation();
+      this.zone.run(() => this.onSelectionOutlinePointerDown(native, selEl.id));
+    });
+
+    // ── Selection outline double-click for text editing ──
+    this.pixiOverlays.onSelectionOutlineDoubleClick((pixiEvent) => {
+      const selEl = this.selectedElement();
+      if (!selEl) return;
+      const native = pixiEvent.nativeEvent as MouseEvent;
+      this.zone.run(() => this.onElementDoubleClick(native, selEl.id));
+    });
+
+    // ── Selection outline context menu ──
+    this.pixiOverlays.onSelectionOutlineContextMenu((pixiEvent) => {
+      const selEl = this.selectedElement();
+      if (!selEl) return;
+      const native = pixiEvent.nativeEvent as MouseEvent;
+      native.preventDefault();
+      native.stopPropagation();
+      this.zone.run(() => this.onElementContextMenu(native, selEl.id));
+    });
   }
 
   /** Returns the id of the topmost non-frame element whose bounds contain (x, y)
@@ -3371,9 +3402,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    this.history.commitTextEditHistory(() => this.createHistorySnapshot());
-    this.discardEmptyTextElement(editingId);
-    this.editingTextElementId.set(null);
+    this.finalizeTextEditing(editingId);
   }
 
   private createElementAtCanvasPoint(
@@ -3425,8 +3454,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     });
 
     if (newElement.type === 'text') {
-      this.editingTextElementId.set(newElement.id);
-      this.focusInlineTextEditor(newElement.id);
+      this.startTextEditing(newElement.id);
     }
 
     return newElement;
@@ -3493,26 +3521,129 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     setTimeout(() => {
       const editor = document.querySelector(
         `[data-text-editor-id="${elementId}"]`,
-      ) as HTMLTextAreaElement | null;
+      ) as HTMLElement | null;
 
       if (!editor) {
         return;
       }
 
+      this.syncInlineTextEditorContent(editor, this.editingTextDraft());
       editor.focus();
-      editor.select();
+      this.placeInlineTextEditorCaretAtEnd(editor);
     }, 0);
   }
 
-  private measureTextSize(element: CanvasElement): { width: number; height: number } {
-    const mirror = document.createElement('span');
+  private syncInlineTextEditorContent(editor: HTMLElement, value: string): void {
+    if (editor.textContent === value) {
+      return;
+    }
+
+    editor.textContent = value;
+  }
+
+  private placeInlineTextEditorCaretAtEnd(editor: HTMLElement): void {
+    const selection = window.getSelection();
+    if (!selection) {
+      return;
+    }
+
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  private readInlineTextEditorValue(editor: HTMLElement | null): string {
+    if (!editor) {
+      return '';
+    }
+
+    const value = (editor.innerText || editor.textContent || '').replace(/\r\n/g, '\n');
+    if (value === '\n') {
+      return '';
+    }
+
+    return value;
+  }
+
+  private startTextEditing(elementId: string): void {
+    const element = this.el.findElementById(elementId, this.elements());
+    if (element?.type !== 'text') {
+      return;
+    }
+
+    this.editingTextDraft.set(element.text ?? '');
+    this.editingTextElementId.set(elementId);
+    this.focusInlineTextEditor(elementId);
+  }
+
+  private stopTextEditing(): void {
+    this.editingTextElementId.set(null);
+    this.editingTextDraft.set('');
+  }
+
+  private applyTextEditorDraft(id: string): void {
+    const element = this.el.findElementById(id, this.elements());
+    if (element?.type !== 'text') {
+      return;
+    }
+
+    const value = this.editingTextDraft();
+    if (value === (element.text ?? '')) {
+      return;
+    }
+
+    this.updateCurrentPageElements((elements) => {
+      let effectivePatch: Partial<CanvasElement> = { text: value };
+      const withText = elements.map((currentElement) => {
+        if (currentElement.id !== id) return currentElement;
+        const updated = { ...currentElement, text: value };
+        if (value) {
+          const textLayoutPatch = this.buildAutoSizedTextPatch(currentElement, updated);
+          if (textLayoutPatch) {
+            effectivePatch = { text: value, ...textLayoutPatch };
+            return { ...updated, ...textLayoutPatch };
+          }
+        }
+        return updated;
+      });
+      const editedEl = withText.find((e) => e.id === id);
+      if (editedEl?.primarySyncId) {
+        return withText.map((e) => (e.id === id ? { ...e, primarySyncId: undefined } : e));
+      }
+      return this.syncElementPatchToPrimary(id, effectivePatch, withText);
+    });
+  }
+
+  private finalizeTextEditing(id: string | null): boolean {
+    if (!id || this.editingTextElementId() !== id) {
+      return false;
+    }
+
+    this.applyTextEditorDraft(id);
+    this.history.commitTextEditHistory(() => this.createHistorySnapshot());
+    const removed = this.discardEmptyTextElement(id);
+    this.stopTextEditing();
+    return removed;
+  }
+
+  private measureTextSize(
+    element: CanvasElement,
+    widthConstraint?: number,
+  ): { width: number; height: number } {
+    const mirror = document.createElement('div');
     mirror.style.cssText = [
       'position:fixed',
       'top:-9999px',
       'left:-9999px',
       'visibility:hidden',
-      'white-space:pre',
-      'display:inline-block',
+      'box-sizing:content-box',
+      'padding:0',
+      'margin:0',
+      widthConstraint == null ? 'white-space:pre' : 'white-space:pre-wrap',
+      widthConstraint == null ? 'display:inline-block' : 'display:block',
+      'overflow-wrap:break-word',
       `font-size:${getTextFontSize(element)}`,
       `font-family:${getTextFontFamily(element)}`,
       `font-weight:${getTextFontWeight(element)}`,
@@ -3520,12 +3651,15 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       `line-height:${getTextLineHeight(element)}`,
       `letter-spacing:${getTextLetterSpacing(element)}`,
     ].join(';');
+    if (widthConstraint != null) {
+      mirror.style.width = `${widthConstraint}px`;
+    }
     // Append a non-breaking space after any trailing newlines so each Enter
     // counts as a real line in the span's layout (trailing \n has no height otherwise).
     const textForMeasure = (element.text || ' ').replace(/\n+$/, (m) => m + '\u200b');
     mirror.textContent = textForMeasure;
     document.body.appendChild(mirror);
-    const w = mirror.offsetWidth;
+    const w = widthConstraint ?? mirror.offsetWidth;
     const h = mirror.offsetHeight;
     document.body.removeChild(mirror);
     return { width: Math.max(w, 24), height: Math.max(h, 4) };
@@ -3562,14 +3696,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return null;
     }
 
-    const size = this.measureTextSize(nextElement);
-    const centerX = previousElement.x + previousElement.width / 2;
-
-    return {
-      x: roundToTwoDecimals(centerX - size.width / 2),
-      width: size.width,
-      height: size.height,
-    };
+    return this.buildAutoSizedTextPatch(previousElement, nextElement);
   }
 
   private shouldAutoSizeTextFromPatch(
@@ -3585,6 +3712,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       patch.fontFamily !== undefined ||
       patch.fontWeight !== undefined ||
       patch.fontStyle !== undefined ||
+      patch.widthMode !== undefined ||
+      patch.heightMode !== undefined ||
       patch.fontSize !== undefined ||
       patch.fontSizeUnit !== undefined ||
       patch.lineHeight !== undefined ||
@@ -3617,7 +3746,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       snapshot.selectedElementId,
     );
     this.currentTool.set('select');
-    this.editingTextElementId.set(null);
+    this.stopTextEditing();
   }
 
   // ── Private: Clipboard ────────────────────────────────────
@@ -3655,7 +3784,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) => [...elements, ...pasted.elements]);
       this.setSelectedElements(pasted.rootIds, pasted.rootIds[pasted.rootIds.length - 1] ?? null);
-      this.editingTextElementId.set(null);
+      this.stopTextEditing();
       this.currentTool.set('select');
     });
 

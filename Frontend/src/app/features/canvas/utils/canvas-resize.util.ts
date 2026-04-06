@@ -1,7 +1,7 @@
 import { clamp, roundToTwoDecimals } from './canvas-math.util';
 import type { Bounds, Point, ResizeState } from '../canvas.types';
 
-const MIN_RESIZE_SIZE = 24;
+const MIN_RESIZE_SIZE = 1;
 
 export function calculateResizedBounds(
   start: ResizeState,

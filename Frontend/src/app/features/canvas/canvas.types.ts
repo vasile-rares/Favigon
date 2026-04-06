@@ -105,3 +105,9 @@ export interface CanvasClipboardPasteResult {
   elements: CanvasElement[];
   rootIds: string[];
 }
+
+export interface FlowDragRenderState {
+  draggingElementId: string;
+  floatingBounds: Bounds;
+  placeholder: { containerId: string; dropIndex: number } | null;
+}

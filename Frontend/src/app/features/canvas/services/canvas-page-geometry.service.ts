@@ -8,7 +8,7 @@ import { CanvasViewportService } from './canvas-viewport.service';
 
 const PAGE_SHELL_SIDE_PADDING = 28;
 const PAGE_SHELL_BOTTOM_PADDING = 28;
-const PAGE_SHELL_HEADER_HEIGHT = 32;
+const PAGE_SHELL_HEADER_HEIGHT = 44;
 const PAGE_FRAME_TITLE_OFFSET = 24;
 
 @Injectable()

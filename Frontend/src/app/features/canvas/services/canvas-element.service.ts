@@ -15,6 +15,14 @@ import {
 import { clamp, roundToTwoDecimals } from '../utils/canvas-math.util';
 import { collectSubtreeIds, formatCanvasElementTypeLabel } from '../utils/canvas-interaction.util';
 import {
+  getTextFontFamily,
+  getTextFontSize,
+  getTextFontStyle,
+  getTextFontWeight,
+  getTextLetterSpacing,
+  getTextLineHeight,
+} from '../utils/canvas-text.util';
+import {
   buildCanvasElementBackfaceVisibility,
   buildCanvasElementTransform,
   buildCanvasElementTransformOrigin,
@@ -49,7 +57,7 @@ const DEFAULT_ELEMENT_DIMENSIONS: Record<CanvasElementType, { width: number; hei
 
 @Injectable()
 export class CanvasElementService {
-  // ── Element Factories ─────────────────────────────────────
+  // G��G�� Element Factories G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
   createElementAtPoint(
     tool: CanvasElementType,
@@ -241,7 +249,7 @@ export class CanvasElementService {
     };
   }
 
-  // ── Naming ────────────────────────────────────────────────
+  // G��G�� Naming G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
   getNextPageName(pages: CanvasPageModel[]): string {
     return `Page ${pages.length + 1}`;
@@ -260,7 +268,7 @@ export class CanvasElementService {
     return templateName;
   }
 
-  // ── Tree Queries ──────────────────────────────────────────
+  // G��G�� Tree Queries G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
   findElementById(id: string | null, elements: CanvasElement[]): CanvasElement | null {
     if (!id) {
@@ -373,7 +381,11 @@ export class CanvasElementService {
     const parent = this.findElementById(element.parentId ?? null, elements);
     const parentBounds = parent ? this.getAbsoluteBounds(parent, elements, page) : null;
 
-    if (mode !== 'fixed' && mode !== 'fit-content') {
+    if (element.type === 'text' && mode === 'fit-content') {
+      const widthConstraint = this.getTextMeasurementWidthConstraint(element, elements, page);
+      const measured = this.measureTextContentSize(element, widthConstraint);
+      resolvedPixels = axis === 'width' ? measured.width : measured.height;
+    } else if (mode !== 'fixed' && mode !== 'fit-content') {
       if (mode === 'viewport' && !page) {
         resolvedPixels = fallbackPixels;
       } else {
@@ -420,6 +432,75 @@ export class CanvasElementService {
     }
 
     return roundToTwoDecimals(resolvedPixels);
+  }
+
+  private getTextMeasurementWidthConstraint(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    page?: CanvasPageModel | null,
+  ): number | undefined {
+    const widthMode = getCanvasSizeMode(element, 'width');
+    if (widthMode !== 'fit-content') {
+      return this.getRenderedSizePx(element, elements, 'width', page);
+    }
+
+    let minWidth = this.getRenderedConstraintPx(element, elements, 'minWidth', page);
+    let maxWidth = this.getRenderedConstraintPx(element, elements, 'maxWidth', page);
+    if (minWidth !== undefined && maxWidth !== undefined && maxWidth < minWidth) {
+      maxWidth = minWidth;
+    }
+    let constrainedWidth = this.measureTextContentSize(element).width;
+
+    if (minWidth !== undefined) {
+      constrainedWidth = Math.max(constrainedWidth, minWidth);
+    }
+
+    if (maxWidth !== undefined) {
+      constrainedWidth = Math.min(constrainedWidth, maxWidth);
+    }
+
+    return constrainedWidth;
+  }
+
+  private measureTextContentSize(
+    element: CanvasElement,
+    widthConstraint?: number,
+  ): { width: number; height: number } {
+    const mirror = document.createElement('div');
+    mirror.style.cssText = [
+      'position:fixed',
+      'top:-9999px',
+      'left:-9999px',
+      'visibility:hidden',
+      'box-sizing:content-box',
+      'padding:0',
+      'margin:0',
+      widthConstraint == null ? 'white-space:pre' : 'white-space:pre-wrap',
+      widthConstraint == null ? 'display:inline-block' : 'display:block',
+      'overflow-wrap:break-word',
+      `font-size:${getTextFontSize(element)}`,
+      `font-family:${getTextFontFamily(element)}`,
+      `font-weight:${getTextFontWeight(element)}`,
+      `font-style:${getTextFontStyle(element)}`,
+      `line-height:${getTextLineHeight(element)}`,
+      `letter-spacing:${getTextLetterSpacing(element)}`,
+    ].join(';');
+
+    if (widthConstraint != null) {
+      mirror.style.width = `${widthConstraint}px`;
+    }
+
+    const textForMeasure = (element.text || ' ').replace(/\n+$/, (match) => match + '\u200b');
+    mirror.textContent = textForMeasure;
+    document.body.appendChild(mirror);
+    const measuredWidth = widthConstraint ?? mirror.offsetWidth;
+    const measuredHeight = mirror.offsetHeight;
+    document.body.removeChild(mirror);
+
+    return {
+      width: Math.max(roundToTwoDecimals(measuredWidth), MIN_ELEMENT_SIZE),
+      height: Math.max(roundToTwoDecimals(measuredHeight), 4),
+    };
   }
 
   private getRenderedSizeStyle(
@@ -505,7 +586,7 @@ export class CanvasElementService {
     return this.isContainerElement(selectedElement) ? selectedElement : null;
   }
 
-  // ── Frame Positioning ─────────────────────────────────────
+  // G��G�� Frame Positioning G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
   getNextFramePosition(elements: CanvasElement[], width: number, height: number): Point | null {
     const rootFrames = elements.filter((element) => element.type === 'frame' && !element.parentId);
@@ -529,7 +610,7 @@ export class CanvasElementService {
     };
   }
 
-  // ── Layer Reordering ──────────────────────────────────────
+  // G��G�� Layer Reordering G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
   reorderLayerElements(
     elements: CanvasElement[],
@@ -621,7 +702,7 @@ export class CanvasElementService {
     return this.isContainerElement(element);
   }
 
-  // ── Element Update Helper ────────────────────────────────
+  // G��G�� Element Update Helper G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
   updatePageElements(
     pages: CanvasPageModel[],
@@ -633,7 +714,7 @@ export class CanvasElementService {
     );
   }
 
-  // ── Template Rendering Helpers ───────────────────────────
+  // G��G�� Template Rendering Helpers G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
   getElementStrokeStyle(element: CanvasElement): string {
     if (!element.stroke || element.type === 'text') {

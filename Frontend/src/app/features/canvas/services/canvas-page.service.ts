@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { CanvasElement, CanvasPageModel, CanvasPageViewportPreset } from '@app/core';
 import type { ContextMenuItem, DialogBoxField } from '@app/shared';
 import { roundToTwoDecimals, clamp } from '../utils/canvas-math.util';
+import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from './canvas-viewport.constants';
 import { getFrameTitle } from '../utils/canvas-text.util';
 import { DeviceFramePreset, PageCanvasLayout, VIEWPORT_PRESET_OPTIONS } from '../canvas.types';
 import type { Point } from '../canvas.types';
@@ -466,6 +467,10 @@ export class CanvasPageService {
     }
 
     const bounds = target.getBoundingClientRect();
+    this.openDeviceFrameMenuAt(bounds.left, bounds.bottom, pageId);
+  }
+
+  openDeviceFrameMenuAt(screenX: number, screenBottom: number, pageId?: string): void {
     const targetId = pageId ?? this.editorState.currentPageId();
     this.deviceMenuTargetPageId.set(targetId);
     const targetPage = targetId ? this.getPageById(targetId) : null;
@@ -491,8 +496,8 @@ export class CanvasPageService {
         action: () => this.addDeviceFrame('custom'),
       },
     ]);
-    this.deviceMenuX.set(Math.round(bounds.left));
-    this.deviceMenuY.set(Math.round(bounds.bottom + 6));
+    this.deviceMenuX.set(Math.round(screenX));
+    this.deviceMenuY.set(Math.round(screenBottom + 6));
     this.isDeviceMenuOpen.set(true);
   }
 
@@ -656,7 +661,11 @@ export class CanvasPageService {
     const minSize = 24;
     const horizontalZoom = (safeWidth - padding) / Math.max(shellWidth, minSize);
     const verticalZoom = (safeHeight - padding) / Math.max(shellHeight, minSize);
-    const targetZoom = clamp(Math.min(horizontalZoom, verticalZoom), 0.25, 3);
+    const targetZoom = clamp(
+      Math.min(horizontalZoom, verticalZoom),
+      CANVAS_MIN_ZOOM,
+      CANVAS_MAX_ZOOM,
+    );
     const targetOffset: Point = {
       x: roundToTwoDecimals(safeCenterX - (shellLeft + shellWidth / 2) * targetZoom),
       y: roundToTwoDecimals(safeCenterY - (shellTop + shellHeight / 2) * targetZoom),

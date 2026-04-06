@@ -2,15 +2,14 @@ import { Injectable, signal } from '@angular/core';
 import { CanvasElement } from '@app/core';
 import { roundToTwoDecimals, clamp } from '../utils/canvas-math.util';
 import { Bounds, Point } from '../canvas.types';
+import { CANVAS_DEFAULT_ZOOM, CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from './canvas-viewport.constants';
 
-const MIN_ZOOM = 0.25;
-const MAX_ZOOM = 3;
 const ZOOM_FACTOR = 1.1;
 const GRID_SIZE = 20;
 
 @Injectable()
 export class CanvasViewportService {
-  readonly zoomLevel = signal(1);
+  readonly zoomLevel = signal(CANVAS_DEFAULT_ZOOM);
   readonly viewportOffset = signal<Point>({ x: 0, y: 0 });
   readonly isPanning = signal(false);
   readonly isSpacePressed = signal(false);
@@ -34,7 +33,7 @@ export class CanvasViewportService {
   }
 
   resetZoom(canvasElement: HTMLElement | null): void {
-    this.setZoom(1, this.getCanvasScreenCenter(canvasElement));
+    this.setZoom(CANVAS_DEFAULT_ZOOM, this.getCanvasScreenCenter(canvasElement));
   }
 
   zoomPercentage(): number {
@@ -43,7 +42,7 @@ export class CanvasViewportService {
 
   setZoom(nextZoom: number, anchor?: Point): void {
     const previousZoom = this.zoomLevel();
-    const clampedZoom = clamp(nextZoom, MIN_ZOOM, MAX_ZOOM);
+    const clampedZoom = clamp(nextZoom, CANVAS_MIN_ZOOM, CANVAS_MAX_ZOOM);
 
     if (clampedZoom === previousZoom) {
       return;
@@ -179,7 +178,7 @@ export class CanvasViewportService {
     const minSize = 24;
     const horizontalZoom = (canvasElement.clientWidth - padding) / Math.max(bounds.width, minSize);
     const verticalZoom = (canvasElement.clientHeight - padding) / Math.max(bounds.height, minSize);
-    const zoom = clamp(Math.min(horizontalZoom, verticalZoom), MIN_ZOOM, MAX_ZOOM);
+    const zoom = clamp(Math.min(horizontalZoom, verticalZoom), CANVAS_MIN_ZOOM, CANVAS_MAX_ZOOM);
 
     this.zoomLevel.set(zoom);
     this.viewportOffset.set({

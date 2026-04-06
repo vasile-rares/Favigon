@@ -32,8 +32,11 @@
     "@angular/router": "^20.3.0",
     "@monaco-editor/loader": "^1.7.0",
     "monaco-editor": "^0.55.1",
+    "pixi-filters": "^6.1.5",
+    "pixi.js": "^8.17.1",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0",
+    "yoga-layout": "^3.2.1",
     "zone.js": "~0.15.0"
   },
   "devDependencies": {

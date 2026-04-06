@@ -20,7 +20,7 @@ import {
 } from './canvas-sizing.util';
 import { normalizeCanvasShadowValue } from './canvas-shadow.util';
 
-const MIN_SIZE = 24;
+const MIN_SIZE = 1;
 
 export function isPointInsideElement(x: number, y: number, element: CanvasElement): boolean {
   return (
