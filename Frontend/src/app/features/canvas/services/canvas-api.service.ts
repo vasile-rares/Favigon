@@ -9,6 +9,7 @@ import {
   CanvasProjectDocument,
   ConverterPageRequest,
   ConverterService,
+  GeneratedFile,
   IRNode,
   ProjectDesignResponse,
   ProjectService,
@@ -81,6 +82,7 @@ export class CanvasGenerationService {
   readonly isGenerating = signal(false);
   readonly generatedHtml = signal('');
   readonly generatedCss = signal('');
+  readonly generatedFiles = signal<GeneratedFile[]>([]);
   readonly error = signal<string | null>(null);
 
   setFramework(framework: SupportedFramework): void {
@@ -111,18 +113,23 @@ export class CanvasGenerationService {
     this.error.set(null);
     this.generatedHtml.set('');
     this.generatedCss.set('');
+    this.generatedFiles.set([]);
     this.isGenerating.set(true);
 
-    const request =
-      pages.length === 1
-        ? { framework: this.selectedFramework(), ir: pages[0].ir }
-        : { framework: this.selectedFramework(), ir: pages[0].ir, pages };
+    const request = { framework: this.selectedFramework(), pages };
 
-    this.converterService.generate(request).subscribe({
+    this.converterService.generateFiles(request).subscribe({
       next: (response) => {
-        this.generatedHtml.set(response.html);
-        this.generatedCss.set(response.css);
+        this.generatedFiles.set(response.files);
         this.validationResult.set(response.isValid);
+
+        const firstHtml = response.files.find(
+          (f) => f.path.endsWith('.html') || f.path.endsWith('.jsx'),
+        );
+        const firstCss = response.files.find((f) => f.path.endsWith('.css'));
+        this.generatedHtml.set(firstHtml?.content ?? '');
+        this.generatedCss.set(firstCss?.content ?? '');
+
         this.isGenerating.set(false);
       },
       error: (err: { error?: { message?: string; title?: string; detail?: string } }) => {

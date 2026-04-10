@@ -2,7 +2,11 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { ConverterRequest, ConverterResponse } from '../models/converter.models';
+import {
+  ConverterRequest,
+  ConverterResponse,
+  MultiPageConverterResponse,
+} from '../models/converter.models';
 
 @Injectable({ providedIn: 'root' })
 export class ConverterService {
@@ -15,5 +19,12 @@ export class ConverterService {
 
   generate(request: ConverterRequest): Observable<ConverterResponse> {
     return this.http.post<ConverterResponse>(`${this.baseUrl}/converter/generate`, request);
+  }
+
+  generateFiles(request: ConverterRequest): Observable<MultiPageConverterResponse> {
+    return this.http.post<MultiPageConverterResponse>(
+      `${this.baseUrl}/converter/generate-files`,
+      request,
+    );
   }
 }

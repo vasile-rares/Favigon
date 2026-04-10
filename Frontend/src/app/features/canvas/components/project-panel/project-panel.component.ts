@@ -39,7 +39,7 @@ type ProjectPanelTab = 'navigator' | 'ai-chat';
 
 const DEFAULT_PANEL_WIDTH = 280;
 const MIN_PANEL_WIDTH = 280;
-const MAX_PANEL_WIDTH = 560;
+const MAX_PANEL_WIDTH = 440;
 const PANEL_VIEWPORT_GUTTER = 240;
 const DEVICE_FRAME_PRESET_OPTIONS = VIEWPORT_PRESET_OPTIONS.filter(
   (
@@ -72,6 +72,7 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
   @Input() selectedElementId: string | null = null;
   @Input() selectedElementIds: string[] = [];
 
+  @Output() panelWidthChanged = new EventEmitter<number>();
   @Output() pageSelected = new EventEmitter<string>();
   @Output() pageLayerSelected = new EventEmitter<string>();
   @Output() pageCreateRequested = new EventEmitter<void>();
@@ -161,6 +162,7 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
 
   ngOnInit(): void {
     window.addEventListener('canvas:rename-request', this.renameRequestListener);
+    this.panelWidthChanged.emit(this.panelWidth);
   }
 
   ngOnDestroy(): void {
@@ -183,7 +185,13 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
 
     event.preventDefault();
     const deltaX = event.clientX - this.resizeStartX;
-    this.panelWidth = this.clampPanelWidth(this.resizeStartWidth + deltaX);
+    const nextWidth = this.clampPanelWidth(this.resizeStartWidth + deltaX);
+    if (nextWidth === this.panelWidth) {
+      return;
+    }
+
+    this.panelWidth = nextWidth;
+    this.panelWidthChanged.emit(this.panelWidth);
   }
 
   @HostListener('window:pointerup')

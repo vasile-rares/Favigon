@@ -261,6 +261,23 @@ export class CanvasPreviewPage {
     return this.el.getElementClipPath(element, this.currentPage()?.elements ?? []);
   }
 
+  getElementPaddingStyle(element: CanvasElement): string | null {
+    const padding = element.padding;
+    if (!padding) {
+      return null;
+    }
+
+    if (
+      padding.top === padding.right &&
+      padding.right === padding.bottom &&
+      padding.bottom === padding.left
+    ) {
+      return `${padding.top}px`;
+    }
+
+    return `${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`;
+  }
+
   getTextFontFamily(element: CanvasElement): string {
     return getTextFontFamily(element);
   }

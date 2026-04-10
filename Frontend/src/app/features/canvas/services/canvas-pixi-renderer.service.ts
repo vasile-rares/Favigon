@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Container, Graphics, Text, TextStyle, Sprite, Assets, Texture, Color } from 'pixi.js';
+import { Container, Graphics, Text, TextStyle, Sprite, Assets, Texture } from 'pixi.js';
 import { DropShadowFilter } from 'pixi-filters';
 import { CanvasElement, CanvasCornerRadii } from '@app/core';
 import { CanvasPixiApplicationService } from './canvas-pixi-application.service';
@@ -12,7 +12,7 @@ import {
 } from '../utils/canvas-interaction.util';
 import { roundToTwoDecimals } from '../utils/canvas-math.util';
 import { Bounds, FlowDragRenderState, PageCanvasLayout } from '../canvas.types';
-import { parseShadowParams } from './canvas-pixi-shadow.util';
+import { parsePixiCssColor, parseShadowParams } from './canvas-pixi-shadow.util';
 
 const MAX_TEXT_RENDER_RESOLUTION = 4;
 const MAX_SHADOW_FILTER_RESOLUTION = 4;
@@ -170,7 +170,16 @@ export class CanvasPixiRendererService {
       // Position may have changed — update position
       this.applyPosition(node, element, allElements, layout, layoutOverride);
       // Re-add children
-      this.addChildElements(node, element, allElements, childrenMap, layout, flowDragState, zoom);
+      this.addChildElements(
+        node,
+        element,
+        allElements,
+        childrenMap,
+        layout,
+        { width: renderedWidth, height: renderedHeight },
+        flowDragState,
+        zoom,
+      );
       return node;
     }
 
@@ -190,7 +199,16 @@ export class CanvasPixiRendererService {
     this.applyPosition(node, element, allElements, layout, layoutOverride);
 
     // Add children for containers
-    this.addChildElements(node, element, allElements, childrenMap, layout, flowDragState, zoom);
+    this.addChildElements(
+      node,
+      element,
+      allElements,
+      childrenMap,
+      layout,
+      { width: renderedWidth, height: renderedHeight },
+      flowDragState,
+      zoom,
+    );
 
     return node;
   }
@@ -213,6 +231,7 @@ export class CanvasPixiRendererService {
 
     const width = layoutOverride?.width ?? this.elService.getRenderedWidth(element, allElements);
     const height = layoutOverride?.height ?? this.elService.getRenderedHeight(element, allElements);
+    const contentBox = this.getElementContentBox(element, width, height);
     const cornerRadii = getResolvedCornerRadii(element);
 
     let textObj: Text | null = null;
@@ -274,7 +293,7 @@ export class CanvasPixiRendererService {
         fontStyle: element.fontStyle || 'normal',
         fill: element.fill || '#000000',
         wordWrap: true,
-        wordWrapWidth: width,
+        wordWrapWidth: Math.max(contentBox.width, 1),
         align: element.textAlign || 'left',
         lineHeight: this.resolveLineHeight(element),
         letterSpacing: element.letterSpacing || 0,
@@ -308,8 +327,9 @@ export class CanvasPixiRendererService {
     // Image
     if (element.type === 'image' && element.imageUrl) {
       sprite = new Sprite();
-      sprite.width = width;
-      sprite.height = height;
+      sprite.position.set(contentBox.x, contentBox.y);
+      sprite.width = contentBox.width;
+      sprite.height = contentBox.height;
       container.addChild(sprite);
 
       // Apply corner radius mask for images
@@ -406,6 +426,7 @@ export class CanvasPixiRendererService {
     allElements: CanvasElement[],
     childrenMap: Map<string | null, CanvasElement[]>,
     layout: PageCanvasLayout,
+    containerSize: { width: number; height: number },
     flowDragState?: FlowDragRenderState | null,
     zoom = 1,
   ): void {
@@ -424,6 +445,7 @@ export class CanvasPixiRendererService {
           element,
           children,
           allElements,
+          containerSize,
           flowDragState!,
         );
       } else {
@@ -431,7 +453,12 @@ export class CanvasPixiRendererService {
         const filteredChildren = flowDragState
           ? children.filter((c) => c.id !== flowDragState.draggingElementId)
           : children;
-        layoutResults = this.layoutService.computeLayout(element, filteredChildren, allElements);
+        layoutResults = this.layoutService.computeLayout(
+          element,
+          filteredChildren,
+          allElements,
+          containerSize,
+        );
       }
     }
 
@@ -527,7 +554,16 @@ export class CanvasPixiRendererService {
       );
       this.syncShadowFilterPresentation(node, zoom);
       this.applyPosition(node, element, allElements, layout, layoutOverride);
-      this.addChildElements(node, element, allElements, childrenMap, layout, undefined, zoom);
+      this.addChildElements(
+        node,
+        element,
+        allElements,
+        childrenMap,
+        layout,
+        { width: layoutOverride.width, height: layoutOverride.height },
+        undefined,
+        zoom,
+      );
       return node;
     }
 
@@ -541,7 +577,16 @@ export class CanvasPixiRendererService {
 
     this.applyTransforms(node, element);
     this.applyPosition(node, element, allElements, layout, layoutOverride);
-    this.addChildElements(node, element, allElements, childrenMap, layout, undefined, zoom);
+    this.addChildElements(
+      node,
+      element,
+      allElements,
+      childrenMap,
+      layout,
+      { width: layoutOverride.width, height: layoutOverride.height },
+      undefined,
+      zoom,
+    );
 
     return node;
   }
@@ -569,12 +614,15 @@ export class CanvasPixiRendererService {
 
     textObj.roundPixels = true;
     textObj.style.wordWrap = true;
-    textObj.style.wordWrapWidth = Math.max(width, 1);
+    const contentBox = this.getElementContentBox(element, width, height);
+    textObj.style.wordWrapWidth = Math.max(contentBox.width, 1);
     textObj.style.align = element.textAlign || 'left';
 
     const localBounds = textObj.getLocalBounds();
-    const textX = this.getTextHorizontalOffset(element, width, localBounds.width);
-    const textY = this.getTextVerticalOffset(element, height, localBounds.height);
+    const textX =
+      contentBox.x + this.getTextHorizontalOffset(element, contentBox.width, localBounds.width);
+    const textY =
+      contentBox.y + this.getTextVerticalOffset(element, contentBox.height, localBounds.height);
 
     textObj.position.set(
       roundToTwoDecimals(textX - localBounds.x),
@@ -628,6 +676,25 @@ export class CanvasPixiRendererService {
     );
   }
 
+  private getElementContentBox(
+    element: CanvasElement,
+    width: number,
+    height: number,
+  ): { x: number; y: number; width: number; height: number } {
+    const padding = element.padding;
+    const left = padding?.left ?? 0;
+    const top = padding?.top ?? 0;
+    const right = padding?.right ?? 0;
+    const bottom = padding?.bottom ?? 0;
+
+    return {
+      x: left,
+      y: top,
+      width: Math.max(0, width - left - right),
+      height: Math.max(0, height - top - bottom),
+    };
+  }
+
   private getTextHorizontalOffset(
     element: CanvasElement,
     width: number,
@@ -666,6 +733,7 @@ export class CanvasPixiRendererService {
     container: CanvasElement,
     children: CanvasElement[],
     allElements: CanvasElement[],
+    containerSize: { width: number; height: number },
     flowDragState: FlowDragRenderState,
   ): Map<string, LayoutResult> {
     const draggedEl = allElements.find((e) => e.id === flowDragState.draggingElementId);
@@ -713,6 +781,7 @@ export class CanvasPixiRendererService {
       container,
       [...virtualFlowChildren, ...absChildren],
       allElements,
+      containerSize,
     );
   }
 
@@ -797,11 +866,11 @@ export class CanvasPixiRendererService {
 
     g.clear();
 
-    let color: number;
+    let fill: { color: number; alpha: number };
     try {
-      color = new Color(fillColor).toNumber();
+      fill = parsePixiCssColor(fillColor);
     } catch {
-      color = 0xe0e0e0;
+      fill = { color: 0xe0e0e0, alpha: 1 };
     }
 
     if (tl === 0 && tr === 0 && br === 0 && bl === 0) {
@@ -826,7 +895,7 @@ export class CanvasPixiRendererService {
       g.closePath();
     }
 
-    g.fill({ color });
+    g.fill(fill);
   }
 
   private drawRoundedRectStroke(
@@ -848,11 +917,11 @@ export class CanvasPixiRendererService {
 
     g.clear();
 
-    let color: number;
+    let stroke: { color: number; alpha: number };
     try {
-      color = new Color(strokeColor).toNumber();
+      stroke = parsePixiCssColor(strokeColor);
     } catch {
-      color = 0x000000;
+      stroke = { color: 0x000000, alpha: 1 };
     }
 
     if (tl === 0 && tr === 0 && br === 0 && bl === 0) {
@@ -876,7 +945,7 @@ export class CanvasPixiRendererService {
       g.closePath();
     }
 
-    g.stroke({ width: strokeWidth, color });
+    g.stroke({ width: strokeWidth, color: stroke.color, alpha: stroke.alpha, alignment: 1 });
   }
 
   // ── Image Loading ─────────────────────────────────────────

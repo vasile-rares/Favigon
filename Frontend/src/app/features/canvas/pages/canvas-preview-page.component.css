@@ -135,7 +135,7 @@
 
 .preview-element {
   position: absolute;
-  box-sizing: border-box;
+  box-sizing: content-box;
 
   &.preview-element--interactive {
     cursor: pointer;

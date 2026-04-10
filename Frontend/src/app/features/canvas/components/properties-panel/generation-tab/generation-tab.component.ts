@@ -10,17 +10,11 @@ import {
   SimpleChanges,
   ViewEncapsulation,
 } from '@angular/core';
-import { IRNode } from '@app/core';
+import { GeneratedFile, IRNode } from '@app/core';
 import { SupportedFramework } from '../../../canvas.types';
+import JSZip from 'jszip';
 
-type OutputTab = 'html' | 'css';
-type CopyKind = OutputTab | 'ir';
-type ExportFile = {
-  name: string;
-  content: string;
-  mimeType: string;
-  kind: OutputTab;
-};
+type CopyKind = 'current' | 'ir';
 
 @Component({
   selector: 'app-generation-tab',
@@ -39,16 +33,16 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   @Input() isGenerating = false;
   @Input() generatedHtml = '';
   @Input() generatedCss = '';
+  @Input() generatedFiles: GeneratedFile[] = [];
   @Input() irPreview: IRNode | null = null;
 
   @Output() frameworkChanged = new EventEmitter<SupportedFramework>();
   @Output() validateRequested = new EventEmitter<void>();
   @Output() generateRequested = new EventEmitter<void>();
 
-  activeOutputTab: OutputTab = 'html';
+  activeFileIndex = 0;
   copiedKind: CopyKind | null = null;
-  highlightedHtml = '';
-  highlightedCss = '';
+  highlightedCode = '';
   highlightedIr = '';
 
   private copyResetTimer: number | null = null;
@@ -63,8 +57,16 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   ];
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['generatedHtml'] || changes['generatedCss'] || changes['irPreview']) {
+    if (changes['generatedFiles']) {
+      if (this.activeFileIndex >= this.generatedFiles.length) {
+        this.activeFileIndex = 0;
+      }
       this.refreshHighlightedCode();
+    }
+    if (changes['irPreview']) {
+      this.highlightedIr = this.highlightJson(
+        this.irPreview ? JSON.stringify(this.irPreview, null, 2) : '',
+      );
     }
   }
 
@@ -82,51 +84,41 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
     this.frameworkChanged.emit(framework);
   }
 
-  selectOutputTab(tab: OutputTab): void {
-    if (
-      (tab === 'html' && !this.hasGeneratedHtml()) ||
-      (tab === 'css' && !this.hasGeneratedCss())
-    ) {
-      return;
+  selectFile(index: number): void {
+    if (index >= 0 && index < this.generatedFiles.length) {
+      this.activeFileIndex = index;
+      this.refreshHighlightedCode();
     }
-
-    this.activeOutputTab = tab;
-  }
-
-  isOutputTabActive(tab: OutputTab): boolean {
-    return this.getResolvedOutputTab() === tab;
   }
 
   hasGeneratedCode(): boolean {
-    return this.hasGeneratedHtml() || this.hasGeneratedCss();
+    return this.generatedFiles.length > 0;
   }
 
-  hasGeneratedHtml(): boolean {
-    return this.generatedHtml.trim().length > 0;
+  getActiveFile(): GeneratedFile | null {
+    return this.generatedFiles[this.activeFileIndex] ?? null;
   }
 
-  hasGeneratedCss(): boolean {
-    return this.generatedCss.trim().length > 0;
+  getActiveFileContent(): string {
+    return this.getActiveFile()?.content ?? '';
   }
 
-  hasResponsiveCss(): boolean {
-    return this.generatedCss.includes('@media');
+  getActiveFilePath(): string {
+    return this.getActiveFile()?.path ?? '';
   }
 
-  getCurrentOutputCode(): string {
-    return this.getResolvedOutputTab() === 'css' ? this.generatedCss : this.generatedHtml;
+  getActiveFileName(): string {
+    const path = this.getActiveFilePath();
+    return path.split('/').pop() ?? path;
   }
 
-  getCurrentOutputLabel(): string {
-    return this.getResolvedOutputTab() === 'css' ? 'CSS' : this.getMarkupOutputLabel();
-  }
-
-  getCurrentHighlightedOutput(): string {
-    return this.getResolvedOutputTab() === 'css' ? this.highlightedCss : this.highlightedHtml;
-  }
-
-  getCurrentFileName(): string {
-    return this.getOutputFile(this.getResolvedOutputTab()).name;
+  getFileIcon(path: string): string {
+    if (path.endsWith('.html')) return 'html';
+    if (path.endsWith('.css')) return 'css';
+    if (path.endsWith('.json')) return 'json';
+    if (path.endsWith('.jsx')) return 'jsx';
+    if (path.endsWith('.ts')) return 'ts';
+    return 'file';
   }
 
   getStatusTone(): 'idle' | 'working' | 'success' | 'error' {
@@ -163,7 +155,7 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
     }
 
     if (this.hasGeneratedCode()) {
-      return 'Code ready';
+      return `${this.generatedFiles.length} files ready`;
     }
 
     if (this.validationResult === true) {
@@ -178,8 +170,8 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
       return this.apiError;
     }
 
-    if (this.hasResponsiveCss()) {
-      return 'Device pages are exported as responsive breakpoints.';
+    if (this.hasGeneratedCode()) {
+      return 'Click a file to preview. Save individually or download all as ZIP.';
     }
 
     return 'Validate first if you want a quick structural check.';
@@ -190,24 +182,7 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
       return 'Copied';
     }
 
-    return kind === 'ir' ? 'Copy IR' : `Copy ${kind.toUpperCase()}`;
-  }
-
-  getCopyCurrentButtonLabel(): string {
-    const current = this.getResolvedOutputTab();
-    if (this.copiedKind === current) {
-      return 'Copied';
-    }
-
-    return `Copy ${this.getCurrentOutputLabel()}`;
-  }
-
-  getExportCurrentButtonLabel(): string {
-    return `Save ${this.getCurrentOutputLabel()}`;
-  }
-
-  getExportAllButtonLabel(): string {
-    return this.hasMultipleExportFiles() ? 'Save files' : 'Save file';
+    return kind === 'ir' ? 'Copy IR' : 'Copy';
   }
 
   lineCount(value: string): number {
@@ -219,7 +194,12 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   }
 
   copy(kind: CopyKind): void {
-    const value = this.getCopyValue(kind);
+    const value =
+      kind === 'ir'
+        ? this.irPreview
+          ? JSON.stringify(this.irPreview, null, 2)
+          : ''
+        : this.getActiveFileContent();
     if (!value) {
       return;
     }
@@ -238,156 +218,38 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
     });
   }
 
-  copyCurrentOutput(): void {
-    this.copy(this.getResolvedOutputTab());
+  exportCurrentFile(): void {
+    const file = this.getActiveFile();
+    if (!file) return;
+
+    const mimeType = file.path.endsWith('.css')
+      ? 'text/css;charset=utf-8'
+      : file.path.endsWith('.html')
+        ? 'text/html;charset=utf-8'
+        : file.path.endsWith('.json')
+          ? 'application/json;charset=utf-8'
+          : 'text/plain;charset=utf-8';
+    this.downloadBlob(file.content, this.getActiveFileName(), mimeType);
   }
 
-  canExportFiles(): boolean {
-    return this.getExportFiles().length > 0;
+  async exportAsZip(): Promise<void> {
+    if (this.generatedFiles.length === 0) return;
+
+    const zip = new JSZip();
+    for (const file of this.generatedFiles) {
+      zip.file(file.path, file.content);
+    }
+
+    const blob = await zip.generateAsync({ type: 'blob' });
+    this.downloadBlob(blob, 'generated-project.zip', 'application/zip');
   }
 
-  hasMultipleExportFiles(): boolean {
-    return this.getExportFiles().length > 1;
-  }
-
-  exportCurrentOutput(): void {
-    this.exportFiles([this.getOutputFile(this.getResolvedOutputTab())]);
-  }
-
-  exportAllOutputs(): void {
-    this.exportFiles(this.getExportFiles());
-  }
-
-  private getResolvedOutputTab(): OutputTab {
-    if (this.activeOutputTab === 'css' && this.hasGeneratedCss()) {
-      return 'css';
-    }
-
-    if (this.hasGeneratedHtml()) {
-      return 'html';
-    }
-
-    if (this.hasGeneratedCss()) {
-      return 'css';
-    }
-
-    return 'html';
-  }
-
-  private getCopyValue(kind: CopyKind): string {
-    if (kind === 'html') {
-      return this.generatedHtml;
-    }
-
-    if (kind === 'css') {
-      return this.generatedCss;
-    }
-
-    return this.irPreview ? JSON.stringify(this.irPreview, null, 2) : '';
-  }
-
-  getMarkupOutputLabel(): string {
-    if (this.selectedFramework === 'react') {
-      return 'JSX';
-    }
-
-    if (this.selectedFramework === 'angular') {
-      return 'Template';
-    }
-
-    return 'HTML';
-  }
-
-  private getExportFiles(): ExportFile[] {
-    const files: ExportFile[] = [];
-
-    if (this.hasGeneratedHtml()) {
-      files.push(this.getOutputFile('html'));
-    }
-
-    if (this.hasGeneratedCss()) {
-      files.push(this.getOutputFile('css'));
-    }
-
-    return files;
-  }
-
-  private getOutputFile(kind: OutputTab): ExportFile {
-    const baseSlug = this.getBaseFileSlug();
-
-    if (kind === 'css') {
-      return {
-        kind,
-        name:
-          this.selectedFramework === 'angular' ? `${baseSlug}.component.css` : `${baseSlug}.css`,
-        content: this.generatedCss,
-        mimeType: 'text/css;charset=utf-8',
-      };
-    }
-
-    if (this.selectedFramework === 'react') {
-      return {
-        kind,
-        name: `${this.toPascalCase(baseSlug)}.jsx`,
-        content: this.generatedHtml,
-        mimeType: 'text/plain;charset=utf-8',
-      };
-    }
-
-    if (this.selectedFramework === 'angular') {
-      return {
-        kind,
-        name: `${baseSlug}.component.html`,
-        content: this.generatedHtml,
-        mimeType: 'text/html;charset=utf-8',
-      };
-    }
-
-    return {
-      kind,
-      name: `${baseSlug}.html`,
-      content: this.generatedHtml,
-      mimeType: 'text/html;charset=utf-8',
-    };
-  }
-
-  private getBaseFileSlug(): string {
-    const rawName = this.irPreview?.props?.['pageName'];
-    const pageName = typeof rawName === 'string' ? rawName : '';
-    const normalized = pageName
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-
-    return normalized || 'generation-export';
-  }
-
-  private toPascalCase(value: string): string {
-    const parts = value.split('-').filter(Boolean);
-    if (parts.length === 0) {
-      return 'GenerationExport';
-    }
-
-    return parts.map((part) => part[0].toUpperCase() + part.slice(1)).join('');
-  }
-
-  private exportFiles(files: ExportFile[]): void {
-    files
-      .filter((file) => file.content.trim().length > 0)
-      .forEach((file, index) => {
-        window.setTimeout(() => {
-          this.downloadFile(file);
-        }, index * 40);
-      });
-  }
-
-  private downloadFile(file: ExportFile): void {
-    const blob = new Blob([file.content], { type: file.mimeType });
+  private downloadBlob(content: string | Blob, fileName: string, mimeType: string): void {
+    const blob = content instanceof Blob ? content : new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = file.name;
+    anchor.download = fileName;
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
@@ -395,11 +257,24 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   }
 
   private refreshHighlightedCode(): void {
-    this.highlightedHtml = this.highlightMarkup(this.generatedHtml);
-    this.highlightedCss = this.highlightCss(this.generatedCss);
-    this.highlightedIr = this.highlightJson(
-      this.irPreview ? JSON.stringify(this.irPreview, null, 2) : '',
-    );
+    const file = this.getActiveFile();
+    if (!file) {
+      this.highlightedCode = '';
+      return;
+    }
+
+    const path = file.path;
+    if (path.endsWith('.css')) {
+      this.highlightedCode = this.highlightCss(file.content);
+    } else if (path.endsWith('.json')) {
+      this.highlightedCode = this.highlightJson(file.content);
+    } else if (path.endsWith('.html') || path.endsWith('.jsx')) {
+      this.highlightedCode = this.highlightMarkup(file.content);
+    } else if (path.endsWith('.ts')) {
+      this.highlightedCode = this.highlightMarkup(file.content);
+    } else {
+      this.highlightedCode = this.escapeHtml(file.content);
+    }
   }
 
   private highlightMarkup(code: string): string {

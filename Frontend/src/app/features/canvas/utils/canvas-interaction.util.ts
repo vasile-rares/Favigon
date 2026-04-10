@@ -230,6 +230,8 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
     maxWidthConstraint !== undefined ? Math.max(widthMin, maxWidthConstraint) : undefined;
   const heightMaxConstraint =
     maxHeightConstraint !== undefined ? Math.max(heightMin, maxHeightConstraint) : undefined;
+  const parentSizeRef = getParentSizeReference(element, parent);
+  const isFlowInLayoutParent = isFlowLayoutChild(element, parent);
 
   if (!parent || element.type === 'frame') {
     element.x = roundToTwoDecimals(element.x);
@@ -246,31 +248,49 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
     return;
   }
 
-  const maxWidth = Math.max(MIN_SIZE, parent.width - element.x);
-  const maxHeight = Math.max(MIN_SIZE, parent.height - element.y);
+  const maxWidth = isFlowInLayoutParent
+    ? Math.max(MIN_SIZE, parentSizeRef?.width ?? parent.width)
+    : Math.max(MIN_SIZE, parent.width - element.x);
+  const maxHeight = isFlowInLayoutParent
+    ? Math.max(MIN_SIZE, parentSizeRef?.height ?? parent.height)
+    : Math.max(MIN_SIZE, parent.height - element.y);
 
   if (widthMode === 'fill') {
-    element.width = maxWidth;
+    element.width = resolveCanvasPixelsFromMode(
+      'fill',
+      element.width,
+      'width',
+      element.widthSizingValue,
+      parentSizeRef,
+      null,
+    );
   } else if (widthMode === 'relative') {
     element.width = resolveCanvasPixelsFromMode(
       'relative',
       element.width,
       'width',
       element.widthSizingValue,
-      parent,
+      parentSizeRef,
       null,
     );
   }
 
   if (heightMode === 'fill') {
-    element.height = maxHeight;
+    element.height = resolveCanvasPixelsFromMode(
+      'fill',
+      element.height,
+      'height',
+      element.heightSizingValue,
+      parentSizeRef,
+      null,
+    );
   } else if (heightMode === 'relative') {
     element.height = resolveCanvasPixelsFromMode(
       'relative',
       element.height,
       'height',
       element.heightSizingValue,
-      parent,
+      parentSizeRef,
       null,
     );
   }
@@ -286,14 +306,16 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
     Math.min(maxHeight, heightMaxConstraint ?? maxHeight),
   );
 
-  element.x = clamp(element.x, 0, parent.width - element.width);
-  element.y = clamp(element.y, 0, parent.height - element.height);
+  if (!isFlowInLayoutParent) {
+    element.x = clamp(element.x, 0, parent.width - element.width);
+    element.y = clamp(element.y, 0, parent.height - element.height);
+  }
   if (widthMode === 'relative') {
     element.widthSizingValue = deriveCanvasSizeValueFromPixels(
       'relative',
       element.width,
       'width',
-      parent,
+      parentSizeRef,
       null,
     );
   }
@@ -303,7 +325,7 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
       'relative',
       element.height,
       'height',
-      parent,
+      parentSizeRef,
       null,
     );
   }
@@ -328,7 +350,7 @@ function normalizeConstraintField(
   element: CanvasElement,
   field: 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight',
   mode: 'fixed' | 'relative',
-  parent: Pick<CanvasElement, 'width' | 'height'> | null,
+  parent: Pick<CanvasElement, 'width' | 'height' | 'padding' | 'display' | 'type'> | null,
 ): void {
   const currentValue = getCanvasConstraintValue(element, field);
   if (!Number.isFinite(currentValue ?? Number.NaN)) {
@@ -382,7 +404,7 @@ function normalizeConstraintField(
       'relative',
       normalizedPixels,
       axis,
-      parent,
+      getParentSizeReference(element, parent),
     );
   }
 }
@@ -390,7 +412,7 @@ function normalizeConstraintField(
 function resolveConstraintField(
   element: CanvasElement,
   field: 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight',
-  parent: Pick<CanvasElement, 'width' | 'height'> | null,
+  parent: Pick<CanvasElement, 'width' | 'height' | 'padding' | 'display' | 'type'> | null,
 ): number | undefined {
   const pixels = getCanvasConstraintValue(element, field);
   if (!Number.isFinite(pixels ?? Number.NaN)) {
@@ -408,8 +430,38 @@ function resolveConstraintField(
         : field === 'minHeight'
           ? element.minHeightSizingValue
           : element.maxHeightSizingValue,
-    parent,
+    getParentSizeReference(element, parent),
   );
+}
+
+function getParentSizeReference(
+  element: CanvasElement,
+  parent: Pick<CanvasElement, 'width' | 'height' | 'padding' | 'display' | 'type'> | null,
+): { width: number; height: number; padding?: CanvasElement['padding'] } | null {
+  if (!parent) {
+    return null;
+  }
+
+  const width = parent.width + ((parent.padding?.left ?? 0) + (parent.padding?.right ?? 0));
+  const height = parent.height + ((parent.padding?.top ?? 0) + (parent.padding?.bottom ?? 0));
+
+  if (isFlowLayoutChild(element, parent)) {
+    return { width, height, padding: parent.padding };
+  }
+
+  return { width, height };
+}
+
+function isFlowLayoutChild(
+  element: Pick<CanvasElement, 'position'>,
+  parent: Pick<CanvasElement, 'display' | 'type'> | null,
+): boolean {
+  if (!parent || !parent.display || (parent.type !== 'frame' && parent.type !== 'rectangle')) {
+    return false;
+  }
+
+  const position = element.position;
+  return !position || position === 'static' || position === 'relative' || position === 'sticky';
 }
 
 export function formatCanvasElementTypeLabel(type: CanvasElementType): string {

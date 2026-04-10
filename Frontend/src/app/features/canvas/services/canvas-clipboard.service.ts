@@ -152,6 +152,8 @@ export class CanvasClipboardService {
     const pastedElements = clipboard.elements.map((element) => {
       const cloned = structuredClone(element);
       cloned.id = idMap.get(element.id) ?? crypto.randomUUID();
+      cloned.primarySyncId = undefined;
+      cloned.isPrimary = false;
 
       if (rootIds.has(element.id)) {
         const rootBounds = rootBoundsById.get(element.id);

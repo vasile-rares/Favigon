@@ -90,6 +90,8 @@ import { CanvasPixiLayoutService } from '../services/canvas-pixi-layout.service'
 
 const ROOT_FRAME_INSERT_GAP = 48;
 const ELEMENT_DRAG_START_THRESHOLD = 3;
+const CONTAINER_DROP_TOLERANCE = 4;
+const DEFAULT_PROJECT_PANEL_WIDTH = 280;
 
 interface RectangleDrawState {
   startPoint: Point;
@@ -184,6 +186,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   );
 
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
+  readonly projectPanelWidth = signal(DEFAULT_PROJECT_PANEL_WIDTH);
 
   // ── API / Generation State ────────────────────────────────
 
@@ -391,7 +394,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
         return;
       }
 
-      const showHandles = !!selected && selected.type !== 'frame' && selected.type !== 'text';
+      const showHandles =
+        !!selected &&
+        selected.type !== 'frame' &&
+        selected.type !== 'text' &&
+        selected.widthMode !== 'fill' &&
+        selected.heightMode !== 'fill';
       this.pixiOverlays.drawSelectionOutline(selected, elements, zoom, layout, showHandles);
 
       // Multi-selection outlines
@@ -405,24 +413,40 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     effect(() => {
       if (!this.pixiApp.ready()) return;
       const hoveredId = this.hoveredElementId();
-      const elements = this.elements();
       const zoom = this.viewport.zoomLevel();
-      const layout = this.page.activePageLayout();
       const isDragging = this.isDraggingEl();
       const selectedIds = this.selectedElementIds();
 
       if (!hoveredId || isDragging || selectedIds.includes(hoveredId)) {
-        this.pixiOverlays.drawHoverOutline(null, elements, zoom, layout);
+        this.pixiOverlays.drawHoverOutline(
+          null,
+          this.elements(),
+          zoom,
+          this.page.activePageLayout(),
+        );
         return;
       }
 
-      const hovered = this.el.findElementById(hoveredId, elements);
-      if (hovered?.type === 'frame') {
-        this.pixiOverlays.drawHoverOutline(null, elements, zoom, layout);
+      const hoveredPageId = this.findPageIdByElementId(hoveredId);
+      if (!hoveredPageId) {
+        this.pixiOverlays.drawHoverOutline(
+          null,
+          this.elements(),
+          zoom,
+          this.page.activePageLayout(),
+        );
         return;
       }
 
-      this.pixiOverlays.drawHoverOutline(hovered, elements, zoom, layout);
+      const hoveredElements = this.getPageElementsById(hoveredPageId);
+      const hoveredLayout = this.page.getPageLayoutById(hoveredPageId);
+      const hovered = this.el.findElementById(hoveredId, hoveredElements);
+      if (!hoveredLayout || hovered?.type === 'frame') {
+        this.pixiOverlays.drawHoverOutline(null, hoveredElements, zoom, hoveredLayout);
+        return;
+      }
+
+      this.pixiOverlays.drawHoverOutline(hovered, hoveredElements, zoom, hoveredLayout);
     });
 
     // Sync snap lines
@@ -729,21 +753,21 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.finalizeTextEditing(editingId);
     }
 
-    const elementForTypeCheck = this.el.findElementById(id, this.elements());
+    if (!this.activateElementPageContext(id)) {
+      return;
+    }
 
-    this.page.clearSelectedPageLayer();
+    const elementForTypeCheck = this.el.findElementById(id, this.elements());
 
     if (event.shiftKey && this.currentTool() === 'select') {
       event.preventDefault();
       event.stopPropagation();
-      this.page.layersFocusedPageId.set(this.currentPageId());
       this.toggleElementSelection(id);
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
-    this.page.layersFocusedPageId.set(this.currentPageId());
 
     const tool = this.currentTool();
     if (tool !== 'select') {
@@ -816,12 +840,16 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   onElementDoubleClick(event: MouseEvent, id: string): void {
     event.stopPropagation();
+
+    if (!this.activateElementPageContext(id)) {
+      return;
+    }
+
     const element = this.el.findElementById(id, this.elements());
     if (element?.type !== 'text') {
       return;
     }
-    this.page.clearSelectedPageLayer();
-    this.page.layersFocusedPageId.set(this.currentPageId());
+
     this.selectOnlyElement(id);
     this.startTextEditing(id);
   }
@@ -915,13 +943,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.resizeStart = {
       pointerX: pointer.x,
       pointerY: pointer.y,
-      width: element.width,
-      height: element.height,
+      width: bounds.width,
+      height: bounds.height,
       absoluteX: bounds.x,
       absoluteY: bounds.y,
-      centerX: bounds.x + element.width / 2,
-      centerY: bounds.y + element.height / 2,
-      aspectRatio: element.width / Math.max(element.height, 1),
+      centerX: bounds.x + bounds.width / 2,
+      centerY: bounds.y + bounds.height / 2,
+      aspectRatio: bounds.width / Math.max(bounds.height, 1),
       elementId: id,
       handle,
     };
@@ -942,8 +970,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     const bounds = this.el.getAbsoluteBounds(element, this.elements(), this.currentPage());
-    const centerX = bounds.x + element.width / 2;
-    const centerY = bounds.y + element.height / 2;
+    const centerX = bounds.x + bounds.width / 2;
+    const centerY = bounds.y + bounds.height / 2;
     const startAngle = Math.atan2(pointer.y - centerY, pointer.x - centerX) * (180 / Math.PI);
 
     this.selectOnlyElement(id);
@@ -1060,6 +1088,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.runWithHistory(() => {
       applyPatch();
     });
+  }
+
+  onProjectPanelWidthChanged(width: number): void {
+    this.projectPanelWidth.set(width);
   }
 
   onPropertyNumberGestureStarted(): void {
@@ -1184,7 +1216,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
 
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => [...elements, frame]);
+      this.updateCurrentPageElements((elements) => {
+        const withFrame = [...elements, frame];
+        const primaryFrame = this.getPrimaryFrame(withFrame);
+        return primaryFrame
+          ? this.syncPrimarySubtreeAcrossFrames(primaryFrame.id, withFrame)
+          : withFrame;
+      });
       this.selectOnlyElement(frame.id);
       this.currentTool.set('select');
     });
@@ -1207,7 +1245,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   onElementContextMenu(event: MouseEvent, id: string): void {
     event.preventDefault();
     event.stopPropagation();
-    this.page.clearSelectedPageLayer();
+
+    if (!this.activateElementPageContext(id)) {
+      return;
+    }
+
     if (!this.isElementSelected(id)) {
       this.selectOnlyElement(id);
     } else {
@@ -1443,11 +1485,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const pageHeight = this.page.currentViewportHeight();
     xCandidates.push(0, pageWidth / 2, pageWidth);
     yCandidates.push(0, pageHeight / 2, pageHeight);
+    const draggedBounds =
+      this.getLiveElementCanvasBounds(dragged) ??
+      this.el.getAbsoluteBounds(dragged, elements, this.currentPage());
     const snap = computeSnappedPosition(
       absoluteX,
       absoluteY,
-      dragged.width,
-      dragged.height,
+      draggedBounds.width,
+      draggedBounds.height,
       xCandidates,
       yCandidates,
     );
@@ -1494,7 +1539,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
         return {
           ...element,
-          ...this.resolveDraggedElementPatch(element, elements, absoluteX, absoluteY),
+          ...this.resolveDraggedElementPatch(element, elements, absoluteX, absoluteY, true),
         };
       });
       const movedEl = mapped.find((e) => e.id === selectedId) ?? null;
@@ -1686,6 +1731,40 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.editorState.clearElementSelection();
   }
 
+  private activateElementPageContext(elementId: string): boolean {
+    const targetPageId = this.findPageIdByElementId(elementId);
+    if (!targetPageId) {
+      return false;
+    }
+
+    const shouldPreserveAllPagesView = this.page.layersFocusedPageId() === null;
+    if (targetPageId !== this.currentPageId()) {
+      this.currentPageId.set(targetPageId);
+    }
+
+    this.page.clearSelectedPageLayer();
+    if (!shouldPreserveAllPagesView) {
+      this.page.layersFocusedPageId.set(targetPageId);
+    }
+
+    return true;
+  }
+
+  private findPageIdByElementId(elementId: string): string | null {
+    const pages = this.pages();
+    for (const page of pages) {
+      if (page.elements.some((element) => element.id === elementId)) {
+        return page.id;
+      }
+    }
+
+    return null;
+  }
+
+  private getPageElementsById(pageId: string): CanvasElement[] {
+    return this.pages().find((page) => page.id === pageId)?.elements ?? [];
+  }
+
   private selectOnlyElement(id: string): void {
     this.editorState.selectOnlyElement(id);
   }
@@ -1848,9 +1927,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const layout = this.page.activePageLayout();
     const currentPreview = this.flowDragPlaceholder();
     const previewWidth =
-      currentPreview?.elementId === dragged.id ? currentPreview.bounds.width : dragged.width;
+      currentPreview?.elementId === dragged.id
+        ? currentPreview.bounds.width
+        : this.el.getRenderedWidth(dragged, elements, this.currentPage());
     const previewHeight =
-      currentPreview?.elementId === dragged.id ? currentPreview.bounds.height : dragged.height;
+      currentPreview?.elementId === dragged.id
+        ? currentPreview.bounds.height
+        : this.el.getRenderedHeight(dragged, elements, this.currentPage());
     this.flowDragPlaceholder.set({
       elementId: dragged.id,
       bounds: {
@@ -2194,14 +2277,19 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     previousElement: CanvasElement,
     nextElement: CanvasElement,
   ): Partial<CanvasElement> | null {
+    const previousRenderedWidth = this.el.getRenderedWidth(
+      previousElement,
+      this.elements(),
+      this.currentPage(),
+    );
     const widthConstraint = this.canAutoSizeTextAxis(previousElement, 'width')
       ? undefined
-      : this.el.getRenderedWidth(previousElement, this.elements(), this.currentPage());
+      : previousRenderedWidth;
     const size = this.measureTextSize(nextElement, widthConstraint);
     const patch: Partial<CanvasElement> = {};
 
     if (this.canAutoSizeTextAxis(previousElement, 'width')) {
-      const centerX = previousElement.x + previousElement.width / 2;
+      const centerX = previousElement.x + previousRenderedWidth / 2;
       patch.x = roundToTwoDecimals(centerX - size.width / 2);
       patch.width = size.width;
     }
@@ -2211,6 +2299,27 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     return Object.keys(patch).length > 0 ? patch : null;
+  }
+
+  private getElementPaddingAxisTotal(element: CanvasElement, axis: 'width' | 'height'): number {
+    if (!element.padding) {
+      return 0;
+    }
+
+    return axis === 'width'
+      ? element.padding.left + element.padding.right
+      : element.padding.top + element.padding.bottom;
+  }
+
+  private getStoredAxisSizeFromRendered(
+    element: CanvasElement,
+    axis: 'width' | 'height',
+    renderedSize: number,
+  ): number {
+    return Math.max(
+      24,
+      roundToTwoDecimals(renderedSize - this.getElementPaddingAxisTotal(element, axis)),
+    );
   }
 
   getTextEditorScreenLeft(): number {
@@ -2299,7 +2408,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
         x: roundToTwoDecimals(cursorX),
         y: roundToTwoDecimals(baselineY),
       });
-      cursorX += frame.width + ROOT_FRAME_INSERT_GAP;
+      cursorX +=
+        this.el.getRenderedWidth(frame, elements, this.currentPage()) + ROOT_FRAME_INSERT_GAP;
     }
 
     return elements.map((element) => {
@@ -2502,8 +2612,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
           ...element,
           x: parentBounds ? bounds.x - parentBounds.x : bounds.x,
           y: parentBounds ? bounds.y - parentBounds.y : bounds.y,
-          width: bounds.width,
-          height: bounds.height,
+          width: this.getStoredAxisSizeFromRendered(element, 'width', bounds.width),
+          height: this.getStoredAxisSizeFromRendered(element, 'height', bounds.height),
         };
 
         mutateNormalizeElement(nextElement, elements);
@@ -2517,8 +2627,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       if (resizedTarget && this.isRootFrame(resizedTarget) && start.handle.includes('s')) {
         const candidates: number[] = elements
           .filter((el) => el.type === 'frame' && !el.parentId && el.id !== start.elementId)
-          .flatMap((el) => [el.y + el.height, el.y]);
-        const currentBottom = resizedTarget.y + resizedTarget.height;
+          .flatMap((el) => [
+            el.y + this.el.getRenderedHeight(el, elements, this.currentPage()),
+            el.y,
+          ]);
+        const currentBottom =
+          resizedTarget.y +
+          this.el.getRenderedHeight(resizedTarget, resizedElements, this.currentPage());
         let bestDelta = SNAP_THRESHOLD;
         let snappedBottom: number | null = null;
         for (const c of candidates) {
@@ -2529,7 +2644,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
           }
         }
         if (snappedBottom !== null) {
-          const snappedHeight = roundToTwoDecimals(Math.max(24, snappedBottom - resizedTarget.y));
+          const snappedHeight = this.getStoredAxisSizeFromRendered(
+            resizedTarget,
+            'height',
+            snappedBottom - resizedTarget.y,
+          );
           snappedElements = resizedElements.map((e) =>
             e.id === start.elementId ? { ...e, height: snappedHeight } : e,
           );
@@ -2587,14 +2706,19 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const maxRadius = Math.max(0, Math.min(start.width, start.height) / 2);
     const nextRadius = clamp(rawRadius, 0, maxRadius);
 
-    this.updateCurrentPageElements((elements) =>
-      elements.map((element) => {
+    this.updateCurrentPageElements((elements) => {
+      const withRadius = elements.map((element) => {
         if (element.id !== start.elementId || !this.el.supportsCornerRadius(element)) {
           return element;
         }
         return { ...element, cornerRadius: roundToTwoDecimals(nextRadius) };
-      }),
-    );
+      });
+      return this.syncElementPatchToPrimary(
+        start.elementId,
+        { cornerRadius: roundToTwoDecimals(nextRadius) },
+        withRadius,
+      );
+    });
   }
 
   private captureResizeSubtreeSnapshot(elementId: string, elements: CanvasElement[]): void {
@@ -2645,8 +2769,28 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
         continue;
       }
 
-      const scaleX = sourceParent.width > 0 ? nextParent.width / sourceParent.width : 1;
-      const scaleY = sourceParent.height > 0 ? nextParent.height / sourceParent.height : 1;
+      const sourceParentWidth = this.el.getRenderedWidth(
+        sourceParent,
+        sourceElements,
+        this.currentPage(),
+      );
+      const sourceParentHeight = this.el.getRenderedHeight(
+        sourceParent,
+        sourceElements,
+        this.currentPage(),
+      );
+      const nextParentWidth = this.el.getRenderedWidth(
+        nextParent,
+        nextElements,
+        this.currentPage(),
+      );
+      const nextParentHeight = this.el.getRenderedHeight(
+        nextParent,
+        nextElements,
+        this.currentPage(),
+      );
+      const scaleX = sourceParentWidth > 0 ? nextParentWidth / sourceParentWidth : 1;
+      const scaleY = sourceParentHeight > 0 ? nextParentHeight / sourceParentHeight : 1;
       const shouldScalePosition =
         !this.isLayoutContainer(nextParent) || !this.isChildInFlow(sourceElement);
       const textScale = Math.min(Math.abs(scaleX), Math.abs(scaleY));
@@ -3208,18 +3352,26 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       const previousChild =
         previousElements.find((candidate) => candidate.id === element.id) ?? element;
       const childBounds = this.getFlowAwareBounds(previousChild, previousElements);
+      const nextContainerWidth = this.el.getRenderedWidth(
+        nextContainer,
+        nextElements,
+        this.currentPage(),
+      );
+      const nextContainerHeight = this.el.getRenderedHeight(
+        nextContainer,
+        nextElements,
+        this.currentPage(),
+      );
+      const childWidth = this.el.getRenderedWidth(element, nextElements, this.currentPage());
+      const childHeight = this.el.getRenderedHeight(element, nextElements, this.currentPage());
 
       return {
         ...element,
         x: roundToTwoDecimals(
-          clamp(childBounds.x - previousContainerBounds.x, 0, nextContainer.width - element.width),
+          clamp(childBounds.x - previousContainerBounds.x, 0, nextContainerWidth - childWidth),
         ),
         y: roundToTwoDecimals(
-          clamp(
-            childBounds.y - previousContainerBounds.y,
-            0,
-            nextContainer.height - element.height,
-          ),
+          clamp(childBounds.y - previousContainerBounds.y, 0, nextContainerHeight - childHeight),
         ),
         position: this.el.getDefaultPositionForPlacement(element.type, nextContainer),
       };
@@ -3285,8 +3437,16 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const parentBounds =
       this.getLiveElementCanvasBounds(previousParent) ??
       this.getFlowAwareBounds(previousParent, previousElements);
-    const maxX = Math.max(0, nextParent.width - dragged.width);
-    const maxY = Math.max(0, nextParent.height - dragged.height);
+    const nextParentWidth = this.el.getRenderedWidth(nextParent, nextElements, this.currentPage());
+    const nextParentHeight = this.el.getRenderedHeight(
+      nextParent,
+      nextElements,
+      this.currentPage(),
+    );
+    const draggedWidth = this.el.getRenderedWidth(dragged, nextElements, this.currentPage());
+    const draggedHeight = this.el.getRenderedHeight(dragged, nextElements, this.currentPage());
+    const maxX = Math.max(0, nextParentWidth - draggedWidth);
+    const maxY = Math.max(0, nextParentHeight - draggedHeight);
 
     return nextElements.map((element) =>
       element.id === draggedId
@@ -3355,7 +3515,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     excludedRootId?: string | null,
   ): CanvasElement | null {
     const elements = this.elements();
-    const excludedIds = excludedRootId ? new Set(collectSubtreeIds(elements, excludedRootId)) : null;
+    const excludedIds = excludedRootId
+      ? new Set(collectSubtreeIds(elements, excludedRootId))
+      : null;
     const hoveredContainers = elements.filter((element) => {
       if (
         !this.el.isContainerElement(element) ||
@@ -3398,8 +3560,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     return containers.reduce((best, candidate) => {
-      const bestArea = best.width * best.height;
-      const candidateArea = candidate.width * candidate.height;
+      const bestArea =
+        this.el.getRenderedWidth(best, this.elements(), this.currentPage()) *
+        this.el.getRenderedHeight(best, this.elements(), this.currentPage());
+      const candidateArea =
+        this.el.getRenderedWidth(candidate, this.elements(), this.currentPage()) *
+        this.el.getRenderedHeight(candidate, this.elements(), this.currentPage());
       return candidateArea < bestArea ? candidate : best;
     });
   }
@@ -3412,7 +3578,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return true;
     }
 
-    return container.width >= requiredSize.width && container.height >= requiredSize.height;
+    return (
+      this.el.getRenderedWidth(container, this.elements(), this.currentPage()) >=
+        requiredSize.width &&
+      this.el.getRenderedHeight(container, this.elements(), this.currentPage()) >=
+        requiredSize.height
+    );
   }
 
   private isBoundsFullyInsideBounds(inner: Bounds, outer: Bounds): boolean {
@@ -3424,11 +3595,25 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
   }
 
+  private isBoundsInsideBoundsWithTolerance(
+    inner: Bounds,
+    outer: Bounds,
+    tolerance: number,
+  ): boolean {
+    return (
+      inner.x >= outer.x - tolerance &&
+      inner.y >= outer.y - tolerance &&
+      inner.x + inner.width <= outer.x + outer.width + tolerance &&
+      inner.y + inner.height <= outer.y + outer.height + tolerance
+    );
+  }
+
   private resolveDraggedElementPatch(
     element: CanvasElement,
     elements: CanvasElement[],
     nextAbsoluteX: number,
     nextAbsoluteY: number,
+    preserveParentDuringDrag = false,
   ): Partial<CanvasElement> {
     const parent = this.el.findElementById(element.parentId ?? null, elements);
     if (!parent) {
@@ -3439,12 +3624,28 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     const parentBounds = this.el.getAbsoluteBounds(parent, elements, this.currentPage());
+    const elementRenderedWidth = this.el.getRenderedWidth(element, elements, this.currentPage());
+    const elementRenderedHeight = this.el.getRenderedHeight(element, elements, this.currentPage());
+    const parentRenderedWidth = this.el.getRenderedWidth(parent, elements, this.currentPage());
+    const parentRenderedHeight = this.el.getRenderedHeight(parent, elements, this.currentPage());
     const nextBounds: Bounds = {
       x: nextAbsoluteX,
       y: nextAbsoluteY,
-      width: element.width,
-      height: element.height,
+      width: elementRenderedWidth,
+      height: elementRenderedHeight,
     };
+
+    if (
+      preserveParentDuringDrag &&
+      this.isContainerElement(parent) &&
+      !this.isLayoutContainer(parent) &&
+      element.position === 'absolute'
+    ) {
+      return {
+        x: roundToTwoDecimals(nextAbsoluteX - parentBounds.x),
+        y: roundToTwoDecimals(nextAbsoluteY - parentBounds.y),
+      };
+    }
 
     if (
       this.isContainerElement(parent) &&
@@ -3460,8 +3661,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     return {
-      x: clamp(nextAbsoluteX - parentBounds.x, 0, parent.width - element.width),
-      y: clamp(nextAbsoluteY - parentBounds.y, 0, parent.height - element.height),
+      x: clamp(nextAbsoluteX - parentBounds.x, 0, parentRenderedWidth - elementRenderedWidth),
+      y: clamp(nextAbsoluteY - parentBounds.y, 0, parentRenderedHeight - elementRenderedHeight),
     };
   }
 
@@ -3491,13 +3692,15 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   ): CanvasElement | null {
     const requiredSize = this.el.getDefaultElementDimensions(tool, this.viewport.frameTemplate());
     const preferredContainer =
-      tool === 'frame' || !targetContainer || !this.canContainerFitSize(targetContainer, requiredSize)
+      tool === 'frame' ||
+      !targetContainer ||
+      !this.canContainerFitSize(targetContainer, requiredSize)
         ? null
         : targetContainer;
     const resolvedContainer =
       tool === 'frame'
         ? null
-        : preferredContainer ?? this.resolveInsertionContainer(pointer, requiredSize);
+        : (preferredContainer ?? this.resolveInsertionContainer(pointer, requiredSize));
     const resolvedContainerBounds = resolvedContainer
       ? targetContainer && resolvedContainer.id === targetContainer.id
         ? (containerBounds ??
@@ -3533,8 +3736,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const newElement = result.element;
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) => {
-        const synced = this.createSyncedCopies(newElement, elements);
-        return [...elements, newElement, ...synced];
+        const withNewElement = [...elements, newElement];
+        return this.syncPrimarySubtreeAcrossFrames(newElement.id, withNewElement);
       });
       this.selectedElementId.set(newElement.id);
       this.currentTool.set('select');
@@ -3557,7 +3760,73 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if (!element || element.type === 'frame') return;
 
     const elementBounds = this.el.getAbsoluteBounds(element, elements, this.currentPage());
+    const currentParent = element.parentId
+      ? this.el.findElementById(element.parentId, elements)
+      : null;
+
+    if (currentParent) {
+      const currentParentBounds = this.el.getAbsoluteBounds(
+        currentParent,
+        elements,
+        this.currentPage(),
+      );
+      const isStillInsideCurrentParent = this.isBoundsInsideBoundsWithTolerance(
+        elementBounds,
+        currentParentBounds,
+        CONTAINER_DROP_TOLERANCE,
+      );
+
+      if (isStillInsideCurrentParent) {
+        this.updateCurrentPageElements((els) =>
+          els.map((el) =>
+            el.id === id
+              ? {
+                  ...el,
+                  x: roundToTwoDecimals(
+                    clamp(
+                      elementBounds.x - currentParentBounds.x,
+                      0,
+                      this.el.getRenderedWidth(currentParent, els, this.currentPage()) -
+                        this.el.getRenderedWidth(el, els, this.currentPage()),
+                    ),
+                  ),
+                  y: roundToTwoDecimals(
+                    clamp(
+                      elementBounds.y - currentParentBounds.y,
+                      0,
+                      this.el.getRenderedHeight(currentParent, els, this.currentPage()) -
+                        this.el.getRenderedHeight(el, els, this.currentPage()),
+                    ),
+                  ),
+                }
+              : el,
+          ),
+        );
+        return;
+      }
+    }
+
     const target = this.resolveInsertionContainerForBounds(elementBounds, id);
+
+    if (!target) {
+      if (currentParent) {
+        this.updateCurrentPageElements((els) =>
+          els.map((el) =>
+            el.id === id
+              ? {
+                  ...el,
+                  parentId: null,
+                  position: this.el.getDefaultPositionForPlacement(el.type, null),
+                  x: roundToTwoDecimals(elementBounds.x),
+                  y: roundToTwoDecimals(elementBounds.y),
+                }
+              : el,
+          ),
+        );
+      }
+
+      return;
+    }
 
     if (!target || target.id === element.parentId) return;
 
@@ -3572,10 +3841,20 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
               position: this.el.getDefaultPositionForPlacement(el.type, target),
               x: isTargetLayout
                 ? 0
-                : clamp(elementBounds.x - fb.x, 0, target.width - element.width),
+                : clamp(
+                    elementBounds.x - fb.x,
+                    0,
+                    this.el.getRenderedWidth(target, els, this.currentPage()) -
+                      this.el.getRenderedWidth(el, els, this.currentPage()),
+                  ),
               y: isTargetLayout
                 ? 0
-                : clamp(elementBounds.y - fb.y, 0, target.height - element.height),
+                : clamp(
+                    elementBounds.y - fb.y,
+                    0,
+                    this.el.getRenderedHeight(target, els, this.currentPage()) -
+                      this.el.getRenderedHeight(el, els, this.currentPage()),
+                  ),
             }
           : el,
       ),
@@ -3742,7 +4021,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     this.updateCurrentPageElements((elements) => {
       const withoutElement = removeWithChildren(elements, id);
-      return withoutElement.filter((el) => el.primarySyncId !== id);
+      return this.removeSyncedCopiesForSourceSubtree(id, withoutElement, elements);
     });
 
     if (this.selectedElementId() === id) {
@@ -3847,7 +4126,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) => [...elements, ...pasted.elements]);
+      this.updateCurrentPageElements((elements) => {
+        let nextElements = [...elements, ...pasted.elements];
+        for (const rootId of pasted.rootIds) {
+          nextElements = this.syncPrimarySubtreeAcrossFrames(rootId, nextElements);
+        }
+
+        return nextElements;
+      });
       this.setSelectedElements(pasted.rootIds, pasted.rootIds[pasted.rootIds.length - 1] ?? null);
       this.stopTextEditing();
       this.currentTool.set('select');
@@ -3866,7 +4152,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.updateCurrentPageElements((elements) => {
         return selectedIds.reduce((nextElements, selectedId) => {
           const withoutElement = removeWithChildren(nextElements, selectedId);
-          return withoutElement.filter((el) => el.primarySyncId !== selectedId);
+          return this.removeSyncedCopiesForSourceSubtree(selectedId, withoutElement, nextElements);
         }, elements);
       });
       this.clearElementSelection();
@@ -4002,7 +4288,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
           this.updateCurrentPageElements((elements) => {
             return targetIds.reduce((nextElements, targetId) => {
               const withoutElement = removeWithChildren(nextElements, targetId);
-              return withoutElement.filter((el) => el.primarySyncId !== targetId);
+              return this.removeSyncedCopiesForSourceSubtree(
+                targetId,
+                withoutElement,
+                nextElements,
+              );
             }, elements);
           });
           this.clearElementSelection();
@@ -4050,116 +4340,23 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     });
   }
 
-  private createSyncedCopies(
-    newElement: CanvasElement,
-    elements: CanvasElement[],
-  ): CanvasElement[] {
-    const primaryFrame = this.getPrimaryFrame(elements);
-    if (!primaryFrame || newElement.parentId !== primaryFrame.id) {
-      return [];
-    }
-
-    const otherRootFrames = elements.filter(
-      (el) => el.type === 'frame' && !el.parentId && el.id !== primaryFrame.id,
-    );
-
-    return otherRootFrames.map((frame) => ({
-      ...newElement,
-      id: crypto.randomUUID(),
-      parentId: frame.id,
-      primarySyncId: newElement.id,
-      x:
-        primaryFrame.width > 0
-          ? roundToTwoDecimals((newElement.x / primaryFrame.width) * frame.width)
-          : newElement.x,
-      y:
-        primaryFrame.height > 0
-          ? roundToTwoDecimals((newElement.y / primaryFrame.height) * frame.height)
-          : newElement.y,
-      width: newElement.width,
-      height: newElement.height,
-    }));
-  }
-
   private syncElementPatchToPrimary(
     elementId: string,
-    patch: Partial<CanvasElement>,
+    _patch: Partial<CanvasElement>,
     elements: CanvasElement[],
   ): CanvasElement[] {
-    const element = elements.find((el) => el.id === elementId);
-    if (!element || !element.parentId) {
-      return elements;
-    }
-
-    const primaryFrame = this.getPrimaryFrame(elements);
-    if (!primaryFrame || element.parentId !== primaryFrame.id) {
-      return elements;
-    }
-
-    const otherRootFrames = elements.filter(
-      (el) => el.type === 'frame' && !el.parentId && el.id !== primaryFrame.id,
-    );
-
-    return elements.map((el) => {
-      if (el.primarySyncId !== elementId) {
-        return el;
-      }
-      const parentFrame = otherRootFrames.find((f) => f.id === el.parentId);
-      if (!parentFrame) {
-        return el;
-      }
-      const scaleX = primaryFrame.width > 0 ? parentFrame.width / primaryFrame.width : 1;
-      const scaleY = primaryFrame.height > 0 ? parentFrame.height / primaryFrame.height : 1;
-      const syncedPatch: Partial<CanvasElement> = { ...patch };
-      if (patch.x !== undefined) syncedPatch.x = roundToTwoDecimals(patch.x * scaleX);
-      if (patch.y !== undefined) syncedPatch.y = roundToTwoDecimals(patch.y * scaleY);
-      if (patch.width !== undefined) syncedPatch.width = patch.width;
-      if (patch.height !== undefined) syncedPatch.height = patch.height;
-      return { ...el, ...syncedPatch };
-    });
+    return this.syncPrimarySubtreeAcrossFrames(elementId, elements);
   }
 
   private syncElementMoveToPrimary(
     movedElement: CanvasElement | null,
     elements: CanvasElement[],
   ): CanvasElement[] {
-    if (!movedElement || !movedElement.parentId) {
+    if (!movedElement) {
       return elements;
     }
 
-    const primaryFrame = this.getPrimaryFrame(elements);
-    if (!primaryFrame || movedElement.parentId !== primaryFrame.id) {
-      return elements;
-    }
-
-    const otherRootFrames = elements.filter(
-      (el) => el.type === 'frame' && !el.parentId && el.id !== primaryFrame.id,
-    );
-
-    const syncId = movedElement.id;
-
-    return elements.map((el) => {
-      if (el.primarySyncId !== syncId) {
-        return el;
-      }
-      const parentFrame = otherRootFrames.find((f) => f.id === el.parentId);
-      if (!parentFrame) {
-        return el;
-      }
-      return {
-        ...el,
-        x:
-          primaryFrame.width > 0
-            ? roundToTwoDecimals((movedElement.x / primaryFrame.width) * parentFrame.width)
-            : movedElement.x,
-        y:
-          primaryFrame.height > 0
-            ? roundToTwoDecimals((movedElement.y / primaryFrame.height) * parentFrame.height)
-            : movedElement.y,
-        width: movedElement.width,
-        height: movedElement.height,
-      };
-    });
+    return this.syncPrimarySubtreeAcrossFrames(movedElement.id, elements);
   }
 
   private syncPrimaryFrameResize(
@@ -4171,28 +4368,437 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return elements;
     }
 
-    const newW = resizedFrame.width;
-    const newH = resizedFrame.height;
-    const otherRootFrames = elements.filter(
-      (el) => el.type === 'frame' && !el.parentId && el.id !== primaryFrame.id,
-    );
+    return this.syncPrimarySubtreeAcrossFrames(primaryFrame.id, elements);
+  }
 
-    return elements.map((el) => {
-      // Re-anchor synced children proportionally using new primary size
-      const parentFrame = otherRootFrames.find((f) => f.id === el.parentId);
-      if (!parentFrame || !el.primarySyncId) {
-        return el;
+  private syncPrimarySubtreeAcrossFrames(
+    sourceRootId: string,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    const primaryFrame = this.getPrimaryFrame(elements);
+    if (!primaryFrame) {
+      return elements;
+    }
+
+    if (sourceRootId !== primaryFrame.id) {
+      const sourceRoot = elements.find((element) => element.id === sourceRootId);
+      if (
+        !sourceRoot ||
+        sourceRoot.primarySyncId ||
+        !this.isElementWithinPrimaryFrame(sourceRoot, elements, primaryFrame.id)
+      ) {
+        return elements;
       }
-      const source = elements.find((e) => e.id === el.primarySyncId);
-      if (!source) {
-        return el;
+    }
+
+    const otherRootFrames = elements.filter(
+      (element) => this.isRootFrame(element) && element.id !== primaryFrame.id,
+    );
+    if (otherRootFrames.length === 0) {
+      return elements;
+    }
+
+    let nextElements =
+      sourceRootId === primaryFrame.id
+        ? this.syncRootFramesFromPrimary(primaryFrame, elements)
+        : elements;
+    for (const frame of otherRootFrames) {
+      const targetFrame = nextElements.find((element) => element.id === frame.id) ?? frame;
+      nextElements = this.syncPrimarySubtreeToFrame(
+        sourceRootId,
+        primaryFrame,
+        targetFrame,
+        nextElements,
+      );
+    }
+
+    return nextElements;
+  }
+
+  private syncRootFramesFromPrimary(
+    primaryFrame: CanvasElement,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    return elements.map((element) => {
+      if (!this.isRootFrame(element) || element.id === primaryFrame.id) {
+        return element;
       }
+
       return {
-        ...el,
-        x: newW > 0 ? roundToTwoDecimals((source.x / newW) * parentFrame.width) : el.x,
-        y: newH > 0 ? roundToTwoDecimals((source.y / newH) * parentFrame.height) : el.y,
+        ...primaryFrame,
+        id: element.id,
+        name: element.name,
+        x: element.x,
+        y: element.y,
+        width: element.width,
+        height: element.height,
+        parentId: null,
+        isPrimary: false,
+        primarySyncId: undefined,
       };
     });
+  }
+
+  private syncPrimarySubtreeToFrame(
+    sourceRootId: string,
+    primaryFrame: CanvasElement,
+    targetFrame: CanvasElement,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    const sourceRoot =
+      sourceRootId === primaryFrame.id
+        ? primaryFrame
+        : (elements.find((element) => element.id === sourceRootId) ?? null);
+    if (!sourceRoot) {
+      return elements;
+    }
+
+    const sourceNodes = [
+      ...this.getPrimarySourceAncestors(sourceRoot, elements, primaryFrame.id),
+      ...this.getPrimarySourceSubtree(sourceRootId, primaryFrame, elements),
+    ];
+    if (sourceNodes.length === 0) {
+      return elements;
+    }
+
+    let nextElements = [...elements];
+    const syncedBySourceId = new Map<string, CanvasElement>();
+    const syncedParentIds = new Map<string, string>();
+
+    for (const sourceElement of sourceNodes) {
+      if (!sourceElement.parentId) {
+        continue;
+      }
+
+      const sourceParent =
+        elements.find((element) => element.id === sourceElement.parentId) ?? null;
+      if (!sourceParent) {
+        continue;
+      }
+
+      const targetParent =
+        sourceElement.parentId === primaryFrame.id
+          ? targetFrame
+          : (syncedBySourceId.get(sourceElement.parentId) ??
+            this.findSyncedElementInRootFrame(
+              sourceElement.parentId,
+              targetFrame.id,
+              nextElements,
+            ));
+      if (!targetParent) {
+        continue;
+      }
+
+      syncedParentIds.set(sourceParent.id, targetParent.id);
+
+      const existingCopy = this.findSyncedElementInRootFrame(
+        sourceElement.id,
+        targetFrame.id,
+        nextElements,
+      );
+      const syncedElement = this.buildSyncedElementFromSource(
+        sourceElement,
+        sourceParent,
+        targetParent,
+        nextElements,
+        existingCopy,
+      );
+
+      nextElements = this.upsertElement(nextElements, syncedElement);
+      syncedBySourceId.set(sourceElement.id, syncedElement);
+    }
+
+    for (const [sourceParentId, targetParentId] of syncedParentIds) {
+      nextElements = this.syncFlowChildOrderAcrossFrames(
+        sourceParentId,
+        targetParentId,
+        elements,
+        nextElements,
+      );
+    }
+
+    return nextElements;
+  }
+
+  private buildSyncedElementFromSource(
+    sourceElement: CanvasElement,
+    sourceParent: CanvasElement,
+    targetParent: CanvasElement,
+    elements: CanvasElement[],
+    existingCopy: CanvasElement | null,
+  ): CanvasElement {
+    const sourceParentWidth = this.el.getRenderedWidth(sourceParent, elements, this.currentPage());
+    const sourceParentHeight = this.el.getRenderedHeight(
+      sourceParent,
+      elements,
+      this.currentPage(),
+    );
+    const targetParentWidth = this.el.getRenderedWidth(targetParent, elements, this.currentPage());
+    const targetParentHeight = this.el.getRenderedHeight(
+      targetParent,
+      elements,
+      this.currentPage(),
+    );
+    const scaleX = sourceParentWidth > 0 ? targetParentWidth / sourceParentWidth : 1;
+    const scaleY = sourceParentHeight > 0 ? targetParentHeight / sourceParentHeight : 1;
+    const shouldScalePosition =
+      !this.isLayoutContainer(targetParent) || !this.isChildInFlow(sourceElement);
+    const syncedElement: CanvasElement = {
+      ...sourceElement,
+      id: existingCopy?.id ?? crypto.randomUUID(),
+      parentId: targetParent.id,
+      primarySyncId: sourceElement.id,
+      isPrimary: false,
+      x: shouldScalePosition ? roundToTwoDecimals(sourceElement.x * scaleX) : 0,
+      y: shouldScalePosition ? roundToTwoDecimals(sourceElement.y * scaleY) : 0,
+      width: this.getSyncedAxisSize(sourceElement.width, sourceElement.widthMode, scaleX),
+      height: this.getSyncedAxisSize(sourceElement.height, sourceElement.heightMode, scaleY),
+    };
+
+    mutateNormalizeElement(syncedElement, elements);
+    return syncedElement;
+  }
+
+  private getPrimarySourceSubtree(
+    sourceRootId: string,
+    primaryFrame: CanvasElement,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    const subtreeIds =
+      sourceRootId === primaryFrame.id ? null : new Set(collectSubtreeIds(elements, sourceRootId));
+    const sourceElements =
+      sourceRootId === primaryFrame.id
+        ? elements.filter(
+            (element) =>
+              !element.primarySyncId &&
+              this.isElementWithinPrimaryFrame(element, elements, primaryFrame.id),
+          )
+        : elements.filter((element) => !element.primarySyncId && !!subtreeIds?.has(element.id));
+
+    return sourceElements.sort(
+      (left, right) =>
+        this.getElementNestingDepth(left, elements) - this.getElementNestingDepth(right, elements),
+    );
+  }
+
+  private getPrimarySourceAncestors(
+    sourceElement: CanvasElement,
+    elements: CanvasElement[],
+    primaryFrameId: string,
+  ): CanvasElement[] {
+    const ancestors: CanvasElement[] = [];
+    let parentId = sourceElement.parentId ?? null;
+
+    while (parentId && parentId !== primaryFrameId) {
+      const parent = elements.find((element) => element.id === parentId && !element.primarySyncId);
+      if (!parent) {
+        break;
+      }
+
+      ancestors.push(parent);
+      parentId = parent.parentId ?? null;
+    }
+
+    return ancestors.reverse();
+  }
+
+  private isElementWithinPrimaryFrame(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    primaryFrameId: string,
+  ): boolean {
+    let parentId = element.parentId ?? null;
+
+    while (parentId) {
+      if (parentId === primaryFrameId) {
+        return true;
+      }
+
+      parentId = this.el.findElementById(parentId, elements)?.parentId ?? null;
+    }
+
+    return false;
+  }
+
+  private findSyncedElementInRootFrame(
+    sourceId: string,
+    rootFrameId: string,
+    elements: CanvasElement[],
+  ): CanvasElement | null {
+    return (
+      elements.find(
+        (element) =>
+          element.primarySyncId === sourceId &&
+          this.findRootFrameId(element, elements) === rootFrameId,
+      ) ?? null
+    );
+  }
+
+  private findRootFrameId(element: CanvasElement, elements: CanvasElement[]): string | null {
+    let current: CanvasElement | null = element;
+
+    while (current) {
+      if (this.isRootFrame(current)) {
+        return current.id;
+      }
+
+      current = current.parentId ? this.el.findElementById(current.parentId, elements) : null;
+    }
+
+    return null;
+  }
+
+  private upsertElement(elements: CanvasElement[], nextElement: CanvasElement): CanvasElement[] {
+    const index = elements.findIndex((element) => element.id === nextElement.id);
+    if (index === -1) {
+      return [...elements, nextElement];
+    }
+
+    const nextElements = [...elements];
+    nextElements[index] = nextElement;
+    return nextElements;
+  }
+
+  private syncFlowChildOrderAcrossFrames(
+    sourceParentId: string,
+    targetParentId: string,
+    sourceElements: CanvasElement[],
+    targetElements: CanvasElement[],
+  ): CanvasElement[] {
+    const sourceParent = this.el.findElementById(sourceParentId, sourceElements);
+    const targetParent = this.el.findElementById(targetParentId, targetElements);
+    if (!sourceParent || !targetParent || !this.isLayoutContainer(sourceParent)) {
+      return targetElements;
+    }
+
+    const sourceFlowChildren = sourceElements.filter(
+      (element) =>
+        element.parentId === sourceParentId &&
+        !element.primarySyncId &&
+        this.isChildInFlow(element),
+    );
+    if (sourceFlowChildren.length <= 1) {
+      return targetElements;
+    }
+
+    const sourceOrder = new Map(
+      sourceFlowChildren.map((element, index) => [element.id, index] as const),
+    );
+    const targetIndices: number[] = [];
+    const targetFlowChildren: CanvasElement[] = [];
+
+    targetElements.forEach((element, index) => {
+      if (
+        element.parentId === targetParentId &&
+        !!element.primarySyncId &&
+        sourceOrder.has(element.primarySyncId) &&
+        this.isChildInFlow(element)
+      ) {
+        targetIndices.push(index);
+        targetFlowChildren.push(element);
+      }
+    });
+
+    if (targetFlowChildren.length <= 1) {
+      return targetElements;
+    }
+
+    const sortedChildren = [...targetFlowChildren].sort(
+      (left, right) =>
+        (sourceOrder.get(left.primarySyncId ?? '') ?? Number.MAX_SAFE_INTEGER) -
+        (sourceOrder.get(right.primarySyncId ?? '') ?? Number.MAX_SAFE_INTEGER),
+    );
+
+    const changed = sortedChildren.some(
+      (element, index) => element.id !== targetFlowChildren[index].id,
+    );
+    if (!changed) {
+      return targetElements;
+    }
+
+    const nextElements = [...targetElements];
+    targetIndices.forEach((elementIndex, index) => {
+      nextElements[elementIndex] = sortedChildren[index];
+    });
+
+    return nextElements;
+  }
+
+  private scaleAxisValue(value: number | undefined, scale: number): number | undefined {
+    if (typeof value !== 'number') {
+      return value;
+    }
+
+    return roundToTwoDecimals(value * scale);
+  }
+
+  private getSyncedAxisSize(
+    value: number,
+    mode: CanvasElement['widthMode'] | CanvasElement['heightMode'] | undefined,
+    scale: number,
+  ): number {
+    if ((mode ?? 'fixed') === 'fixed') {
+      return roundToTwoDecimals(value);
+    }
+
+    return roundToTwoDecimals(value * scale);
+  }
+
+  private scaleScalarValue(value: number | undefined, scale: number): number | undefined {
+    if (typeof value !== 'number') {
+      return value;
+    }
+
+    return roundToTwoDecimals(value * scale);
+  }
+
+  private scaleSpacing(
+    spacing: CanvasElement['padding'] | CanvasElement['margin'],
+    scaleX: number,
+    scaleY: number,
+  ): CanvasElement['padding'] | CanvasElement['margin'] {
+    if (!spacing) {
+      return spacing;
+    }
+
+    return {
+      top: roundToTwoDecimals(spacing.top * scaleY),
+      right: roundToTwoDecimals(spacing.right * scaleX),
+      bottom: roundToTwoDecimals(spacing.bottom * scaleY),
+      left: roundToTwoDecimals(spacing.left * scaleX),
+    };
+  }
+
+  private scaleCornerRadii(
+    radii: CanvasElement['cornerRadii'],
+    scale: number,
+  ): CanvasElement['cornerRadii'] {
+    if (!radii) {
+      return radii;
+    }
+
+    return {
+      topLeft: roundToTwoDecimals(radii.topLeft * scale),
+      topRight: roundToTwoDecimals(radii.topRight * scale),
+      bottomRight: roundToTwoDecimals(radii.bottomRight * scale),
+      bottomLeft: roundToTwoDecimals(radii.bottomLeft * scale),
+    };
+  }
+
+  private removeSyncedCopiesForSourceSubtree(
+    sourceRootId: string,
+    elements: CanvasElement[],
+    sourceElements: CanvasElement[] = elements,
+  ): CanvasElement[] {
+    const sourceRoot = sourceElements.find((element) => element.id === sourceRootId);
+    if (!sourceRoot || sourceRoot.primarySyncId) {
+      return elements;
+    }
+
+    const sourceSubtreeIds = new Set(collectSubtreeIds(sourceElements, sourceRootId));
+    return elements.filter(
+      (element) => !element.primarySyncId || !sourceSubtreeIds.has(element.primarySyncId),
+    );
   }
 
   private breakSyncOnParentChange(
@@ -4209,19 +4815,46 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if (currentParentId === prevParentId) return elements;
 
     const primaryFrame = this.getPrimaryFrame(elements);
+    const currentSubtreeIds = new Set(collectSubtreeIds(elements, elementId));
 
     // Synced copy was moved out of its parent frame → clear its own sync link
     if (current.primarySyncId) {
-      return elements.map((e) => (e.id === elementId ? { ...e, primarySyncId: undefined } : e));
+      return elements.map((element) =>
+        currentSubtreeIds.has(element.id) ? { ...element, primarySyncId: undefined } : element,
+      );
     }
 
-    // Primary element moved out of primary frame → break all synced copies
-    if (primaryFrame && prevParentId === primaryFrame.id && currentParentId !== primaryFrame.id) {
-      return elements.map((e) =>
-        e.primarySyncId === elementId ? { ...e, primarySyncId: undefined } : e,
+    const wasInPrimaryScope =
+      !!primaryFrame && this.isParentWithinPrimaryScope(prevParentId, elements, primaryFrame.id);
+    const isInPrimaryScope =
+      !!primaryFrame && this.isParentWithinPrimaryScope(currentParentId, elements, primaryFrame.id);
+
+    // Primary source left the primary sync scope → break sync for the whole mirrored subtree.
+    if (wasInPrimaryScope && !isInPrimaryScope) {
+      return elements.map((element) =>
+        element.primarySyncId && currentSubtreeIds.has(element.primarySyncId)
+          ? { ...element, primarySyncId: undefined }
+          : element,
       );
     }
 
     return elements;
+  }
+
+  private isParentWithinPrimaryScope(
+    parentId: string | null,
+    elements: CanvasElement[],
+    primaryFrameId: string,
+  ): boolean {
+    if (!parentId) {
+      return false;
+    }
+
+    if (parentId === primaryFrameId) {
+      return true;
+    }
+
+    const parent = this.el.findElementById(parentId, elements);
+    return !!parent && this.isElementWithinPrimaryFrame(parent, elements, primaryFrameId);
   }
 }

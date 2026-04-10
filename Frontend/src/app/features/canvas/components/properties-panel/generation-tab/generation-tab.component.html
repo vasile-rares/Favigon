@@ -50,58 +50,47 @@
     <div class="generation-card__header">
       <div>
         <p class="generation-kicker">Output</p>
-        <h4 class="generation-subtitle">Code preview</h4>
+        <h4 class="generation-subtitle">{{ generatedFiles.length }} files</h4>
       </div>
 
       <div class="generation-copy-actions">
-        <button type="button" class="generation-copy-button" (click)="copyCurrentOutput()">
-          {{ getCopyCurrentButtonLabel() }}
+        <button type="button" class="generation-copy-button" (click)="copy('current')">
+          {{ getCopyButtonLabel('current') }}
         </button>
         <button
           type="button"
           class="generation-copy-button"
-          [disabled]="!canExportFiles()"
-          (click)="exportCurrentOutput()">
-          {{ getExportCurrentButtonLabel() }}
+          (click)="exportCurrentFile()">
+          Save file
         </button>
         <button
-          *ngIf="hasMultipleExportFiles()"
           type="button"
           class="generation-copy-button generation-copy-button--accent"
-          (click)="exportAllOutputs()">
-          {{ getExportAllButtonLabel() }}
+          (click)="exportAsZip()">
+          Save as ZIP
         </button>
       </div>
     </div>
 
-    <div class="generation-output-tabs">
+    <div class="generation-file-tree">
       <button
-        *ngIf="hasGeneratedHtml()"
+        *ngFor="let file of generatedFiles; let i = index"
         type="button"
-        class="generation-output-tab"
-        [class.generation-output-tab--active]="isOutputTabActive('html')"
-        (click)="selectOutputTab('html')">
-        <span>{{ getMarkupOutputLabel() }}</span>
-        <small>{{ lineCount(generatedHtml) }}L</small>
-      </button>
-
-      <button
-        *ngIf="hasGeneratedCss()"
-        type="button"
-        class="generation-output-tab"
-        [class.generation-output-tab--active]="isOutputTabActive('css')"
-        (click)="selectOutputTab('css')">
-        <span>CSS</span>
-        <small>{{ lineCount(generatedCss) }}L</small>
+        class="generation-file-item"
+        [class.generation-file-item--active]="activeFileIndex === i"
+        (click)="selectFile(i)">
+        <span class="generation-file-icon" [attr.data-type]="getFileIcon(file.path)"></span>
+        <span class="generation-file-path">{{ file.path }}</span>
+        <small class="generation-file-lines">{{ lineCount(file.content) }}L</small>
       </button>
     </div>
 
     <div class="generation-code-shell">
       <div class="generation-code-shell__meta">
-        <span>{{ getCurrentFileName() }}</span>
-        <span>{{ lineCount(getCurrentOutputCode()) }} lines</span>
+        <span>{{ getActiveFilePath() }}</span>
+        <span>{{ lineCount(getActiveFileContent()) }} lines</span>
       </div>
-      <pre class="generation-code"><code class="generation-code__content" [innerHTML]="getCurrentHighlightedOutput()"></code></pre>
+      <pre class="generation-code"><code class="generation-code__content" [innerHTML]="highlightedCode"></code></pre>
     </div>
   </section>
 
@@ -113,7 +102,7 @@
           <rect x="3" y="3" width="16" height="16" rx="3" stroke="currentColor" stroke-width="1.4" />
         </svg>
       </div>
-      <p>Generate once to preview HTML and CSS here.</p>
+      <p>Generate once to preview code files here.</p>
     </section>
   </ng-template>
 

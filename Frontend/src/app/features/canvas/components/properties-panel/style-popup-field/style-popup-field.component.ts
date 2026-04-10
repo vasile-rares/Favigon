@@ -165,7 +165,7 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
   }
 
   get showClearButton(): boolean {
-    return this.kind === 'fill' || this.hasValue;
+    return this.hasValue;
   }
 
   get clearButtonTitle(): string {

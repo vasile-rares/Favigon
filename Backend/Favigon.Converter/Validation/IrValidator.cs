@@ -10,8 +10,7 @@ public static class IrValidator
       "Frame", "Container", "Text", "Image"
   ];
 
-  private static readonly HashSet<string> ValidOverflow = ["clip", "visible"];
-  private static readonly HashSet<string> ValidShadowPresets = ["none", "sm", "md", "lg", "xl"];
+
   private static readonly HashSet<string> ValidBreakpoints = ["xs", "sm", "md", "lg", "xl", "2xl"];
   private static readonly HashSet<int> ValidFontWeights = [100, 200, 300, 400, 500, 600, 700, 800, 900];
   private static readonly HashSet<string> ValidUnits = ["px", "%", "rem", "em", "vw", "vh"];
@@ -20,10 +19,6 @@ public static class IrValidator
       @"^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})" +
       @"|rgb\(.+\)|rgba\(.+\)|hsl\(.+\)|hsla\(.+\)|var\(--[a-zA-Z0-9_-]+\)|[a-zA-Z]+)$",
       RegexOptions.Compiled);
-
-  private static readonly Regex CssBoxShadow = new(
-    @"^(?:inset\s+)?-?(?:\d+|\d*\.\d+)px\s+-?(?:\d+|\d*\.\d+)px\s+(?:\d+|\d*\.\d+)px\s+-?(?:\d+|\d*\.\d+)px\s+(?:#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})|rgb\(.+\)|rgba\(.+\)|hsl\(.+\)|hsla\(.+\)|var\(--[a-zA-Z0-9_-]+\)|[a-zA-Z]+)$",
-    RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
   public static bool Validate(IRNode node) => GetValidationErrors(node).Count == 0;
 
@@ -100,11 +95,9 @@ public static class IrValidator
     if (style.FontWeight is not null && !ValidFontWeights.Contains(style.FontWeight.Value))
       errors.Add(Error(path, "fontWeight", $"Invalid fontWeight '{style.FontWeight}'. Must be 100–900 in steps of 100."));
 
-    if (style.Shadow is not null && !IsValidShadow(style.Shadow))
-      errors.Add(Error(path, "shadow", $"Invalid shadow '{style.Shadow}'. Must be: none | sm | md | lg | xl or a single CSS box-shadow value."));
-
-    if (style.Overflow is not null && !ValidOverflow.Contains(style.Overflow))
-      errors.Add(Error(path, "overflow", $"Invalid overflow '{style.Overflow}'. Must be: clip | visible."));
+    if (style.Shadows is not null)
+      for (int i = 0; i < style.Shadows.Count; i++)
+        ValidateShadow(style.Shadows[i], $"{path}.shadows[{i}]", errors);
 
     if (style.Opacity is not null && (style.Opacity < 0 || style.Opacity > 1))
       errors.Add(Error(path, "opacity", "Opacity must be between 0 and 1."));
@@ -128,10 +121,11 @@ public static class IrValidator
     ValidateColor(border.Color, path, "color", errors);
   }
 
-  private static bool IsValidShadow(string shadow)
+  private static void ValidateShadow(IRShadow shadow, string path, List<string> errors)
   {
-    var normalized = shadow.Trim();
-    return ValidShadowPresets.Contains(normalized) || CssBoxShadow.IsMatch(normalized);
+    if (shadow.Blur < 0)
+      errors.Add(Error(path, "blur", "Shadow blur must be >= 0."));
+    ValidateColor(shadow.Color, path, "color", errors);
   }
 
   private static void ValidateSpacing(IRSpacing spacing, string path, List<string> errors)

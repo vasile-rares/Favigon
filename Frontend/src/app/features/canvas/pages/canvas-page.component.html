@@ -1,4 +1,4 @@
-<div class="canvas-layout">
+<div class="canvas-layout" [style.--canvas-side-panel-width.px]="projectPanelWidth()">
   <app-header-bar class="canvas-header" appearance="canvas"></app-header-bar>
 
   <div class="workspace">
@@ -11,6 +11,7 @@
       [elements]="elements()"
       [selectedElementId]="selectedElementId()"
       [selectedElementIds]="selectedElementIds()"
+      (panelWidthChanged)="onProjectPanelWidthChanged($event)"
       (pageSelected)="page.selectPage($event)"
       (pageLayerSelected)="page.selectPageWithoutFocus($event)"
       (pageCreateRequested)="page.addPage()"
@@ -102,6 +103,7 @@
       [isGenerating]="gen.isGenerating()"
       [generatedHtml]="gen.generatedHtml()"
       [generatedCss]="gen.generatedCss()"
+      [generatedFiles]="gen.generatedFiles()"
       [irPreview]="irPreview()"
       (frameworkChanged)="setFramework($event)"
       (validateRequested)="validateIR()"

@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { CanvasElement, CanvasPageModel, CanvasPageViewportPreset } from '@app/core';
 import type { ContextMenuItem, DialogBoxField } from '@app/shared';
 import { roundToTwoDecimals, clamp } from '../utils/canvas-math.util';
+import { mutateNormalizeElement } from '../utils/canvas-interaction.util';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from './canvas-viewport.constants';
 import { getFrameTitle } from '../utils/canvas-text.util';
 import { DeviceFramePreset, PageCanvasLayout, VIEWPORT_PRESET_OPTIONS } from '../canvas.types';
@@ -842,27 +843,7 @@ export class CanvasPageService {
       }
 
       this.editorState.updatePageElements(pageId, (elements) => {
-        const primaryFrame = this.getPrimaryFrame(elements);
-        const primaryChildren = primaryFrame
-          ? elements.filter((el) => el.parentId === primaryFrame.id)
-          : [];
-        const copies = primaryChildren.map((child) => ({
-          ...child,
-          id: crypto.randomUUID(),
-          parentId: frame.id,
-          primarySyncId: child.primarySyncId ?? child.id,
-          x:
-            primaryFrame!.width > 0
-              ? roundToTwoDecimals((child.x / primaryFrame!.width) * normalizedWidth)
-              : child.x,
-          y:
-            primaryFrame!.height > 0
-              ? roundToTwoDecimals((child.y / primaryFrame!.height) * normalizedHeight)
-              : child.y,
-          width: child.width,
-          height: child.height,
-        }));
-        return [...elements, frame, ...copies];
+        return this.populateNewRootFrameFromPrimary(frame, [...elements, frame]);
       });
       if (this.editorState.currentPageId() === pageId) {
         this.editorState.selectedElementId.set(frame.id);
@@ -895,6 +876,215 @@ export class CanvasPageService {
       rootFrames[0] ??
       null
     );
+  }
+
+  private populateNewRootFrameFromPrimary(
+    targetFrame: CanvasElement,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    const primaryFrame = this.getPrimaryFrame(elements);
+    if (!primaryFrame || primaryFrame.id === targetFrame.id) {
+      return elements;
+    }
+
+    let nextElements = this.syncRootFrameFromPrimary(primaryFrame, targetFrame, elements);
+    const nextTargetFrame =
+      nextElements.find((element) => element.id === targetFrame.id) ?? targetFrame;
+    const createdBySourceId = new Map<string, CanvasElement>();
+    const sourceElements = elements
+      .filter(
+        (element) =>
+          !element.primarySyncId &&
+          this.isElementWithinPrimaryFrame(element, elements, primaryFrame.id),
+      )
+      .sort(
+        (left, right) =>
+          this.getElementNestingDepth(left, elements) -
+          this.getElementNestingDepth(right, elements),
+      );
+
+    for (const sourceElement of sourceElements) {
+      if (!sourceElement.parentId) {
+        continue;
+      }
+
+      const sourceParent = this.el.findElementById(sourceElement.parentId, elements);
+      if (!sourceParent) {
+        continue;
+      }
+
+      const targetParent =
+        sourceElement.parentId === primaryFrame.id
+          ? nextTargetFrame
+          : (createdBySourceId.get(sourceElement.parentId) ?? null);
+      if (!targetParent) {
+        continue;
+      }
+
+      const syncedElement = this.buildSyncedElementFromSource(
+        sourceElement,
+        sourceParent,
+        targetParent,
+        nextElements,
+      );
+
+      nextElements = [...nextElements, syncedElement];
+      createdBySourceId.set(sourceElement.id, syncedElement);
+    }
+
+    return nextElements;
+  }
+
+  private syncRootFrameFromPrimary(
+    primaryFrame: CanvasElement,
+    targetFrame: CanvasElement,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    const syncedFrame: CanvasElement = {
+      ...primaryFrame,
+      id: targetFrame.id,
+      name: targetFrame.name,
+      x: targetFrame.x,
+      y: targetFrame.y,
+      width: targetFrame.width,
+      height: targetFrame.height,
+      parentId: null,
+      isPrimary: false,
+      primarySyncId: undefined,
+    };
+
+    return elements.map((element) => (element.id === targetFrame.id ? syncedFrame : element));
+  }
+
+  private buildSyncedElementFromSource(
+    sourceElement: CanvasElement,
+    sourceParent: CanvasElement,
+    targetParent: CanvasElement,
+    elements: CanvasElement[],
+  ): CanvasElement {
+    const scaleX = sourceParent.width > 0 ? targetParent.width / sourceParent.width : 1;
+    const scaleY = sourceParent.height > 0 ? targetParent.height / sourceParent.height : 1;
+    const shouldScalePosition =
+      !this.isLayoutContainer(targetParent) || !this.isChildInFlow(sourceElement);
+    const syncedElement: CanvasElement = {
+      ...sourceElement,
+      id: crypto.randomUUID(),
+      parentId: targetParent.id,
+      primarySyncId: sourceElement.id,
+      isPrimary: false,
+      x: shouldScalePosition ? roundToTwoDecimals(sourceElement.x * scaleX) : 0,
+      y: shouldScalePosition ? roundToTwoDecimals(sourceElement.y * scaleY) : 0,
+      width: this.getSyncedAxisSize(sourceElement.width, sourceElement.widthMode, scaleX),
+      height: this.getSyncedAxisSize(sourceElement.height, sourceElement.heightMode, scaleY),
+    };
+
+    mutateNormalizeElement(syncedElement, elements);
+    return syncedElement;
+  }
+
+  private isLayoutContainer(element: CanvasElement): boolean {
+    return !!element.display && (element.type === 'frame' || element.type === 'rectangle');
+  }
+
+  private isChildInFlow(element: CanvasElement): boolean {
+    const position = element.position;
+    return !position || position === 'static' || position === 'relative' || position === 'sticky';
+  }
+
+  private isElementWithinPrimaryFrame(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    primaryFrameId: string,
+  ): boolean {
+    let parentId = element.parentId ?? null;
+
+    while (parentId) {
+      if (parentId === primaryFrameId) {
+        return true;
+      }
+
+      parentId = this.el.findElementById(parentId, elements)?.parentId ?? null;
+    }
+
+    return false;
+  }
+
+  private getElementNestingDepth(element: CanvasElement, elements: CanvasElement[]): number {
+    let depth = 0;
+    let parentId = element.parentId ?? null;
+
+    while (parentId) {
+      const parent = this.el.findElementById(parentId, elements);
+      if (!parent) {
+        break;
+      }
+
+      depth += 1;
+      parentId = parent.parentId ?? null;
+    }
+
+    return depth;
+  }
+
+  private scaleAxisValue(value: number | undefined, scale: number): number | undefined {
+    if (typeof value !== 'number') {
+      return value;
+    }
+
+    return roundToTwoDecimals(value * scale);
+  }
+
+  private getSyncedAxisSize(
+    value: number,
+    mode: CanvasElement['widthMode'] | CanvasElement['heightMode'] | undefined,
+    scale: number,
+  ): number {
+    if ((mode ?? 'fixed') === 'fixed') {
+      return roundToTwoDecimals(value);
+    }
+
+    return roundToTwoDecimals(value * scale);
+  }
+
+  private scaleScalarValue(value: number | undefined, scale: number): number | undefined {
+    if (typeof value !== 'number') {
+      return value;
+    }
+
+    return roundToTwoDecimals(value * scale);
+  }
+
+  private scaleSpacing(
+    spacing: CanvasElement['padding'] | CanvasElement['margin'],
+    scaleX: number,
+    scaleY: number,
+  ): CanvasElement['padding'] | CanvasElement['margin'] {
+    if (!spacing) {
+      return spacing;
+    }
+
+    return {
+      top: roundToTwoDecimals(spacing.top * scaleY),
+      right: roundToTwoDecimals(spacing.right * scaleX),
+      bottom: roundToTwoDecimals(spacing.bottom * scaleY),
+      left: roundToTwoDecimals(spacing.left * scaleX),
+    };
+  }
+
+  private scaleCornerRadii(
+    radii: CanvasElement['cornerRadii'],
+    scale: number,
+  ): CanvasElement['cornerRadii'] {
+    if (!radii) {
+      return radii;
+    }
+
+    return {
+      topLeft: roundToTwoDecimals(radii.topLeft * scale),
+      topRight: roundToTwoDecimals(radii.topRight * scale),
+      bottomRight: roundToTwoDecimals(radii.bottomRight * scale),
+      bottomLeft: roundToTwoDecimals(radii.bottomLeft * scale),
+    };
   }
 
   /** Used internally by applyPageSelection — requires canvas DOM reference. */

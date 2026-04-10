@@ -1,6 +1,5 @@
 ﻿using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Favigon.Converter.Abstractions;
 using Favigon.Converter.Models;
 using Favigon.Converter.Transformers;
@@ -10,6 +9,8 @@ namespace Favigon.Converter.Generators;
 
 public abstract class FrameworkMapperBase : IComponentMapper
 {
+  private static readonly AsyncLocal<EmitContext?> CurrentContext = new();
+
   public abstract string Type { get; }
 
   protected abstract string ClassAttributeName { get; }
@@ -18,34 +19,38 @@ public abstract class FrameworkMapperBase : IComponentMapper
 
   public string Emit(IRNode node, EmitContext ctx)
   {
-    var cssClass = Slugify(node);
+    var cssClasses = ctx.GetCssClasses(node);
     var cssProps = StyleTransformer.MergeToProperties(node.Layout, node.Style, node.Position);
     if (node.Meta.Hidden)
       cssProps["display"] = "none";
-    ctx.Styles.AddBase(cssClass, cssProps);
-    ctx.Styles.AddVariants(cssClass, node.Variants);
+    ctx.Styles.AddBase(cssClasses.TargetClass, cssProps);
+    ctx.Styles.AddVariants(cssClasses.TargetClass, node.Variants);
 
     var sb = new StringBuilder();
-    sb.Append(OpenNodeComment(node, ctx));
-    sb.Append(EmitElement(node, ctx));
-    sb.Append(CloseNodeComment(node, ctx));
+    var previousContext = CurrentContext.Value;
+
+    try
+    {
+      CurrentContext.Value = ctx;
+      sb.Append(OpenNodeComment(node, ctx));
+      sb.Append(EmitElement(node, ctx));
+      sb.Append(CloseNodeComment(node, ctx));
+    }
+    finally
+    {
+      CurrentContext.Value = previousContext;
+    }
 
     return sb.ToString();
   }
 
   protected abstract string EmitElement(IRNode node, EmitContext ctx);
 
-  protected string NodeClass(IRNode node) => $" {ClassAttributeName}=\"{Slugify(node)}\"";
-
-  private static string Slugify(IRNode node)
+  protected string NodeClass(IRNode node)
   {
-    if (!string.IsNullOrWhiteSpace(node.Meta.Name))
-    {
-      var slug = Regex.Replace(node.Meta.Name.Trim().ToLowerInvariant(), @"[^a-z0-9]+", "-").Trim('-');
-      if (slug.Length > 0) return slug;
-    }
-
-    return $"{node.Type.ToLowerInvariant()}-{node.Id}";
+    var context = CurrentContext.Value ?? throw new InvalidOperationException("Emit context is not available.");
+    var cssClasses = node is null ? throw new ArgumentNullException(nameof(node)) : context.GetCssClasses(node);
+    return $" {ClassAttributeName}=\"{cssClasses.MarkupClasses}\"";
   }
 
   protected static string EmitChildren(IRNode node, EmitContext ctx)

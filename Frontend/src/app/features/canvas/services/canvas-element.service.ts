@@ -85,6 +85,16 @@ export class CanvasElementService {
     }
 
     if (tool !== 'frame' && selectedContainer && containerBounds) {
+      const containerWidth = this.getContainerChildPlacementSize(
+        selectedContainer,
+        elements,
+        'width',
+      );
+      const containerHeight = this.getContainerChildPlacementSize(
+        selectedContainer,
+        elements,
+        'height',
+      );
       if (
         !(
           pointer.x >= containerBounds.x &&
@@ -99,15 +109,11 @@ export class CanvasElementService {
         };
       }
 
-      x = clamp(
-        pointer.x - containerBounds.x - defaultWidth / 2,
-        0,
-        selectedContainer.width - defaultWidth,
-      );
+      x = clamp(pointer.x - containerBounds.x - defaultWidth / 2, 0, containerWidth - defaultWidth);
       y = clamp(
         pointer.y - containerBounds.y - defaultHeight / 2,
         0,
-        selectedContainer.height - defaultHeight,
+        containerHeight - defaultHeight,
       );
       parentId = selectedContainer.id;
     }
@@ -158,8 +164,7 @@ export class CanvasElementService {
   ): { width: number; height: number } {
     return {
       width: tool === 'frame' ? frameTemplateSize.width : DEFAULT_ELEMENT_DIMENSIONS[tool].width,
-      height:
-        tool === 'frame' ? frameTemplateSize.height : DEFAULT_ELEMENT_DIMENSIONS[tool].height,
+      height: tool === 'frame' ? frameTemplateSize.height : DEFAULT_ELEMENT_DIMENSIONS[tool].height,
     };
   }
 
@@ -196,9 +201,15 @@ export class CanvasElementService {
     selectedContainer: CanvasElement | null,
     containerBounds: Bounds | null,
   ): { element: CanvasElement | null; error: string | null } {
-    const maxWidth = selectedContainer ? Math.max(selectedContainer.width, MIN_ELEMENT_SIZE) : null;
+    const placementWidth = selectedContainer
+      ? this.getContainerChildPlacementSize(selectedContainer, elements, 'width')
+      : null;
+    const placementHeight = selectedContainer
+      ? this.getContainerChildPlacementSize(selectedContainer, elements, 'height')
+      : null;
+    const maxWidth = placementWidth != null ? Math.max(placementWidth, MIN_ELEMENT_SIZE) : null;
     const maxHeight = selectedContainer
-      ? Math.max(selectedContainer.height, MIN_ELEMENT_SIZE)
+      ? Math.max(placementHeight ?? MIN_ELEMENT_SIZE, MIN_ELEMENT_SIZE)
       : null;
     const width = roundToTwoDecimals(
       maxWidth == null
@@ -231,8 +242,8 @@ export class CanvasElementService {
     let y = roundToTwoDecimals(bounds.y);
 
     if (selectedContainer && containerBounds) {
-      x = clamp(bounds.x - containerBounds.x, 0, Math.max(0, selectedContainer.width - width));
-      y = clamp(bounds.y - containerBounds.y, 0, Math.max(0, selectedContainer.height - height));
+      x = clamp(bounds.x - containerBounds.x, 0, Math.max(0, (placementWidth ?? 0) - width));
+      y = clamp(bounds.y - containerBounds.y, 0, Math.max(0, (placementHeight ?? 0) - height));
     }
 
     return {
@@ -293,7 +304,7 @@ export class CanvasElementService {
     elements: CanvasElement[],
     page?: CanvasPageModel | null,
   ): number {
-    return this.getRenderedSizePx(element, elements, 'width', page);
+    return this.getRenderedBoxSizePx(element, elements, 'width', page);
   }
 
   getRenderedHeight(
@@ -301,7 +312,7 @@ export class CanvasElementService {
     elements: CanvasElement[],
     page?: CanvasPageModel | null,
   ): number {
-    return this.getRenderedSizePx(element, elements, 'height', page);
+    return this.getRenderedBoxSizePx(element, elements, 'height', page);
   }
 
   getRenderedWidthStyle(
@@ -358,8 +369,8 @@ export class CanvasElementService {
     page?: CanvasPageModel | null,
   ): Bounds {
     const parent = this.findElementById(element.parentId ?? null, elements);
-    const width = this.getRenderedSizePx(element, elements, 'width', page);
-    const height = this.getRenderedSizePx(element, elements, 'height', page);
+    const width = this.getRenderedBoxSizePx(element, elements, 'width', page);
+    const height = this.getRenderedBoxSizePx(element, elements, 'height', page);
 
     if (!parent || element.type === 'frame') {
       return {
@@ -379,7 +390,17 @@ export class CanvasElementService {
     };
   }
 
-  private getRenderedSizePx(
+  private getRenderedBoxSizePx(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    axis: CanvasSizeAxis,
+    page?: CanvasPageModel | null,
+  ): number {
+    const contentSize = this.getResolvedContentSizePx(element, elements, axis, page);
+    return roundToTwoDecimals(contentSize + this.getPaddingAxisTotal(element, axis));
+  }
+
+  private getResolvedContentSizePx(
     element: CanvasElement,
     elements: CanvasElement[],
     axis: CanvasSizeAxis,
@@ -390,7 +411,7 @@ export class CanvasElementService {
     let resolvedPixels = fallbackPixels;
 
     const parent = this.findElementById(element.parentId ?? null, elements);
-    const parentBounds = parent ? this.getAbsoluteBounds(parent, elements, page) : null;
+    const parentSizeRef = this.getParentSizeReferenceForChild(element, parent, elements, page);
 
     if (element.type === 'text' && mode === 'fit-content') {
       const widthConstraint = this.getTextMeasurementWidthConstraint(element, elements, page);
@@ -405,7 +426,7 @@ export class CanvasElementService {
           fallbackPixels,
           axis,
           getCanvasSizingValue(element, axis),
-          parentBounds ? { width: parentBounds.width, height: parentBounds.height } : null,
+          parentSizeRef,
           page,
         );
       }
@@ -452,7 +473,7 @@ export class CanvasElementService {
   ): number | undefined {
     const widthMode = getCanvasSizeMode(element, 'width');
     if (widthMode !== 'fit-content') {
-      return this.getRenderedSizePx(element, elements, 'width', page);
+      return this.getResolvedContentSizePx(element, elements, 'width', page);
     }
 
     let minWidth = this.getRenderedConstraintPx(element, elements, 'minWidth', page);
@@ -522,7 +543,7 @@ export class CanvasElementService {
   ): string {
     return getCanvasSizeMode(element, axis) === 'fit-content'
       ? 'fit-content'
-      : `${this.getRenderedSizePx(element, elements, axis, page)}px`;
+      : `${this.getResolvedContentSizePx(element, elements, axis, page)}px`;
   }
 
   private getRenderedConstraintPx(
@@ -537,7 +558,7 @@ export class CanvasElementService {
     }
 
     const parent = this.findElementById(element.parentId ?? null, elements);
-    const parentBounds = parent ? this.getAbsoluteBounds(parent, elements, page) : null;
+    const parentSizeRef = this.getParentSizeReferenceForChild(element, parent, elements, page);
     const axis = getCanvasConstraintAxis(field);
 
     return roundToTwoDecimals(
@@ -546,9 +567,54 @@ export class CanvasElementService {
         fallbackPixels as number,
         axis,
         getCanvasConstraintSizingValue(element, field),
-        parentBounds ? { width: parentBounds.width, height: parentBounds.height } : null,
+        parentSizeRef,
       ),
     );
+  }
+
+  private getParentSizeReferenceForChild(
+    element: CanvasElement,
+    parent: CanvasElement | null,
+    elements: CanvasElement[],
+    page?: CanvasPageModel | null,
+  ): { width: number; height: number; padding?: CanvasElement['padding'] } | null {
+    if (!parent) {
+      return null;
+    }
+
+    const width = this.getRenderedWidth(parent, elements, page);
+    const height = this.getRenderedHeight(parent, elements, page);
+
+    if (this.isLayoutContainerElement(parent) && isFlowLayoutChild(element)) {
+      return { width, height, padding: parent.padding };
+    }
+
+    return { width, height };
+  }
+
+  private getContainerChildPlacementSize(
+    container: CanvasElement,
+    elements: CanvasElement[],
+    axis: CanvasSizeAxis,
+    page?: CanvasPageModel | null,
+  ): number {
+    return axis === 'width'
+      ? this.getRenderedWidth(container, elements, page)
+      : this.getRenderedHeight(container, elements, page);
+  }
+
+  private getPaddingAxisTotal(
+    element: Pick<CanvasElement, 'padding'>,
+    axis: CanvasSizeAxis,
+  ): number {
+    const padding = element.padding;
+    if (!padding) {
+      return 0;
+    }
+
+    return axis === 'width'
+      ? (padding.left ?? 0) + (padding.right ?? 0)
+      : (padding.top ?? 0) + (padding.bottom ?? 0);
   }
 
   private getRenderedConstraintStyle(
@@ -691,15 +757,17 @@ export class CanvasElementService {
     draggedRoot.position = this.getDefaultPositionForPlacement(draggedRoot.type, nextParent);
     if (nextParent) {
       const parentBounds = this.getAbsoluteBounds(nextParent, remaining);
+      const nextParentWidth = this.getContainerChildPlacementSize(nextParent, remaining, 'width');
+      const nextParentHeight = this.getContainerChildPlacementSize(nextParent, remaining, 'height');
       draggedRoot.x = clamp(
         draggedBounds.x - parentBounds.x,
         0,
-        nextParent.width - draggedRoot.width,
+        nextParentWidth - draggedRoot.width,
       );
       draggedRoot.y = clamp(
         draggedBounds.y - parentBounds.y,
         0,
-        nextParent.height - draggedRoot.height,
+        nextParentHeight - draggedRoot.height,
       );
     } else {
       draggedRoot.x = roundToTwoDecimals(draggedBounds.x);
@@ -831,4 +899,9 @@ export class CanvasElementService {
     // so CSS top/right = radius - handleRadius. Clamped for small elements.
     return roundToTwoDecimals(clamp(radius - handleRadius, 0, maxInset));
   }
+}
+
+function isFlowLayoutChild(element: Pick<CanvasElement, 'position'>): boolean {
+  const position = element.position;
+  return !position || position === 'static' || position === 'relative' || position === 'sticky';
 }

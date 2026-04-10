@@ -23,8 +23,11 @@
   IRMeta,
   IRNode,
   IRPosition,
+  IRShadow,
   IRSpacing,
   IRStyle,
+  IRNodeType,
+  OverflowMode,
   JustifyContent,
   LayoutMode,
   length,
@@ -50,7 +53,11 @@ import {
   getCanvasSizeMode,
   getCanvasSizingValue,
 } from '../utils/canvas-sizing.util';
-import { normalizeCanvasShadowValue } from '../utils/canvas-shadow.util';
+import {
+  buildCanvasShadowCss,
+  resolveEditableCanvasShadow,
+  normalizeCanvasShadowValue,
+} from '../utils/canvas-shadow.util';
 
 const ROOT_ROLE = 'canvas-root';
 const ROOT_TYPE = 'Container';
@@ -59,7 +66,6 @@ const MANAGED_PROP_KEYS = [
   'content',
   'src',
   'name',
-  'overflow',
   'textVerticalAlign',
   'fontStyle',
   'primitive',
@@ -162,21 +168,32 @@ function syncBreakpointElements(
     primaryById.set(el.id, el);
   }
 
+  // Build a complete ID remap (mobile element ID → primary element ID) so that
+  // parentId references are remapped consistently for the entire subtree, not
+  // just direct children of the frame root.
+  const idRemap = new Map<string, string>();
+  idRemap.set(breakpointFrameId, primaryFrame.id);
+  for (const el of breakpointElements) {
+    if (el.primarySyncId) {
+      idRemap.set(el.id, el.primarySyncId);
+    }
+  }
+
   return breakpointElements.map((el) => {
     if (el.id === breakpointFrameId) {
-      return { ...el, id: primaryFrame.id, name: primaryFrame.name };
+      return { ...primaryFrame, id: primaryFrame.id, parentId: el.parentId };
     }
-    const syncedParentId = el.parentId === breakpointFrameId ? primaryFrame.id : el.parentId;
+    const remappedParentId = el.parentId ? (idRemap.get(el.parentId) ?? el.parentId) : el.parentId;
     if (el.primarySyncId) {
       const primaryEl = primaryById.get(el.primarySyncId);
-      return {
-        ...el,
-        id: el.primarySyncId,
-        name: primaryEl?.name ?? el.name,
-        parentId: syncedParentId,
-      };
+      if (primaryEl) {
+        // Element is an unmodified synced copy — use the primary element's exact
+        // properties so code generation produces no diff for it.
+        return { ...primaryEl, parentId: remappedParentId };
+      }
+      return { ...el, id: el.primarySyncId, parentId: remappedParentId };
     }
-    return { ...el, parentId: syncedParentId };
+    return { ...el, parentId: remappedParentId };
   });
 }
 
@@ -298,8 +315,19 @@ export function buildCanvasElementsFromIR(root: IRNode | null | undefined): Canv
 function createNodeIndex(elements: CanvasElement[]): Map<string, IRNode> {
   const nodesById = new Map<string, IRNode>();
 
+  // Build a fast parent lookup so buildNodePosition can compensate for
+  // parent border width (canvas coords are from the outer edge; CSS
+  // position:absolute is from the padding edge, i.e. inside the border).
+  const parentById = new Map<string, CanvasElement>();
   for (const element of elements) {
-    nodesById.set(element.id, mapCanvasElementToIR(element));
+    if (element.parentId) {
+      const parent = elements.find((e) => e.id === element.parentId);
+      if (parent) parentById.set(element.id, parent);
+    }
+  }
+
+  for (const element of elements) {
+    nodesById.set(element.id, mapCanvasElementToIR(element, parentById.get(element.id)));
   }
 
   return nodesById;
@@ -359,12 +387,12 @@ function createRootNode(
       height: { value: 100, unit: '%' },
     },
     variants: {},
-    meta: { locked: false, hidden: false, selected: false },
+    meta: { hidden: false },
     children,
   };
 }
 
-function mapCanvasElementToIR(element: CanvasElement): IRNode {
+function mapCanvasElementToIR(element: CanvasElement, parent?: CanvasElement): IRNode {
   const primitiveType = mapElementType(element.type);
 
   return {
@@ -373,7 +401,7 @@ function mapCanvasElementToIR(element: CanvasElement): IRNode {
     props: buildNodeProps(element, primitiveType),
     layout: buildNodeLayout(element),
     style: buildNodeStyle(element),
-    position: buildNodePosition(element),
+    position: buildNodePosition(element, parent),
     meta: buildNodeMeta(element),
     variants: {},
     children: [],
@@ -404,25 +432,41 @@ function buildNodeLayout(element: CanvasElement): IRLayout | undefined {
   }
 
   // Text vertical alignment: map onto flex align-items (cross-axis in row layout)
+  // Text horizontal alignment: map onto justify-content for flex context
   if (needsFlexForVA && textVA !== null) {
     layout.align ??= textVA === 'bottom' ? 'End' : 'Center';
+    if (element.textAlign === 'center') layout.justify ??= 'Center';
+    else if (element.textAlign === 'right') layout.justify ??= 'End';
   }
 
   return layout;
 }
 
-function buildNodePosition(element: CanvasElement): IRPosition {
+function buildNodePosition(element: CanvasElement, parent?: CanvasElement): IRPosition {
+  // CSS `position: absolute` offsets from the padding edge (inside the border).
+  // Canvas x/y are from the outer bounding box edge.
+  // Subtract parent border width so positions match visually.
+  const parentBorderWidth: number = parent?.stroke
+    ? typeof parent.strokeWidth === 'number'
+      ? Math.max(0, parent.strokeWidth)
+      : DEFAULT_STROKE_WIDTH
+    : 0;
+
   if (!element.position) {
-    return { mode: 'Absolute', x: px(element.x), y: px(element.y) };
+    return {
+      mode: 'Absolute',
+      left: px(element.x - parentBorderWidth),
+      top: px(element.y - parentBorderWidth),
+    };
   }
   const mode = mapPositionMode(element.position);
   const pos: IRPosition = { mode };
   if (element.position === 'absolute' || element.position === 'fixed') {
-    pos.x = px(element.x);
-    pos.y = px(element.y);
+    pos.left = px(element.x - parentBorderWidth);
+    pos.top = px(element.y - parentBorderWidth);
   }
   if (element.position === 'sticky') {
-    pos.y = px(element.y);
+    pos.top = px(element.y);
   }
   return pos;
 }
@@ -430,9 +474,7 @@ function buildNodePosition(element: CanvasElement): IRPosition {
 function buildNodeMeta(element: CanvasElement): IRMeta {
   return {
     name: element.name || undefined,
-    locked: false,
     hidden: element.visible === false,
-    selected: false,
   };
 }
 
@@ -446,7 +488,11 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
   applyNodeConstraintStyle(style, element, 'maxHeight');
 
   if (element.fill) {
-    style.background = element.fill;
+    if (element.type === 'text') {
+      style.color = element.fill;
+    } else {
+      style.background = element.fill;
+    }
   }
 
   if (element.stroke) {
@@ -468,13 +514,23 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     style.opacity = element.opacity;
   }
 
-  if (element.type === 'frame' && element.overflow) {
-    style.overflow = element.overflow;
+  if (element.type === 'frame') {
+    style.overflow = element.overflow === 'visible' ? 'Visible' : 'Clip';
   }
 
-  const shadow = normalizeCanvasShadowValue(element.shadow);
-  if (shadow) {
-    style.shadow = shadow;
+  const shadowStr = normalizeCanvasShadowValue(element.shadow);
+  if (shadowStr) {
+    const parsed = resolveEditableCanvasShadow(shadowStr);
+    style.shadows = [
+      {
+        inset: parsed.position === 'inside',
+        x: parsed.x,
+        y: parsed.y,
+        blur: parsed.blur,
+        spread: parsed.spread,
+        color: parsed.color,
+      },
+    ];
   }
 
   if (typeof element.cornerRadius === 'number') {
@@ -520,6 +576,8 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
 
   if (element.padding) style.padding = buildIRSpacing(element.padding);
   if (element.margin) style.margin = buildIRSpacing(element.margin);
+
+  if (element.cursor) style.cursor = element.cursor;
 
   const transform = buildCanvasElementTransform(element);
   if (transform) {
@@ -611,10 +669,6 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
     props['src'] = element.imageUrl ?? '';
   }
 
-  if (element.type === 'frame') {
-    props['overflow'] = element.overflow ?? 'clip';
-  }
-
   if (element.irMeta?.type && element.irMeta.type !== primitiveType) {
     props['sourceType'] = element.irMeta.type;
   }
@@ -664,7 +718,7 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
   return props;
 }
 
-function mapElementType(type: CanvasElement['type']): string {
+function mapElementType(type: CanvasElement['type']): IRNodeType {
   switch (type) {
     case 'frame':
       return 'Frame';
@@ -783,8 +837,8 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     id: node.id,
     type: mappedType,
     name: readOptionalStringProp(node.props, 'name'),
-    x: readLength(node.position?.x, DEFAULT_POSITION),
-    y: readLength(node.position?.y, DEFAULT_POSITION),
+    x: readLength(node.position?.left, DEFAULT_POSITION),
+    y: readLength(node.position?.top, DEFAULT_POSITION),
     width:
       importedWidthMode === 'fixed'
         ? readLength(node.style?.width, defaults.width)
@@ -813,7 +867,7 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     fill:
       mappedType !== 'text'
         ? (node.style?.background ?? (mappedType === 'frame' ? DEFAULT_FRAME_FILL : DEFAULT_FILL))
-        : undefined,
+        : (node.style?.color ?? '#000000'),
     stroke: node.style?.border?.color,
     strokeWidth:
       mappedType !== 'text'
@@ -823,11 +877,8 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     opacity: readNumber(node.style?.opacity, DEFAULT_OPACITY),
     cornerRadius,
     cornerRadii,
-    overflow:
-      mappedType === 'frame'
-        ? readOverflow(node.style?.overflow, readOverflowFromProps(node.props, 'clip'))
-        : undefined,
-    shadow: readShadow(node.style?.shadow),
+    overflow: mappedType === 'frame' ? readOverflow(node.style?.overflow, 'clip') : undefined,
+    shadow: readShadow(node.style?.shadows),
     text: mappedType === 'text' ? readStringProp(node.props, 'content', 'New text') : undefined,
     fontSize: mappedType === 'text' ? readLength(node.style?.fontSize, 16) : undefined,
     fontSizeUnit:
@@ -859,6 +910,7 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     linkUrl: readOptionalStringProp(node.props, 'href') ?? undefined,
     tag: normalizeStoredCanvasTag(mappedType, importedTag, linkType !== undefined),
     ariaLabel: normalizeCanvasAccessibilityLabel(importedAriaLabel),
+    cursor: (readOptionalStringStyle(node.style, 'cursor') as CanvasElement['cursor']) ?? undefined,
     ...transformFields,
     irMeta: {
       type: node.type,
@@ -1173,7 +1225,9 @@ function readOverflowFromProps(
 }
 
 function readOverflow(value: unknown, fallback: 'clip' | 'visible'): 'clip' | 'visible' {
-  return value === 'clip' || value === 'visible' ? value : fallback;
+  if (value === 'Clip') return 'clip';
+  if (value === 'Visible') return 'visible';
+  return fallback;
 }
 
 function readStringProp(
@@ -1227,7 +1281,27 @@ function normalizeExternalLinkUrl(value: string | undefined): string | undefined
 }
 
 function readShadow(value: unknown): string | undefined {
-  return normalizeCanvasShadowValue(value);
+  const first = Array.isArray(value) ? value[0] : value;
+  if (
+    first &&
+    typeof first === 'object' &&
+    'x' in first &&
+    'y' in first &&
+    'blur' in first &&
+    'spread' in first &&
+    'color' in first
+  ) {
+    const shadow = first as IRShadow;
+    return buildCanvasShadowCss({
+      position: shadow.inset ? 'inside' : 'outside',
+      x: shadow.x,
+      y: shadow.y,
+      blur: shadow.blur,
+      spread: shadow.spread,
+      color: shadow.color,
+    });
+  }
+  return undefined;
 }
 
 function readNumber(value: unknown, fallback: number): number {

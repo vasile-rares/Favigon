@@ -18,3 +18,14 @@ export interface ConverterResponse {
   html: string;
   css: string;
 }
+
+export interface GeneratedFile {
+  path: string;
+  content: string;
+}
+
+export interface MultiPageConverterResponse {
+  framework: string;
+  isValid: boolean;
+  files: GeneratedFile[];
+}

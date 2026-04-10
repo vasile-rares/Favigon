@@ -2,6 +2,7 @@
   --canvas-edge-gap: 12px;
   --canvas-top-chrome-offset: 12px;
   --canvas-side-panel-width: 280px;
+  --canvas-properties-panel-width: 280px;
   --canvas-header-panel-gap: 16px;
   position: relative;
   display: flex;
@@ -20,7 +21,7 @@
     var(--canvas-edge-gap) + var(--canvas-side-panel-width) + var(--canvas-header-panel-gap)
   );
   right: calc(
-    var(--canvas-edge-gap) + var(--canvas-side-panel-width) + var(--canvas-header-panel-gap)
+    var(--canvas-edge-gap) + var(--canvas-properties-panel-width) + var(--canvas-header-panel-gap)
   );
   z-index: 30;
   pointer-events: none;

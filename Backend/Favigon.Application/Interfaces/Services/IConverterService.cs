@@ -8,5 +8,6 @@ public interface IConverterService
 {
   ConverterResponse Generate(IRNode root, string framework);
   ConverterResponse GenerateResponsive(List<ConverterPageInput> pages, string framework);
+  MultiPageConverterResponse GenerateMultiPage(List<ConverterPageInput> pages, string framework);
   bool Validate(IRNode root);
 }

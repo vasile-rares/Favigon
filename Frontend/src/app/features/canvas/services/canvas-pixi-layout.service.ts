@@ -33,6 +33,11 @@ export interface LayoutResult {
   height: number;
 }
 
+interface LayoutContainerSize {
+  width: number;
+  height: number;
+}
+
 @Injectable()
 export class CanvasPixiLayoutService {
   private readonly elService = inject(CanvasElementService);
@@ -60,6 +65,7 @@ export class CanvasPixiLayoutService {
     container: CanvasElement,
     children: CanvasElement[],
     allElements: CanvasElement[],
+    containerSize?: LayoutContainerSize,
   ): Map<string, LayoutResult> {
     const results = new Map<string, LayoutResult>();
 
@@ -76,8 +82,10 @@ export class CanvasPixiLayoutService {
     const rootNode = yoga.Node.create(config);
 
     // Configure root (container)
-    const containerWidth = this.elService.getRenderedWidth(container, allElements);
-    const containerHeight = this.elService.getRenderedHeight(container, allElements);
+    const containerWidth =
+      containerSize?.width ?? this.elService.getRenderedWidth(container, allElements);
+    const containerHeight =
+      containerSize?.height ?? this.elService.getRenderedHeight(container, allElements);
     rootNode.setWidth(containerWidth);
     rootNode.setHeight(containerHeight);
     rootNode.setDisplay(Display.Flex);
@@ -87,12 +95,22 @@ export class CanvasPixiLayoutService {
       rootNode.setFlexDirection(mapFlexDirection(container.flexDirection));
       rootNode.setJustifyContent(mapJustifyContent(container.justifyContent));
       rootNode.setAlignItems(mapAlignItems(container.alignItems));
+      // Mirror align-items as align-content so wrapped flex lines behave consistently
+      // (e.g. "center" means centered whether items are on one line or many).
+      rootNode.setAlignContent(mapAlignItems(container.alignItems));
       rootNode.setFlexWrap(mapFlexWrap(container.flexWrap));
     } else if (container.display === 'grid') {
       // Yoga doesn't support CSS Grid natively — approximate with flex-wrap
       rootNode.setFlexDirection(FlexDirection.Row);
       rootNode.setFlexWrap(Wrap.Wrap);
       rootNode.setAlignItems(Align.FlexStart);
+      rootNode.setAlignContent(Align.Stretch);
+      rootNode.setJustifyContent(Justify.FlexStart);
+    } else {
+      // Approximate normal block flow as a vertical stack.
+      rootNode.setFlexDirection(FlexDirection.Column);
+      rootNode.setFlexWrap(Wrap.NoWrap);
+      rootNode.setAlignItems(Align.Stretch);
       rootNode.setJustifyContent(Justify.FlexStart);
     }
 
@@ -138,11 +156,7 @@ export class CanvasPixiLayoutService {
       const widthMode = child.widthMode ?? 'fixed';
       const heightMode = child.heightMode ?? 'fixed';
 
-      // Determine which axis is the main axis based on flex direction
-      const isColumnDirection =
-        container.flexDirection === 'column' || container.flexDirection === 'column-reverse';
-      // For grid (approximated as flex-wrap row), treat as row-like
-      const mainAxisIsWidth = !isColumnDirection;
+      const mainAxisIsWidth = isMainAxisWidth(container);
 
       const mainFillMode = mainAxisIsWidth ? widthMode : heightMode;
       const crossFillMode = mainAxisIsWidth ? heightMode : widthMode;
@@ -289,4 +303,16 @@ function mapFlexWrap(wrap?: CanvasFlexWrap): Wrap {
 function isChildInFlow(element: CanvasElement): boolean {
   const pos = element.position;
   return !pos || pos === 'static' || pos === 'relative' || pos === 'sticky';
+}
+
+function isMainAxisWidth(container: Pick<CanvasElement, 'display' | 'flexDirection'>): boolean {
+  if (container.display === 'grid') {
+    return true;
+  }
+
+  if (container.display === 'block') {
+    return false;
+  }
+
+  return container.flexDirection !== 'column' && container.flexDirection !== 'column-reverse';
 }

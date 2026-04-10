@@ -1,6 +1,6 @@
 export interface IRNode {
   id: string;
-  type: string;
+  type: IRNodeType;
   props: Record<string, unknown>;
   layout?: IRLayout;
   style?: IRStyle;
@@ -25,8 +25,6 @@ export interface IRLayout {
 
 export interface IRPosition {
   mode: PositionMode;
-  x?: IRLength;
-  y?: IRLength;
   top?: IRLength;
   right?: IRLength;
   bottom?: IRLength;
@@ -67,13 +65,24 @@ export interface IRStyle {
   borderBottomLeftRadius?: IRLength;
   border?: IRBorder;
 
-  overflow?: 'clip' | 'visible';
-  shadow?: string;
+  overflow?: OverflowMode;
+  shadows?: IRShadow[];
 
   opacity?: number;
 
+  cursor?: string;
+
   padding?: IRSpacing;
   margin?: IRSpacing;
+}
+
+export interface IRShadow {
+  inset: boolean;
+  x: number;
+  y: number;
+  blur: number;
+  spread: number;
+  color: string;
 }
 
 export interface IRLength {
@@ -102,9 +111,7 @@ export interface IRBorder {
 
 export interface IRMeta {
   name?: string;
-  locked: boolean;
   hidden: boolean;
-  selected: boolean;
   componentInstanceId?: string;
 }
 
@@ -115,6 +122,8 @@ export interface IRVariant {
 }
 
 // Must match C# enum names exactly (JsonStringEnumConverter uses PascalCase names)
+export type IRNodeType = 'Frame' | 'Container' | 'Text' | 'Image';
+export type OverflowMode = 'Clip' | 'Visible';
 export type LayoutMode = 'Block' | 'Flex' | 'Grid';
 export type PositionMode = 'Flow' | 'Relative' | 'Absolute' | 'Fixed' | 'Sticky';
 export type FlexDirection = 'Row' | 'Column' | 'RowReverse' | 'ColumnReverse';

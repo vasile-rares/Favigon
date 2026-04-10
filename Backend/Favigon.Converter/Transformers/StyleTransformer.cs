@@ -1,18 +1,10 @@
-﻿using Favigon.Converter.Models;
+﻿using System.Linq;
+using Favigon.Converter.Models;
 
 namespace Favigon.Converter.Transformers;
 
 public static class StyleTransformer
 {
-  private static readonly Dictionary<string, string> ShadowMap = new(StringComparer.OrdinalIgnoreCase)
-  {
-    ["none"] = "none",
-    ["sm"] = "0 1px 2px 0 rgba(0,0,0,0.05)",
-    ["md"] = "0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)",
-    ["lg"] = "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)",
-    ["xl"] = "0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1)"
-  };
-
   public static Dictionary<string, string> ToCssProperties(IRStyle style)
   {
     var css = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -26,14 +18,14 @@ public static class StyleTransformer
     if (style.TransformStyle is not null) css["transform-style"] = style.TransformStyle;
     if (style.Border is not null) ApplyBorder(css, style.Border);
 
-    if (style.BorderRadius is not null) css["border-radius"] = style.BorderRadius.ToString();
-    if (style.BorderTopLeftRadius is not null)
+    if (style.BorderRadius is { Value: not 0 }) css["border-radius"] = style.BorderRadius.ToString();
+    if (style.BorderTopLeftRadius is { Value: not 0 })
       css["border-top-left-radius"] = style.BorderTopLeftRadius.ToString();
-    if (style.BorderTopRightRadius is not null)
+    if (style.BorderTopRightRadius is { Value: not 0 })
       css["border-top-right-radius"] = style.BorderTopRightRadius.ToString();
-    if (style.BorderBottomRightRadius is not null)
+    if (style.BorderBottomRightRadius is { Value: not 0 })
       css["border-bottom-right-radius"] = style.BorderBottomRightRadius.ToString();
-    if (style.BorderBottomLeftRadius is not null)
+    if (style.BorderBottomLeftRadius is { Value: not 0 })
       css["border-bottom-left-radius"] = style.BorderBottomLeftRadius.ToString();
     if (style.FontSize is not null) css["font-size"] = style.FontSize.ToString();
     if (style.FontWeight is not null) css["font-weight"] = style.FontWeight.Value.ToString();
@@ -42,16 +34,14 @@ public static class StyleTransformer
     if (style.TextAlign is not null) css["text-align"] = style.TextAlign;
     if (style.LineHeight is not null) css["line-height"] = style.LineHeight.ToString();
     if (style.LetterSpacing is not null) css["letter-spacing"] = style.LetterSpacing.ToString();
-    if (style.Overflow is not null) css["overflow"] = style.Overflow;
+    if (style.Overflow is not null) css["overflow"] = style.Overflow.Value.ToString().ToLower();
 
-    if (!string.IsNullOrWhiteSpace(style.Shadow))
-    {
-      css["box-shadow"] = ShadowMap.TryGetValue(style.Shadow, out var shadow)
-        ? shadow
-        : style.Shadow;
-    }
+    if (style.Shadows is { Count: > 0 })
+      css["box-shadow"] = string.Join(", ", style.Shadows.Select(s => s.ToCss()));
 
-    if (style.Opacity is not null) css["opacity"] = style.Opacity.Value.ToString("G");
+    if (style.Opacity is not null && style.Opacity.Value != 1.0) css["opacity"] = style.Opacity.Value.ToString("G");
+
+    if (style.Cursor is not null) css["cursor"] = style.Cursor;
 
     if (style.Width is not null) css["width"] = style.Width.ToString();
     if (style.Height is not null) css["height"] = style.Height.ToString();
@@ -93,8 +83,6 @@ public static class StyleTransformer
       };
       if (positionCss is not null) merged["position"] = positionCss;
 
-      if (position.X is not null) merged["left"] = position.X.ToString();
-      if (position.Y is not null) merged["top"] = position.Y.ToString();
       if (position.Top is not null) merged["top"] = position.Top.ToString();
       if (position.Right is not null) merged["right"] = position.Right.ToString();
       if (position.Bottom is not null) merged["bottom"] = position.Bottom.ToString();

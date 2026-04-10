@@ -29,6 +29,26 @@ export type CanvasSemanticTag =
   | 'span';
 export type CanvasRotationMode = '2d' | '3d';
 export type CanvasBackfaceVisibility = 'visible' | 'hidden';
+export type CanvasCursorType =
+  | 'auto'
+  | 'default'
+  | 'pointer'
+  | 'text'
+  | 'move'
+  | 'grab'
+  | 'grabbing'
+  | 'not-allowed'
+  | 'wait'
+  | 'progress'
+  | 'crosshair'
+  | 'zoom-in'
+  | 'zoom-out'
+  | 'help'
+  | 'ns-resize'
+  | 'ew-resize'
+  | 'col-resize'
+  | 'row-resize'
+  | 'none';
 export type CanvasTransformOption =
   | 'scale'
   | 'rotate'
@@ -150,6 +170,7 @@ export interface CanvasElement {
   // Position (not for frame)
   position?: CanvasPositionMode;
   margin?: CanvasSpacing;
+  cursor?: CanvasCursorType;
   parentId?: string | null;
   isPrimary?: boolean;
   primarySyncId?: string;

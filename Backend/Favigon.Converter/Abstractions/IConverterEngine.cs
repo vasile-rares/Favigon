@@ -2,10 +2,15 @@
 
 namespace Favigon.Converter.Abstractions;
 
+public record GeneratedFile(string Path, string Content);
+
 public interface IConverterEngine
 {
   (string Html, string Css) GenerateFromCanvas(string canvasJson, string framework);
   (string Html, string Css) Generate(IRNode root, string framework);
+  List<GeneratedFile> GenerateMultiPage(IEnumerable<(string PageName, int ViewportWidth, IRNode Ir)> pages, string framework);
+  /// <summary>Returns a @media diff block containing only the CSS properties that differ between primary and breakpoint.</summary>
+  string GenerateDiffCss(IRNode primary, IRNode breakpoint, string framework, int maxWidth, string label);
   bool Validate(IRNode root);
   IRNode ParseCanvas(string canvasJson);
 }

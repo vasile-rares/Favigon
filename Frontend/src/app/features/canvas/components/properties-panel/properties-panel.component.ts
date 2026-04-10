@@ -7,6 +7,7 @@ import {
   CanvasAlignItems,
   CanvasDisplayMode,
   CanvasCornerRadii,
+  CanvasCursorType,
   CanvasElement,
   CanvasElementType,
   CanvasFontSizeUnit,
@@ -28,6 +29,7 @@ import {
   CanvasTextSpacingUnit,
   CanvasTextAlign,
   CanvasTextVerticalAlign,
+  GeneratedFile,
   IRNode,
 } from '@app/core';
 import { NumberInputComponent } from './number-input/number-input.component';
@@ -239,6 +241,7 @@ export class PropertiesPanelComponent {
   @Input() isGenerating = false;
   @Input() generatedHtml = '';
   @Input() generatedCss = '';
+  @Input() generatedFiles: GeneratedFile[] = [];
   @Input() irPreview: IRNode | null = null;
 
   @Output() elementPatch = new EventEmitter<Partial<CanvasElement>>();
@@ -475,6 +478,27 @@ export class PropertiesPanelComponent {
     { label: 'Absolute', value: 'absolute' },
     { label: 'Fixed', value: 'fixed' },
     { label: 'Sticky', value: 'sticky' },
+  ];
+  readonly cursorOptions: DropdownSelectOption[] = [
+    { label: 'Auto (inherit)', value: 'auto' },
+    { label: 'Default', value: 'default' },
+    { label: 'Pointer', value: 'pointer' },
+    { label: 'Text', value: 'text' },
+    { label: 'Move', value: 'move' },
+    { label: 'Grab', value: 'grab' },
+    { label: 'Grabbing', value: 'grabbing' },
+    { label: 'Not Allowed', value: 'not-allowed' },
+    { label: 'Wait', value: 'wait' },
+    { label: 'Progress', value: 'progress' },
+    { label: 'Crosshair', value: 'crosshair' },
+    { label: 'Zoom In', value: 'zoom-in' },
+    { label: 'Zoom Out', value: 'zoom-out' },
+    { label: 'Help', value: 'help' },
+    { label: 'N/S Resize', value: 'ns-resize' },
+    { label: 'E/W Resize', value: 'ew-resize' },
+    { label: 'Col Resize', value: 'col-resize' },
+    { label: 'Row Resize', value: 'row-resize' },
+    { label: 'None', value: 'none' },
   ];
   readonly dimensionModeDefinitions = DIMENSION_MODE_DEFINITIONS;
   readonly dimensionConstraintModeDefinitions = DIMENSION_CONSTRAINT_MODE_DEFINITIONS;
@@ -1481,6 +1505,48 @@ export class PropertiesPanelComponent {
     return element.position ?? 'static';
   }
 
+  hasCursor(element: CanvasElement): boolean {
+    return !!element.cursor;
+  }
+
+  onCursorSectionHeaderClick(): void {
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    if (this.hasCursor(element)) {
+      this.removeCursor();
+      return;
+    }
+
+    this.addCursor();
+  }
+
+  onCursorSectionToggleClick(event: MouseEvent): void {
+    event.stopPropagation();
+    this.onCursorSectionHeaderClick();
+  }
+
+  addCursor(): void {
+    this.emitPatch({ cursor: 'pointer' });
+  }
+
+  removeCursor(): void {
+    this.emitPatch({ cursor: undefined });
+  }
+
+  cursorValue(element: CanvasElement): CanvasCursorType | null {
+    return element.cursor ?? null;
+  }
+
+  onCursorChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string') {
+      return;
+    }
+    this.emitPatch({ cursor: (value as CanvasCursorType) || undefined });
+  }
+
   flexDirectionValue(element: CanvasElement): 'row' | 'column' {
     return element.flexDirection === 'column' || element.flexDirection === 'column-reverse'
       ? 'column'
@@ -1493,6 +1559,22 @@ export class PropertiesPanelComponent {
 
   justifyContentValue(element: CanvasElement): CanvasJustifyContent {
     return element.justifyContent ?? 'flex-start';
+  }
+
+  justifyContentAxisLabel(element: CanvasElement): 'Horizontal' | 'Vertical' {
+    return this.flexDirectionValue(element) === 'column' ? 'Vertical' : 'Horizontal';
+  }
+
+  justifyContentPlaceholder(element: CanvasElement): string {
+    return `Select ${this.justifyContentAxisLabel(element).toLowerCase()} alignment`;
+  }
+
+  alignItemsAxisLabel(element: CanvasElement): 'Horizontal' | 'Vertical' {
+    return this.flexDirectionValue(element) === 'column' ? 'Horizontal' : 'Vertical';
+  }
+
+  alignItemsAriaLabel(element: CanvasElement): string {
+    return `${this.alignItemsAxisLabel(element)} layout alignment`;
   }
 
   alignItemsOptions(element: CanvasElement): readonly ToggleGroupOption[] {
@@ -2003,10 +2085,30 @@ export class PropertiesPanelComponent {
       return null;
     }
 
-    return (
+    const parent =
       this.currentPageModel()?.elements.find((candidate) => candidate.id === element.parentId) ??
-      null
-    );
+      null;
+    if (!parent) {
+      return null;
+    }
+
+    const paddedWidth = parent.width + ((parent.padding?.left ?? 0) + (parent.padding?.right ?? 0));
+    const paddedHeight =
+      parent.height + ((parent.padding?.top ?? 0) + (parent.padding?.bottom ?? 0));
+    const isFlowLayoutChild =
+      !!parent.display &&
+      (parent.type === 'frame' || parent.type === 'rectangle') &&
+      (!element.position ||
+        element.position === 'static' ||
+        element.position === 'relative' ||
+        element.position === 'sticky');
+
+    return {
+      ...parent,
+      width: paddedWidth,
+      height: paddedHeight,
+      padding: isFlowLayoutChild ? parent.padding : undefined,
+    };
   }
 
   private buildDimensionMenuItems(element: CanvasElement): ContextMenuItem[] {

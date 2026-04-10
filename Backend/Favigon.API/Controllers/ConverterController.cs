@@ -43,6 +43,16 @@ public class ConverterController(IConverterService converterService) : Controlle
             IsValid = isValid
         });
     }
+
+    [HttpPost("generate-files")]
+    public IActionResult GenerateFiles([FromBody] ConverterRequest request)
+    {
+        if (request.Pages is not { Count: > 0 })
+            throw new ArgumentException("'pages' (1+ entries) is required for multi-page generation.");
+
+        var result = converterService.GenerateMultiPage(request.Pages, request.Framework);
+        return Ok(result);
+    }
 }
 
 

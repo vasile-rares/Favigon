@@ -25,6 +25,7 @@ export type {
   CanvasSemanticTag,
   CanvasRotationMode,
   CanvasBackfaceVisibility,
+  CanvasCursorType,
   CanvasTransformOption,
   CanvasDisplayMode,
   CanvasPositionMode,
@@ -40,7 +41,13 @@ export type {
   CanvasProjectDocument,
 } from './canvas.models';
 
-export type { ConverterPageRequest, ConverterRequest, ConverterResponse } from './converter.models';
+export type {
+  ConverterPageRequest,
+  ConverterRequest,
+  ConverterResponse,
+  GeneratedFile,
+  MultiPageConverterResponse,
+} from './converter.models';
 
 export type {
   IRNode,
@@ -48,10 +55,13 @@ export type {
   IRPosition,
   IRStyle,
   IRLength,
+  IRShadow,
   IRSpacing,
   IRBorder,
   IRMeta,
   IRVariant,
+  IRNodeType,
+  OverflowMode,
   LayoutMode,
   PositionMode,
   FlexDirection,

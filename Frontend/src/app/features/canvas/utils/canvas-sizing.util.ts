@@ -8,6 +8,9 @@ import { roundToTwoDecimals } from './canvas-math.util';
 
 export type CanvasSizeAxis = 'width' | 'height';
 export type CanvasConstraintField = 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight';
+type CanvasParentSizeRef = Pick<CanvasElement, 'width' | 'height'> & {
+  padding?: CanvasElement['padding'];
+};
 
 const DEFAULT_PAGE_WIDTH = 1280;
 const DEFAULT_PAGE_HEIGHT = 720;
@@ -117,7 +120,7 @@ export function deriveCanvasSizeValueFromPixels(
   mode: CanvasSizeMode,
   pixels: number,
   axis: CanvasSizeAxis,
-  parent: Pick<CanvasElement, 'width' | 'height'> | null,
+  parent: CanvasParentSizeRef | null,
   page: CanvasPageModel | null | undefined,
 ): number | undefined {
   if (mode === 'fixed' || mode === 'fit-content') {
@@ -142,7 +145,7 @@ export function resolveCanvasPixelsFromMode(
   fallbackPixels: number,
   axis: CanvasSizeAxis,
   sizingValue: number | undefined,
-  parent: Pick<CanvasElement, 'width' | 'height'> | null,
+  parent: CanvasParentSizeRef | null,
   page: CanvasPageModel | null | undefined,
 ): number {
   if (mode === 'fixed' || mode === 'fit-content') {
@@ -169,14 +172,25 @@ export function resolveCanvasPixelsFromMode(
 }
 
 export function getCanvasParentSize(
-  parent: Pick<CanvasElement, 'width' | 'height'> | null,
+  parent: CanvasParentSizeRef | null,
   axis: CanvasSizeAxis,
 ): number | null {
   if (!parent) {
     return null;
   }
 
-  return axis === 'width' ? parent.width : parent.height;
+  const rawSize = axis === 'width' ? parent.width : parent.height;
+  const padding = parent.padding;
+  if (!padding) {
+    return rawSize;
+  }
+
+  const paddingOffset =
+    axis === 'width'
+      ? (padding.left ?? 0) + (padding.right ?? 0)
+      : (padding.top ?? 0) + (padding.bottom ?? 0);
+
+  return Math.max(0, rawSize - paddingOffset);
 }
 
 export function getCanvasSizeSuffix(mode: CanvasSizeMode, axis: CanvasSizeAxis): string | null {
@@ -321,7 +335,7 @@ export function deriveCanvasConstraintValueFromPixels(
   mode: CanvasConstraintSizeMode,
   pixels: number,
   axis: CanvasSizeAxis,
-  parent: Pick<CanvasElement, 'width' | 'height'> | null,
+  parent: CanvasParentSizeRef | null,
 ): number | undefined {
   if (mode === 'fixed') {
     return undefined;
@@ -340,7 +354,7 @@ export function resolveCanvasConstraintPixels(
   fallbackPixels: number,
   axis: CanvasSizeAxis,
   sizingValue: number | undefined,
-  parent: Pick<CanvasElement, 'width' | 'height'> | null,
+  parent: CanvasParentSizeRef | null,
 ): number {
   if (mode === 'fixed') {
     return roundToTwoDecimals(fallbackPixels);

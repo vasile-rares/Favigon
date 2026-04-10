@@ -25,6 +25,15 @@ public sealed class StyleBuilder
 
   public bool IsEmpty => _baseRules.Count == 0 && _mediaRules.Count == 0;
 
+  /// <summary>Returns a snapshot of all base rules as {className: {prop: value}} for diff computation.</summary>
+  public IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> GetBaseRulesSnapshot()
+  {
+    var map = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
+    foreach (var (cssClass, props) in _baseRules)
+      map[cssClass] = props;
+    return map;
+  }
+
   public string Build()
   {
     if (IsEmpty) return string.Empty;

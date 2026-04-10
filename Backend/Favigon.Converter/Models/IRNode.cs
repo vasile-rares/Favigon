@@ -51,9 +51,6 @@ public class IRPosition
 {
   public PositionMode Mode { get; set; } = PositionMode.Flow;
 
-  public IRLength? X { get; set; }
-  public IRLength? Y { get; set; }
-
   public IRLength? Top { get; set; }
   public IRLength? Right { get; set; }
   public IRLength? Bottom { get; set; }
@@ -94,13 +91,31 @@ public class IRStyle
   public IRLength? BorderBottomLeftRadius { get; set; }
   public IRBorder? Border { get; set; }
 
-  public string? Overflow { get; set; }
-  public string? Shadow { get; set; }
+  public OverflowMode? Overflow { get; set; }
+  public List<IRShadow>? Shadows { get; set; }
 
   public double? Opacity { get; set; }
 
+  public string? Cursor { get; set; }
+
   public IRSpacing? Padding { get; set; }
   public IRSpacing? Margin { get; set; }
+}
+
+public class IRShadow
+{
+  public bool Inset { get; set; }
+  public double X { get; set; }
+  public double Y { get; set; }
+  public double Blur { get; set; }
+  public double Spread { get; set; }
+  public string Color { get; set; } = "rgba(0,0,0,0.1)";
+
+  public string ToCss()
+  {
+    var prefix = Inset ? "inset " : "";
+    return $"{prefix}{X}px {Y}px {Blur}px {Spread}px {Color}";
+  }
 }
 
 public class IRSpacing
@@ -142,10 +157,15 @@ public class IRVariant
 public class IRMeta
 {
   public string? Name { get; set; }
-  public bool Locked { get; set; }
   public bool Hidden { get; set; }
-  public bool Selected { get; set; }
   public string? ComponentInstanceId { get; set; }
+}
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum OverflowMode
+{
+  Clip,
+  Visible
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

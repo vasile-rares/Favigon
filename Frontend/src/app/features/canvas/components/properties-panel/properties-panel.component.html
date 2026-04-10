@@ -310,6 +310,221 @@
         </div>
       </section>
 
+      <!-- -- Cursor -- -->
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasCursor(element)"
+        [class.properties-section--actionable]="!hasCursor(element)"
+        (click)="!hasCursor(element) && onCursorSectionHeaderClick()">
+        <div class="properties-section-header properties-section-header--actionable" (click)="onCursorSectionHeaderClick()">
+          <p class="properties-section-title">Cursor</p>
+          <button
+            type="button"
+            class="pp-section-toggle"
+            [class.pp-section-toggle--minus]="hasCursor(element)"
+            [class.pp-section-toggle--plus]="!hasCursor(element)"
+            [attr.aria-label]="hasCursor(element) ? 'Remove cursor override' : 'Add cursor override'"
+            [title]="hasCursor(element) ? 'Remove cursor override' : 'Add cursor override'"
+            (click)="onCursorSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <ng-container *ngIf="hasCursor(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Type</span>
+            <div class="pp-style-control pp-style-control--dropdown">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="'Select cursor'"
+                [options]="cursorOptions"
+                [ngModel]="cursorValue(element)"
+                (ngModelChange)="onCursorChange($event)"></app-dropdown-select>
+            </div>
+          </div>
+        </ng-container>
+      </section>
+
+      <!-- -- Layout -- -->
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasLayout(element)"
+        [class.properties-section--actionable]="!hasLayout(element)"
+        (click)="!hasLayout(element) && onLayoutSectionHeaderClick()"
+        *ngIf="supportsLayout(element.type)">
+        <div class="properties-section-header properties-section-header--actionable" (click)="onLayoutSectionHeaderClick()">
+          <p class="properties-section-title">Layout</p>
+          <button
+            type="button"
+            class="pp-section-toggle"
+            [class.pp-section-toggle--minus]="hasLayout(element)"
+            [class.pp-section-toggle--plus]="!hasLayout(element)"
+            [attr.aria-label]="hasLayout(element) ? 'Remove layout' : 'Add layout'"
+            [title]="hasLayout(element) ? 'Remove layout' : 'Add layout'"
+            (click)="onLayoutSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <ng-container *ngIf="hasLayout(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Display</span>
+            <div class="pp-style-control">
+              <app-toggle-group
+                [ariaLabel]="'Layout display mode'"
+                [options]="layoutDisplayOptions"
+                [value]="displayValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onDisplayChange($event)"></app-toggle-group>
+            </div>
+          </div>
+
+          <ng-container *ngIf="isFlex(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Direction</span>
+            <div class="pp-style-control">
+              <app-toggle-group
+                [ariaLabel]="'Layout direction'"
+                [options]="layoutDirectionOptions"
+                [value]="flexDirectionValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onFlexDirectionChange($event)"></app-toggle-group>
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">{{ justifyContentAxisLabel(element) }}</span>
+            <div class="pp-style-control pp-style-control--dropdown">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="justifyContentPlaceholder(element)"
+                [options]="justifyContentOptions"
+                [ngModel]="justifyContentValue(element)"
+                (ngModelChange)="onJustifyContentChange($event)"></app-dropdown-select>
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">{{ alignItemsAxisLabel(element) }}</span>
+            <div class="pp-style-control">
+              <app-toggle-group
+                [ariaLabel]="alignItemsAriaLabel(element)"
+                [options]="alignItemsOptions(element)"
+                [value]="alignItemsValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onAlignItemsChange($event)"></app-toggle-group>
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Wrap</span>
+            <app-toggle-group
+              [ariaLabel]="'Flex wrap'"
+              [options]="wrapOptions"
+              [value]="flexWrapValue(element)"
+              (valueChange)="onFlexWrapToggle($event === true)">
+            </app-toggle-group>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Gap</span>
+            <div class="pp-style-control pp-style-control--metric">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Gap"
+                [value]="element.gap ?? 0"
+                [min]="0"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onNumberChange('gap', $event)" />
+            </div>
+          </div>
+          </ng-container>
+
+          <ng-container *ngIf="isGrid(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Columns</span>
+            <div class="pp-style-control">
+              <input type="text" class="pp-text-input" [value]="element.gridTemplateColumns || ''" (input)="onGridTemplateChange('gridTemplateColumns', $event)" placeholder="1fr 1fr" />
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Rows</span>
+            <div class="pp-style-control">
+              <input type="text" class="pp-text-input" [value]="element.gridTemplateRows || ''" (input)="onGridTemplateChange('gridTemplateRows', $event)" placeholder="auto" />
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Gap</span>
+            <div class="pp-style-control pp-style-control--metric">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Gap"
+                [value]="element.gap ?? 0"
+                [min]="0"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onNumberChange('gap', $event)" />
+            </div>
+          </div>
+          </ng-container>
+
+          <div class="pp-style-row pp-style-row--corner-radius">
+            <span class="pp-row-label">Padding</span>
+            <div class="pp-style-control pp-style-control--corner-radius">
+              <div class="pp-corner-radius-header">
+                <app-number-input
+                  appearance="compact"
+                  ariaLabel="Padding"
+                  [value]="fullPaddingInputValue(element)"
+                  [min]="0"
+                  [step]="1"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onPaddingFullChange($event)" />
+
+                <div class="pp-corner-radius-mode">
+                  <app-toggle-group
+                    [ariaLabel]="'Padding mode'"
+                    [options]="paddingModeOptions"
+                    [value]="paddingMode(element)"
+                    [stretch]="true"
+                    [minWidth]="null"
+                    (valueChange)="onPaddingModeChange($event)"></app-toggle-group>
+                </div>
+              </div>
+
+              <div class="pp-corner-radius-grid" *ngIf="paddingMode(element) === 'per-side'">
+                <div class="pp-corner-radius-field" *ngFor="let side of paddingFields">
+                  <div class="pp-corner-radius-input">
+                    <app-number-input
+                      appearance="compact"
+                      [ariaLabel]="side.ariaLabel"
+                      [value]="spacingValue(element, 'padding', side.key)"
+                      [min]="0"
+                      [step]="1"
+                      (gestureStarted)="onNumberInputGestureStarted()"
+                      (gestureCommitted)="onNumberInputGestureCommitted()"
+                      (valueChange)="onPaddingSideChange(side.key, $event)"></app-number-input>
+                    <span class="pp-corner-radius-tag pp-corner-radius-tag--text" aria-hidden="true">
+                      {{ side.label }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+      </section>
+
       <!-- -- Style -- -->
       <section class="properties-section">
         <p class="properties-section-title">Style</p>
@@ -353,11 +568,13 @@
           <div class="pp-style-control pp-style-control--popup">
             <app-style-popup-field
               kind="fill"
+              [hasValue]="!isTransparentFill(element)"
               [triggerText]="fillLabel(element)"
               [swatchColor]="fillSwatchBackground(element)"
               [isTransparent]="isTransparentFill(element)"
               [colorValue]="fillInputValue(element)"
               [pickerColor]="fillPickerValue(element)"
+              [activationPatch]="{ fill: fillPickerValue(element) }"
               [clearPatch]="{ fill: 'transparent' }"
               (patchRequested)="elementPatch.emit($event)"
               (numberGestureStarted)="onNumberInputGestureStarted()"
@@ -488,183 +705,6 @@
             </app-style-popup-field>
           </div>
         </div>
-
-      </section>
-
-      <!-- -- Layout -- -->
-      <section
-        class="properties-section properties-section--collapsible"
-        [class.properties-section--compact]="!hasLayout(element)"
-        [class.properties-section--actionable]="!hasLayout(element)"
-        (click)="!hasLayout(element) && onLayoutSectionHeaderClick()"
-        *ngIf="supportsLayout(element.type)">
-        <div class="properties-section-header properties-section-header--actionable" (click)="onLayoutSectionHeaderClick()">
-          <p class="properties-section-title">Layout</p>
-          <button
-            type="button"
-            class="pp-section-toggle"
-            [class.pp-section-toggle--minus]="hasLayout(element)"
-            [class.pp-section-toggle--plus]="!hasLayout(element)"
-            [attr.aria-label]="hasLayout(element) ? 'Remove layout' : 'Add layout'"
-            [title]="hasLayout(element) ? 'Remove layout' : 'Add layout'"
-            (click)="onLayoutSectionToggleClick($event)">
-            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
-              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
-              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
-            </svg>
-          </button>
-        </div>
-
-        <ng-container *ngIf="hasLayout(element)">
-          <div class="pp-style-row">
-            <span class="pp-row-label">Display</span>
-            <div class="pp-style-control">
-              <app-toggle-group
-                [ariaLabel]="'Layout display mode'"
-                [options]="layoutDisplayOptions"
-                [value]="displayValue(element)"
-                [stretch]="true"
-                [minWidth]="null"
-                (valueChange)="onDisplayChange($event)"></app-toggle-group>
-            </div>
-          </div>
-
-          <ng-container *ngIf="isFlex(element)">
-          <div class="pp-style-row">
-            <span class="pp-row-label">Direction</span>
-            <div class="pp-style-control">
-              <app-toggle-group
-                [ariaLabel]="'Layout direction'"
-                [options]="layoutDirectionOptions"
-                [value]="flexDirectionValue(element)"
-                [stretch]="true"
-                [minWidth]="null"
-                (valueChange)="onFlexDirectionChange($event)"></app-toggle-group>
-            </div>
-          </div>
-          <div class="pp-style-row">
-            <span class="pp-row-label">Justify</span>
-            <div class="pp-style-control pp-style-control--dropdown">
-              <app-dropdown-select
-                [enableSearch]="false"
-                [placeholder]="'Select justification'"
-                [options]="justifyContentOptions"
-                [ngModel]="justifyContentValue(element)"
-                (ngModelChange)="onJustifyContentChange($event)"></app-dropdown-select>
-            </div>
-          </div>
-          <div class="pp-style-row">
-            <span class="pp-row-label">Align</span>
-            <div class="pp-style-control">
-              <app-toggle-group
-                [ariaLabel]="'Align items'"
-                [options]="alignItemsOptions(element)"
-                [value]="alignItemsValue(element)"
-                [stretch]="true"
-                [minWidth]="null"
-                (valueChange)="onAlignItemsChange($event)"></app-toggle-group>
-            </div>
-          </div>
-          <div class="pp-style-row">
-            <span class="pp-row-label">Wrap</span>
-            <app-toggle-group
-              [ariaLabel]="'Flex wrap'"
-              [options]="wrapOptions"
-              [value]="flexWrapValue(element)"
-              (valueChange)="onFlexWrapToggle($event === true)">
-            </app-toggle-group>
-          </div>
-          <div class="pp-style-row">
-            <span class="pp-row-label">Gap</span>
-            <div class="pp-style-control pp-style-control--metric">
-              <app-number-input
-                appearance="boxed"
-                ariaLabel="Gap"
-                [value]="element.gap ?? 0"
-                [min]="0"
-                [step]="1"
-                (gestureStarted)="onNumberInputGestureStarted()"
-                (gestureCommitted)="onNumberInputGestureCommitted()"
-                (valueChange)="onNumberChange('gap', $event)" />
-            </div>
-          </div>
-          </ng-container>
-
-          <ng-container *ngIf="isGrid(element)">
-          <div class="pp-style-row">
-            <span class="pp-row-label">Columns</span>
-            <div class="pp-style-control">
-              <input type="text" class="pp-text-input" [value]="element.gridTemplateColumns || ''" (input)="onGridTemplateChange('gridTemplateColumns', $event)" placeholder="1fr 1fr" />
-            </div>
-          </div>
-          <div class="pp-style-row">
-            <span class="pp-row-label">Rows</span>
-            <div class="pp-style-control">
-              <input type="text" class="pp-text-input" [value]="element.gridTemplateRows || ''" (input)="onGridTemplateChange('gridTemplateRows', $event)" placeholder="auto" />
-            </div>
-          </div>
-          <div class="pp-style-row">
-            <span class="pp-row-label">Gap</span>
-            <div class="pp-style-control pp-style-control--metric">
-              <app-number-input
-                appearance="boxed"
-                ariaLabel="Gap"
-                [value]="element.gap ?? 0"
-                [min]="0"
-                [step]="1"
-                (gestureStarted)="onNumberInputGestureStarted()"
-                (gestureCommitted)="onNumberInputGestureCommitted()"
-                (valueChange)="onNumberChange('gap', $event)" />
-            </div>
-          </div>
-          </ng-container>
-
-          <div class="pp-style-row pp-style-row--corner-radius">
-            <span class="pp-row-label">Padding</span>
-            <div class="pp-style-control pp-style-control--corner-radius">
-              <div class="pp-corner-radius-header">
-                <app-number-input
-                  appearance="compact"
-                  ariaLabel="Padding"
-                  [value]="fullPaddingInputValue(element)"
-                  [min]="0"
-                  [step]="1"
-                  (gestureStarted)="onNumberInputGestureStarted()"
-                  (gestureCommitted)="onNumberInputGestureCommitted()"
-                  (valueChange)="onPaddingFullChange($event)" />
-
-                <div class="pp-corner-radius-mode">
-                  <app-toggle-group
-                    [ariaLabel]="'Padding mode'"
-                    [options]="paddingModeOptions"
-                    [value]="paddingMode(element)"
-                    [stretch]="true"
-                    [minWidth]="null"
-                    (valueChange)="onPaddingModeChange($event)"></app-toggle-group>
-                </div>
-              </div>
-
-              <div class="pp-corner-radius-grid" *ngIf="paddingMode(element) === 'per-side'">
-                <div class="pp-corner-radius-field" *ngFor="let side of paddingFields">
-                  <div class="pp-corner-radius-input">
-                    <app-number-input
-                      appearance="compact"
-                      [ariaLabel]="side.ariaLabel"
-                      [value]="spacingValue(element, 'padding', side.key)"
-                      [min]="0"
-                      [step]="1"
-                      (gestureStarted)="onNumberInputGestureStarted()"
-                      (gestureCommitted)="onNumberInputGestureCommitted()"
-                      (valueChange)="onPaddingSideChange(side.key, $event)"></app-number-input>
-                    <span class="pp-corner-radius-tag pp-corner-radius-tag--text" aria-hidden="true">
-                      {{ side.label }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </ng-container>
 
       </section>
 
@@ -1091,6 +1131,7 @@
       [isGenerating]="isGenerating"
       [generatedHtml]="generatedHtml"
       [generatedCss]="generatedCss"
+      [generatedFiles]="generatedFiles"
       [irPreview]="irPreview"
       (frameworkChanged)="frameworkChanged.emit($event)"
       (validateRequested)="validateRequested.emit()"

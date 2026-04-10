@@ -10,6 +10,11 @@ export interface PixiShadowParams {
   alpha: number;
 }
 
+export interface PixiColorParams {
+  color: number;
+  alpha: number;
+}
+
 const SHADOW_PATTERN =
   /^(inset\s+)?(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px\s+(-?[\d.]+)px\s+(.+)$/i;
 
@@ -33,12 +38,30 @@ export function parseShadowParams(shadow: string | undefined | null): PixiShadow
   const blur = parseFloat(match[4]);
   const colorStr = match[6].trim();
 
-  const { color, alpha } = parseCssColor(colorStr);
+  const { color, alpha } = parsePixiCssColor(colorStr);
 
   return { x, y, blur, color, alpha };
 }
 
-function parseCssColor(colorStr: string): { color: number; alpha: number } {
+export function parsePixiCssColor(colorStr: string): PixiColorParams {
+  const normalized = colorStr.trim();
+  if (!normalized) {
+    return { color: 0x000000, alpha: 1 };
+  }
+
+  if (normalized.toLowerCase() === 'transparent') {
+    return { color: 0x000000, alpha: 0 };
+  }
+
+  const resolved = resolveBrowserCssColor(normalized);
+  if (resolved) {
+    return parsePixiCssColorLiteral(resolved);
+  }
+
+  return parsePixiCssColorLiteral(normalized);
+}
+
+function parsePixiCssColorLiteral(colorStr: string): PixiColorParams {
   const rgbaMatch = RGBA_PATTERN.exec(colorStr);
   if (rgbaMatch) {
     const r = Math.round(parseFloat(rgbaMatch[1]));
@@ -54,6 +77,9 @@ function parseCssColor(colorStr: string): { color: number; alpha: number } {
     if (hex.length === 3) {
       hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
     }
+    if (hex.length === 4) {
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2] + hex[3] + hex[3];
+    }
     if (hex.length === 8) {
       const color = parseInt(hex.slice(0, 6), 16);
       const alpha = parseInt(hex.slice(6, 8), 16) / 255;
@@ -63,4 +89,31 @@ function parseCssColor(colorStr: string): { color: number; alpha: number } {
   }
 
   return { color: 0x000000, alpha: 1 };
+}
+
+function resolveBrowserCssColor(colorStr: string): string | null {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  const context = getColorProbeContext();
+  if (!context) {
+    return null;
+  }
+
+  context.fillStyle = '#000000';
+  context.fillStyle = colorStr;
+  return typeof context.fillStyle === 'string' ? context.fillStyle : null;
+}
+
+let colorProbeContext: CanvasRenderingContext2D | null | undefined;
+
+function getColorProbeContext(): CanvasRenderingContext2D | null {
+  if (colorProbeContext !== undefined) {
+    return colorProbeContext;
+  }
+
+  const canvas = document.createElement('canvas');
+  colorProbeContext = canvas.getContext('2d');
+  return colorProbeContext;
 }

@@ -62,8 +62,8 @@ public sealed class CanvasParser
     var position = new IRPosition
     {
       Mode = PositionMode.Absolute,
-      X = new IRLength { Value = element.X },
-      Y = new IRLength { Value = element.Y }
+      Left = new IRLength { Value = element.X },
+      Top = new IRLength { Value = element.Y }
     };
 
     if (string.Equals(element.Type, "text", StringComparison.OrdinalIgnoreCase))
