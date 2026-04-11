@@ -30,6 +30,8 @@ public static class LayoutTransformer
     }
 
     if (layout.Gap is not null) css["gap"] = layout.Gap.ToString();
+    if (layout.RowGap is not null) css["row-gap"] = layout.RowGap.ToString();
+    if (layout.ColumnGap is not null) css["column-gap"] = layout.ColumnGap.ToString();
 
     if (layout.Mode == LayoutMode.Grid)
     {

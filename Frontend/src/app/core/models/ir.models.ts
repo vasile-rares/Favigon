@@ -17,6 +17,8 @@ export interface IRLayout {
   align?: AlignItems;
   justify?: JustifyContent;
   gap?: IRLength;
+  rowGap?: IRLength;
+  columnGap?: IRLength;
   wrap?: boolean;
   columns?: number;
   rows?: number;

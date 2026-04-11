@@ -431,28 +431,59 @@
           <ng-container *ngIf="isGrid(element)">
           <div class="pp-style-row">
             <span class="pp-row-label">Columns</span>
-            <div class="pp-style-control">
-              <input type="text" class="pp-text-input" [value]="element.gridTemplateColumns || ''" (input)="onGridTemplateChange('gridTemplateColumns', $event)" placeholder="1fr 1fr" />
+            <div class="pp-style-control pp-style-control--transform-scale">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Grid columns"
+                [value]="gridColumnsValue(element)"
+                [min]="1"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onGridTrackCountChange('gridTemplateColumns', $event)" />
             </div>
           </div>
           <div class="pp-style-row">
             <span class="pp-row-label">Rows</span>
-            <div class="pp-style-control">
-              <input type="text" class="pp-text-input" [value]="element.gridTemplateRows || ''" (input)="onGridTemplateChange('gridTemplateRows', $event)" placeholder="auto" />
+            <div class="pp-style-control pp-style-control--transform-scale">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Grid rows"
+                [value]="gridRowsValue(element)"
+                [min]="1"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onGridTrackCountChange('gridTemplateRows', $event)" />
             </div>
           </div>
           <div class="pp-style-row">
             <span class="pp-row-label">Gap</span>
-            <div class="pp-style-control pp-style-control--metric">
-              <app-number-input
-                appearance="boxed"
-                ariaLabel="Gap"
-                [value]="element.gap ?? 0"
-                [min]="0"
-                [step]="1"
-                (gestureStarted)="onNumberInputGestureStarted()"
-                (gestureCommitted)="onNumberInputGestureCommitted()"
-                (valueChange)="onNumberChange('gap', $event)" />
+            <div class="pp-style-control pp-style-control--transform-dual">
+              <div class="pp-transform-axis-field">
+                <app-number-input
+                  appearance="boxed"
+                  ariaLabel="Grid gap X"
+                  [value]="gridGapXValue(element)"
+                  [min]="0"
+                  [step]="1"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onGridGapChange('x', $event)"></app-number-input>
+                <span class="pp-transform-axis-tag">X</span>
+              </div>
+              <div class="pp-transform-axis-field">
+                <app-number-input
+                  appearance="boxed"
+                  ariaLabel="Grid gap Y"
+                  [value]="gridGapYValue(element)"
+                  [min]="0"
+                  [step]="1"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onGridGapChange('y', $event)"></app-number-input>
+                <span class="pp-transform-axis-tag">Y</span>
+              </div>
             </div>
           </div>
           </ng-container>

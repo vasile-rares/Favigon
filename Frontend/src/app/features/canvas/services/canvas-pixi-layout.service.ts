@@ -115,7 +115,16 @@ export class CanvasPixiLayoutService {
     }
 
     // Gap
-    if (typeof container.gap === 'number' && container.gap > 0) {
+    if (container.display === 'grid') {
+      const rowGap = resolveGridGap(container, 'y');
+      const columnGap = resolveGridGap(container, 'x');
+      if (rowGap > 0) {
+        rootNode.setGap(Gutter.Row, rowGap);
+      }
+      if (columnGap > 0) {
+        rootNode.setGap(Gutter.Column, columnGap);
+      }
+    } else if (typeof container.gap === 'number' && container.gap > 0) {
       rootNode.setGap(Gutter.All, container.gap);
     }
 
@@ -315,4 +324,16 @@ function isMainAxisWidth(container: Pick<CanvasElement, 'display' | 'flexDirecti
   }
 
   return container.flexDirection !== 'column' && container.flexDirection !== 'column-reverse';
+}
+
+function resolveGridGap(
+  container: Pick<CanvasElement, 'gap' | 'gapX' | 'gapY'>,
+  axis: 'x' | 'y',
+): number {
+  const specificGap = axis === 'x' ? container.gapX : container.gapY;
+  if (typeof specificGap === 'number' && specificGap > 0) {
+    return specificGap;
+  }
+
+  return typeof container.gap === 'number' && container.gap > 0 ? container.gap : 0;
 }

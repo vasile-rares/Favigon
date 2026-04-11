@@ -71,6 +71,9 @@ export function withRoundedPrecision(element: CanvasElement): CanvasElement {
       typeof element.maxHeightSizingValue === 'number'
         ? roundToTwoDecimals(element.maxHeightSizingValue)
         : undefined,
+    gap: typeof element.gap === 'number' ? roundToTwoDecimals(element.gap) : undefined,
+    gapX: typeof element.gapX === 'number' ? roundToTwoDecimals(element.gapX) : undefined,
+    gapY: typeof element.gapY === 'number' ? roundToTwoDecimals(element.gapY) : undefined,
     strokeWidth:
       typeof element.strokeWidth === 'number' ? roundToTwoDecimals(element.strokeWidth) : undefined,
     fontSize:
@@ -195,6 +198,16 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
     ? (element.opacity as number)
     : 1;
   element.opacity = clamp(normalizedOpacity, 0, 1);
+
+  element.gap = Number.isFinite(element.gap ?? Number.NaN)
+    ? Math.max(0, roundToTwoDecimals(element.gap as number))
+    : undefined;
+  element.gapX = Number.isFinite(element.gapX ?? Number.NaN)
+    ? Math.max(0, roundToTwoDecimals(element.gapX as number))
+    : undefined;
+  element.gapY = Number.isFinite(element.gapY ?? Number.NaN)
+    ? Math.max(0, roundToTwoDecimals(element.gapY as number))
+    : undefined;
 
   if (element.type !== 'text') {
     element.cornerRadius = getDefaultCornerRadius(element);

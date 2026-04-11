@@ -64,6 +64,8 @@ public class IRLayout
   public AlignItems? Align { get; set; }
   public JustifyContent? Justify { get; set; }
   public IRLength? Gap { get; set; }
+  public IRLength? RowGap { get; set; }
+  public IRLength? ColumnGap { get; set; }
   public bool? Wrap { get; set; }
 
   // Grid

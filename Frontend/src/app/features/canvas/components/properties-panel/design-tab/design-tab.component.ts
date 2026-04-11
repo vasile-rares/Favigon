@@ -2158,6 +2158,8 @@ export class DesignTabComponent {
       justifyContent: undefined,
       alignItems: undefined,
       gap: undefined,
+      gapX: undefined,
+      gapY: undefined,
       gridTemplateColumns: undefined,
       gridTemplateRows: undefined,
       padding: undefined,
@@ -2389,6 +2391,49 @@ export class DesignTabComponent {
     }
 
     this.emitPatch({ display: value as CanvasDisplayMode });
+  }
+
+  gridColumnsValue(element: CanvasElement): number {
+    return resolveGridTrackCount(element.gridTemplateColumns, 2);
+  }
+
+  gridRowsValue(element: CanvasElement): number {
+    return resolveGridTrackCount(element.gridTemplateRows, 1);
+  }
+
+  gridGapXValue(element: CanvasElement): number {
+    return typeof element.gapX === 'number' ? element.gapX : (element.gap ?? 0);
+  }
+
+  gridGapYValue(element: CanvasElement): number {
+    return typeof element.gapY === 'number' ? element.gapY : (element.gap ?? 0);
+  }
+
+  onGridTrackCountChange(field: 'gridTemplateColumns' | 'gridTemplateRows', value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const count = Math.max(1, Math.round(value));
+    this.emitPatch({ [field]: buildRepeatedGridTrackTemplate(count) } as Partial<CanvasElement>);
+  }
+
+  onGridGapChange(axis: 'x' | 'y', value: number): void {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const element = this.selectedElement;
+    if (!element) {
+      return;
+    }
+
+    const normalized = Math.max(0, roundToTwoDecimals(value));
+    this.emitPatch({
+      gap: undefined,
+      gapX: axis === 'x' ? normalized : this.gridGapXValue(element),
+      gapY: axis === 'y' ? normalized : this.gridGapYValue(element),
+    });
   }
 
   onPositionChange(value: string | number | boolean | null): void {
@@ -3077,4 +3122,59 @@ function isTransparentColor(value: string): boolean {
   }
 
   return false;
+}
+
+function buildRepeatedGridTrackTemplate(count: number): string {
+  return `repeat(${Math.max(1, Math.round(count))}, minmax(0, 1fr))`;
+}
+
+function resolveGridTrackCount(template: string | undefined, fallback: number): number {
+  const normalized = template?.trim();
+  if (!normalized) {
+    return fallback;
+  }
+
+  const repeatMatch = normalized.match(/^repeat\(\s*(\d+)\s*,/i);
+  if (repeatMatch) {
+    return Math.max(1, Number.parseInt(repeatMatch[1], 10));
+  }
+
+  const tracks = splitGridTrackTemplate(normalized);
+  return tracks.length > 0 ? tracks.length : fallback;
+}
+
+function splitGridTrackTemplate(template: string): string[] {
+  const tracks: string[] = [];
+  let depth = 0;
+  let token = '';
+
+  for (const char of template.trim()) {
+    if (char === '(') {
+      depth++;
+      token += char;
+      continue;
+    }
+
+    if (char === ')') {
+      depth = Math.max(0, depth - 1);
+      token += char;
+      continue;
+    }
+
+    if (/\s/.test(char) && depth === 0) {
+      if (token.trim().length > 0) {
+        tracks.push(token.trim());
+        token = '';
+      }
+      continue;
+    }
+
+    token += char;
+  }
+
+  if (token.trim().length > 0) {
+    tracks.push(token.trim());
+  }
+
+  return tracks;
 }

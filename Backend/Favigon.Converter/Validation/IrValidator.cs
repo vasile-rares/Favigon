@@ -73,6 +73,8 @@ public static class IrValidator
   private static void ValidateLayout(IRLayout layout, string path, List<string> errors)
   {
     if (layout.Gap is not null) ValidateLength(layout.Gap, path, "gap", errors, allowNegative: false);
+    if (layout.RowGap is not null) ValidateLength(layout.RowGap, path, "rowGap", errors, allowNegative: false);
+    if (layout.ColumnGap is not null) ValidateLength(layout.ColumnGap, path, "columnGap", errors, allowNegative: false);
     if (layout.Columns is < 1) errors.Add(Error(path, "columns", "Columns must be >= 1."));
     if (layout.Rows is < 1) errors.Add(Error(path, "rows", "Rows must be >= 1."));
     if (layout.Mode == LayoutMode.Grid && layout.Columns is null)

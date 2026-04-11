@@ -15,6 +15,7 @@ const HANDLE_SIZE = 12;
 const HANDLE_HALF = HANDLE_SIZE / 2;
 const EDGE_HIT_SIZE = 8;
 const CORNER_RADIUS_HANDLE_SIZE = 8;
+const CORNER_RADIUS_HANDLE_INSET_OFFSET = 6;
 const PAGE_SHELL_BORDER_COLOR = 0xffffff;
 const PAGE_SHELL_BORDER_ALPHA = 0.22;
 const PAGE_SHELL_BG_ALPHA = 0.03;
@@ -160,13 +161,17 @@ export class CanvasPixiOverlaysService {
         return;
       }
 
-      const desiredInset = Math.max(cr * zoom, CORNER_RADIUS_HANDLE_SIZE);
+      const desiredInset =
+        Math.max(cr * zoom, CORNER_RADIUS_HANDLE_SIZE) + CORNER_RADIUS_HANDLE_INSET_OFFSET;
       const actualInset = Math.min(desiredInset, maxInset);
       const handleCenter = this.getInsetCornerPoint(quad.ne, quad.nw, quad.se, actualInset);
+      const handleRadius = CORNER_RADIUS_HANDLE_SIZE / 2;
 
       this.cornerRadiusHandle.clear();
-      this.cornerRadiusHandle.circle(handleCenter.x, handleCenter.y, CORNER_RADIUS_HANDLE_SIZE / 2);
+      this.cornerRadiusHandle.circle(handleCenter.x, handleCenter.y, handleRadius);
       this.cornerRadiusHandle.fill({ color: SELECTION_COLOR });
+      this.cornerRadiusHandle.circle(handleCenter.x, handleCenter.y, handleRadius);
+      this.cornerRadiusHandle.stroke({ width: 2, color: 0xffffff });
       this.cornerRadiusHandle.visible = true;
     } else {
       this.cornerRadiusHandle.visible = false;

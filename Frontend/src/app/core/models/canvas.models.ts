@@ -226,6 +226,8 @@ export interface CanvasElement {
   justifyContent?: CanvasJustifyContent;
   alignItems?: CanvasAlignItems;
   gap?: number;
+  gapX?: number;
+  gapY?: number;
   gridTemplateColumns?: string;
   gridTemplateRows?: string;
   padding?: CanvasSpacing;

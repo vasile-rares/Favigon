@@ -433,9 +433,27 @@ function buildNodeLayout(element: CanvasElement): IRLayout | undefined {
     if (typeof element.gap === 'number') layout.gap = px(element.gap);
   }
   if (element.display === 'grid') {
+    const gridColumns = resolveGridTrackCount(element.gridTemplateColumns);
+    const gridRows = resolveGridTrackCount(element.gridTemplateRows);
+
+    if (gridColumns !== undefined) layout.columns = gridColumns;
+    if (gridRows !== undefined) layout.rows = gridRows;
     if (element.gridTemplateColumns) layout.gridTemplateColumns = element.gridTemplateColumns;
     if (element.gridTemplateRows) layout.gridTemplateRows = element.gridTemplateRows;
-    if (typeof element.gap === 'number') layout.gap = px(element.gap);
+
+    const gapX = typeof element.gapX === 'number' ? element.gapX : element.gap;
+    const gapY = typeof element.gapY === 'number' ? element.gapY : element.gap;
+
+    if (typeof gapX === 'number' && typeof gapY === 'number') {
+      if (gapX === gapY) {
+        layout.gap = px(gapX);
+      } else {
+        layout.columnGap = px(gapX);
+        layout.rowGap = px(gapY);
+      }
+    } else if (typeof element.gap === 'number') {
+      layout.gap = px(element.gap);
+    }
   }
 
   // Text vertical alignment: map onto flex align-items (cross-axis in row layout)
@@ -871,6 +889,57 @@ function mapAlignItems(ai: CanvasAlignItems): AlignItems {
     case 'baseline':
       return 'Baseline';
   }
+}
+
+function resolveGridTrackCount(template: string | undefined): number | undefined {
+  const normalized = template?.trim();
+  if (!normalized) {
+    return undefined;
+  }
+
+  const repeatMatch = normalized.match(/^repeat\(\s*(\d+)\s*,/i);
+  if (repeatMatch) {
+    return Math.max(1, Number.parseInt(repeatMatch[1], 10));
+  }
+
+  const tracks = splitGridTrackTemplate(normalized);
+  return tracks.length > 0 ? tracks.length : undefined;
+}
+
+function splitGridTrackTemplate(template: string): string[] {
+  const tracks: string[] = [];
+  let depth = 0;
+  let token = '';
+
+  for (const char of template.trim()) {
+    if (char === '(') {
+      depth++;
+      token += char;
+      continue;
+    }
+
+    if (char === ')') {
+      depth = Math.max(0, depth - 1);
+      token += char;
+      continue;
+    }
+
+    if (/\s/.test(char) && depth === 0) {
+      if (token.trim().length > 0) {
+        tracks.push(token.trim());
+        token = '';
+      }
+      continue;
+    }
+
+    token += char;
+  }
+
+  if (token.trim().length > 0) {
+    tracks.push(token.trim());
+  }
+
+  return tracks;
 }
 
 function mapPositionMode(pos: CanvasPositionMode): PositionMode {

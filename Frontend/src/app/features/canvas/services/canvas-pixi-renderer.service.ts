@@ -1087,6 +1087,8 @@ export class CanvasPixiRendererService {
       justifyContent: el.justifyContent,
       alignItems: el.alignItems,
       gap: el.gap,
+      gapX: el.gapX,
+      gapY: el.gapY,
       padding: el.padding,
       margin: el.margin,
       gridTemplateColumns: el.gridTemplateColumns,
