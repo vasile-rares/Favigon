@@ -17,6 +17,8 @@ export type ToggleGroupIcon =
   | 'text-align-justify'
   | 'radius-full'
   | 'radius-corners'
+  | 'border-all'
+  | 'border-sides'
   | 'spacing-all'
   | 'spacing-sides'
   | 'paint-solid'

@@ -1,0 +1,1816 @@
+
+    <!-- Frame templates -->
+    <section class="properties-section" *ngIf="isFrameToolSelected()">
+      <p class="properties-section-title">Frame presets</p>
+      <p class="properties-section-hint">Select a preset to add a new frame.</p>
+      <div class="frame-template-grid">
+        <button
+          type="button"
+          class="frame-template-button"
+          *ngFor="let template of frameTemplates"
+          (click)="applyFrameTemplate(template)">
+          <span class="frame-template-name">{{ template.name }}</span>
+          <span class="frame-template-size">{{ template.sizeLabel }}</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Empty state -->
+    <div class="properties-empty-state" *ngIf="!selectedElement && !isFrameToolSelected()">
+      <div class="pp-empty-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+          <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+          <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+          <rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+        </svg>
+      </div>
+      <p>Select an element to edit its properties.</p>
+    </div>
+
+    <!-- -- Element properties --------------------------- -->
+    <ng-container *ngIf="selectedElement as element">
+
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasLink(element)"
+        [class.properties-section--actionable]="!hasLink(element)"
+        (click)="!hasLink(element) && onLinkSectionHeaderClick()">
+        <div class="properties-section-header properties-section-header--actionable" (click)="onLinkSectionHeaderClick()">
+          <p class="properties-section-title">Link</p>
+          <button
+            type="button"
+            class="pp-section-toggle"
+            [class.pp-section-toggle--minus]="hasLink(element)"
+            [class.pp-section-toggle--plus]="!hasLink(element)"
+            [attr.aria-label]="hasLink(element) ? 'Remove link' : 'Add link'"
+            [title]="hasLink(element) ? 'Remove link' : 'Add link'"
+            (click)="onLinkSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <ng-container *ngIf="hasLink(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Type</span>
+            <div class="pp-style-control">
+              <app-toggle-group
+                [ariaLabel]="'Link type'"
+                [options]="linkTypeOptions"
+                [value]="linkTypeValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onLinkTypeChange($event)"></app-toggle-group>
+            </div>
+          </div>
+
+          <ng-container [ngSwitch]="linkTypeValue(element)">
+            <ng-container *ngSwitchCase="'page'">
+              <div class="pp-style-row" *ngIf="linkPageOptions(element).length > 0; else noLinkPages">
+                <span class="pp-row-label">Page</span>
+                <div class="pp-style-control pp-style-control--dropdown">
+                  <app-dropdown-select
+                    [enableSearch]="false"
+                    [placeholder]="'Select page'"
+                    [options]="linkPageOptions(element)"
+                    [ngModel]="linkPageValue(element)"
+                    (ngModelChange)="onLinkPageChange($event)"></app-dropdown-select>
+                </div>
+              </div>
+            </ng-container>
+
+            <div class="pp-style-row" *ngSwitchCase="'url'">
+              <span class="pp-row-label">URL</span>
+              <div class="pp-style-control pp-style-control--dropdown">
+                <input
+                  type="url"
+                  class="pp-text-input pp-text-input--boxed"
+                  [value]="linkUrlValue(element)"
+                  (input)="onLinkUrlChange($event)"
+                  placeholder="https://example.com" />
+              </div>
+            </div>
+          </ng-container>
+
+          <ng-template #noLinkPages>
+            <p class="properties-section-hint">Add another page to create an internal navigation target.</p>
+          </ng-template>
+        </ng-container>
+      </section>
+
+      <!-- -- Position -- -->
+      <section class="properties-section" *ngIf="supportsPosition(element.type)">
+        <p class="properties-section-title">Position</p>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Type</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <app-dropdown-select
+              [enableSearch]="false"
+              [placeholder]="'Select position type'"
+              [options]="positionOptions"
+              [ngModel]="positionValue(element)"
+              (ngModelChange)="onPositionChange($event)"></app-dropdown-select>
+          </div>
+        </div>
+      </section>
+
+      <!-- -- Dimensions -- -->
+      <section class="properties-section">
+        <div class="properties-section-header properties-section-header--actionable" (click)="onDimensionSectionHeaderClick($event)">
+          <p class="properties-section-title">Dimensions</p>
+          <button
+            type="button"
+            class="pp-section-toggle pp-section-toggle--plus"
+            aria-label="Dimension options"
+            title="Dimension options"
+            (click)="onDimensionSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="pp-metric-list">
+          <div class="pp-style-row pp-style-row--metric">
+            <span class="pp-row-label">Width</span>
+            <div class="pp-style-control pp-style-control--dimension">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Width"
+                [value]="dimensionInputValue(element, 'width')"
+                [disabled]="isDimensionInputDisabled(element, 'width')"
+                [min]="1"
+                [step]="1"
+                [suffix]="dimensionInputSuffix(element, 'width')"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onDimensionValueChange('width', $event)" />
+
+              <div class="pp-dimension-mode-control">
+                <app-dropdown-select
+                  [enableSearch]="false"
+                  [placeholder]="'Sizing'"
+                  [options]="dimensionModeOptions(element, 'width')"
+                  [ngModel]="dimensionModeValue(element, 'width')"
+                  (ngModelChange)="onDimensionModeChange('width', $event)"></app-dropdown-select>
+              </div>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--metric">
+            <span class="pp-row-label">Height</span>
+            <div class="pp-style-control pp-style-control--dimension">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Height"
+                [value]="dimensionInputValue(element, 'height')"
+                [disabled]="isDimensionInputDisabled(element, 'height')"
+                [min]="1"
+                [step]="1"
+                [suffix]="dimensionInputSuffix(element, 'height')"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onDimensionValueChange('height', $event)" />
+
+              <div class="pp-dimension-mode-control">
+                <app-dropdown-select
+                  [enableSearch]="false"
+                  [placeholder]="'Sizing'"
+                  [options]="dimensionModeOptions(element, 'height')"
+                  [ngModel]="dimensionModeValue(element, 'height')"
+                  (ngModelChange)="onDimensionModeChange('height', $event)"></app-dropdown-select>
+              </div>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--metric" *ngIf="hasDimensionConstraintField(element, 'minWidth')">
+            <span class="pp-row-label">Min W</span>
+            <div class="pp-style-control pp-style-control--dimension">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Minimum width"
+                [value]="dimensionConstraintInputValue(element, 'minWidth')"
+                [min]="1"
+                [step]="1"
+                [suffix]="dimensionConstraintInputSuffix(element, 'minWidth')"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onDimensionConstraintValueChange('minWidth', $event)" />
+
+              <div class="pp-dimension-mode-control">
+                <app-dropdown-select
+                  [enableSearch]="false"
+                  [placeholder]="'Sizing'"
+                  [options]="dimensionConstraintModeOptions(element, 'minWidth')"
+                  [ngModel]="dimensionConstraintModeValue(element, 'minWidth')"
+                  (ngModelChange)="onDimensionConstraintModeChange('minWidth', $event)"></app-dropdown-select>
+              </div>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--metric" *ngIf="hasDimensionConstraintField(element, 'maxWidth')">
+            <span class="pp-row-label">Max W</span>
+            <div class="pp-style-control pp-style-control--dimension">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Maximum width"
+                [value]="dimensionConstraintInputValue(element, 'maxWidth')"
+                [min]="1"
+                [step]="1"
+                [suffix]="dimensionConstraintInputSuffix(element, 'maxWidth')"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onDimensionConstraintValueChange('maxWidth', $event)" />
+
+              <div class="pp-dimension-mode-control">
+                <app-dropdown-select
+                  [enableSearch]="false"
+                  [placeholder]="'Sizing'"
+                  [options]="dimensionConstraintModeOptions(element, 'maxWidth')"
+                  [ngModel]="dimensionConstraintModeValue(element, 'maxWidth')"
+                  (ngModelChange)="onDimensionConstraintModeChange('maxWidth', $event)"></app-dropdown-select>
+              </div>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--metric" *ngIf="hasDimensionConstraintField(element, 'minHeight')">
+            <span class="pp-row-label">Min H</span>
+            <div class="pp-style-control pp-style-control--dimension">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Minimum height"
+                [value]="dimensionConstraintInputValue(element, 'minHeight')"
+                [min]="1"
+                [step]="1"
+                [suffix]="dimensionConstraintInputSuffix(element, 'minHeight')"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onDimensionConstraintValueChange('minHeight', $event)" />
+
+              <div class="pp-dimension-mode-control">
+                <app-dropdown-select
+                  [enableSearch]="false"
+                  [placeholder]="'Sizing'"
+                  [options]="dimensionConstraintModeOptions(element, 'minHeight')"
+                  [ngModel]="dimensionConstraintModeValue(element, 'minHeight')"
+                  (ngModelChange)="onDimensionConstraintModeChange('minHeight', $event)"></app-dropdown-select>
+              </div>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--metric" *ngIf="hasDimensionConstraintField(element, 'maxHeight')">
+            <span class="pp-row-label">Max H</span>
+            <div class="pp-style-control pp-style-control--dimension">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Maximum height"
+                [value]="dimensionConstraintInputValue(element, 'maxHeight')"
+                [min]="1"
+                [step]="1"
+                [suffix]="dimensionConstraintInputSuffix(element, 'maxHeight')"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onDimensionConstraintValueChange('maxHeight', $event)" />
+
+              <div class="pp-dimension-mode-control">
+                <app-dropdown-select
+                  [enableSearch]="false"
+                  [placeholder]="'Sizing'"
+                  [options]="dimensionConstraintModeOptions(element, 'maxHeight')"
+                  [ngModel]="dimensionConstraintModeValue(element, 'maxHeight')"
+                  (ngModelChange)="onDimensionConstraintModeChange('maxHeight', $event)"></app-dropdown-select>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- -- Cursor -- -->
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasCursor(element)"
+        [class.properties-section--actionable]="!hasCursor(element)"
+        (click)="!hasCursor(element) && onCursorSectionHeaderClick()">
+        <div class="properties-section-header properties-section-header--actionable" (click)="onCursorSectionHeaderClick()">
+          <p class="properties-section-title">Cursor</p>
+          <button
+            type="button"
+            class="pp-section-toggle"
+            [class.pp-section-toggle--minus]="hasCursor(element)"
+            [class.pp-section-toggle--plus]="!hasCursor(element)"
+            [attr.aria-label]="hasCursor(element) ? 'Remove cursor override' : 'Add cursor override'"
+            [title]="hasCursor(element) ? 'Remove cursor override' : 'Add cursor override'"
+            (click)="onCursorSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <ng-container *ngIf="hasCursor(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Type</span>
+            <div class="pp-style-control pp-style-control--dropdown">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="'Select cursor'"
+                [options]="cursorOptions"
+                [ngModel]="cursorValue(element)"
+                (ngModelChange)="onCursorChange($event)"></app-dropdown-select>
+            </div>
+          </div>
+        </ng-container>
+      </section>
+
+      <!-- -- Layout -- -->
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasLayout(element)"
+        [class.properties-section--actionable]="!hasLayout(element)"
+        (click)="!hasLayout(element) && onLayoutSectionHeaderClick()"
+        *ngIf="supportsLayout(element.type)">
+        <div class="properties-section-header properties-section-header--actionable" (click)="onLayoutSectionHeaderClick()">
+          <p class="properties-section-title">Layout</p>
+          <button
+            type="button"
+            class="pp-section-toggle"
+            [class.pp-section-toggle--minus]="hasLayout(element)"
+            [class.pp-section-toggle--plus]="!hasLayout(element)"
+            [attr.aria-label]="hasLayout(element) ? 'Remove layout' : 'Add layout'"
+            [title]="hasLayout(element) ? 'Remove layout' : 'Add layout'"
+            (click)="onLayoutSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <ng-container *ngIf="hasLayout(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Display</span>
+            <div class="pp-style-control">
+              <app-toggle-group
+                [ariaLabel]="'Layout display mode'"
+                [options]="layoutDisplayOptions"
+                [value]="displayValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onDisplayChange($event)"></app-toggle-group>
+            </div>
+          </div>
+
+          <ng-container *ngIf="isFlex(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Direction</span>
+            <div class="pp-style-control">
+              <app-toggle-group
+                [ariaLabel]="'Layout direction'"
+                [options]="layoutDirectionOptions"
+                [value]="flexDirectionValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onFlexDirectionChange($event)"></app-toggle-group>
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">{{ justifyContentAxisLabel(element) }}</span>
+            <div class="pp-style-control pp-style-control--dropdown">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="justifyContentPlaceholder(element)"
+                [options]="justifyContentOptions"
+                [ngModel]="justifyContentValue(element)"
+                (ngModelChange)="onJustifyContentChange($event)"></app-dropdown-select>
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">{{ alignItemsAxisLabel(element) }}</span>
+            <div class="pp-style-control">
+              <app-toggle-group
+                [ariaLabel]="alignItemsAriaLabel(element)"
+                [options]="alignItemsOptions(element)"
+                [value]="alignItemsValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onAlignItemsChange($event)"></app-toggle-group>
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Wrap</span>
+            <app-toggle-group
+              [ariaLabel]="'Flex wrap'"
+              [options]="wrapOptions"
+              [value]="flexWrapValue(element)"
+              (valueChange)="onFlexWrapToggle($event === true)">
+            </app-toggle-group>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Gap</span>
+            <div class="pp-style-control pp-style-control--metric">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Gap"
+                [value]="element.gap ?? 0"
+                [min]="0"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onNumberChange('gap', $event)" />
+            </div>
+          </div>
+          </ng-container>
+
+          <ng-container *ngIf="isGrid(element)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Columns</span>
+            <div class="pp-style-control">
+              <input type="text" class="pp-text-input" [value]="element.gridTemplateColumns || ''" (input)="onGridTemplateChange('gridTemplateColumns', $event)" placeholder="1fr 1fr" />
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Rows</span>
+            <div class="pp-style-control">
+              <input type="text" class="pp-text-input" [value]="element.gridTemplateRows || ''" (input)="onGridTemplateChange('gridTemplateRows', $event)" placeholder="auto" />
+            </div>
+          </div>
+          <div class="pp-style-row">
+            <span class="pp-row-label">Gap</span>
+            <div class="pp-style-control pp-style-control--metric">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Gap"
+                [value]="element.gap ?? 0"
+                [min]="0"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onNumberChange('gap', $event)" />
+            </div>
+          </div>
+          </ng-container>
+
+          <div class="pp-style-row pp-style-row--corner-radius">
+            <span class="pp-row-label">Padding</span>
+            <div class="pp-style-control pp-style-control--corner-radius">
+              <div class="pp-corner-radius-header">
+                <app-number-input
+                  appearance="compact"
+                  ariaLabel="Padding"
+                  [value]="fullPaddingInputValue(element)"
+                  [min]="0"
+                  [step]="1"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onPaddingFullChange($event)" />
+
+                <div class="pp-corner-radius-mode">
+                  <app-toggle-group
+                    [ariaLabel]="'Padding mode'"
+                    [options]="paddingModeOptions"
+                    [value]="paddingMode(element)"
+                    [stretch]="true"
+                    [minWidth]="null"
+                    (valueChange)="onPaddingModeChange($event)"></app-toggle-group>
+                </div>
+              </div>
+
+              <div class="pp-corner-radius-grid" *ngIf="paddingMode(element) === 'per-side'">
+                <div class="pp-corner-radius-field" *ngFor="let side of paddingFields">
+                  <div class="pp-corner-radius-input">
+                    <app-number-input
+                      appearance="compact"
+                      [ariaLabel]="side.ariaLabel"
+                      [value]="spacingValue(element, 'padding', side.key)"
+                      [min]="0"
+                      [step]="1"
+                      (gestureStarted)="onNumberInputGestureStarted()"
+                      (gestureCommitted)="onNumberInputGestureCommitted()"
+                      (valueChange)="onPaddingSideChange(side.key, $event)"></app-number-input>
+                    <span class="pp-corner-radius-tag pp-corner-radius-tag--text" aria-hidden="true">
+                      {{ side.label }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+
+      </section>
+
+      <!-- -- Style -- -->
+      <section class="properties-section">
+        <p class="properties-section-title">Style</p>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Opacity</span>
+          <div class="pp-style-control pp-style-control--opacity">
+            <input
+              class="pp-slider"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              [style.--pp-slider-value]="opacitySliderPercent(element)"
+              [value]="element.opacity ?? 1"
+              (input)="onNumberChange('opacity', $event)" />
+            <app-number-input
+              appearance="compact"
+              ariaLabel="Opacity"
+              [value]="element.opacity ?? 1"
+              [min]="0"
+              [max]="1"
+              [step]="0.01"
+              (gestureStarted)="onNumberInputGestureStarted()"
+              (gestureCommitted)="onNumberInputGestureCommitted()"
+              (valueChange)="onNumberChange('opacity', $event)" />
+          </div>
+        </div>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Visible</span>
+          <app-toggle-group
+            [ariaLabel]="'Visibility toggle'"
+            [options]="visibleOptions"
+            [value]="isVisible(element)"
+            (valueChange)="setVisible($event === true)"></app-toggle-group>
+        </div>
+
+        <div class="pp-style-row" *ngIf="hasFill(element.type)">
+          <span class="pp-row-label">Fill</span>
+          <div class="pp-style-control pp-style-control--popup">
+            <app-field-input
+              kind="fill"
+              [hasValue]="!isTransparentFill(element)"
+              [triggerText]="fillLabel(element)"
+              [swatchColor]="fillSwatchBackground(element)"
+              [isTransparent]="isTransparentFill(element)"
+              [colorValue]="fillInputValue(element)"
+              [pickerColor]="fillPickerValue(element)"
+              [activationPatch]="{ fill: fillPickerValue(element) }"
+              [clearPatch]="{ fill: 'transparent' }"
+              (patchRequested)="elementPatch.emit($event)"
+              (numberGestureStarted)="onNumberInputGestureStarted()"
+              (numberGestureCommitted)="onNumberInputGestureCommitted()">
+            </app-field-input>
+          </div>
+        </div>
+
+        <div class="pp-style-row" *ngIf="supportsOverflow(element.type)">
+          <span class="pp-row-label">Overflow</span>
+          <div class="pp-style-control">
+            <select class="pp-select" [value]="overflowValue(element)" (change)="onOverflowChange($event)">
+              <option *ngFor="let option of overflowOptions" [value]="option">{{ option | titlecase }}</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="pp-style-row pp-style-row--corner-radius" *ngIf="supportsCornerRadius(element.type)">
+          <span class="pp-row-label">Radius</span>
+          <div class="pp-style-control pp-style-control--corner-radius">
+            <div class="pp-corner-radius-header">
+              <app-number-input
+                appearance="compact"
+                ariaLabel="Corner radius"
+                [value]="fullCornerRadiusInputValue(element)"
+                [min]="0"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onNumberChange('cornerRadius', $event)" />
+
+              <div class="pp-corner-radius-mode">
+                <app-toggle-group
+                  [ariaLabel]="'Corner radius mode'"
+                  [options]="cornerRadiusModeOptions"
+                  [value]="cornerRadiusMode(element)"
+                  [stretch]="true"
+                  [minWidth]="null"
+                  (valueChange)="onCornerRadiusModeChange($event)"></app-toggle-group>
+              </div>
+            </div>
+
+            <div class="pp-corner-radius-grid" *ngIf="cornerRadiusMode(element) === 'per-corner'">
+              <div class="pp-corner-radius-field" *ngFor="let corner of cornerRadiusFields">
+                <div class="pp-corner-radius-input">
+                  <app-number-input
+                    appearance="compact"
+                    [ariaLabel]="corner.ariaLabel"
+                    [value]="cornerRadiusValue(element, corner.key)"
+                    [min]="0"
+                    [step]="1"
+                    (gestureStarted)="onNumberInputGestureStarted()"
+                    (gestureCommitted)="onNumberInputGestureCommitted()"
+                    (valueChange)="onCornerRadiusCornerChange(corner.key, $event)"></app-number-input>
+                  <span class="pp-corner-radius-tag" aria-hidden="true">
+                    <svg
+                      *ngIf="corner.key === 'topLeft'"
+                      class="pp-corner-radius-tag-icon"
+                      viewBox="0 0 12 12"
+                      fill="none">
+                      <path d="M9.5 2H2V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <svg
+                      *ngIf="corner.key === 'topRight'"
+                      class="pp-corner-radius-tag-icon"
+                      viewBox="0 0 12 12"
+                      fill="none">
+                      <path d="M2.5 2H10V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <svg
+                      *ngIf="corner.key === 'bottomRight'"
+                      class="pp-corner-radius-tag-icon"
+                      viewBox="0 0 12 12"
+                      fill="none">
+                      <path d="M2.5 10H10V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <svg
+                      *ngIf="corner.key === 'bottomLeft'"
+                      class="pp-corner-radius-tag-icon"
+                      viewBox="0 0 12 12"
+                      fill="none">
+                      <path d="M9.5 10H2V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <ng-container *ngIf="hasStroke(element.type)">
+          <div class="pp-style-row">
+            <span class="pp-row-label">Border</span>
+            <div class="pp-style-control pp-style-control--popup">
+              <app-field-input
+                kind="stroke"
+                [hasValue]="hasActiveBorder(element)"
+                [triggerText]="borderSummary(element)"
+                [swatchColor]="strokeSwatchBackground(element)"
+                [colorValue]="strokeInputValue(element)"
+                [pickerColor]="strokeInputValue(element)"
+                [strokeWidth]="element.strokeWidth ?? 1"
+                [strokeStyle]="borderStyleValue(element)"
+                [strokeSides]="strokeSidesValue(element)"
+                [strokeWidths]="strokeWidthsValue(element)"
+                [borderStyleOptions]="borderStyleOptions"
+                [activationPatch]="{ stroke: '#52525b', strokeWidth: 1, strokeStyle: 'Solid', strokeSides: undefined, strokeWidths: undefined }"
+                [clearPatch]="{ stroke: undefined, strokeWidth: 0, strokeStyle: undefined, strokeSides: undefined, strokeWidths: undefined }"
+                (patchRequested)="elementPatch.emit($event)"
+                (numberGestureStarted)="onNumberInputGestureStarted()"
+                (numberGestureCommitted)="onNumberInputGestureCommitted()">
+              </app-field-input>
+            </div>
+          </div>
+        </ng-container>
+
+        <div class="pp-style-row" *ngIf="supportsShadow(element.type)">
+          <span class="pp-row-label">Shadows</span>
+          <div class="pp-style-control pp-style-control--popup">
+            <app-field-input
+              kind="shadow"
+              [hasValue]="hasActiveShadow(element)"
+              [triggerText]="shadowSummary(element)"
+              [shadowValue]="shadowValue(element)"
+              [activationPatch]="shadowActivationPatch"
+              [clearPatch]="shadowClearPatch"
+              (patchRequested)="elementPatch.emit($event)"
+              (numberGestureStarted)="onNumberInputGestureStarted()"
+              (numberGestureCommitted)="onNumberInputGestureCommitted()">
+            </app-field-input>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- -- Text -- -->
+      <section class="properties-section properties-section--text" *ngIf="isText(element.type)">
+        <p class="properties-section-title">Text</p>
+        <div class="pp-style-row">
+          <span class="pp-row-label">Content</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <input
+              type="text"
+              class="pp-text-input pp-text-input--boxed"
+              [value]="element.text || ''"
+              (input)="onTextChange('text', $event)"
+              placeholder="Text content" />
+          </div>
+        </div>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Font</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <app-dropdown-select
+              [enableSearch]="false"
+              [placeholder]="'Select font'"
+              [options]="fontFamilyOptions"
+              [ngModel]="fontFamilyValue(element)"
+              (ngModelChange)="onTypographySelectChange('fontFamily', $event)"></app-dropdown-select>
+          </div>
+        </div>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Weight</span>
+          <div class="pp-style-control pp-style-control--text-style">
+            <app-dropdown-select
+              [enableSearch]="false"
+              [placeholder]="'Select weight'"
+              [options]="fontWeightOptions"
+              [ngModel]="fontWeightValue(element)"
+              (ngModelChange)="onTypographySelectChange('fontWeight', $event)"></app-dropdown-select>
+            <div class="pp-icon-group pp-icon-group--compact">
+              <button
+                type="button"
+                class="pp-icon-btn pp-italic-btn"
+                [class.active]="fontStyleValue(element) === 'italic'"
+                (click)="setFontStyle(fontStyleValue(element) === 'italic' ? 'normal' : 'italic')"
+                title="Italic">
+                <em>I</em>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Color</span>
+          <div class="pp-style-control pp-style-control--popup">
+            <app-field-input
+              kind="fill"
+              [triggerText]="fillLabel(element)"
+              [swatchColor]="fillSwatchBackground(element)"
+              [isTransparent]="isTransparentFill(element)"
+              [colorValue]="fillInputValue(element)"
+              [pickerColor]="fillPickerValue(element)"
+              [clearPatch]="{ fill: 'transparent' }"
+              (patchRequested)="elementPatch.emit($event)"
+              (numberGestureStarted)="onNumberInputGestureStarted()"
+              (numberGestureCommitted)="onNumberInputGestureCommitted()">
+            </app-field-input>
+          </div>
+        </div>
+
+        <div class="pp-style-row pp-style-row--metric">
+          <span class="pp-row-label">Size</span>
+          <div class="pp-style-control pp-style-control--text-metric">
+            <app-number-input
+              appearance="compact"
+              ariaLabel="Font size"
+              [value]="element.fontSize || 16"
+              [min]="fontSizeUnitValue(element) === 'rem' ? 0.1 : 8"
+              [step]="fontSizeUnitValue(element) === 'rem' ? 0.01 : 1"
+              (gestureStarted)="onNumberInputGestureStarted()"
+              (gestureCommitted)="onNumberInputGestureCommitted()"
+              (valueChange)="onNumberChange('fontSize', $event)" />
+            <div class="pp-text-unit-control">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="'Unit'"
+                [options]="fontSizeUnitOptions"
+                [ngModel]="fontSizeUnitValue(element)"
+                (ngModelChange)="onTextMetricUnitChange('fontSizeUnit', $event)"></app-dropdown-select>
+            </div>
+          </div>
+        </div>
+
+        <div class="pp-style-row pp-style-row--metric">
+          <span class="pp-row-label">Letter</span>
+          <div class="pp-style-control pp-style-control--text-metric">
+            <app-number-input
+              appearance="compact"
+              ariaLabel="Letter spacing"
+              [value]="element.letterSpacing ?? 0"
+              [step]="0.01"
+              (gestureStarted)="onNumberInputGestureStarted()"
+              (gestureCommitted)="onNumberInputGestureCommitted()"
+              (valueChange)="onNumberChange('letterSpacing', $event)" />
+            <div class="pp-text-unit-control">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="'Unit'"
+                [options]="textSpacingUnitOptions"
+                [ngModel]="letterSpacingUnitValue(element)"
+                (ngModelChange)="onTextMetricUnitChange('letterSpacingUnit', $event)"></app-dropdown-select>
+            </div>
+          </div>
+        </div>
+
+        <div class="pp-style-row pp-style-row--metric">
+          <span class="pp-row-label">Line</span>
+          <div class="pp-style-control pp-style-control--text-metric">
+            <app-number-input
+              appearance="compact"
+              ariaLabel="Line height"
+              [value]="element.lineHeight ?? 1.2"
+              [min]="lineHeightUnitValue(element) === 'em' ? 0.8 : 1"
+              [step]="0.01"
+              (gestureStarted)="onNumberInputGestureStarted()"
+              (gestureCommitted)="onNumberInputGestureCommitted()"
+              (valueChange)="onNumberChange('lineHeight', $event)" />
+            <div class="pp-text-unit-control">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="'Unit'"
+                [options]="textSpacingUnitOptions"
+                [ngModel]="lineHeightUnitValue(element)"
+                (ngModelChange)="onTextMetricUnitChange('lineHeightUnit', $event)"></app-dropdown-select>
+            </div>
+          </div>
+        </div>
+
+        <div class="pp-style-row">
+          <span class="pp-row-label">Align</span>
+          <div class="pp-style-control pp-style-control--text-align">
+            <app-toggle-group
+              [ariaLabel]="'Text alignment'"
+              [options]="textAlignToggleOptions"
+              [value]="textAlignValue(element)"
+              [stretch]="true"
+              [minWidth]="null"
+              (valueChange)="onTextAlignChange($event)"></app-toggle-group>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- -- Image -- -->
+      <section class="properties-section" *ngIf="isImage(element.type)">
+        <p class="properties-section-title">Image</p>
+        <input
+          type="text"
+          class="pp-text-input"
+          [value]="element.imageUrl || ''"
+          (input)="onTextChange('imageUrl', $event)"
+          placeholder="https://example.com/image.png" />
+      </section>
+
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasTransforms(element)"
+        [class.properties-section--actionable]="!hasTransforms(element)"
+        (click)="!hasTransforms(element) && onTransformSectionHeaderClick($event)">
+        <div
+          class="properties-section-header properties-section-header--menu properties-section-header--actionable"
+          (click)="onTransformSectionHeaderClick($event)">
+          <p class="properties-section-title">Transforms</p>
+          <button
+            type="button"
+            class="pp-section-toggle pp-section-toggle--plus"
+            aria-label="Add transform"
+            title="Add transform"
+            (click)="onTransformSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <ng-container *ngIf="hasTransforms(element)">
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'scale')">
+            <span class="pp-row-label">Scale</span>
+            <div class="pp-style-control pp-style-control--transform-scale">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Scale"
+                [value]="transformScaleValue(element)"
+                [min]="0.1"
+                [step]="0.1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onTransformScaleChange($event)"></app-number-input>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'rotate')">
+            <span class="pp-row-label">Rotate</span>
+            <div class="pp-style-control pp-style-control--transform-rotate">
+              <app-number-input
+                appearance="boxed"
+                ariaLabel="Rotation"
+                [value]="rotationValue(element)"
+                [step]="1"
+                [suffix]="'�'"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onRotationChange($event)"></app-number-input>
+              <app-toggle-group
+                [ariaLabel]="'Rotation mode'"
+                [options]="rotateModeOptions"
+                [value]="rotationModeValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onRotationModeChange($event)"></app-toggle-group>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'skew')">
+            <span class="pp-row-label">Skew</span>
+            <div class="pp-style-control pp-style-control--transform-dual">
+              <div class="pp-transform-axis-field">
+                <app-number-input
+                  appearance="boxed"
+                  ariaLabel="Skew X"
+                  [value]="skewXValue(element)"
+                  [step]="1"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onSkewChange('x', $event)"></app-number-input>
+                <span class="pp-transform-axis-tag">X</span>
+              </div>
+              <div class="pp-transform-axis-field">
+                <app-number-input
+                  appearance="boxed"
+                  ariaLabel="Skew Y"
+                  [value]="skewYValue(element)"
+                  [step]="1"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onSkewChange('y', $event)"></app-number-input>
+                <span class="pp-transform-axis-tag">Y</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'depth')">
+            <span class="pp-row-label">Depth</span>
+            <div class="pp-style-control pp-style-control--transform-slider">
+              <app-number-input
+                appearance="compact"
+                ariaLabel="Depth"
+                [value]="depthValue(element)"
+                [min]="-1000"
+                [max]="1000"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onDepthChange($event)"></app-number-input>
+              <input
+                class="pp-slider"
+                type="range"
+                min="-1000"
+                max="1000"
+                step="1"
+                [style.--pp-slider-value]="transformSliderPercent(depthValue(element), -1000, 1000)"
+                [value]="depthValue(element)"
+                (input)="onDepthChange($any($event.target).valueAsNumber)" />
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'perspective')">
+            <span class="pp-row-label">Perspective</span>
+            <div class="pp-style-control pp-style-control--transform-slider">
+              <app-number-input
+                appearance="compact"
+                ariaLabel="Perspective"
+                [value]="perspectiveValue(element)"
+                [min]="100"
+                [max]="3000"
+                [step]="10"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onPerspectiveChange($event)"></app-number-input>
+              <input
+                class="pp-slider"
+                type="range"
+                min="100"
+                max="3000"
+                step="10"
+                [style.--pp-slider-value]="transformSliderPercent(perspectiveValue(element), 100, 3000)"
+                [value]="perspectiveValue(element)"
+                (input)="onPerspectiveChange($any($event.target).valueAsNumber)" />
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'origin')">
+            <span class="pp-row-label">Origin</span>
+            <div class="pp-style-control pp-style-control--transform-dual">
+              <div class="pp-transform-axis-field">
+                <app-number-input
+                  appearance="boxed"
+                  ariaLabel="Origin X"
+                  [value]="originXValue(element)"
+                  [min]="0"
+                  [max]="100"
+                  [step]="1"
+                  [suffix]="'%'"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onOriginChange('x', $event)"></app-number-input>
+                <span class="pp-transform-axis-tag">X</span>
+              </div>
+              <div class="pp-transform-axis-field">
+                <app-number-input
+                  appearance="boxed"
+                  ariaLabel="Origin Y"
+                  [value]="originYValue(element)"
+                  [min]="0"
+                  [max]="100"
+                  [step]="1"
+                  [suffix]="'%'"
+                  (gestureStarted)="onNumberInputGestureStarted()"
+                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                  (valueChange)="onOriginChange('y', $event)"></app-number-input>
+                <span class="pp-transform-axis-tag">Y</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'backface')">
+            <span class="pp-row-label">Backface</span>
+            <div class="pp-style-control pp-style-control--transform-toggle">
+              <app-toggle-group
+                [ariaLabel]="'Backface visibility'"
+                [options]="backfaceVisibilityOptions"
+                [value]="backfaceVisibilityValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onBackfaceVisibilityChange($event)"></app-toggle-group>
+            </div>
+          </div>
+
+          <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'preserve3d')">
+            <span class="pp-row-label">Preserve 3D</span>
+            <div class="pp-style-control pp-style-control--transform-toggle">
+              <app-toggle-group
+                [ariaLabel]="'Preserve 3D'"
+                [options]="preserve3DOptions"
+                [value]="preserve3DValue(element)"
+                [stretch]="true"
+                [minWidth]="null"
+                (valueChange)="onPreserve3DChange($event)"></app-toggle-group>
+            </div>
+          </div>
+        </ng-container>
+      </section>
+
+      <!-- -- Effects -- -->
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasEffects(element)"
+        [class.properties-section--actionable]="!hasEffects(element)"
+        (click)="!hasEffects(element) && onEffectSectionHeaderClick($event)">
+        <div
+          class="properties-section-header properties-section-header--menu properties-section-header--actionable"
+          (click)="onEffectSectionHeaderClick($event)">
+          <p class="properties-section-title">Effects</p>
+          <button
+            type="button"
+            class="pp-section-toggle pp-section-toggle--plus"
+            aria-label="Add effect"
+            title="Add effect"
+            (click)="onEffectSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <ng-container *ngFor="let eff of getEffects(element); let i = index; trackBy: trackEffectByIndex">
+          <div class="pp-style-row pp-style-row--effect-summary">
+            <span class="pp-row-label">{{ effectDisplayName(eff, i) }}</span>
+            <div class="pp-style-control pp-style-control--popup">
+              <app-field-input
+                kind="effect"
+                [hasValue]="true"
+                [triggerText]="'Effect'"
+                [popupTitleOverride]="effectPopupTitle(eff, i)"
+                [popupWidthOverride]="280"
+                (openChange)="onEffectPopupOpenChange(i, $event)"
+                (clearRequested)="removeEffect(i)">
+                <div class="pp-effect-popup-body">
+                  <ng-container [ngSwitch]="effectPopupView(i)">
+                    <ng-container *ngSwitchCase="'main'">
+                      <div class="pp-effect-popup-section">
+                        <div class="pp-effect-preview">
+                          <div class="pp-effect-preview__stage">
+                            <div class="pp-effect-preview__node-shell">
+                              <div class="pp-effect-preview__node" [ngStyle]="effectPreviewStyle(eff, i)">
+                                <span class="pp-effect-preview__line pp-effect-preview__line--short"></span>
+                                <span class="pp-effect-preview__line"></span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <ng-container *ngIf="effectUsesHoverEditor(eff); else loopOrAppearEffectControls">
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Opacity</span>
+                            <div class="pp-style-control pp-style-control--opacity">
+                              <input
+                                class="pp-slider"
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                [style.--pp-slider-value]="effectOpacitySliderPercent(eff)"
+                                [value]="effectOpacityValue(eff)"
+                                (input)="onEffectOpacityChange(i, $any($event.target).valueAsNumber)" />
+                              <app-number-input
+                                appearance="compact"
+                                ariaLabel="Effect opacity"
+                                [value]="effectOpacityValue(eff)"
+                                [min]="0"
+                                [max]="1"
+                                [step]="0.01"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectOpacityChange(i, $event)"></app-number-input>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Scale</span>
+                            <div class="pp-style-control pp-style-control--transform-scale">
+                              <app-number-input
+                                appearance="boxed"
+                                ariaLabel="Effect scale"
+                                [value]="effectScaleValue(eff)"
+                                [min]="0"
+                                [step]="0.01"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectScaleChange(i, $event)"></app-number-input>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Rotate</span>
+                            <div class="pp-style-control pp-style-control--transform-rotate">
+                              <app-number-input
+                                appearance="boxed"
+                                ariaLabel="Effect rotation"
+                                [value]="effectRotateValue(eff)"
+                                [step]="1"
+                                [suffix]="'�'"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectRotateChange(i, $event)"></app-number-input>
+                              <app-toggle-group
+                                [ariaLabel]="'Effect rotation mode'"
+                                [options]="rotateModeOptions"
+                                [value]="effectRotationModeValue(eff)"
+                                [stretch]="true"
+                                [minWidth]="null"
+                                (valueChange)="onEffectRotationModeChange(i, $event)"></app-toggle-group>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Skew</span>
+                            <div class="pp-style-control pp-style-control--transform-dual">
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect skew X"
+                                  [value]="effectSkewXValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectSkewChange(i, 'x', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">X</span>
+                              </div>
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect skew Y"
+                                  [value]="effectSkewYValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectSkewChange(i, 'y', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">Y</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Offset</span>
+                            <div class="pp-style-control pp-style-control--transform-dual">
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect offset X"
+                                  [value]="effectOffsetXValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectOffsetChange(i, 'x', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">X</span>
+                              </div>
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect offset Y"
+                                  [value]="effectOffsetYValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectOffsetChange(i, 'y', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">Y</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="hasFill(element.type)">
+                            <span class="pp-row-label">Fill</span>
+                            <div class="pp-style-control pp-style-control--popup">
+                              <div class="pp-effect-popup-picker">
+                                <button type="button" class="pp-effect-popup-picker__main" (click)="openEffectFillSettings(i)">
+                                  <span
+                                    class="pp-effect-popup-picker__swatch"
+                                    [class.pp-effect-popup-picker__swatch--transparent]="effectIsTransparentFill(eff)"
+                                    [style.background]="effectFillSwatchBackground(eff)"></span>
+                                  <span class="pp-effect-popup-picker__text">{{ effectFillLabel(eff) }}</span>
+                                </button>
+                                <button
+                                  *ngIf="effectHasActiveFill(eff)"
+                                  type="button"
+                                  class="pp-effect-popup-picker__clear"
+                                  aria-label="Clear hover fill"
+                                  (click)="clearEffectFill(i)">�</button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="supportsShadow(element.type)">
+                            <span class="pp-row-label">Shadow</span>
+                            <div class="pp-style-control pp-style-control--popup">
+                              <div class="pp-effect-popup-picker">
+                                <button type="button" class="pp-effect-popup-picker__main" (click)="openEffectShadowSettings(i)">
+                                  <span
+                                    class="pp-effect-popup-picker__swatch"
+                                    [class.pp-effect-popup-picker__swatch--transparent]="!effectHasActiveShadow(eff)"
+                                    [style.background]="effectShadowSwatchBackground(eff)"></span>
+                                  <span class="pp-effect-popup-picker__text">{{ effectShadowSummary(eff) }}</span>
+                                </button>
+                                <button
+                                  *ngIf="effectHasActiveShadow(eff)"
+                                  type="button"
+                                  class="pp-effect-popup-picker__clear"
+                                  aria-label="Clear hover shadow"
+                                  (click)="clearEffectShadow(i)">�</button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Transition</span>
+                            <div class="pp-style-control">
+                              <button
+                                type="button"
+                                class="pp-effect-popup-nav"
+                                (click)="openEffectTransitionSettings(i)">
+                                <span class="pp-effect-popup-nav__summary">{{ effectTransitionSummary(eff) }}</span>
+                                <svg class="pp-effect-popup-nav__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                  <path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </ng-container>
+
+                        <ng-template #loopOrAppearEffectControls>
+                          <ng-container *ngIf="effectUsesLoopEditor(eff); else appearEffectControls">
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Type</span>
+                              <div class="pp-style-control">
+                                <app-toggle-group
+                                  [ariaLabel]="'Loop type'"
+                                  [options]="effectLoopTypeOptions"
+                                  [value]="effectLoopTypeValue(eff)"
+                                  [stretch]="true"
+                                  [minWidth]="null"
+                                  (valueChange)="onEffectLoopTypeChange(i, $event)"></app-toggle-group>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Delay</span>
+                              <div class="pp-style-control pp-style-control--transform-scale">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Loop animation delay in milliseconds"
+                                  [value]="eff.delay"
+                                  [min]="0"
+                                  [step]="50"
+                                  [suffix]="'ms'"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectDelayChange(i, $event)"></app-number-input>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Opacity</span>
+                              <div class="pp-style-control pp-style-control--opacity">
+                                <input
+                                  class="pp-slider"
+                                  type="range"
+                                  min="0"
+                                  max="1"
+                                  step="0.01"
+                                  [style.--pp-slider-value]="effectOpacitySliderPercent(eff)"
+                                  [value]="effectOpacityValue(eff)"
+                                  (input)="onEffectOpacityChange(i, $any($event.target).valueAsNumber)" />
+                                <app-number-input
+                                  appearance="compact"
+                                  ariaLabel="Effect opacity"
+                                  [value]="effectOpacityValue(eff)"
+                                  [min]="0"
+                                  [max]="1"
+                                  [step]="0.01"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectOpacityChange(i, $event)"></app-number-input>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Scale</span>
+                              <div class="pp-style-control pp-style-control--transform-scale">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect scale"
+                                  [value]="effectScaleValue(eff)"
+                                  [min]="0"
+                                  [step]="0.01"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectScaleChange(i, $event)"></app-number-input>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Rotate</span>
+                              <div class="pp-style-control pp-style-control--transform-rotate">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect rotation"
+                                  [value]="effectRotateValue(eff)"
+                                  [step]="1"
+                                  [suffix]="'�'"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectRotateChange(i, $event)"></app-number-input>
+                                <app-toggle-group
+                                  [ariaLabel]="'Effect rotation mode'"
+                                  [options]="rotateModeOptions"
+                                  [value]="effectRotationModeValue(eff)"
+                                  [stretch]="true"
+                                  [minWidth]="null"
+                                  (valueChange)="onEffectRotationModeChange(i, $event)"></app-toggle-group>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Skew</span>
+                              <div class="pp-style-control pp-style-control--transform-dual">
+                                <div class="pp-transform-axis-field">
+                                  <app-number-input
+                                    appearance="boxed"
+                                    ariaLabel="Effect skew X"
+                                    [value]="effectSkewXValue(eff)"
+                                    [step]="1"
+                                    (gestureStarted)="onNumberInputGestureStarted()"
+                                    (gestureCommitted)="onNumberInputGestureCommitted()"
+                                    (valueChange)="onEffectSkewChange(i, 'x', $event)"></app-number-input>
+                                  <span class="pp-transform-axis-tag">X</span>
+                                </div>
+                                <div class="pp-transform-axis-field">
+                                  <app-number-input
+                                    appearance="boxed"
+                                    ariaLabel="Effect skew Y"
+                                    [value]="effectSkewYValue(eff)"
+                                    [step]="1"
+                                    (gestureStarted)="onNumberInputGestureStarted()"
+                                    (gestureCommitted)="onNumberInputGestureCommitted()"
+                                    (valueChange)="onEffectSkewChange(i, 'y', $event)"></app-number-input>
+                                  <span class="pp-transform-axis-tag">Y</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Offset</span>
+                              <div class="pp-style-control pp-style-control--transform-dual">
+                                <div class="pp-transform-axis-field">
+                                  <app-number-input
+                                    appearance="boxed"
+                                    ariaLabel="Effect offset X"
+                                    [value]="effectOffsetXValue(eff)"
+                                    [step]="1"
+                                    (gestureStarted)="onNumberInputGestureStarted()"
+                                    (gestureCommitted)="onNumberInputGestureCommitted()"
+                                    (valueChange)="onEffectOffsetChange(i, 'x', $event)"></app-number-input>
+                                  <span class="pp-transform-axis-tag">X</span>
+                                </div>
+                                <div class="pp-transform-axis-field">
+                                  <app-number-input
+                                    appearance="boxed"
+                                    ariaLabel="Effect offset Y"
+                                    [value]="effectOffsetYValue(eff)"
+                                    [step]="1"
+                                    (gestureStarted)="onNumberInputGestureStarted()"
+                                    (gestureCommitted)="onNumberInputGestureCommitted()"
+                                    (valueChange)="onEffectOffsetChange(i, 'y', $event)"></app-number-input>
+                                  <span class="pp-transform-axis-tag">Y</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Off Screen</span>
+                              <div class="pp-style-control">
+                                <app-toggle-group
+                                  [ariaLabel]="'Off screen playback'"
+                                  [options]="effectOffScreenOptions"
+                                  [value]="effectOffScreenBehaviorValue(eff)"
+                                  [stretch]="true"
+                                  [minWidth]="null"
+                                  (valueChange)="onEffectOffScreenBehaviorChange(i, $event)"></app-toggle-group>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Transition</span>
+                              <div class="pp-style-control">
+                                <button
+                                  type="button"
+                                  class="pp-effect-popup-nav"
+                                  (click)="openEffectTransitionSettings(i)">
+                                  <span class="pp-effect-popup-nav__summary">{{ effectTransitionSummary(eff) }}</span>
+                                  <svg class="pp-effect-popup-nav__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                    <path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          </ng-container>
+                        </ng-template>
+
+                        <ng-template #appearEffectControls>
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Preset</span>
+                            <div class="pp-style-control pp-style-control--dropdown">
+                              <app-dropdown-select
+                                [enableSearch]="false"
+                                [outsideClickBoundarySelector]="'.style-popup-overlay'"
+                                [placeholder]="'Select preset'"
+                                [options]="effectPresetOptions"
+                                [ngModel]="eff.preset"
+                                (ngModelChange)="onEffectPresetChange(i, $event)"></app-dropdown-select>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectShowsCustomControls(eff)">
+                            <span class="pp-row-label">Opacity</span>
+                            <div class="pp-style-control pp-style-control--opacity">
+                              <input
+                                class="pp-slider"
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                [style.--pp-slider-value]="effectOpacitySliderPercent(eff)"
+                                [value]="effectOpacityValue(eff)"
+                                (input)="onEffectOpacityChange(i, $any($event.target).valueAsNumber)" />
+                              <app-number-input
+                                appearance="compact"
+                                ariaLabel="Effect opacity"
+                                [value]="effectOpacityValue(eff)"
+                                [min]="0"
+                                [max]="1"
+                                [step]="0.01"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectOpacityChange(i, $event)"></app-number-input>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectShowsCustomControls(eff)">
+                            <span class="pp-row-label">Scale</span>
+                            <div class="pp-style-control pp-style-control--transform-scale">
+                              <app-number-input
+                                appearance="boxed"
+                                ariaLabel="Effect scale"
+                                [value]="effectScaleValue(eff)"
+                                [min]="0"
+                                [step]="0.01"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectScaleChange(i, $event)"></app-number-input>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectShowsCustomControls(eff)">
+                            <span class="pp-row-label">Rotate</span>
+                            <div class="pp-style-control pp-style-control--transform-rotate">
+                              <app-number-input
+                                appearance="boxed"
+                                ariaLabel="Effect rotation"
+                                [value]="effectRotateValue(eff)"
+                                [step]="1"
+                                [suffix]="'�'"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectRotateChange(i, $event)"></app-number-input>
+                              <app-toggle-group
+                                [ariaLabel]="'Effect rotation mode'"
+                                [options]="rotateModeOptions"
+                                [value]="effectRotationModeValue(eff)"
+                                [stretch]="true"
+                                [minWidth]="null"
+                                (valueChange)="onEffectRotationModeChange(i, $event)"></app-toggle-group>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectShowsCustomControls(eff)">
+                            <span class="pp-row-label">Skew</span>
+                            <div class="pp-style-control pp-style-control--transform-dual">
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect skew X"
+                                  [value]="effectSkewXValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectSkewChange(i, 'x', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">X</span>
+                              </div>
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect skew Y"
+                                  [value]="effectSkewYValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectSkewChange(i, 'y', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">Y</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectShowsCustomControls(eff)">
+                            <span class="pp-row-label">Offset</span>
+                            <div class="pp-style-control pp-style-control--transform-dual">
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect offset X"
+                                  [value]="effectOffsetXValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectOffsetChange(i, 'x', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">X</span>
+                              </div>
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect offset Y"
+                                  [value]="effectOffsetYValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectOffsetChange(i, 'y', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">Y</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectSupportsTransition(eff)">
+                            <span class="pp-row-label">Transition</span>
+                            <div class="pp-style-control">
+                              <button
+                                type="button"
+                                class="pp-effect-popup-nav"
+                                (click)="openEffectTransitionSettings(i)">
+                                <span class="pp-effect-popup-nav__summary">{{ effectTransitionSummary(eff) }}</span>
+                                <svg class="pp-effect-popup-nav__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                  <path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </ng-template>
+                      </div>
+                    </ng-container>
+
+                    <ng-container *ngSwitchCase="'transition'">
+                      <div class="pp-effect-popup-section pp-effect-popup-section--transition">
+                        <div class="pp-effect-popup-subview-header">
+                          <button
+                            type="button"
+                            class="pp-effect-popup-back"
+                            aria-label="Back to effect settings"
+                            (click)="closeEffectPopupSubview(i)">
+                            <svg class="pp-effect-popup-back__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                              <path d="M10 3.5L5.5 8L10 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                          </button>
+                          <p class="pp-effect-popup-subview-title">Transition</p>
+                        </div>
+
+                        <div class="pp-style-row">
+                          <span class="pp-row-label">Duration</span>
+                          <div class="pp-style-control pp-style-control--transform-scale">
+                            <app-number-input
+                              appearance="boxed"
+                              ariaLabel="Animation duration in milliseconds"
+                              [value]="eff.duration"
+                              [min]="0"
+                              [step]="50"
+                              [suffix]="'ms'"
+                              (gestureStarted)="onNumberInputGestureStarted()"
+                              (gestureCommitted)="onNumberInputGestureCommitted()"
+                              (valueChange)="onEffectDurationChange(i, $event)"></app-number-input>
+                          </div>
+                        </div>
+
+                        <div class="pp-style-row" *ngIf="!effectUsesLoopEditor(eff)">
+                          <span class="pp-row-label">Delay</span>
+                          <div class="pp-style-control pp-style-control--transform-scale">
+                            <app-number-input
+                              appearance="boxed"
+                              ariaLabel="Animation delay in milliseconds"
+                              [value]="eff.delay"
+                              [min]="0"
+                              [step]="50"
+                              [suffix]="'ms'"
+                              (gestureStarted)="onNumberInputGestureStarted()"
+                              (gestureCommitted)="onNumberInputGestureCommitted()"
+                              (valueChange)="onEffectDelayChange(i, $event)"></app-number-input>
+                          </div>
+                        </div>
+
+                        <div class="pp-style-row">
+                          <span class="pp-row-label">Easing</span>
+                          <div class="pp-style-control pp-style-control--dropdown">
+                            <app-dropdown-select
+                              [enableSearch]="false"
+                              [placeholder]="'Select easing'"
+                              [options]="effectEasingOptions"
+                              [ngModel]="eff.easing"
+                              (ngModelChange)="onEffectEasingChange(i, $event)"></app-dropdown-select>
+                          </div>
+                        </div>
+                      </div>
+                    </ng-container>
+
+                    <ng-container *ngSwitchCase="'fill'">
+                      <div class="pp-effect-popup-section pp-effect-popup-section--transition">
+                        <div class="pp-effect-popup-subview-header">
+                          <button
+                            type="button"
+                            class="pp-effect-popup-back"
+                            aria-label="Back to effect settings"
+                            (click)="closeEffectPopupSubview(i)">
+                            <svg class="pp-effect-popup-back__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                              <path d="M10 3.5L5.5 8L10 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                          </button>
+                          <p class="pp-effect-popup-subview-title">Fill</p>
+                        </div>
+
+                        <app-field-input
+                          kind="fill"
+                          [inlineContentOnly]="true"
+                          [hasValue]="effectHasActiveFill(eff)"
+                          [isTransparent]="effectIsTransparentFill(eff)"
+                          [colorValue]="effectFillInputValue(eff)"
+                          [pickerColor]="effectFillPickerValue(eff)"
+                          (patchRequested)="onEffectFillPatch(i, $event)"
+                          (numberGestureStarted)="onNumberInputGestureStarted()"
+                          (numberGestureCommitted)="onNumberInputGestureCommitted()"></app-field-input>
+                      </div>
+                    </ng-container>
+
+                    <ng-container *ngSwitchCase="'shadow'">
+                      <div class="pp-effect-popup-section pp-effect-popup-section--transition">
+                        <div class="pp-effect-popup-subview-header">
+                          <button
+                            type="button"
+                            class="pp-effect-popup-back"
+                            aria-label="Back to effect settings"
+                            (click)="closeEffectPopupSubview(i)">
+                            <svg class="pp-effect-popup-back__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                              <path d="M10 3.5L5.5 8L10 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                          </button>
+                          <p class="pp-effect-popup-subview-title">Shadow</p>
+                        </div>
+
+                        <app-field-input
+                          kind="shadow"
+                          [inlineContentOnly]="true"
+                          [hasValue]="effectHasActiveShadow(eff)"
+                          [shadowValue]="effectShadowEditorValue(eff)"
+                          (patchRequested)="onEffectShadowPatch(i, $event)"
+                          (numberGestureStarted)="onNumberInputGestureStarted()"
+                          (numberGestureCommitted)="onNumberInputGestureCommitted()"></app-field-input>
+                      </div>
+                    </ng-container>
+                  </ng-container>
+                </div>
+              </app-field-input>
+            </div>
+          </div>
+        </ng-container>
+      </section>
+
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasAccessibilityFields(element)"
+        [class.properties-section--actionable]="!hasAccessibilityFields(element)"
+        (click)="!hasAccessibilityFields(element) && onAccessibilitySectionHeaderClick($event)">
+        <div
+          class="properties-section-header properties-section-header--menu properties-section-header--actionable"
+          (click)="onAccessibilitySectionHeaderClick($event)">
+          <p class="properties-section-title">Accessibility</p>
+          <button
+            type="button"
+            class="pp-section-toggle pp-section-toggle--plus"
+            aria-label="Accessibility options"
+            title="Accessibility options"
+            (click)="onAccessibilitySectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <div class="pp-style-row" *ngIf="hasAccessibilityField(element, 'tag') && supportsAccessibilityTag(element)">
+          <span class="pp-row-label">Tag</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <app-dropdown-select
+              [disabled]="isAccessibilityTagLocked(element)"
+              [enableSearch]="false"
+              [placeholder]="accessibilityTagPlaceholder(element)"
+              [options]="accessibilityTagOptions(element)"
+              [ngModel]="accessibilityTagValue(element)"
+              (ngModelChange)="onAccessibilityTagChange($event)"></app-dropdown-select>
+          </div>
+        </div>
+
+        <div class="pp-style-row" *ngIf="hasAccessibilityField(element, 'ariaLabel')">
+          <span class="pp-row-label">Aria Label</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <input
+              type="text"
+              class="pp-text-input pp-text-input--boxed"
+              [value]="accessibilityLabelValue(element)"
+              (input)="onAccessibilityLabelChange($event)"
+              [placeholder]="accessibilityLabelPlaceholder(element)" />
+          </div>
+        </div>
+        <p class="properties-section-hint" *ngIf="element.type === 'image'">
+          Image labels are exported as alt text.
+        </p>
+      </section>
+
+
+
+<app-context-menu
+  *ngIf="transformMenuItems.length > 0"
+  [x]="transformMenuX"
+  [y]="transformMenuY"
+  [verticalDirection]="'below'"
+  [items]="transformMenuItems"
+  (closed)="closeTransformMenu()"></app-context-menu>
+
+<app-context-menu
+  *ngIf="effectMenuItems.length > 0"
+  [x]="effectMenuX"
+  [y]="effectMenuY"
+  [verticalDirection]="'below'"
+  [items]="effectMenuItems"
+  (closed)="closeEffectMenu()"></app-context-menu>
+
+<app-context-menu
+  *ngIf="dimensionMenuItems.length > 0"
+  [x]="dimensionMenuX"
+  [y]="dimensionMenuY"
+  [verticalDirection]="'below'"
+  [items]="dimensionMenuItems"
+  (closed)="closeDimensionMenu()"></app-context-menu>
+
+<app-context-menu
+  *ngIf="accessibilityMenuItems.length > 0"
+  [x]="accessibilityMenuX"
+  [y]="accessibilityMenuY"
+  [verticalDirection]="'below'"
+  [items]="accessibilityMenuItems"
+  (closed)="closeAccessibilityMenu()"></app-context-menu>

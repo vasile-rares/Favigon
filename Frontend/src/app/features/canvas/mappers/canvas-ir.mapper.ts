@@ -1,5 +1,7 @@
 ﻿import {
   CanvasAlignItems,
+  CanvasBorderSides,
+  CanvasBorderWidths,
   CanvasCornerRadii,
   CanvasDisplayMode,
   CanvasEffect,
@@ -450,25 +452,22 @@ function buildNodeLayout(element: CanvasElement): IRLayout | undefined {
 function buildNodePosition(element: CanvasElement, parent?: CanvasElement): IRPosition {
   // CSS `position: absolute` offsets from the padding edge (inside the border).
   // Canvas x/y are from the outer bounding box edge.
-  // Subtract parent border width so positions match visually.
-  const parentBorderWidth: number = parent?.stroke
-    ? typeof parent.strokeWidth === 'number'
-      ? Math.max(0, parent.strokeWidth)
-      : DEFAULT_STROKE_WIDTH
-    : 0;
+  // Subtract parent border widths so positions match visually.
+  const parentBorderLeftWidth = resolveCanvasBorderSideWidth(parent, 'left');
+  const parentBorderTopWidth = resolveCanvasBorderSideWidth(parent, 'top');
 
   if (!element.position) {
     return {
       mode: 'Absolute',
-      left: px(element.x - parentBorderWidth),
-      top: px(element.y - parentBorderWidth),
+      left: px(element.x - parentBorderLeftWidth),
+      top: px(element.y - parentBorderTopWidth),
     };
   }
   const mode = mapPositionMode(element.position);
   const pos: IRPosition = { mode };
   if (element.position === 'absolute' || element.position === 'fixed') {
-    pos.left = px(element.x - parentBorderWidth);
-    pos.top = px(element.y - parentBorderWidth);
+    pos.left = px(element.x - parentBorderLeftWidth);
+    pos.top = px(element.y - parentBorderTopWidth);
   }
   if (element.position === 'sticky') {
     pos.top = px(element.y);
@@ -557,17 +556,37 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
   }
 
   if (element.stroke) {
-    const strokeWidth =
-      typeof element.strokeWidth === 'number'
-        ? Math.max(0, element.strokeWidth)
-        : DEFAULT_STROKE_WIDTH;
+    const strokeWidths = element.strokeWidths;
+    const hasPerSideStrokeWidths =
+      strokeWidths !== undefined &&
+      Object.values(strokeWidths).some((value) => Math.max(0, value) > 0);
 
-    if (strokeWidth > 0) {
+    if (hasPerSideStrokeWidths && strokeWidths) {
       style.border = {
-        width: px(strokeWidth),
         color: element.stroke,
         style: (element.strokeStyle as BorderStyle | undefined) ?? 'Solid',
+        topWidth: px(Math.max(0, strokeWidths.top)),
+        rightWidth: px(Math.max(0, strokeWidths.right)),
+        bottomWidth: px(Math.max(0, strokeWidths.bottom)),
+        leftWidth: px(Math.max(0, strokeWidths.left)),
       } satisfies IRBorder;
+    } else {
+      const strokeWidth =
+        typeof element.strokeWidth === 'number'
+          ? Math.max(0, element.strokeWidth)
+          : DEFAULT_STROKE_WIDTH;
+
+      if (strokeWidth > 0) {
+        const sides = element.strokeSides;
+        style.border = {
+          width: px(strokeWidth),
+          color: element.stroke,
+          style: (element.strokeStyle as BorderStyle | undefined) ?? 'Solid',
+          ...(sides
+            ? { top: sides.top, right: sides.right, bottom: sides.bottom, left: sides.left }
+            : {}),
+        } satisfies IRBorder;
+      }
     }
   }
 
@@ -932,9 +951,11 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     stroke: node.style?.border?.color,
     strokeWidth:
       mappedType !== 'text'
-        ? readLength(node.style?.border?.width, DEFAULT_STROKE_WIDTH)
+        ? resolveImportedBorderWidth(node.style?.border, DEFAULT_STROKE_WIDTH)
         : undefined,
     strokeStyle: mappedType !== 'text' ? (node.style?.border?.style ?? 'Solid') : undefined,
+    strokeSides: mappedType !== 'text' ? readImportedBorderSides(node.style?.border) : undefined,
+    strokeWidths: mappedType !== 'text' ? readImportedBorderWidths(node.style?.border) : undefined,
     opacity: readNumber(node.style?.opacity, DEFAULT_OPACITY),
     cornerRadius,
     cornerRadii,
@@ -1120,6 +1141,94 @@ function readLength(len: IRLength | undefined, fallback: number): number {
     return fallback;
   }
   return Number.isFinite(len.value) ? len.value : fallback;
+}
+
+function resolveCanvasBorderSideWidth(
+  element: CanvasElement | undefined,
+  side: keyof CanvasBorderWidths,
+): number {
+  if (!element?.stroke) {
+    return 0;
+  }
+
+  if (element.strokeWidths) {
+    return Math.max(0, element.strokeWidths[side]);
+  }
+
+  if (element.strokeSides && !element.strokeSides[side]) {
+    return 0;
+  }
+
+  return typeof element.strokeWidth === 'number'
+    ? Math.max(0, element.strokeWidth)
+    : DEFAULT_STROKE_WIDTH;
+}
+
+function readImportedBorderWidths(border: IRBorder | undefined): CanvasBorderWidths | undefined {
+  if (!border) {
+    return undefined;
+  }
+
+  const hasSpecificWidths =
+    border.topWidth !== undefined ||
+    border.rightWidth !== undefined ||
+    border.bottomWidth !== undefined ||
+    border.leftWidth !== undefined;
+
+  if (!hasSpecificWidths) {
+    return undefined;
+  }
+
+  return {
+    top: readLength(border.topWidth, 0),
+    right: readLength(border.rightWidth, 0),
+    bottom: readLength(border.bottomWidth, 0),
+    left: readLength(border.leftWidth, 0),
+  };
+}
+
+function readImportedBorderSides(border: IRBorder | undefined): CanvasBorderSides | undefined {
+  if (!border) {
+    return undefined;
+  }
+
+  const widths = readImportedBorderWidths(border);
+  const hasSpecificSides =
+    border.top !== undefined ||
+    border.right !== undefined ||
+    border.bottom !== undefined ||
+    border.left !== undefined;
+
+  if (!hasSpecificSides && !widths) {
+    return undefined;
+  }
+
+  return {
+    top: border.top ?? (widths?.top ?? 0) > 0,
+    right: border.right ?? (widths?.right ?? 0) > 0,
+    bottom: border.bottom ?? (widths?.bottom ?? 0) > 0,
+    left: border.left ?? (widths?.left ?? 0) > 0,
+  };
+}
+
+function resolveImportedBorderWidth(
+  border: IRBorder | undefined,
+  fallback: number,
+): number | undefined {
+  if (!border) {
+    return undefined;
+  }
+
+  if (border.width) {
+    return readLength(border.width, fallback);
+  }
+
+  const widths = readImportedBorderWidths(border);
+  if (!widths) {
+    return fallback;
+  }
+
+  return [widths.top, widths.right, widths.bottom, widths.left].find((value) => value > 0) ?? 0;
 }
 
 function readCornerRadii(

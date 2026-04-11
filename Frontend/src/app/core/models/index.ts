@@ -42,6 +42,8 @@ export type {
   CanvasAlignItems,
   CanvasSpacing,
   CanvasCornerRadii,
+  CanvasBorderSides,
+  CanvasBorderWidths,
   CanvasElementIrMeta,
   CanvasElement,
   CanvasPageModel,

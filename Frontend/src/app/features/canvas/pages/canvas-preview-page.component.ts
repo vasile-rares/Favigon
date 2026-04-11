@@ -217,6 +217,22 @@ export class CanvasPreviewPage {
     return this.el.getElementStrokeStyle(element);
   }
 
+  getElementBorderTopStyle(element: CanvasElement): string | null {
+    return this.el.getElementStrokeSideStyle(element, 'top');
+  }
+
+  getElementBorderRightStyle(element: CanvasElement): string | null {
+    return this.el.getElementStrokeSideStyle(element, 'right');
+  }
+
+  getElementBorderBottomStyle(element: CanvasElement): string | null {
+    return this.el.getElementStrokeSideStyle(element, 'bottom');
+  }
+
+  getElementBorderLeftStyle(element: CanvasElement): string | null {
+    return this.el.getElementStrokeSideStyle(element, 'left');
+  }
+
   getElementBorderRadius(element: CanvasElement): string {
     return this.el.getElementBorderRadius(element);
   }

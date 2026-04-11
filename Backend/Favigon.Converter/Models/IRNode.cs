@@ -157,6 +157,10 @@ public class IRBorder
   public IRLength? Width { get; set; }
   public string? Color { get; set; }
   public BorderStyle Style { get; set; } = BorderStyle.Solid;
+  public IRLength? TopWidth { get; set; }
+  public IRLength? RightWidth { get; set; }
+  public IRLength? BottomWidth { get; set; }
+  public IRLength? LeftWidth { get; set; }
 
   // Selective sides — if all are null the border applies to all four sides
   public bool? Top { get; set; }

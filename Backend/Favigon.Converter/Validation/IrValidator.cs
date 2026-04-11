@@ -118,6 +118,10 @@ public static class IrValidator
   private static void ValidateBorder(IRBorder border, string path, List<string> errors)
   {
     ValidateOptionalLength(border.Width, path, "width", errors, allowNegative: false);
+    ValidateOptionalLength(border.TopWidth, path, "topWidth", errors, allowNegative: false);
+    ValidateOptionalLength(border.RightWidth, path, "rightWidth", errors, allowNegative: false);
+    ValidateOptionalLength(border.BottomWidth, path, "bottomWidth", errors, allowNegative: false);
+    ValidateOptionalLength(border.LeftWidth, path, "leftWidth", errors, allowNegative: false);
     ValidateColor(border.Color, path, "color", errors);
   }
 

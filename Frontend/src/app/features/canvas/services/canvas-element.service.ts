@@ -9,7 +9,9 @@ import {
 import {
   getDefaultCornerRadius,
   getElementBorderRadiusCss,
+  getStrokeWidths,
   getStrokeWidth,
+  hasPerSideStrokeWidths,
   hasPerCornerRadius,
 } from '../utils/canvas-interaction.util';
 import { clamp, roundToTwoDecimals } from '../utils/canvas-math.util';
@@ -800,6 +802,10 @@ export class CanvasElementService {
       return 'none';
     }
 
+    if (hasPerSideStrokeWidths(element)) {
+      return 'none';
+    }
+
     const strokeWidth = getStrokeWidth(element);
     if (strokeWidth <= 0) {
       return 'none';
@@ -807,6 +813,28 @@ export class CanvasElementService {
 
     const cssStyle = (element.strokeStyle ?? 'Solid').toLowerCase();
     return `${strokeWidth}px ${cssStyle} ${element.stroke}`;
+  }
+
+  getElementStrokeSideStyle(
+    element: CanvasElement,
+    side: keyof ReturnType<typeof getStrokeWidths>,
+  ): string | null {
+    if (!element.stroke || element.type === 'text') {
+      return null;
+    }
+
+    if (!hasPerSideStrokeWidths(element)) {
+      return null;
+    }
+
+    const widths = getStrokeWidths(element);
+    const width = widths[side];
+    if (width <= 0) {
+      return 'none';
+    }
+
+    const cssStyle = (element.strokeStyle ?? 'Solid').toLowerCase();
+    return `${width}px ${cssStyle} ${element.stroke}`;
   }
 
   getElementTransform(element: CanvasElement): string | null {

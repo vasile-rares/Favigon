@@ -132,6 +132,20 @@ export interface CanvasCornerRadii {
   bottomLeft: number;
 }
 
+export interface CanvasBorderSides {
+  top: boolean;
+  right: boolean;
+  bottom: boolean;
+  left: boolean;
+}
+
+export interface CanvasBorderWidths {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
 export interface CanvasElementIrMeta {
   type?: string;
   props?: Record<string, unknown>;
@@ -180,6 +194,8 @@ export interface CanvasElement {
   stroke?: string;
   strokeWidth?: number;
   strokeStyle?: string;
+  strokeSides?: CanvasBorderSides;
+  strokeWidths?: CanvasBorderWidths;
   opacity?: number;
   cornerRadius?: number;
   cornerRadii?: CanvasCornerRadii;

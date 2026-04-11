@@ -7,7 +7,7 @@
   min-width: 0;
 }
 
-.style-popup-field__trigger {
+.field-input__trigger {
   box-sizing: border-box;
   min-width: 0;
   width: 100%;
@@ -44,11 +44,11 @@
   }
 }
 
-.style-popup-field__trigger--color {
+.field-input__trigger--color {
   justify-content: flex-start;
 }
 
-.style-popup-field__trigger-main {
+.field-input__trigger-main {
   min-width: 0;
   flex: 1;
   height: 100%;
@@ -63,7 +63,7 @@
   overflow: hidden;
 }
 
-.style-popup-field__trigger-text {
+.field-input__trigger-text {
   flex: 1;
   min-width: 0;
   overflow: visible;
@@ -73,7 +73,7 @@
   text-align: left;
 }
 
-.style-popup-field__trigger-clear {
+.field-input__trigger-clear {
   width: 20px;
   height: 20px;
   display: inline-flex;
@@ -99,7 +99,7 @@
   }
 }
 
-.style-popup-field__add-btn {
+.field-input__add-btn {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -129,7 +129,7 @@
   }
 }
 
-.style-popup-field__color-swatch {
+.field-input__color-swatch {
   display: block;
   width: 22px;
   height: 22px;
@@ -139,7 +139,7 @@
   flex-shrink: 0;
 }
 
-.style-popup-field__effect-swatch {
+.field-input__effect-swatch {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -155,13 +155,13 @@
     linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
 }
 
-.style-popup-field__effect-swatch-icon {
+.field-input__effect-swatch-icon {
   width: 14px;
   height: 14px;
   display: block;
 }
 
-.style-popup-field__color-swatch--transparent {
+.field-input__color-swatch--transparent {
   background:
     linear-gradient(45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
     linear-gradient(-45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
@@ -175,7 +175,7 @@
     -5px 0;
 }
 
-.style-popup-field__popup {
+.field-input__popup {
   position: fixed;
   inset: auto;
   margin: 0;
@@ -197,11 +197,11 @@
   -webkit-user-select: none;
 }
 
-.style-popup-field__popup:popover-open {
+.field-input__popup:popover-open {
   display: block;
 }
 
-.style-popup-field__popup-header {
+.field-input__popup-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -209,14 +209,14 @@
   margin-bottom: 0.65rem;
 }
 
-.style-popup-field__popup-title {
+.field-input__popup-title {
   margin: 0;
   color: var(--color-zinc-100);
   font-size: var(--canvas-panel-font-size, 0.84rem);
   font-weight: 600;
 }
 
-.style-popup-field__popup-close {
+.field-input__popup-close {
   width: 26px;
   height: 26px;
   border-radius: 7px;

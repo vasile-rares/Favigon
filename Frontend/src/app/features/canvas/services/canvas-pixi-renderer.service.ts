@@ -1,13 +1,15 @@
 import { Injectable, inject } from '@angular/core';
 import { Container, Graphics, Text, TextStyle, Sprite, Assets, Texture } from 'pixi.js';
 import { DropShadowFilter } from 'pixi-filters';
-import { CanvasElement, CanvasCornerRadii } from '@app/core';
+import { CanvasElement, CanvasCornerRadii, CanvasBorderWidths } from '@app/core';
 import { CanvasPixiApplicationService } from './canvas-pixi-application.service';
 import { CanvasPixiLayoutService, LayoutResult } from './canvas-pixi-layout.service';
 import { CanvasElementService } from './canvas-element.service';
 import {
   getResolvedCornerRadii,
+  getStrokeWidths,
   hasPerCornerRadius,
+  hasPerSideStrokeWidths,
   getStrokeWidth,
 } from '../utils/canvas-interaction.util';
 import { roundToTwoDecimals } from '../utils/canvas-math.util';
@@ -22,6 +24,7 @@ interface PixiElementNode {
   container: Container;
   fillGraphics: Graphics;
   strokeGraphics: Graphics;
+  strokeMaskGraphics: Graphics | null;
   textObj: Text | null;
   sprite: Sprite | null;
   maskGraphics: Graphics | null;
@@ -236,6 +239,7 @@ export class CanvasPixiRendererService {
 
     let textObj: Text | null = null;
     let sprite: Sprite | null = null;
+    let strokeMaskGraphics: Graphics | null = null;
     let maskGraphics: Graphics | null = null;
     let shadowFilter: DropShadowFilter | null = null;
 
@@ -247,19 +251,38 @@ export class CanvasPixiRendererService {
 
     // Stroke
     if (element.stroke && element.type !== 'text') {
-      const sw = getStrokeWidth(element);
-      const strokeDash = element.strokeStyle === 'Dashed' ? [4, 4] : undefined;
-      this.drawRoundedRectStroke(
-        strokeGraphics,
-        0,
-        0,
-        width,
-        height,
-        cornerRadii,
-        element.stroke,
-        sw,
-      );
-      container.addChild(strokeGraphics);
+      if (hasPerSideStrokeWidths(element)) {
+        const strokeWidths = getStrokeWidths(element);
+        this.drawPerSideRectStroke(
+          strokeGraphics,
+          0,
+          0,
+          width,
+          height,
+          element.stroke,
+          strokeWidths,
+        );
+        strokeMaskGraphics = new Graphics();
+        this.drawRoundedRect(strokeMaskGraphics, 0, 0, width, height, cornerRadii, '#ffffff');
+        strokeGraphics.mask = strokeMaskGraphics;
+        container.addChild(strokeGraphics);
+        container.addChild(strokeMaskGraphics);
+      } else {
+        const sw = getStrokeWidth(element);
+        if (sw > 0) {
+          this.drawRoundedRectStroke(
+            strokeGraphics,
+            0,
+            0,
+            width,
+            height,
+            cornerRadii,
+            element.stroke,
+            sw,
+          );
+          container.addChild(strokeGraphics);
+        }
+      }
     }
 
     // Shadow
@@ -310,6 +333,7 @@ export class CanvasPixiRendererService {
           container,
           fillGraphics,
           strokeGraphics,
+          strokeMaskGraphics,
           textObj,
           sprite,
           maskGraphics,
@@ -363,6 +387,7 @@ export class CanvasPixiRendererService {
       container,
       fillGraphics,
       strokeGraphics,
+      strokeMaskGraphics,
       textObj,
       sprite,
       maskGraphics,
@@ -948,6 +973,48 @@ export class CanvasPixiRendererService {
     g.stroke({ width: strokeWidth, color: stroke.color, alpha: stroke.alpha, alignment: 1 });
   }
 
+  private drawPerSideRectStroke(
+    g: Graphics,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    strokeColor: string,
+    strokeWidths: CanvasBorderWidths,
+  ): void {
+    g.clear();
+
+    let stroke: { color: number; alpha: number };
+    try {
+      stroke = parsePixiCssColor(strokeColor);
+    } catch {
+      stroke = { color: 0x000000, alpha: 1 };
+    }
+
+    const top = Math.min(Math.max(0, strokeWidths.top), h);
+    const right = Math.min(Math.max(0, strokeWidths.right), w);
+    const bottom = Math.min(Math.max(0, strokeWidths.bottom), h);
+    const left = Math.min(Math.max(0, strokeWidths.left), w);
+
+    if (top > 0) {
+      g.rect(x, y, w, top);
+    }
+
+    if (right > 0) {
+      g.rect(x + w - right, y, right, h);
+    }
+
+    if (bottom > 0) {
+      g.rect(x, y + h - bottom, w, bottom);
+    }
+
+    if (left > 0) {
+      g.rect(x, y, left, h);
+    }
+
+    g.fill({ color: stroke.color, alpha: stroke.alpha });
+  }
+
   // ── Image Loading ─────────────────────────────────────────
 
   private async loadImageTexture(url: string, sprite: Sprite): Promise<void> {
@@ -984,6 +1051,8 @@ export class CanvasPixiRendererService {
       fill: el.fill,
       stroke: el.stroke,
       strokeWidth: el.strokeWidth,
+      strokeSides: el.strokeSides,
+      strokeWidths: el.strokeWidths,
       strokeStyle: el.strokeStyle,
       opacity: el.opacity,
       cornerRadius: el.cornerRadius,

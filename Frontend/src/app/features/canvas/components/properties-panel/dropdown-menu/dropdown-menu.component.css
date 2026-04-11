@@ -1,0 +1,555 @@
+.field-input__popup-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.field-input__popup-field-label {
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-500));
+  font-size: var(--canvas-panel-font-size, 0.68rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.field-input__popup-input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.32);
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-100));
+  border-radius: 8px;
+  padding: 0.45rem 0.55rem;
+  font-size: var(--canvas-panel-font-size, 0.78rem);
+  outline: none;
+
+  &:focus {
+    border-color: var(--color-brand-primary-30);
+  }
+}
+
+.field-input__mode-toggle {
+  --canvas-panel-font-size: 0.66rem;
+  --toggle-group-height: 32px;
+  --toggle-group-padding: 0.16rem;
+  --toggle-group-button-padding: 0.2rem 0.18rem;
+  --toggle-group-button-radius: 6px;
+}
+
+.field-input__popup-text-input-shell {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 0.5rem 0.55rem;
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+
+  &:focus-within {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.45);
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.05),
+      inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.field-input__popup-color-row {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 0.55rem;
+  align-items: stretch;
+}
+
+.field-input__screen-pick-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-100));
+  font-size: var(--canvas-panel-font-size, 0.8rem);
+  font-weight: 500;
+  padding: 0.5rem;
+  cursor: pointer;
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    color 0.2s ease,
+    opacity 0.2s ease;
+
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: rgba(0, 0, 0, 0.45);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.05),
+      inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
+}
+
+.field-input__screen-pick-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.field-input__popup-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.12) 12%,
+    rgba(255, 255, 255, 0.12) 88%,
+    rgba(255, 255, 255, 0)
+  );
+}
+
+.field-input__popup-text-input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-100));
+  font-size: var(--canvas-panel-font-size, 0.8rem);
+  padding: 0;
+  outline: none;
+  cursor: text;
+  text-align: left;
+}
+
+.field-input__popup-dropdown {
+  display: block;
+}
+
+.field-input__popup-dropdown--color-format {
+  min-width: 0;
+}
+
+.field-input__popup-dropdown ::ng-deep .dropdown-select {
+  gap: 0;
+}
+
+.field-input__popup-dropdown ::ng-deep .dropdown-select__trigger {
+  width: 100%;
+  min-height: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.25);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  padding: 0.38rem 0.55rem;
+  font-size: var(--canvas-panel-font-size, 0.8rem);
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-100));
+}
+
+.field-input__popup-dropdown ::ng-deep .dropdown-select__trigger:hover:not(:disabled),
+.field-input__popup-dropdown ::ng-deep .dropdown-select__trigger:focus,
+.field-input__popup-dropdown ::ng-deep .dropdown-select__trigger:focus-visible,
+.field-input__popup-dropdown ::ng-deep .dropdown-select__trigger[aria-expanded='true'] {
+  background: rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.05),
+    inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.field-input__popup-dropdown ::ng-deep .dropdown-select__trigger-text,
+.field-input__popup-dropdown ::ng-deep .dropdown-select__trigger-text--placeholder {
+  color: var(--canvas-panel-section-body-color, var(--color-zinc-100));
+  font-size: var(--canvas-panel-font-size, 0.8rem);
+}
+
+.field-input__popup-dropdown ::ng-deep .dropdown-select__trigger-icon {
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-400));
+  padding: 0;
+}
+
+.field-input__popup-dropdown ::ng-deep .dropdown-select__panel {
+  top: auto;
+  bottom: calc(100% + 0.35rem);
+  left: 0;
+  right: 0;
+  border-radius: 12px;
+  transform-origin: bottom center;
+  z-index: 80;
+}
+
+.field-input__popup-dropdown ::ng-deep .dropdown-select__list {
+  max-height: 180px;
+}
+
+.field-input__stroke-sides {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field-input__stroke-style-row {
+  width: 100%;
+}
+
+.field-input__stroke-header {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+}
+
+.field-input__stroke-metric {
+  position: relative;
+  min-width: 0;
+}
+
+.field-input__stroke-metric > app-number-input {
+  --number-input-compact-host-width: 100%;
+  --number-input-compact-host-flex: 1 1 auto;
+  --number-input-compact-width: 100%;
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.field-input__stroke-metric > app-number-input ::ng-deep .number-input__field {
+  padding-right: 2.9rem;
+}
+
+.field-input__stroke-mode {
+  width: 100%;
+  min-width: 0;
+}
+
+.field-input__stroke-mode > app-toggle-group {
+  width: 100%;
+  --toggle-group-icon-size: 16px;
+  --toggle-group-icon-offset-y: 0px;
+  --toggle-group-icon-only-button-padding: 0.28rem 0.4rem;
+  --canvas-panel-toggle-group-padding: 0.16rem;
+  --canvas-panel-toggle-group-button-padding: 0.28rem;
+}
+
+.field-input__stroke-width-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+}
+
+.field-input__stroke-width-field {
+  min-width: 0;
+}
+
+.field-input__stroke-width-input {
+  position: relative;
+  min-width: 0;
+}
+
+.field-input__stroke-width-input > app-number-input {
+  --number-input-compact-host-width: 100%;
+  --number-input-compact-host-flex: 1 1 auto;
+  --number-input-compact-width: 100%;
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.field-input__stroke-width-input > app-number-input ::ng-deep .number-input__field {
+  padding-right: 1rem;
+}
+
+.field-input__stroke-width-tag {
+  position: absolute;
+  top: 50%;
+  right: 0.65rem;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-500));
+  line-height: 1;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.14s ease;
+}
+
+.field-input__stroke-width-tag--text {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.field-input__stroke-width-input:hover > .field-input__stroke-width-tag,
+.field-input__stroke-width-input:focus-within > .field-input__stroke-width-tag {
+  opacity: 0;
+}
+
+.field-input__popup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem;
+}
+
+.field-input__stroke-metric-tag {
+  position: absolute;
+  top: 50%;
+  right: 0.65rem;
+  transform: translateY(-50%);
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-500));
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.14s ease;
+}
+
+.field-input__stroke-metric:hover > .field-input__stroke-metric-tag,
+.field-input__stroke-metric:focus-within > .field-input__stroke-metric-tag {
+  opacity: 0;
+}
+
+.field-input__color-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.field-input__color-picker-surface {
+  position: relative;
+  height: 160px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: crosshair;
+  background-image:
+    linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, transparent);
+  background-clip: padding-box;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  touch-action: none;
+}
+
+.field-input__color-picker-surface-handle {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.field-input__color-picker-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.field-input__color-picker-preview {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
+  flex-shrink: 0;
+}
+
+.field-input__color-picker-preview--transparent {
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%);
+  background-size: 10px 10px;
+  background-position:
+    0 0,
+    0 5px,
+    5px -5px,
+    -5px 0;
+}
+
+.field-input__color-picker-hue {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.field-input__color-picker-hue-track {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #ff0000 0%,
+    #ffff00 17%,
+    #00ff00 33%,
+    #00ffff 50%,
+    #0000ff 67%,
+    #ff00ff 83%,
+    #ff0000 100%
+  );
+  cursor: ew-resize;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  touch-action: none;
+}
+
+.field-input__color-picker-hue-handle {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 18px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.field-input__color-picker-alpha-track {
+  position: relative;
+  height: 14px;
+  border-radius: 999px;
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%),
+    rgba(255, 255, 255, 0.02);
+  background-size: 10px 10px;
+  background-position:
+    0 0,
+    0 5px,
+    5px -5px,
+    -5px 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.field-input__color-picker-alpha-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.field-input__color-picker-alpha-handle {
+  position: absolute;
+  top: 50%;
+  width: 12px;
+  height: 18px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.field-input__shadow-preview {
+  width: 28px;
+  height: 18px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  flex-shrink: 0;
+  box-shadow: none;
+}
+
+.field-input__shadow-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.field-input__shadow-row,
+.field-input__shadow-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+}
+
+.field-input__shadow-metric {
+  position: relative;
+  min-width: 0;
+}
+
+.field-input__shadow-metric > app-number-input {
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.field-input__shadow-metric > app-number-input ::ng-deep .number-input__field {
+  padding-right: 1.05rem;
+}
+
+.field-input__shadow-metric--blur > app-number-input ::ng-deep .number-input__field {
+  padding-right: 2.25rem;
+}
+
+.field-input__shadow-metric--spread > app-number-input ::ng-deep .number-input__field {
+  padding-right: 2.9rem;
+}
+
+.field-input__shadow-metric-tag {
+  position: absolute;
+  top: 50%;
+  right: 0.65rem;
+  transform: translateY(-50%);
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-500));
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.14s ease;
+}
+
+.field-input__shadow-metric:hover > .field-input__shadow-metric-tag,
+.field-input__shadow-metric:focus-within > .field-input__shadow-metric-tag {
+  opacity: 0;
+}
+
+.field-input__shadow-position-toggle {
+  --canvas-panel-font-size: 0.72rem;
+  --toggle-group-height: 34px;
+  --toggle-group-padding: 0.16rem;
+  --toggle-group-button-padding: 0.24rem 0.45rem;
+  --toggle-group-button-radius: 7px;
+}
+
+.field-input__shadow-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem 0.55rem;
+}

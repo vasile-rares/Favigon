@@ -1,4 +1,4 @@
-import { CanvasCornerRadii, CanvasElement, CanvasElementType } from '@app/core';
+import { CanvasBorderWidths, CanvasCornerRadii, CanvasElement, CanvasElementType } from '@app/core';
 import { clamp, roundToTwoDecimals } from './canvas-math.util';
 import {
   hasCanvasElementLink,
@@ -21,6 +21,7 @@ import {
 import { normalizeCanvasShadowValue } from './canvas-shadow.util';
 
 const MIN_SIZE = 1;
+const DEFAULT_STROKE_WIDTH = 1;
 
 export function isPointInsideElement(x: number, y: number, element: CanvasElement): boolean {
   return (
@@ -85,6 +86,14 @@ export function withRoundedPrecision(element: CanvasElement): CanvasElement {
         ? roundToTwoDecimals(element.cornerRadius)
         : undefined,
     cornerRadii: element.cornerRadii ? roundCornerRadii(element.cornerRadii) : undefined,
+    strokeWidths: element.strokeWidths
+      ? {
+          top: Math.max(0, roundToTwoDecimals(element.strokeWidths.top)),
+          right: Math.max(0, roundToTwoDecimals(element.strokeWidths.right)),
+          bottom: Math.max(0, roundToTwoDecimals(element.strokeWidths.bottom)),
+          left: Math.max(0, roundToTwoDecimals(element.strokeWidths.left)),
+        }
+      : undefined,
   };
 }
 
@@ -195,10 +204,20 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
   if (element.type !== 'text') {
     const normalizedStrokeWidth = Number.isFinite(element.strokeWidth ?? Number.NaN)
       ? (element.strokeWidth as number)
-      : 1;
+      : DEFAULT_STROKE_WIDTH;
     element.strokeWidth = Math.max(0, roundToTwoDecimals(normalizedStrokeWidth));
+    element.strokeWidths = element.strokeWidths
+      ? {
+          top: Math.max(0, roundToTwoDecimals(element.strokeWidths.top)),
+          right: Math.max(0, roundToTwoDecimals(element.strokeWidths.right)),
+          bottom: Math.max(0, roundToTwoDecimals(element.strokeWidths.bottom)),
+          left: Math.max(0, roundToTwoDecimals(element.strokeWidths.left)),
+        }
+      : undefined;
   } else {
     element.strokeWidth = undefined;
+    element.strokeSides = undefined;
+    element.strokeWidths = undefined;
   }
 
   const parent = element.parentId
@@ -339,11 +358,41 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
 }
 
 export function getStrokeWidth(element: CanvasElement): number {
-  if (typeof element.strokeWidth === 'number' && Number.isFinite(element.strokeWidth)) {
-    return Math.max(0, element.strokeWidth);
+  const widths = getStrokeWidths(element);
+  return Math.max(widths.top, widths.right, widths.bottom, widths.left);
+}
+
+export function getStrokeWidths(element: CanvasElement): CanvasBorderWidths {
+  if (!element.stroke || element.type === 'text') {
+    return { top: 0, right: 0, bottom: 0, left: 0 };
   }
 
-  return 1;
+  if (element.strokeWidths) {
+    return {
+      top: Math.max(0, roundToTwoDecimals(element.strokeWidths.top)),
+      right: Math.max(0, roundToTwoDecimals(element.strokeWidths.right)),
+      bottom: Math.max(0, roundToTwoDecimals(element.strokeWidths.bottom)),
+      left: Math.max(0, roundToTwoDecimals(element.strokeWidths.left)),
+    };
+  }
+
+  const baseWidth =
+    typeof element.strokeWidth === 'number' && Number.isFinite(element.strokeWidth)
+      ? Math.max(0, roundToTwoDecimals(element.strokeWidth))
+      : DEFAULT_STROKE_WIDTH;
+  const sides = element.strokeSides ?? { top: true, right: true, bottom: true, left: true };
+
+  return {
+    top: sides.top ? baseWidth : 0,
+    right: sides.right ? baseWidth : 0,
+    bottom: sides.bottom ? baseWidth : 0,
+    left: sides.left ? baseWidth : 0,
+  };
+}
+
+export function hasPerSideStrokeWidths(element: CanvasElement): boolean {
+  const widths = getStrokeWidths(element);
+  return widths.top !== widths.right || widths.top !== widths.bottom || widths.top !== widths.left;
 }
 
 function normalizeConstraintField(

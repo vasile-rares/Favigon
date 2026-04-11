@@ -12,6 +12,8 @@ import {
   ViewChild,
 } from '@angular/core';
 import { CanvasElement } from '@app/core';
+import { CanvasBorderWidths } from '@app/core';
+import { CanvasBorderSides } from '@app/core';
 import { resolveEditableCanvasShadow } from '../../../utils/canvas-shadow.util';
 import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component';
 
@@ -22,13 +24,13 @@ type PopoverElement = HTMLElement & {
 };
 
 @Component({
-  selector: 'app-style-popup-field',
+  selector: 'app-field-input',
   standalone: true,
   imports: [CommonModule, FormsModule, DropdownMenuComponent],
-  templateUrl: './style-popup-field.component.html',
-  styleUrl: './style-popup-field.component.css',
+  templateUrl: './field-input.component.html',
+  styleUrl: './field-input.component.css',
 })
-export class StylePopupFieldComponent implements OnDestroy {
+export class FieldInputComponent implements OnDestroy {
   @Input() kind: StylePopupFieldKind = 'fill';
   @Input() hasValue = true;
   @Input() triggerText = '';
@@ -40,6 +42,8 @@ export class StylePopupFieldComponent implements OnDestroy {
   @Input() strokeWidth = 1;
   @Input() strokeStyle = 'Solid';
   @Input() borderStyleOptions: string[] = [];
+  @Input() strokeSides: CanvasBorderSides | null = null;
+  @Input() strokeWidths: CanvasBorderWidths | null = null;
   @Input() popupTitleOverride = '';
   @Input() popupWidthOverride: number | null = null;
   @Input() inlineContentOnly = false;

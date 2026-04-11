@@ -118,25 +118,54 @@ public static class StyleTransformer
       return;
     }
 
-    var parts = new List<string>();
-    if (border.Width is not null) parts.Add(border.Width.ToString());
-    parts.Add(MapBorderStyle(border.Style));
-    if (border.Color is not null) parts.Add(border.Color);
-    var declaration = string.Join(" ", parts);
+    bool hasSpecificSides = border.Top.HasValue || border.Right.HasValue
+                         || border.Bottom.HasValue || border.Left.HasValue;
+    bool hasSpecificWidths = border.TopWidth is not null || border.RightWidth is not null
+                          || border.BottomWidth is not null || border.LeftWidth is not null;
 
-    bool hasSpecificSides = border.Top is true || border.Right is true
-                         || border.Bottom is true || border.Left is true;
-    if (!hasSpecificSides)
+    if (!hasSpecificSides && !hasSpecificWidths)
     {
-      css["border"] = declaration;
+      css["border"] = BuildBorderDeclaration(border.Width, border.Style, border.Color);
       return;
     }
 
-    // Emit all four sides explicitly so unselected sides are cleared
-    css["border-top"] = border.Top is true ? declaration : "none";
-    css["border-right"] = border.Right is true ? declaration : "none";
-    css["border-bottom"] = border.Bottom is true ? declaration : "none";
-    css["border-left"] = border.Left is true ? declaration : "none";
+    // Emit all four sides explicitly so unselected sides are cleared.
+    css["border-top"] = BuildBorderSideDeclaration(border.Top, border.TopWidth, border.Width, border.Style, border.Color);
+    css["border-right"] = BuildBorderSideDeclaration(border.Right, border.RightWidth, border.Width, border.Style, border.Color);
+    css["border-bottom"] = BuildBorderSideDeclaration(border.Bottom, border.BottomWidth, border.Width, border.Style, border.Color);
+    css["border-left"] = BuildBorderSideDeclaration(border.Left, border.LeftWidth, border.Width, border.Style, border.Color);
+  }
+
+  private static string BuildBorderSideDeclaration(
+    bool? enabled,
+    IRLength? specificWidth,
+    IRLength? fallbackWidth,
+    Models.BorderStyle style,
+    string? color)
+  {
+    if (enabled is false)
+      return "none";
+
+    if (specificWidth is not null)
+      return specificWidth.Value <= 0
+        ? "none"
+        : BuildBorderDeclaration(specificWidth, style, color);
+
+    if (enabled is true)
+      return fallbackWidth is not null && fallbackWidth.Value <= 0
+        ? "none"
+        : BuildBorderDeclaration(fallbackWidth, style, color);
+
+    return "none";
+  }
+
+  private static string BuildBorderDeclaration(IRLength? width, Models.BorderStyle style, string? color)
+  {
+    var parts = new List<string>();
+    if (width is not null) parts.Add(width.ToString());
+    parts.Add(MapBorderStyle(style));
+    if (color is not null) parts.Add(color);
+    return string.Join(" ", parts);
   }
 
   private static string MapBorderStyle(Models.BorderStyle style) => style switch
