@@ -867,7 +867,7 @@ export class CanvasElementService {
       return 'none';
     }
 
-    if (this.getElementOverflowMode(parent) !== 'clip') {
+    if (!isOverflowClippingMode(this.getElementOverflowMode(parent))) {
       return 'none';
     }
 
@@ -894,7 +894,7 @@ export class CanvasElementService {
       return false;
     }
 
-    if (this.getElementOverflowMode(parent) !== 'clip') {
+    if (!isOverflowClippingMode(this.getElementOverflowMode(parent))) {
       return false;
     }
 
@@ -932,4 +932,8 @@ export class CanvasElementService {
 function isFlowLayoutChild(element: Pick<CanvasElement, 'position'>): boolean {
   const position = element.position;
   return !position || position === 'static' || position === 'relative' || position === 'sticky';
+}
+
+function isOverflowClippingMode(mode: CanvasOverflowMode): boolean {
+  return mode === 'clip' || mode === 'hidden' || mode === 'scroll';
 }

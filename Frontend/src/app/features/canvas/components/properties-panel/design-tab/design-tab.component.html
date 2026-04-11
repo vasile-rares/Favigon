@@ -597,10 +597,13 @@
 
         <div class="pp-style-row" *ngIf="supportsOverflow(element.type)">
           <span class="pp-row-label">Overflow</span>
-          <div class="pp-style-control">
-            <select class="pp-select" [value]="overflowValue(element)" (change)="onOverflowChange($event)">
-              <option *ngFor="let option of overflowOptions" [value]="option">{{ option | titlecase }}</option>
-            </select>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <app-dropdown-select
+              [enableSearch]="false"
+              [placeholder]="'Overflow'"
+              [options]="overflowOptions"
+              [ngModel]="overflowValue(element)"
+              (ngModelChange)="onOverflowChange($event)"></app-dropdown-select>
           </div>
         </div>
 

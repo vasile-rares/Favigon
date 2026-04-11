@@ -137,7 +137,11 @@ export class CanvasPixiLayoutService {
     }
 
     // Overflow
-    if (container.overflow === 'clip') {
+    if (
+      container.overflow === 'clip' ||
+      container.overflow === 'hidden' ||
+      container.overflow === 'scroll'
+    ) {
       rootNode.setOverflow(Overflow.Hidden);
     }
 

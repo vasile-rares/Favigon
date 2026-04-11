@@ -612,8 +612,8 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     style.opacity = element.opacity;
   }
 
-  if (element.type === 'frame') {
-    style.overflow = element.overflow === 'visible' ? 'Visible' : 'Clip';
+  if (element.type === 'frame' || element.type === 'rectangle') {
+    style.overflow = mapCanvasOverflowToIr(element.overflow ?? 'clip');
   }
 
   const shadowStr = normalizeCanvasShadowValue(element.shadow);
@@ -1028,7 +1028,10 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     opacity: readNumber(node.style?.opacity, DEFAULT_OPACITY),
     cornerRadius,
     cornerRadii,
-    overflow: mappedType === 'frame' ? readOverflow(node.style?.overflow, 'clip') : undefined,
+    overflow:
+      mappedType === 'frame' || mappedType === 'rectangle'
+        ? readOverflow(node.style?.overflow, 'clip')
+        : undefined,
     shadow: readShadow(node.style?.shadows),
     text: mappedType === 'text' ? readStringProp(node.props, 'content', 'New text') : undefined,
     fontSize: mappedType === 'text' ? readLength(node.style?.fontSize, 16) : undefined,
@@ -1458,16 +1461,37 @@ function readTextVerticalAlignFromProps(
 
 function readOverflowFromProps(
   props: Record<string, unknown> | undefined,
-  fallback: 'clip' | 'visible',
-): 'clip' | 'visible' {
+  fallback: 'clip' | 'visible' | 'hidden' | 'scroll',
+): 'clip' | 'visible' | 'hidden' | 'scroll' {
   const value = props?.['overflow'];
-  return value === 'clip' || value === 'visible' ? value : fallback;
+  return value === 'clip' || value === 'visible' || value === 'hidden' || value === 'scroll'
+    ? value
+    : fallback;
 }
 
-function readOverflow(value: unknown, fallback: 'clip' | 'visible'): 'clip' | 'visible' {
+function readOverflow(
+  value: unknown,
+  fallback: 'clip' | 'visible' | 'hidden' | 'scroll',
+): 'clip' | 'visible' | 'hidden' | 'scroll' {
   if (value === 'Clip') return 'clip';
   if (value === 'Visible') return 'visible';
+  if (value === 'Hidden') return 'hidden';
+  if (value === 'Scroll') return 'scroll';
   return fallback;
+}
+
+function mapCanvasOverflowToIr(value: 'clip' | 'visible' | 'hidden' | 'scroll'): OverflowMode {
+  switch (value) {
+    case 'visible':
+      return 'Visible';
+    case 'hidden':
+      return 'Hidden';
+    case 'scroll':
+      return 'Scroll';
+    case 'clip':
+    default:
+      return 'Clip';
+  }
 }
 
 function readStringProp(

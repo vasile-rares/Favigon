@@ -335,7 +335,12 @@ export class DesignTabComponent {
     { label: 'Yes', value: true },
     { label: 'No', value: false },
   ];
-  readonly overflowOptions: CanvasOverflowMode[] = ['clip', 'visible'];
+  readonly overflowOptions: DropdownSelectOption[] = [
+    { label: 'Clip', value: 'clip' },
+    { label: 'Visible', value: 'visible' },
+    { label: 'Hidden', value: 'hidden' },
+    { label: 'Scroll', value: 'scroll' },
+  ];
   readonly shadowActivationPatch: Partial<CanvasElement> = {
     shadow: buildCanvasShadowCss(DEFAULT_EDITABLE_CANVAS_SHADOW),
   };
@@ -923,7 +928,7 @@ export class DesignTabComponent {
   }
 
   supportsOverflow(type: CanvasElementType): boolean {
-    return type === 'frame';
+    return type === 'frame' || type === 'rectangle';
   }
 
   supportsShadow(type: CanvasElementType): boolean {
@@ -1252,8 +1257,12 @@ export class DesignTabComponent {
     return `${Math.max(0, Math.min(100, Math.round(value * 100)))}%`;
   }
 
-  onOverflowChange(event: Event): void {
-    const overflow = (event.target as HTMLSelectElement).value as CanvasOverflowMode;
+  onOverflowChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    const overflow = value as CanvasOverflowMode;
     this.emitPatch({ overflow });
   }
 

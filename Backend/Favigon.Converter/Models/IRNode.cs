@@ -197,7 +197,9 @@ public class IRMeta
 public enum OverflowMode
 {
   Clip,
-  Visible
+  Visible,
+  Hidden,
+  Scroll
 }
 
 [JsonConverter(typeof(JsonStringEnumConverter))]

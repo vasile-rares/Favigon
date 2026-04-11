@@ -253,4 +253,47 @@ public class ConverterEngineTests
     var homeCss = Assert.Single(files, file => file.Path == "home.css");
     Assert.Contains("overflow: clip;", homeCss.Content);
   }
+
+  [Fact]
+  public void GenerateMultiPage_HtmlEmitsScrollOverflowFromStyle()
+  {
+    var sut = new ConverterEngine();
+    var root = new IRNode
+    {
+      Id = "canvas-project-overflow-scroll",
+      Type = "Container",
+      Props = new Dictionary<string, object?>
+      {
+        ["role"] = "canvas-root",
+        ["pageName"] = "Scrollable"
+      },
+      Children =
+      [
+        new IRNode
+        {
+          Id = "frame-scroll",
+          Type = "Frame",
+          Meta = new IRMeta
+          {
+            Name = "Scrollable Frame"
+          },
+          Style = new IRStyle
+          {
+            Width = new IRLength { Value = 1280, Unit = "px" },
+            Height = new IRLength { Value = 720, Unit = "px" },
+            Overflow = OverflowMode.Scroll
+          }
+        }
+      ]
+    };
+
+    var files = sut.GenerateMultiPage(
+      [
+        ("Scrollable", 1280, root)
+      ],
+      "html");
+
+    var css = Assert.Single(files, file => file.Path == "scrollable.css");
+    Assert.Contains("overflow: scroll;", css.Content);
+  }
 }

@@ -372,10 +372,12 @@ export class CanvasPixiRendererService {
     container.alpha = element.opacity ?? 1;
 
     // Overflow (clip children for containers)
-    // Frames always clip (they are viewports); rectangles clip only when overflow=clip
+    // Containers clip children for clipping overflow modes and allow spill for visible.
     const shouldClip =
       this.elService.isContainerElement(element) &&
-      (element.type === 'frame' || element.overflow === 'clip');
+      (element.overflow === 'clip' ||
+        element.overflow === 'hidden' ||
+        element.overflow === 'scroll');
     if (shouldClip) {
       const clipMask = new Graphics();
       this.drawRoundedRect(clipMask, 0, 0, width, height, cornerRadii, '#ffffff');
