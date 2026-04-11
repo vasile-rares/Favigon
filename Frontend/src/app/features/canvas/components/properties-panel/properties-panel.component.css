@@ -313,6 +313,10 @@
   min-height: 30px;
 }
 
+.pp-style-row--effect-summary {
+  align-items: center;
+}
+
 .pp-style-control {
   width: 100%;
   max-width: 100%;
@@ -344,6 +348,132 @@
   flex: 0 1 auto;
   width: 100%;
   max-width: 100%;
+}
+
+.pp-effect-popup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.pp-effect-popup-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+}
+
+.pp-effect-popup-section--transition {
+  gap: 0.7rem;
+}
+
+.pp-effect-popup-section + .pp-effect-popup-section {
+  padding-top: 0.65rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pp-effect-popup-section-title {
+  margin: 0;
+  color: var(--canvas-panel-section-title-color);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.pp-effect-popup-nav {
+  width: 100%;
+  min-height: var(--canvas-panel-control-height);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--canvas-panel-section-body-color);
+  border-radius: var(--canvas-panel-control-radius);
+  padding: 0.1rem 0.65rem 0.1rem 0.8rem;
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  &:focus-visible {
+    outline: none;
+    background: rgba(0, 0, 0, 0.45);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.05),
+      inset 0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+}
+
+.pp-effect-popup-nav__summary {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--canvas-panel-font-size);
+  color: var(--canvas-panel-section-body-color);
+}
+
+.pp-effect-popup-nav__icon,
+.pp-effect-popup-back__icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.pp-effect-popup-subview-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.pp-effect-popup-back {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--canvas-panel-section-body-color);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.35);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  &:focus-visible {
+    outline: none;
+    background: rgba(0, 0, 0, 0.45);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+}
+
+.pp-effect-popup-subview-title {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--canvas-panel-section-body-color);
 }
 
 .pp-style-control--dimension {
@@ -619,10 +749,6 @@
 
 .pp-transform-axis-field > app-number-input ::ng-deep .number-input__field {
   padding-right: 1rem;
-}
-
-.pp-transform-axis-field--percent > app-number-input ::ng-deep .number-input__field {
-  padding-right: 1.35rem;
 }
 
 .pp-transform-axis-tag {

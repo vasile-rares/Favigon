@@ -115,7 +115,7 @@
   box-shadow:
     0 16px 40px rgba(0, 0, 0, 0.4),
     inset 0 1px 1px 0 rgba(255, 255, 255, 0.15);
-  z-index: 40;
+  z-index: 60;
   overflow: hidden;
   transform-origin: top center;
 }

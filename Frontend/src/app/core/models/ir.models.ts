@@ -5,6 +5,7 @@ export interface IRNode {
   layout?: IRLayout;
   style?: IRStyle;
   position?: IRPosition;
+  effects?: IREffect[];
   variants: Record<string, IRVariant>;
   children: IRNode[];
   meta: IRMeta;
@@ -113,6 +114,28 @@ export interface IRMeta {
   name?: string;
   hidden: boolean;
   componentInstanceId?: string;
+}
+
+export interface IREffect {
+  preset: string;
+  trigger: string; // 'onLoad' | 'hover' | 'click' | 'focus' | 'loop'
+  opacity?: number;
+  scale?: number;
+  rotate?: number;
+  rotationMode?: string;
+  skewX?: number;
+  skewY?: number;
+  offsetX?: number;
+  offsetY?: number;
+  fill?: string;
+  shadow?: string;
+  duration: number;
+  delay: number;
+  iterations: string; // "1", "2", "infinite"
+  easing: string;
+  direction: string;
+  fillMode: string;
+  offScreenBehavior?: string;
 }
 
 export interface IRVariant {

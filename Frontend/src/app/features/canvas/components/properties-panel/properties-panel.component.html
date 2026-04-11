@@ -1010,7 +1010,7 @@
           <div class="pp-style-row pp-style-row--transform" *ngIf="isTransformOptionAdded(element, 'origin')">
             <span class="pp-row-label">Origin</span>
             <div class="pp-style-control pp-style-control--transform-dual">
-              <div class="pp-transform-axis-field pp-transform-axis-field--percent">
+              <div class="pp-transform-axis-field">
                 <app-number-input
                   appearance="boxed"
                   ariaLabel="Origin X"
@@ -1018,12 +1018,13 @@
                   [min]="0"
                   [max]="100"
                   [step]="1"
+                  [suffix]="'%'"
                   (gestureStarted)="onNumberInputGestureStarted()"
                   (gestureCommitted)="onNumberInputGestureCommitted()"
                   (valueChange)="onOriginChange('x', $event)"></app-number-input>
-                <span class="pp-transform-axis-tag">%</span>
+                <span class="pp-transform-axis-tag">X</span>
               </div>
-              <div class="pp-transform-axis-field pp-transform-axis-field--percent">
+              <div class="pp-transform-axis-field">
                 <app-number-input
                   appearance="boxed"
                   ariaLabel="Origin Y"
@@ -1031,10 +1032,11 @@
                   [min]="0"
                   [max]="100"
                   [step]="1"
+                  [suffix]="'%'"
                   (gestureStarted)="onNumberInputGestureStarted()"
                   (gestureCommitted)="onNumberInputGestureCommitted()"
                   (valueChange)="onOriginChange('y', $event)"></app-number-input>
-                <span class="pp-transform-axis-tag">%</span>
+                <span class="pp-transform-axis-tag">Y</span>
               </div>
             </div>
           </div>
@@ -1062,6 +1064,684 @@
                 [stretch]="true"
                 [minWidth]="null"
                 (valueChange)="onPreserve3DChange($event)"></app-toggle-group>
+            </div>
+          </div>
+        </ng-container>
+      </section>
+
+      <!-- -- Effects -- -->
+      <section
+        class="properties-section properties-section--collapsible"
+        [class.properties-section--compact]="!hasEffects(element)"
+        [class.properties-section--actionable]="!hasEffects(element)"
+        (click)="!hasEffects(element) && onEffectSectionHeaderClick($event)">
+        <div
+          class="properties-section-header properties-section-header--menu properties-section-header--actionable"
+          (click)="onEffectSectionHeaderClick($event)">
+          <p class="properties-section-title">Effects</p>
+          <button
+            type="button"
+            class="pp-section-toggle pp-section-toggle--plus"
+            aria-label="Add effect"
+            title="Add effect"
+            (click)="onEffectSectionToggleClick($event)">
+            <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+              <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+            </svg>
+          </button>
+        </div>
+
+        <ng-container *ngFor="let eff of getEffects(element); let i = index; trackBy: trackEffectByIndex">
+          <div class="pp-style-row pp-style-row--effect-summary">
+            <span class="pp-row-label">{{ effectDisplayName(eff, i) }}</span>
+            <div class="pp-style-control pp-style-control--popup">
+              <app-style-popup-field
+                kind="effect"
+                [hasValue]="true"
+                [triggerText]="'Effect'"
+                [popupTitleOverride]="effectPopupTitle(eff, i)"
+                [popupWidthOverride]="280"
+                (openChange)="onEffectPopupOpenChange(i, $event)"
+                (clearRequested)="removeEffect(i)">
+                <div class="pp-effect-popup-body">
+                  <ng-container [ngSwitch]="effectPopupView(i)">
+                    <ng-container *ngSwitchCase="'main'">
+                      <div class="pp-effect-popup-section">
+                        <div class="pp-effect-preview">
+                          <div class="pp-effect-preview__stage">
+                            <div class="pp-effect-preview__node-shell">
+                              <div class="pp-effect-preview__node" [ngStyle]="effectPreviewStyle(eff, i)">
+                                <span class="pp-effect-preview__line pp-effect-preview__line--short"></span>
+                                <span class="pp-effect-preview__line"></span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <ng-container *ngIf="effectUsesHoverEditor(eff); else loopOrAppearEffectControls">
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Opacity</span>
+                            <div class="pp-style-control pp-style-control--opacity">
+                              <input
+                                class="pp-slider"
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                [style.--pp-slider-value]="effectOpacitySliderPercent(eff)"
+                                [value]="effectOpacityValue(eff)"
+                                (input)="onEffectOpacityChange(i, $any($event.target).valueAsNumber)" />
+                              <app-number-input
+                                appearance="compact"
+                                ariaLabel="Effect opacity"
+                                [value]="effectOpacityValue(eff)"
+                                [min]="0"
+                                [max]="1"
+                                [step]="0.01"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectOpacityChange(i, $event)"></app-number-input>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Scale</span>
+                            <div class="pp-style-control pp-style-control--transform-scale">
+                              <app-number-input
+                                appearance="boxed"
+                                ariaLabel="Effect scale"
+                                [value]="effectScaleValue(eff)"
+                                [min]="0"
+                                [step]="0.01"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectScaleChange(i, $event)"></app-number-input>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Rotate</span>
+                            <div class="pp-style-control pp-style-control--transform-rotate">
+                              <app-number-input
+                                appearance="boxed"
+                                ariaLabel="Effect rotation"
+                                [value]="effectRotateValue(eff)"
+                                [step]="1"
+                                [suffix]="'°'"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectRotateChange(i, $event)"></app-number-input>
+                              <app-toggle-group
+                                [ariaLabel]="'Effect rotation mode'"
+                                [options]="rotateModeOptions"
+                                [value]="effectRotationModeValue(eff)"
+                                [stretch]="true"
+                                [minWidth]="null"
+                                (valueChange)="onEffectRotationModeChange(i, $event)"></app-toggle-group>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Skew</span>
+                            <div class="pp-style-control pp-style-control--transform-dual">
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect skew X"
+                                  [value]="effectSkewXValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectSkewChange(i, 'x', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">X</span>
+                              </div>
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect skew Y"
+                                  [value]="effectSkewYValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectSkewChange(i, 'y', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">Y</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Offset</span>
+                            <div class="pp-style-control pp-style-control--transform-dual">
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect offset X"
+                                  [value]="effectOffsetXValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectOffsetChange(i, 'x', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">X</span>
+                              </div>
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect offset Y"
+                                  [value]="effectOffsetYValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectOffsetChange(i, 'y', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">Y</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="hasFill(element.type)">
+                            <span class="pp-row-label">Fill</span>
+                            <div class="pp-style-control pp-style-control--popup">
+                              <div class="pp-effect-popup-picker">
+                                <button type="button" class="pp-effect-popup-picker__main" (click)="openEffectFillSettings(i)">
+                                  <span
+                                    class="pp-effect-popup-picker__swatch"
+                                    [class.pp-effect-popup-picker__swatch--transparent]="effectIsTransparentFill(eff)"
+                                    [style.background]="effectFillSwatchBackground(eff)"></span>
+                                  <span class="pp-effect-popup-picker__text">{{ effectFillLabel(eff) }}</span>
+                                </button>
+                                <button
+                                  *ngIf="effectHasActiveFill(eff)"
+                                  type="button"
+                                  class="pp-effect-popup-picker__clear"
+                                  aria-label="Clear hover fill"
+                                  (click)="clearEffectFill(i)">×</button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="supportsShadow(element.type)">
+                            <span class="pp-row-label">Shadow</span>
+                            <div class="pp-style-control pp-style-control--popup">
+                              <div class="pp-effect-popup-picker">
+                                <button type="button" class="pp-effect-popup-picker__main" (click)="openEffectShadowSettings(i)">
+                                  <span
+                                    class="pp-effect-popup-picker__swatch"
+                                    [class.pp-effect-popup-picker__swatch--transparent]="!effectHasActiveShadow(eff)"
+                                    [style.background]="effectShadowSwatchBackground(eff)"></span>
+                                  <span class="pp-effect-popup-picker__text">{{ effectShadowSummary(eff) }}</span>
+                                </button>
+                                <button
+                                  *ngIf="effectHasActiveShadow(eff)"
+                                  type="button"
+                                  class="pp-effect-popup-picker__clear"
+                                  aria-label="Clear hover shadow"
+                                  (click)="clearEffectShadow(i)">×</button>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Transition</span>
+                            <div class="pp-style-control">
+                              <button
+                                type="button"
+                                class="pp-effect-popup-nav"
+                                (click)="openEffectTransitionSettings(i)">
+                                <span class="pp-effect-popup-nav__summary">{{ effectTransitionSummary(eff) }}</span>
+                                <svg class="pp-effect-popup-nav__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                  <path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </ng-container>
+
+                        <ng-template #loopOrAppearEffectControls>
+                          <ng-container *ngIf="effectUsesLoopEditor(eff); else appearEffectControls">
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Type</span>
+                              <div class="pp-style-control">
+                                <app-toggle-group
+                                  [ariaLabel]="'Loop type'"
+                                  [options]="effectLoopTypeOptions"
+                                  [value]="effectLoopTypeValue(eff)"
+                                  [stretch]="true"
+                                  [minWidth]="null"
+                                  (valueChange)="onEffectLoopTypeChange(i, $event)"></app-toggle-group>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Delay</span>
+                              <div class="pp-style-control pp-style-control--transform-scale">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Loop animation delay in milliseconds"
+                                  [value]="eff.delay"
+                                  [min]="0"
+                                  [step]="50"
+                                  [suffix]="'ms'"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectDelayChange(i, $event)"></app-number-input>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Opacity</span>
+                              <div class="pp-style-control pp-style-control--opacity">
+                                <input
+                                  class="pp-slider"
+                                  type="range"
+                                  min="0"
+                                  max="1"
+                                  step="0.01"
+                                  [style.--pp-slider-value]="effectOpacitySliderPercent(eff)"
+                                  [value]="effectOpacityValue(eff)"
+                                  (input)="onEffectOpacityChange(i, $any($event.target).valueAsNumber)" />
+                                <app-number-input
+                                  appearance="compact"
+                                  ariaLabel="Effect opacity"
+                                  [value]="effectOpacityValue(eff)"
+                                  [min]="0"
+                                  [max]="1"
+                                  [step]="0.01"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectOpacityChange(i, $event)"></app-number-input>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Scale</span>
+                              <div class="pp-style-control pp-style-control--transform-scale">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect scale"
+                                  [value]="effectScaleValue(eff)"
+                                  [min]="0"
+                                  [step]="0.01"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectScaleChange(i, $event)"></app-number-input>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Rotate</span>
+                              <div class="pp-style-control pp-style-control--transform-rotate">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect rotation"
+                                  [value]="effectRotateValue(eff)"
+                                  [step]="1"
+                                  [suffix]="'°'"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectRotateChange(i, $event)"></app-number-input>
+                                <app-toggle-group
+                                  [ariaLabel]="'Effect rotation mode'"
+                                  [options]="rotateModeOptions"
+                                  [value]="effectRotationModeValue(eff)"
+                                  [stretch]="true"
+                                  [minWidth]="null"
+                                  (valueChange)="onEffectRotationModeChange(i, $event)"></app-toggle-group>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Skew</span>
+                              <div class="pp-style-control pp-style-control--transform-dual">
+                                <div class="pp-transform-axis-field">
+                                  <app-number-input
+                                    appearance="boxed"
+                                    ariaLabel="Effect skew X"
+                                    [value]="effectSkewXValue(eff)"
+                                    [step]="1"
+                                    (gestureStarted)="onNumberInputGestureStarted()"
+                                    (gestureCommitted)="onNumberInputGestureCommitted()"
+                                    (valueChange)="onEffectSkewChange(i, 'x', $event)"></app-number-input>
+                                  <span class="pp-transform-axis-tag">X</span>
+                                </div>
+                                <div class="pp-transform-axis-field">
+                                  <app-number-input
+                                    appearance="boxed"
+                                    ariaLabel="Effect skew Y"
+                                    [value]="effectSkewYValue(eff)"
+                                    [step]="1"
+                                    (gestureStarted)="onNumberInputGestureStarted()"
+                                    (gestureCommitted)="onNumberInputGestureCommitted()"
+                                    (valueChange)="onEffectSkewChange(i, 'y', $event)"></app-number-input>
+                                  <span class="pp-transform-axis-tag">Y</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Offset</span>
+                              <div class="pp-style-control pp-style-control--transform-dual">
+                                <div class="pp-transform-axis-field">
+                                  <app-number-input
+                                    appearance="boxed"
+                                    ariaLabel="Effect offset X"
+                                    [value]="effectOffsetXValue(eff)"
+                                    [step]="1"
+                                    (gestureStarted)="onNumberInputGestureStarted()"
+                                    (gestureCommitted)="onNumberInputGestureCommitted()"
+                                    (valueChange)="onEffectOffsetChange(i, 'x', $event)"></app-number-input>
+                                  <span class="pp-transform-axis-tag">X</span>
+                                </div>
+                                <div class="pp-transform-axis-field">
+                                  <app-number-input
+                                    appearance="boxed"
+                                    ariaLabel="Effect offset Y"
+                                    [value]="effectOffsetYValue(eff)"
+                                    [step]="1"
+                                    (gestureStarted)="onNumberInputGestureStarted()"
+                                    (gestureCommitted)="onNumberInputGestureCommitted()"
+                                    (valueChange)="onEffectOffsetChange(i, 'y', $event)"></app-number-input>
+                                  <span class="pp-transform-axis-tag">Y</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Off Screen</span>
+                              <div class="pp-style-control">
+                                <app-toggle-group
+                                  [ariaLabel]="'Off screen playback'"
+                                  [options]="effectOffScreenOptions"
+                                  [value]="effectOffScreenBehaviorValue(eff)"
+                                  [stretch]="true"
+                                  [minWidth]="null"
+                                  (valueChange)="onEffectOffScreenBehaviorChange(i, $event)"></app-toggle-group>
+                              </div>
+                            </div>
+
+                            <div class="pp-style-row">
+                              <span class="pp-row-label">Transition</span>
+                              <div class="pp-style-control">
+                                <button
+                                  type="button"
+                                  class="pp-effect-popup-nav"
+                                  (click)="openEffectTransitionSettings(i)">
+                                  <span class="pp-effect-popup-nav__summary">{{ effectTransitionSummary(eff) }}</span>
+                                  <svg class="pp-effect-popup-nav__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                    <path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          </ng-container>
+                        </ng-template>
+
+                        <ng-template #appearEffectControls>
+                          <div class="pp-style-row">
+                            <span class="pp-row-label">Preset</span>
+                            <div class="pp-style-control pp-style-control--dropdown">
+                              <app-dropdown-select
+                                [enableSearch]="false"
+                                [outsideClickBoundarySelector]="'.style-popup-overlay'"
+                                [placeholder]="'Select preset'"
+                                [options]="effectPresetOptions"
+                                [ngModel]="eff.preset"
+                                (ngModelChange)="onEffectPresetChange(i, $event)"></app-dropdown-select>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectShowsCustomControls(eff)">
+                            <span class="pp-row-label">Opacity</span>
+                            <div class="pp-style-control pp-style-control--opacity">
+                              <input
+                                class="pp-slider"
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                [style.--pp-slider-value]="effectOpacitySliderPercent(eff)"
+                                [value]="effectOpacityValue(eff)"
+                                (input)="onEffectOpacityChange(i, $any($event.target).valueAsNumber)" />
+                              <app-number-input
+                                appearance="compact"
+                                ariaLabel="Effect opacity"
+                                [value]="effectOpacityValue(eff)"
+                                [min]="0"
+                                [max]="1"
+                                [step]="0.01"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectOpacityChange(i, $event)"></app-number-input>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectShowsCustomControls(eff)">
+                            <span class="pp-row-label">Scale</span>
+                            <div class="pp-style-control pp-style-control--transform-scale">
+                              <app-number-input
+                                appearance="boxed"
+                                ariaLabel="Effect scale"
+                                [value]="effectScaleValue(eff)"
+                                [min]="0"
+                                [step]="0.01"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectScaleChange(i, $event)"></app-number-input>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectShowsCustomControls(eff)">
+                            <span class="pp-row-label">Rotate</span>
+                            <div class="pp-style-control pp-style-control--transform-rotate">
+                              <app-number-input
+                                appearance="boxed"
+                                ariaLabel="Effect rotation"
+                                [value]="effectRotateValue(eff)"
+                                [step]="1"
+                                [suffix]="'°'"
+                                (gestureStarted)="onNumberInputGestureStarted()"
+                                (gestureCommitted)="onNumberInputGestureCommitted()"
+                                (valueChange)="onEffectRotateChange(i, $event)"></app-number-input>
+                              <app-toggle-group
+                                [ariaLabel]="'Effect rotation mode'"
+                                [options]="rotateModeOptions"
+                                [value]="effectRotationModeValue(eff)"
+                                [stretch]="true"
+                                [minWidth]="null"
+                                (valueChange)="onEffectRotationModeChange(i, $event)"></app-toggle-group>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectShowsCustomControls(eff)">
+                            <span class="pp-row-label">Skew</span>
+                            <div class="pp-style-control pp-style-control--transform-dual">
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect skew X"
+                                  [value]="effectSkewXValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectSkewChange(i, 'x', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">X</span>
+                              </div>
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect skew Y"
+                                  [value]="effectSkewYValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectSkewChange(i, 'y', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">Y</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectShowsCustomControls(eff)">
+                            <span class="pp-row-label">Offset</span>
+                            <div class="pp-style-control pp-style-control--transform-dual">
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect offset X"
+                                  [value]="effectOffsetXValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectOffsetChange(i, 'x', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">X</span>
+                              </div>
+                              <div class="pp-transform-axis-field">
+                                <app-number-input
+                                  appearance="boxed"
+                                  ariaLabel="Effect offset Y"
+                                  [value]="effectOffsetYValue(eff)"
+                                  [step]="1"
+                                  (gestureStarted)="onNumberInputGestureStarted()"
+                                  (gestureCommitted)="onNumberInputGestureCommitted()"
+                                  (valueChange)="onEffectOffsetChange(i, 'y', $event)"></app-number-input>
+                                <span class="pp-transform-axis-tag">Y</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div class="pp-style-row" *ngIf="effectSupportsTransition(eff)">
+                            <span class="pp-row-label">Transition</span>
+                            <div class="pp-style-control">
+                              <button
+                                type="button"
+                                class="pp-effect-popup-nav"
+                                (click)="openEffectTransitionSettings(i)">
+                                <span class="pp-effect-popup-nav__summary">{{ effectTransitionSummary(eff) }}</span>
+                                <svg class="pp-effect-popup-nav__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                  <path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                        </ng-template>
+                      </div>
+                    </ng-container>
+
+                    <ng-container *ngSwitchCase="'transition'">
+                      <div class="pp-effect-popup-section pp-effect-popup-section--transition">
+                        <div class="pp-effect-popup-subview-header">
+                          <button
+                            type="button"
+                            class="pp-effect-popup-back"
+                            aria-label="Back to effect settings"
+                            (click)="closeEffectPopupSubview(i)">
+                            <svg class="pp-effect-popup-back__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                              <path d="M10 3.5L5.5 8L10 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                          </button>
+                          <p class="pp-effect-popup-subview-title">Transition</p>
+                        </div>
+
+                        <div class="pp-style-row">
+                          <span class="pp-row-label">Duration</span>
+                          <div class="pp-style-control pp-style-control--transform-scale">
+                            <app-number-input
+                              appearance="boxed"
+                              ariaLabel="Animation duration in milliseconds"
+                              [value]="eff.duration"
+                              [min]="0"
+                              [step]="50"
+                              [suffix]="'ms'"
+                              (gestureStarted)="onNumberInputGestureStarted()"
+                              (gestureCommitted)="onNumberInputGestureCommitted()"
+                              (valueChange)="onEffectDurationChange(i, $event)"></app-number-input>
+                          </div>
+                        </div>
+
+                        <div class="pp-style-row" *ngIf="!effectUsesLoopEditor(eff)">
+                          <span class="pp-row-label">Delay</span>
+                          <div class="pp-style-control pp-style-control--transform-scale">
+                            <app-number-input
+                              appearance="boxed"
+                              ariaLabel="Animation delay in milliseconds"
+                              [value]="eff.delay"
+                              [min]="0"
+                              [step]="50"
+                              [suffix]="'ms'"
+                              (gestureStarted)="onNumberInputGestureStarted()"
+                              (gestureCommitted)="onNumberInputGestureCommitted()"
+                              (valueChange)="onEffectDelayChange(i, $event)"></app-number-input>
+                          </div>
+                        </div>
+
+                        <div class="pp-style-row">
+                          <span class="pp-row-label">Easing</span>
+                          <div class="pp-style-control pp-style-control--dropdown">
+                            <app-dropdown-select
+                              [enableSearch]="false"
+                              [placeholder]="'Select easing'"
+                              [options]="effectEasingOptions"
+                              [ngModel]="eff.easing"
+                              (ngModelChange)="onEffectEasingChange(i, $event)"></app-dropdown-select>
+                          </div>
+                        </div>
+                      </div>
+                    </ng-container>
+
+                    <ng-container *ngSwitchCase="'fill'">
+                      <div class="pp-effect-popup-section pp-effect-popup-section--transition">
+                        <div class="pp-effect-popup-subview-header">
+                          <button
+                            type="button"
+                            class="pp-effect-popup-back"
+                            aria-label="Back to effect settings"
+                            (click)="closeEffectPopupSubview(i)">
+                            <svg class="pp-effect-popup-back__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                              <path d="M10 3.5L5.5 8L10 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                          </button>
+                          <p class="pp-effect-popup-subview-title">Fill</p>
+                        </div>
+
+                        <app-style-popup-field
+                          kind="fill"
+                          [inlineContentOnly]="true"
+                          [hasValue]="effectHasActiveFill(eff)"
+                          [isTransparent]="effectIsTransparentFill(eff)"
+                          [colorValue]="effectFillInputValue(eff)"
+                          [pickerColor]="effectFillPickerValue(eff)"
+                          (patchRequested)="onEffectFillPatch(i, $event)"
+                          (numberGestureStarted)="onNumberInputGestureStarted()"
+                          (numberGestureCommitted)="onNumberInputGestureCommitted()"></app-style-popup-field>
+                      </div>
+                    </ng-container>
+
+                    <ng-container *ngSwitchCase="'shadow'">
+                      <div class="pp-effect-popup-section pp-effect-popup-section--transition">
+                        <div class="pp-effect-popup-subview-header">
+                          <button
+                            type="button"
+                            class="pp-effect-popup-back"
+                            aria-label="Back to effect settings"
+                            (click)="closeEffectPopupSubview(i)">
+                            <svg class="pp-effect-popup-back__icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                              <path d="M10 3.5L5.5 8L10 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                          </button>
+                          <p class="pp-effect-popup-subview-title">Shadow</p>
+                        </div>
+
+                        <app-style-popup-field
+                          kind="shadow"
+                          [inlineContentOnly]="true"
+                          [hasValue]="effectHasActiveShadow(eff)"
+                          [shadowValue]="effectShadowEditorValue(eff)"
+                          (patchRequested)="onEffectShadowPatch(i, $event)"
+                          (numberGestureStarted)="onNumberInputGestureStarted()"
+                          (numberGestureCommitted)="onNumberInputGestureCommitted()"></app-style-popup-field>
+                      </div>
+                    </ng-container>
+                  </ng-container>
+                </div>
+              </app-style-popup-field>
             </div>
           </div>
         </ng-container>
@@ -1148,6 +1828,14 @@
   [verticalDirection]="'below'"
   [items]="transformMenuItems"
   (closed)="closeTransformMenu()"></app-context-menu>
+
+<app-context-menu
+  *ngIf="effectMenuItems.length > 0"
+  [x]="effectMenuX"
+  [y]="effectMenuY"
+  [verticalDirection]="'below'"
+  [items]="effectMenuItems"
+  (closed)="closeEffectMenu()"></app-context-menu>
 
 <app-context-menu
   *ngIf="dimensionMenuItems.length > 0"

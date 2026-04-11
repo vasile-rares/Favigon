@@ -25,6 +25,8 @@ export class DropdownSelectComponent implements ControlValueAccessor {
   @Input() emptyText = 'No items found.';
   @Input() enableSearch = true;
   @Input() options: DropdownSelectOption[] = [];
+  @Input() closeOnSelect = true;
+  @Input() outsideClickBoundarySelector = '';
   @Input() disabled = false;
 
   isOpen = false;
@@ -108,7 +110,10 @@ export class DropdownSelectComponent implements ControlValueAccessor {
     this.selectedValue = option.value;
     this.onChange(option.value);
     this.onTouched();
-    this.closePanel();
+
+    if (this.closeOnSelect) {
+      this.closePanel();
+    }
   }
 
   @HostListener('document:click', ['$event'])
@@ -119,6 +124,10 @@ export class DropdownSelectComponent implements ControlValueAccessor {
 
     const target = event.target as Node | null;
     if (!target || this.hostRef.nativeElement.contains(target)) {
+      return;
+    }
+
+    if (this.isInsideOutsideClickBoundary(target)) {
       return;
     }
 
@@ -158,6 +167,19 @@ export class DropdownSelectComponent implements ControlValueAccessor {
 
     clearTimeout(this.closeTimeoutId);
     this.closeTimeoutId = null;
+  }
+
+  private isInsideOutsideClickBoundary(target: Node): boolean {
+    if (!this.outsideClickBoundarySelector.trim()) {
+      return false;
+    }
+
+    if (!(target instanceof Element)) {
+      return false;
+    }
+
+    const boundary = this.hostRef.nativeElement.closest(this.outsideClickBoundarySelector);
+    return !!boundary && boundary.contains(target);
   }
 
   private updatePanelPlacement(): void {

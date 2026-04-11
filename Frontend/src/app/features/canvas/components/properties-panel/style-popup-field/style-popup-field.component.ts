@@ -26,7 +26,7 @@ import type { DropdownSelectOption, ToggleGroupOption, ToggleGroupValue } from '
 import { NumberInputComponent } from '../number-input/number-input.component';
 import { StylePopupOverlayComponent } from '../style-popup-overlay/style-popup-overlay.component';
 
-type StylePopupFieldKind = 'fill' | 'stroke' | 'shadow';
+type StylePopupFieldKind = 'fill' | 'stroke' | 'shadow' | 'effect';
 type ColorPickerDragTarget = 'surface' | 'hue' | 'alpha' | null;
 type ColorPickerFormat = 'hex' | 'rgb' | 'hsl';
 type ColorPickerMode = 'solid' | 'linear' | 'radial' | 'conic' | 'image';
@@ -61,10 +61,15 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
   @Input() strokeWidth = 1;
   @Input() strokeStyle = 'Solid';
   @Input() borderStyleOptions: string[] = [];
+  @Input() popupTitleOverride = '';
+  @Input() popupWidthOverride: number | null = null;
+  @Input() inlineContentOnly = false;
   @Input() activationPatch: Partial<CanvasElement> | null = null;
   @Input() clearPatch: Partial<CanvasElement> | null = null;
 
   @Output() patchRequested = new EventEmitter<Partial<CanvasElement>>();
+  @Output() clearRequested = new EventEmitter<void>();
+  @Output() openChange = new EventEmitter<boolean>();
   @Output() numberGestureStarted = new EventEmitter<void>();
   @Output() numberGestureCommitted = new EventEmitter<void>();
 
@@ -126,10 +131,18 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     if (
       (changes['pickerColor'] || changes['colorValue'] || changes['isTransparent']) &&
       this.isColorKind() &&
-      this.isOpen &&
+      (this.isOpen || this.inlineContentOnly) &&
       !this.colorPickerDragTarget
     ) {
       this.syncPickerFromColor(this.getInitialPickerColor());
+      this.selectedColorFormat =
+        inferCssColorFormat(
+          this.kind === 'fill' && this.isTransparent
+            ? this.getInitialPickerColor()
+            : this.colorValue,
+        ) ??
+        inferCssColorFormat(this.getInitialPickerColor()) ??
+        this.selectedColorFormat;
     }
 
     if (changes['strokeStyle']) {
@@ -148,6 +161,10 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
   }
 
   get popupTitle(): string {
+    if (this.popupTitleOverride.trim().length > 0) {
+      return this.popupTitleOverride;
+    }
+
     switch (this.kind) {
       case 'fill':
         return 'Fill';
@@ -155,6 +172,8 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
         return 'Border';
       case 'shadow':
         return 'Shadow';
+      case 'effect':
+        return 'Effect';
       default:
         return '';
     }
@@ -176,6 +195,8 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
         return 'Remove stroke';
       case 'shadow':
         return 'Remove shadow';
+      case 'effect':
+        return 'Remove effect';
       default:
         return 'Clear';
     }
@@ -272,6 +293,7 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     this.activePopupAnchor = event.currentTarget as HTMLElement;
     this.updatePopupPlacement(this.activePopupAnchor);
     this.isOpen = true;
+    this.openChange.emit(true);
   }
 
   onClearClick(event: MouseEvent): void {
@@ -280,6 +302,8 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
 
     if (this.clearPatch) {
       this.patchRequested.emit(this.clearPatch);
+    } else {
+      this.clearRequested.emit();
     }
 
     if (this.kind !== 'fill') {
@@ -542,6 +566,8 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
   }
 
   private closePopup(): void {
+    const wasOpen = this.isOpen;
+
     if (this.isColorGestureActive) {
       this.isColorGestureActive = false;
       this.numberGestureCommitted.emit();
@@ -552,6 +578,10 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     this.activePopupAnchor = null;
     document.body.style.userSelect = '';
     document.body.style.cursor = '';
+
+    if (wasOpen) {
+      this.openChange.emit(false);
+    }
   }
 
   private getInitialPickerColor(): string {
@@ -645,7 +675,7 @@ export class StylePopupFieldComponent implements OnChanges, OnDestroy {
     this.popupTop = null;
     this.popupBottom = 12;
 
-    const preferredWidth = 248;
+    const preferredWidth = this.popupWidthOverride ?? 248;
     this.popupWidth = Math.min(preferredWidth, Math.max(220, window.innerWidth - 24));
     const desiredLeft = panelBounds.left - this.popupWidth - 12;
     const maxLeft = Math.max(12, window.innerWidth - this.popupWidth - 12);

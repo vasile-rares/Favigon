@@ -8,6 +8,11 @@ import {
   CanvasDisplayMode,
   CanvasCornerRadii,
   CanvasCursorType,
+  CanvasEffect,
+  CanvasEffectEasing,
+  CanvasEffectOffScreenBehavior,
+  CanvasEffectPreset,
+  CanvasEffectTrigger,
   CanvasElement,
   CanvasElementType,
   CanvasFontSizeUnit,
@@ -80,16 +85,19 @@ import {
 import {
   buildCanvasShadowCss,
   DEFAULT_EDITABLE_CANVAS_SHADOW,
+  getCanvasShadowCss,
   hasCanvasShadow,
   normalizeCanvasShadowValue,
   resolveEditableCanvasShadow,
 } from '../../utils/canvas-shadow.util';
+import { createDefaultCanvasEffect, resolveCanvasEffect } from '../../utils/canvas-effect.util';
 import { SupportedFramework } from '../../canvas.types';
 type PropertiesTab = 'design' | 'generation';
 type CornerRadiusMode = 'full' | 'per-corner';
 type PaddingMode = 'full' | 'per-side';
 type AccessibilityField = 'tag' | 'ariaLabel';
 type DimensionConstraintField = 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight';
+type EffectPopupView = 'main' | 'transition' | 'fill' | 'shadow';
 
 type EditableNumericField =
   | 'x'
@@ -212,6 +220,12 @@ const TRANSFORM_DEPTH_MAX = 1000;
 const TRANSFORM_PERSPECTIVE_MIN = 100;
 const TRANSFORM_PERSPECTIVE_MAX = 3000;
 const TRANSFORM_SCALE_STEP = 0.1;
+const EFFECT_PREVIEW_BACKGROUND =
+  'linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)), linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))';
+const EFFECT_PREVIEW_SHADOW =
+  '0 18px 30px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.28)';
+const EFFECT_PREVIEW_HOVER_IDLE_MS = 1180;
+const EFFECT_PREVIEW_CLICK_IDLE_MS = 1080;
 
 @Component({
   selector: 'app-properties-panel',
@@ -256,12 +270,17 @@ export class PropertiesPanelComponent {
   transformMenuItems: ContextMenuItem[] = [];
   transformMenuX = 0;
   transformMenuY = 0;
+  effectMenuItems: ContextMenuItem[] = [];
+  effectMenuX = 0;
+  effectMenuY = 0;
   dimensionMenuItems: ContextMenuItem[] = [];
   dimensionMenuX = 0;
   dimensionMenuY = 0;
   accessibilityMenuItems: ContextMenuItem[] = [];
   accessibilityMenuX = 0;
   accessibilityMenuY = 0;
+  private readonly effectPopupViews = new Map<number, EffectPopupView>();
+  private readonly effectPreviewVersions = new Map<number, number>();
   private readonly paddingModeOverrides = new Map<string, PaddingMode>();
   private readonly paddingLinkedValues = new Map<string, number>();
   private readonly accessibilityFieldOverrides = new Map<string, Set<AccessibilityField>>();
@@ -500,6 +519,42 @@ export class PropertiesPanelComponent {
     { label: 'Row Resize', value: 'row-resize' },
     { label: 'None', value: 'none' },
   ];
+
+  readonly effectPresetOptions: DropdownSelectOption[] = [
+    { label: 'Custom', value: 'custom' },
+    { label: 'Fade In', value: 'fadeIn' },
+    { label: 'Scale In', value: 'scaleIn' },
+    { label: 'Scale In Bottom', value: 'scaleInBottom' },
+    { label: 'Flip Horizontal', value: 'flipHorizontal' },
+    { label: 'Flip Vertical', value: 'flipVertical' },
+    { label: 'Slide In Top', value: 'slideInTop' },
+    { label: 'Slide In Left', value: 'slideInLeft' },
+    { label: 'Slide In Right', value: 'slideInRight' },
+    { label: 'Slide In Bottom', value: 'slideInBottom' },
+  ];
+
+  readonly effectTriggerOptions: DropdownSelectOption[] = [
+    { label: 'On Load', value: 'onLoad' },
+    { label: 'Hover', value: 'hover' },
+    { label: 'Click / Tap', value: 'click' },
+    { label: 'Loop', value: 'loop' },
+  ];
+
+  readonly effectEasingOptions: DropdownSelectOption[] = [
+    { label: 'Ease', value: 'ease' },
+    { label: 'Ease In', value: 'ease-in' },
+    { label: 'Ease Out', value: 'ease-out' },
+    { label: 'Ease In Out', value: 'ease-in-out' },
+    { label: 'Linear', value: 'linear' },
+  ];
+  readonly effectLoopTypeOptions: readonly ToggleGroupOption[] = [
+    { label: 'Loop', value: 'loop' },
+    { label: 'Mirror', value: 'mirror' },
+  ];
+  readonly effectOffScreenOptions: readonly ToggleGroupOption[] = [
+    { label: 'Play', value: 'play' },
+    { label: 'Pause', value: 'pause' },
+  ];
   readonly dimensionModeDefinitions = DIMENSION_MODE_DEFINITIONS;
   readonly dimensionConstraintModeDefinitions = DIMENSION_CONSTRAINT_MODE_DEFINITIONS;
 
@@ -531,6 +586,7 @@ export class PropertiesPanelComponent {
   selectTab(tab: PropertiesTab): void {
     this.activeTab = tab;
     this.closeTransformMenu();
+    this.closeEffectMenu();
     this.closeDimensionMenu();
     this.closeAccessibilityMenu();
   }
@@ -637,6 +693,7 @@ export class PropertiesPanelComponent {
       return;
     }
 
+    this.closeEffectMenu();
     this.closeDimensionMenu();
     this.closeAccessibilityMenu();
 
@@ -657,6 +714,7 @@ export class PropertiesPanelComponent {
     }
 
     this.closeTransformMenu();
+    this.closeEffectMenu();
     this.closeDimensionMenu();
 
     if (this.accessibilityMenuItems.length > 0) {
@@ -676,6 +734,7 @@ export class PropertiesPanelComponent {
     }
 
     this.closeTransformMenu();
+    this.closeEffectMenu();
     this.closeAccessibilityMenu();
 
     if (this.dimensionMenuItems.length > 0) {
@@ -723,6 +782,10 @@ export class PropertiesPanelComponent {
 
   closeTransformMenu(): void {
     this.transformMenuItems = [];
+  }
+
+  closeEffectMenu(): void {
+    this.effectMenuItems = [];
   }
 
   closeDimensionMenu(): void {
@@ -1547,6 +1610,482 @@ export class PropertiesPanelComponent {
     this.emitPatch({ cursor: (value as CanvasCursorType) || undefined });
   }
 
+  // -- Effects --
+
+  private get defaultEffect(): CanvasEffect {
+    return createDefaultCanvasEffect();
+  }
+
+  getEffects(element: CanvasElement): CanvasEffect[] {
+    return element.effects ?? [];
+  }
+
+  trackEffectByIndex(index: number): number {
+    return index;
+  }
+
+  hasEffects(element: CanvasElement): boolean {
+    return (element.effects?.length ?? 0) > 0;
+  }
+
+  onEffectSectionHeaderClick(event: MouseEvent): void {
+    this.openEffectMenu(event, this.resolveSectionHeaderTrigger(event));
+  }
+
+  onEffectSectionToggleClick(event: MouseEvent): void {
+    event.stopPropagation();
+    this.onEffectSectionHeaderClick(event);
+  }
+
+  addEffect(trigger: CanvasEffectTrigger = this.defaultEffect.trigger): void {
+    const current = this.selectedElement?.effects ?? [];
+    this.emitPatch({ effects: [...current, createDefaultCanvasEffect(trigger)] });
+  }
+
+  removeEffect(index: number): void {
+    const current = this.selectedElement?.effects;
+    if (!current) return;
+
+    const updated = current.filter((_, i) => i !== index);
+    this.effectPopupViews.clear();
+    this.effectPreviewVersions.clear();
+    this.emitPatch({ effects: updated.length > 0 ? updated : undefined });
+  }
+
+  effectDisplayName(effect: CanvasEffect, index: number): string {
+    const fallback = `Effect ${index + 1}`;
+    if (effect.trigger === 'focus') {
+      return 'Focus';
+    }
+
+    return this.lookupEffectOptionLabel(this.effectTriggerOptions, effect.trigger) ?? fallback;
+  }
+
+  effectPopupTitle(effect: CanvasEffect, index: number): string {
+    return this.effectDisplayName(effect, index);
+  }
+
+  effectUsesHoverEditor(effect: CanvasEffect): boolean {
+    const trigger = resolveCanvasEffect(effect).trigger;
+    return trigger === 'hover' || trigger === 'click';
+  }
+
+  effectUsesLoopEditor(effect: CanvasEffect): boolean {
+    return resolveCanvasEffect(effect).trigger === 'loop';
+  }
+
+  effectSupportsTransition(effect: CanvasEffect): boolean {
+    return (
+      this.effectUsesHoverEditor(effect) ||
+      this.effectUsesLoopEditor(effect) ||
+      effect.preset === 'custom'
+    );
+  }
+
+  effectPopupView(index: number): EffectPopupView {
+    return this.effectPopupViews.get(index) ?? 'main';
+  }
+
+  effectTransitionSummary(effect: CanvasEffect): string {
+    const resolved = resolveCanvasEffect(effect);
+    const duration = Math.max(0, Math.round(resolved.duration));
+    const delay = Math.max(0, Math.round(resolved.delay));
+    const easing =
+      this.lookupEffectOptionLabel(this.effectEasingOptions, resolved.easing) ?? 'Ease';
+    if (this.effectUsesLoopEditor(resolved)) {
+      return `${duration}ms, ${easing}`;
+    }
+
+    return delay > 0 ? `${duration}ms, ${easing}, +${delay}ms` : `${duration}ms, ${easing}`;
+  }
+
+  effectPreviewStyle(effect: CanvasEffect, index: number): Record<string, string> {
+    const resolved = resolveCanvasEffect(effect);
+    const usesHoverEditor = this.effectUsesHoverEditor(resolved);
+    const usesLoopEditor = this.effectUsesLoopEditor(resolved);
+    const usesClickPreview = resolved.trigger === 'click';
+    const usesHoverPreview = resolved.trigger === 'hover';
+    const loopDelay = usesLoopEditor ? Math.max(0, Math.round(resolved.delay)) : 0;
+    const isMirrorLoop = usesLoopEditor && this.effectLoopTypeValue(resolved) === 'mirror';
+    const previewDuration = usesLoopEditor
+      ? Math.max(320, Math.round(resolved.duration) + loopDelay) * (isMirrorLoop ? 2 : 1)
+      : usesHoverPreview
+        ? Math.max(180, Math.round(resolved.duration)) * 2 + EFFECT_PREVIEW_HOVER_IDLE_MS
+        : Math.max(240, Math.round(resolved.duration)) +
+          (usesClickPreview ? EFFECT_PREVIEW_CLICK_IDLE_MS : EFFECT_PREVIEW_HOVER_IDLE_MS);
+    const versionOffset = ((this.effectPreviewVersions.get(index) ?? 0) & 1) * 0.001;
+    const animationName = usesLoopEditor
+      ? this.effectLoopPreviewAnimationName(resolved)
+      : usesHoverPreview
+        ? 'pp-effect-preview-hover'
+        : usesClickPreview
+          ? 'pp-effect-preview-press'
+          : 'pp-effect-preview-enter';
+    const animationDelay = 0;
+    const animationDirection = usesLoopEditor ? 'normal' : 'normal';
+    const animationFillMode = usesLoopEditor ? resolved.fillMode : 'both';
+
+    return {
+      '--pp-effect-preview-from-opacity': this.formatEffectPreviewNumber(
+        usesHoverEditor ? 1 : Math.max(0, Math.min(1, resolved.opacity)),
+      ),
+      '--pp-effect-preview-to-opacity': this.formatEffectPreviewNumber(
+        usesHoverEditor ? Math.max(0, Math.min(1, resolved.opacity)) : 1,
+      ),
+      '--pp-effect-preview-from-transform': this.buildEffectPreviewTransform(
+        resolved,
+        usesHoverEditor,
+      ),
+      '--pp-effect-preview-to-transform': this.buildEffectPreviewTransform(
+        resolved,
+        !usesHoverEditor,
+      ),
+      '--pp-effect-preview-from-background': usesHoverEditor
+        ? EFFECT_PREVIEW_BACKGROUND
+        : this.composeEffectPreviewBackground(resolved.fill),
+      '--pp-effect-preview-to-background': usesHoverEditor
+        ? this.composeEffectPreviewBackground(resolved.fill)
+        : EFFECT_PREVIEW_BACKGROUND,
+      '--pp-effect-preview-from-box-shadow': usesHoverEditor
+        ? EFFECT_PREVIEW_SHADOW
+        : this.composeEffectPreviewShadow(resolved.shadow),
+      '--pp-effect-preview-to-box-shadow': usesHoverEditor
+        ? this.composeEffectPreviewShadow(resolved.shadow)
+        : EFFECT_PREVIEW_SHADOW,
+      animation: `${animationName} ${previewDuration + versionOffset}ms ${resolved.easing} ${animationDelay}ms infinite ${animationDirection} ${animationFillMode}`,
+    };
+  }
+
+  effectLoopPreviewAnimationName(effect: CanvasEffect): string {
+    const resolved = resolveCanvasEffect(effect);
+    const hasPause = resolved.delay > 0;
+    const isMirror = this.effectLoopTypeValue(resolved) === 'mirror';
+
+    if (isMirror) {
+      return hasPause ? 'pp-effect-preview-mirror' : 'pp-effect-preview-mirror-seamless';
+    }
+
+    return hasPause ? 'pp-effect-preview-loop' : 'pp-effect-preview-loop-seamless';
+  }
+
+  effectLoopTypeValue(effect: CanvasEffect): 'loop' | 'mirror' {
+    const direction = resolveCanvasEffect(effect).direction;
+    return direction === 'alternate' || direction === 'alternate-reverse' ? 'mirror' : 'loop';
+  }
+
+  effectOffScreenBehaviorValue(effect: CanvasEffect): CanvasEffectOffScreenBehavior {
+    return resolveCanvasEffect(effect).offScreenBehavior;
+  }
+
+  effectHasActiveFill(effect: CanvasEffect): boolean {
+    return typeof effect.fill === 'string' && effect.fill.trim().length > 0;
+  }
+
+  effectFillLabel(effect: CanvasEffect): string {
+    const fill = effect.fill?.trim();
+    if (!fill) {
+      return 'None';
+    }
+
+    return fill.toLowerCase() === 'transparent' ? 'Transparent' : preserveColorDisplayValue(fill);
+  }
+
+  effectIsTransparentFill(effect: CanvasEffect): boolean {
+    const fill = effect.fill?.trim();
+    return !fill || isTransparentColor(fill);
+  }
+
+  effectFillSwatchBackground(effect: CanvasEffect): string | null {
+    const fill = effect.fill?.trim();
+    return !fill || isTransparentColor(fill) ? null : fill;
+  }
+
+  effectFillInputValue(effect: CanvasEffect): string {
+    const fill = effect.fill?.trim();
+    if (fill) {
+      return fill;
+    }
+
+    return this.selectedElement && this.hasFill(this.selectedElement.type)
+      ? this.fillInputValue(this.selectedElement)
+      : this.defaultFillColor;
+  }
+
+  effectFillPickerValue(effect: CanvasEffect): string {
+    const fillValue = this.effectFillInputValue(effect);
+    if (fillValue !== 'transparent') {
+      return fillValue;
+    }
+
+    return this.selectedElement && this.hasFill(this.selectedElement.type)
+      ? this.fillPickerValue(this.selectedElement)
+      : this.defaultFillColor;
+  }
+
+  effectHasActiveShadow(effect: CanvasEffect): boolean {
+    return hasCanvasShadow(effect.shadow);
+  }
+
+  effectShadowSummary(effect: CanvasEffect): string {
+    if (!hasCanvasShadow(effect.shadow)) {
+      return 'None';
+    }
+
+    const shadow = resolveEditableCanvasShadow(effect.shadow);
+    return `${this.formatShadowMetric(shadow.x)}, ${this.formatShadowMetric(shadow.y)}, ${this.formatShadowMetric(shadow.spread)}`;
+  }
+
+  effectShadowSwatchBackground(effect: CanvasEffect): string | null {
+    return this.effectHasActiveShadow(effect)
+      ? resolveEditableCanvasShadow(effect.shadow).color
+      : null;
+  }
+
+  effectShadowEditorValue(effect: CanvasEffect): string | null {
+    return (
+      normalizeCanvasShadowValue(effect.shadow) ??
+      (this.selectedElement
+        ? (normalizeCanvasShadowValue(this.selectedElement.shadow) ?? null)
+        : null)
+    );
+  }
+
+  openEffectTransitionSettings(index: number): void {
+    this.openEffectPopupSubview(index, 'transition');
+  }
+
+  openEffectFillSettings(index: number): void {
+    this.openEffectPopupSubview(index, 'fill');
+  }
+
+  openEffectShadowSettings(index: number): void {
+    this.openEffectPopupSubview(index, 'shadow');
+  }
+
+  closeEffectPopupSubview(index: number): void {
+    this.effectPopupViews.set(index, 'main');
+  }
+
+  onEffectPopupOpenChange(index: number, isOpen: boolean): void {
+    if (isOpen) {
+      this.effectPopupViews.set(index, 'main');
+      return;
+    }
+
+    this.effectPopupViews.delete(index);
+  }
+
+  effectShowsCustomControls(effect: CanvasEffect): boolean {
+    return effect.preset === 'custom';
+  }
+
+  effectOpacityValue(effect: CanvasEffect): number {
+    return resolveCanvasEffect(effect).opacity;
+  }
+
+  effectOpacitySliderPercent(effect: CanvasEffect): string {
+    return this.transformSliderPercent(this.effectOpacityValue(effect), 0, 1);
+  }
+
+  effectScaleValue(effect: CanvasEffect): number {
+    return resolveCanvasEffect(effect).scale;
+  }
+
+  effectRotateValue(effect: CanvasEffect): number {
+    return resolveCanvasEffect(effect).rotate;
+  }
+
+  effectRotationModeValue(effect: CanvasEffect): CanvasRotationMode {
+    return resolveCanvasEffect(effect).rotationMode;
+  }
+
+  effectSkewXValue(effect: CanvasEffect): number {
+    return resolveCanvasEffect(effect).skewX;
+  }
+
+  effectSkewYValue(effect: CanvasEffect): number {
+    return resolveCanvasEffect(effect).skewY;
+  }
+
+  effectOffsetXValue(effect: CanvasEffect): number {
+    return resolveCanvasEffect(effect).offsetX;
+  }
+
+  effectOffsetYValue(effect: CanvasEffect): number {
+    return resolveCanvasEffect(effect).offsetY;
+  }
+
+  private patchEffectAt(index: number, patch: Partial<CanvasEffect>): void {
+    const effects = this.selectedElement?.effects;
+    if (!effects) return;
+    this.bumpEffectPreviewVersion(index);
+    this.emitPatch({
+      effects: effects.map((e, i) => (i === index ? { ...resolveCanvasEffect(e), ...patch } : e)),
+    });
+  }
+
+  onEffectPresetChange(index: number, value: string | number | boolean | null): void {
+    if (typeof value !== 'string') return;
+
+    const current = this.selectedElement?.effects?.[index];
+    if (!current) return;
+
+    this.closeEffectPopupSubview(index);
+
+    const resolved = resolveCanvasEffect(current);
+
+    if (value === 'custom') {
+      this.patchEffectAt(index, { preset: 'custom' });
+      return;
+    }
+
+    const presetEffect = createDefaultCanvasEffect(resolved.trigger, value as CanvasEffectPreset);
+    this.patchEffectAt(index, {
+      preset: presetEffect.preset,
+      opacity: presetEffect.opacity,
+      scale: presetEffect.scale,
+      rotate: presetEffect.rotate,
+      skewX: presetEffect.skewX,
+      skewY: presetEffect.skewY,
+      offsetX: presetEffect.offsetX,
+      offsetY: presetEffect.offsetY,
+    });
+  }
+
+  onEffectTriggerChange(index: number, value: string | number | boolean | null): void {
+    if (typeof value !== 'string') return;
+
+    if (value === 'hover' || value === 'click' || value === 'loop') {
+      const nextEffect = createDefaultCanvasEffect(value as CanvasEffectTrigger);
+      this.patchEffectAt(index, {
+        trigger: nextEffect.trigger,
+        preset: nextEffect.preset,
+        opacity: nextEffect.opacity,
+        scale: nextEffect.scale,
+        rotate: nextEffect.rotate,
+        rotationMode: nextEffect.rotationMode,
+        skewX: nextEffect.skewX,
+        skewY: nextEffect.skewY,
+        offsetX: nextEffect.offsetX,
+        offsetY: nextEffect.offsetY,
+        fill: undefined,
+        shadow: undefined,
+        duration: nextEffect.duration,
+        delay: nextEffect.delay,
+        iterations: nextEffect.iterations,
+        easing: nextEffect.easing,
+        direction: nextEffect.direction,
+        fillMode: nextEffect.fillMode,
+        offScreenBehavior: nextEffect.offScreenBehavior,
+      });
+      this.closeEffectPopupSubview(index);
+      return;
+    }
+
+    this.patchEffectAt(index, { trigger: value as CanvasEffectTrigger });
+  }
+
+  onEffectOpacityChange(index: number, value: number): void {
+    this.patchEffectAt(index, { opacity: Math.max(0, Math.min(1, value)) });
+  }
+
+  onEffectScaleChange(index: number, value: number): void {
+    this.patchEffectAt(index, { scale: Math.max(0, value) });
+  }
+
+  onEffectRotateChange(index: number, value: number): void {
+    this.patchEffectAt(index, { rotate: value });
+  }
+
+  onEffectRotationModeChange(index: number, value: string | number | boolean | null): void {
+    if (value !== '2d' && value !== '3d') {
+      return;
+    }
+
+    this.patchEffectAt(index, { rotationMode: value });
+  }
+
+  onEffectSkewChange(index: number, axis: 'x' | 'y', value: number): void {
+    this.patchEffectAt(index, axis === 'x' ? { skewX: value } : { skewY: value });
+  }
+
+  onEffectOffsetChange(index: number, axis: 'x' | 'y', value: number): void {
+    this.patchEffectAt(index, axis === 'x' ? { offsetX: value } : { offsetY: value });
+  }
+
+  onEffectDurationChange(index: number, value: number): void {
+    this.patchEffectAt(index, { duration: value });
+  }
+
+  onEffectDelayChange(index: number, value: number): void {
+    this.patchEffectAt(index, { delay: value });
+  }
+
+  onEffectLoopTypeChange(index: number, value: string | number | boolean | null): void {
+    if (value !== 'loop' && value !== 'mirror') {
+      return;
+    }
+
+    this.patchEffectAt(index, { direction: value === 'mirror' ? 'alternate' : 'normal' });
+  }
+
+  onEffectOffScreenBehaviorChange(index: number, value: string | number | boolean | null): void {
+    if (value !== 'play' && value !== 'pause') {
+      return;
+    }
+
+    this.patchEffectAt(index, { offScreenBehavior: value });
+  }
+
+  onEffectEasingChange(index: number, value: string | number | boolean | null): void {
+    if (typeof value !== 'string') return;
+    this.patchEffectAt(index, { easing: value as CanvasEffectEasing });
+  }
+
+  onEffectFillPatch(index: number, patch: Partial<CanvasElement>): void {
+    if (!Object.prototype.hasOwnProperty.call(patch, 'fill')) {
+      return;
+    }
+
+    this.patchEffectAt(index, { fill: typeof patch.fill === 'string' ? patch.fill : undefined });
+  }
+
+  clearEffectFill(index: number): void {
+    this.patchEffectAt(index, { fill: undefined });
+  }
+
+  onEffectShadowPatch(index: number, patch: Partial<CanvasElement>): void {
+    if (!Object.prototype.hasOwnProperty.call(patch, 'shadow')) {
+      return;
+    }
+
+    this.patchEffectAt(index, { shadow: normalizeCanvasShadowValue(patch.shadow) });
+  }
+
+  clearEffectShadow(index: number): void {
+    this.patchEffectAt(index, { shadow: undefined });
+  }
+
+  private openEffectMenu(event: MouseEvent | null, trigger: HTMLElement | null): void {
+    const element = this.selectedElement;
+    const position = this.resolveTransformMenuPosition(event, trigger);
+    if (!element || !position) {
+      return;
+    }
+
+    this.closeTransformMenu();
+    this.closeDimensionMenu();
+    this.closeAccessibilityMenu();
+
+    if (this.effectMenuItems.length > 0) {
+      return;
+    }
+
+    this.effectMenuItems = this.buildEffectMenuItems();
+    this.effectMenuX = position.x;
+    this.effectMenuY = position.y;
+  }
+
   flexDirectionValue(element: CanvasElement): 'row' | 'column' {
     return element.flexDirection === 'column' || element.flexDirection === 'column-reverse'
       ? 'column'
@@ -2071,6 +2610,73 @@ export class PropertiesPanelComponent {
     this.elementPatch.emit(patch);
   }
 
+  private lookupEffectOptionLabel(
+    options: readonly DropdownSelectOption[],
+    value: string,
+  ): string | null {
+    const match = options.find((option) => option.value === value);
+    return typeof match?.label === 'string' ? match.label : null;
+  }
+
+  private openEffectPopupSubview(index: number, view: Exclude<EffectPopupView, 'main'>): void {
+    const current = this.selectedElement?.effects?.[index];
+    if (!current) {
+      return;
+    }
+
+    if (view === 'transition' && !this.effectSupportsTransition(current)) {
+      return;
+    }
+
+    if ((view === 'fill' || view === 'shadow') && !this.effectUsesHoverEditor(current)) {
+      return;
+    }
+
+    this.effectPopupViews.set(index, view);
+  }
+
+  private bumpEffectPreviewVersion(index: number): void {
+    this.effectPreviewVersions.set(index, (this.effectPreviewVersions.get(index) ?? 0) + 1);
+  }
+
+  private buildEffectPreviewTransform(effect: CanvasEffect, identity: boolean): string {
+    const offsetX = identity ? 0 : effect.offsetX;
+    const offsetY = identity ? 0 : effect.offsetY;
+    const scale = identity ? 1 : effect.scale;
+    const rotate = identity ? 0 : effect.rotate;
+    const skewX = identity ? 0 : effect.skewX;
+    const skewY = identity ? 0 : effect.skewY;
+    const rotation =
+      effect.rotationMode === '3d'
+        ? `rotateY(${this.formatEffectPreviewNumber(rotate)}deg)`
+        : `rotate(${this.formatEffectPreviewNumber(rotate)}deg)`;
+
+    return [
+      `translate(${this.formatEffectPreviewNumber(offsetX)}px, ${this.formatEffectPreviewNumber(offsetY)}px)`,
+      `scale(${this.formatEffectPreviewNumber(scale)})`,
+      rotation,
+      `skew(${this.formatEffectPreviewNumber(skewX)}deg, ${this.formatEffectPreviewNumber(skewY)}deg)`,
+    ].join(' ');
+  }
+
+  private composeEffectPreviewBackground(fill?: string): string {
+    const normalized = fill?.trim();
+    if (!normalized) {
+      return EFFECT_PREVIEW_BACKGROUND;
+    }
+
+    return `linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.06)), ${normalized}`;
+  }
+
+  private composeEffectPreviewShadow(shadow?: string): string {
+    const normalized = shadow?.trim();
+    return normalized ? getCanvasShadowCss(normalized) : EFFECT_PREVIEW_SHADOW;
+  }
+
+  private formatEffectPreviewNumber(value: number): string {
+    return String(roundToTwoDecimals(value));
+  }
+
   private currentPageModel(): CanvasPageModel | null {
     const currentPageId = this.currentPageId;
     if (!currentPageId) {
@@ -2118,6 +2724,17 @@ export class PropertiesPanelComponent {
       checked: this.hasDimensionConstraintField(element, field.id),
       showCheckSlot: true,
       action: () => this.toggleDimensionConstraintField(field.id),
+    }));
+  }
+
+  private buildEffectMenuItems(): ContextMenuItem[] {
+    return this.effectTriggerOptions.map((option) => ({
+      id: String(option.value),
+      label: option.label,
+      action: () => {
+        this.addEffect(option.value as CanvasEffectTrigger);
+        this.closeEffectMenu();
+      },
     }));
   }
 

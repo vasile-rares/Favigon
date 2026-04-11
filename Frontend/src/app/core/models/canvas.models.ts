@@ -49,6 +49,52 @@ export type CanvasCursorType =
   | 'col-resize'
   | 'row-resize'
   | 'none';
+export type CanvasEffectPreset =
+  | 'custom'
+  | 'fadeIn'
+  | 'scaleIn'
+  | 'scaleInBottom'
+  | 'flipHorizontal'
+  | 'flipVertical'
+  | 'slideInTop'
+  | 'slideInLeft'
+  | 'slideInRight'
+  | 'slideInBottom'
+  | 'fadeOut'
+  | 'slideInUp'
+  | 'slideInDown'
+  | 'scaleOut'
+  | 'spin'
+  | 'pulse'
+  | 'bounce'
+  | 'shake';
+export type CanvasEffectEasing = 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out' | 'linear';
+export type CanvasEffectDirection = 'normal' | 'reverse' | 'alternate' | 'alternate-reverse';
+export type CanvasEffectFillMode = 'none' | 'forwards' | 'backwards' | 'both';
+export type CanvasEffectOffScreenBehavior = 'play' | 'pause';
+export type CanvasEffectTrigger = 'onLoad' | 'hover' | 'click' | 'focus' | 'loop';
+
+export interface CanvasEffect {
+  preset: CanvasEffectPreset;
+  trigger: CanvasEffectTrigger;
+  opacity: number;
+  scale: number;
+  rotate: number;
+  rotationMode: CanvasRotationMode;
+  skewX: number;
+  skewY: number;
+  offsetX: number;
+  offsetY: number;
+  fill?: string;
+  shadow?: string;
+  duration: number; // ms
+  delay: number; // ms
+  iterations: number | 'infinite';
+  easing: CanvasEffectEasing;
+  direction: CanvasEffectDirection;
+  fillMode: CanvasEffectFillMode;
+  offScreenBehavior: CanvasEffectOffScreenBehavior;
+}
 export type CanvasTransformOption =
   | 'scale'
   | 'rotate'
@@ -171,6 +217,7 @@ export interface CanvasElement {
   position?: CanvasPositionMode;
   margin?: CanvasSpacing;
   cursor?: CanvasCursorType;
+  effects?: CanvasEffect[];
   parentId?: string | null;
   isPrimary?: boolean;
   primarySyncId?: string;

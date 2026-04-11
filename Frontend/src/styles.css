@@ -200,3 +200,518 @@ textarea {
   left: 50%;
   transform: translateX(-50%);
 }
+
+.pp-effect-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.pp-effect-preview__stage {
+  position: relative;
+  min-height: 118px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    radial-gradient(circle at 18% 18%, rgba(255, 255, 255, 0.07), transparent 42%),
+    linear-gradient(155deg, rgba(28, 31, 37, 0.92), rgba(11, 13, 16, 0.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -18px 30px rgba(0, 0, 0, 0.26);
+  display: grid;
+  place-items: center;
+  perspective: 720px;
+}
+
+.pp-effect-preview__stage::before,
+.pp-effect-preview__stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pp-effect-preview__stage::before {
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.045) 1px, transparent 1px);
+  background-size: 18px 18px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), transparent 88%);
+}
+
+.pp-effect-preview__stage::after {
+  background: radial-gradient(circle at 50% 72%, rgba(80, 148, 255, 0.16), transparent 34%);
+}
+
+.pp-effect-preview__node-shell {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+}
+
+.pp-effect-preview__node {
+  width: 104px;
+  min-height: 64px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+    linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92));
+  box-shadow:
+    0 18px 30px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  padding: 0.8rem 0.85rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.45rem;
+  transform-origin: center center;
+  transform-style: preserve-3d;
+  will-change: transform, opacity, background, box-shadow;
+}
+
+.pp-effect-preview__line {
+  display: block;
+  height: 8px;
+  width: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.32);
+}
+
+.pp-effect-preview__line--short {
+  width: 58%;
+}
+
+.pp-effect-popup-picker {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--canvas-panel-section-body-color);
+  border-radius: var(--canvas-panel-control-radius);
+  min-height: var(--canvas-panel-control-height);
+  padding: 0 var(--canvas-panel-control-padding-x);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, 0.3),
+    0 1px 0 rgba(255, 255, 255, 0.05);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.pp-effect-popup-picker:hover {
+  background: rgba(0, 0, 0, 0.35);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.pp-effect-popup-picker:focus-within {
+  background: rgba(0, 0, 0, 0.45);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.05),
+    inset 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.pp-effect-popup-picker__main {
+  min-width: 0;
+  flex: 1;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.pp-effect-popup-picker__main:focus-visible,
+.pp-effect-popup-picker__clear:focus-visible {
+  outline: none;
+}
+
+.pp-effect-popup-picker__swatch {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+}
+
+.pp-effect-popup-picker__swatch--transparent {
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.08) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.08) 75%);
+  background-size: 10px 10px;
+  background-position:
+    0 0,
+    0 5px,
+    5px -5px,
+    -5px 0;
+}
+
+.pp-effect-popup-picker__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--canvas-panel-font-size);
+  text-align: left;
+}
+
+.pp-effect-popup-picker__clear {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--canvas-panel-section-muted-color);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  margin-left: 0.2rem;
+  font-size: var(--canvas-panel-font-size);
+  line-height: 1;
+  transition:
+    color 0.18s ease,
+    background-color 0.18s ease;
+}
+
+.pp-effect-popup-picker__clear:hover {
+  color: var(--color-zinc-100);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+@keyframes pp-effect-preview-enter {
+  0%,
+  14% {
+    opacity: var(--pp-effect-preview-from-opacity, 0);
+    transform: var(
+      --pp-effect-preview-from-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-from-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-from-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+
+  58%,
+  100% {
+    opacity: 1;
+    transform: var(
+      --pp-effect-preview-to-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-to-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-to-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+}
+
+@keyframes pp-effect-preview-press {
+  0%,
+  16%,
+  100% {
+    opacity: var(--pp-effect-preview-from-opacity, 1);
+    transform: var(
+      --pp-effect-preview-from-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-from-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-from-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+
+  34%,
+  56% {
+    opacity: var(--pp-effect-preview-to-opacity, 1);
+    transform: var(
+      --pp-effect-preview-to-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-to-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-to-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+}
+
+@keyframes pp-effect-preview-hover {
+  0%,
+  10%,
+  100% {
+    opacity: var(--pp-effect-preview-from-opacity, 1);
+    transform: var(
+      --pp-effect-preview-from-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-from-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-from-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+
+  22%,
+  48% {
+    opacity: var(--pp-effect-preview-to-opacity, 1);
+    transform: var(
+      --pp-effect-preview-to-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-to-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-to-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+}
+
+@keyframes pp-effect-preview-loop-seamless {
+  0% {
+    opacity: var(--pp-effect-preview-from-opacity, 1);
+    transform: var(
+      --pp-effect-preview-from-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-from-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-from-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+
+  100% {
+    opacity: var(--pp-effect-preview-to-opacity, 1);
+    transform: var(
+      --pp-effect-preview-to-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-to-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-to-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+}
+
+@keyframes pp-effect-preview-loop {
+  0% {
+    opacity: var(--pp-effect-preview-from-opacity, 1);
+    transform: var(
+      --pp-effect-preview-from-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-from-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-from-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+
+  62%,
+  100% {
+    opacity: var(--pp-effect-preview-to-opacity, 1);
+    transform: var(
+      --pp-effect-preview-to-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-to-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-to-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+}
+
+@keyframes pp-effect-preview-mirror-seamless {
+  0% {
+    opacity: var(--pp-effect-preview-from-opacity, 1);
+    transform: var(
+      --pp-effect-preview-from-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-from-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-from-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+
+  50% {
+    opacity: var(--pp-effect-preview-to-opacity, 1);
+    transform: var(
+      --pp-effect-preview-to-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-to-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-to-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+
+  100% {
+    opacity: var(--pp-effect-preview-from-opacity, 1);
+    transform: var(
+      --pp-effect-preview-from-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-from-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-from-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+}
+
+@keyframes pp-effect-preview-mirror {
+  0% {
+    opacity: var(--pp-effect-preview-from-opacity, 1);
+    transform: var(
+      --pp-effect-preview-from-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-from-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-from-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+
+  31%,
+  50% {
+    opacity: var(--pp-effect-preview-to-opacity, 1);
+    transform: var(
+      --pp-effect-preview-to-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-to-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-to-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+
+  81%,
+  100% {
+    opacity: var(--pp-effect-preview-from-opacity, 1);
+    transform: var(
+      --pp-effect-preview-from-transform,
+      translate(0px, 0px) scale(1) rotate(0deg) skew(0deg, 0deg)
+    );
+    background: var(
+      --pp-effect-preview-from-background,
+      linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.08)),
+      linear-gradient(135deg, rgba(86, 162, 255, 0.88), rgba(33, 91, 201, 0.92))
+    );
+    box-shadow: var(
+      --pp-effect-preview-from-box-shadow,
+      0 18px 30px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.28)
+    );
+  }
+}

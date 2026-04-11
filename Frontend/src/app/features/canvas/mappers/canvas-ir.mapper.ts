@@ -2,6 +2,8 @@
   CanvasAlignItems,
   CanvasCornerRadii,
   CanvasDisplayMode,
+  CanvasEffect,
+  CanvasEffectTrigger,
   CanvasElement,
   CanvasFontSizeUnit,
   CanvasFlexDirection,
@@ -18,6 +20,7 @@
   ConverterPageRequest,
   FlexDirection,
   IRBorder,
+  IREffect,
   IRLayout,
   IRLength,
   IRMeta,
@@ -58,6 +61,7 @@ import {
   resolveEditableCanvasShadow,
   normalizeCanvasShadowValue,
 } from '../utils/canvas-shadow.util';
+import { resolveCanvasEffect } from '../utils/canvas-effect.util';
 
 const ROOT_ROLE = 'canvas-root';
 const ROOT_TYPE = 'Container';
@@ -402,6 +406,7 @@ function mapCanvasElementToIR(element: CanvasElement, parent?: CanvasElement): I
     layout: buildNodeLayout(element),
     style: buildNodeStyle(element),
     position: buildNodePosition(element, parent),
+    effects: buildNodeEffects(element),
     meta: buildNodeMeta(element),
     variants: {},
     children: [],
@@ -476,6 +481,62 @@ function buildNodeMeta(element: CanvasElement): IRMeta {
     name: element.name || undefined,
     hidden: element.visible === false,
   };
+}
+
+function buildNodeEffects(element: CanvasElement): IREffect[] | undefined {
+  if (!element.effects?.length) return undefined;
+  return element.effects.map((effect) => {
+    const e = resolveCanvasEffect(effect);
+
+    return {
+      preset: e.preset,
+      trigger: e.trigger,
+      opacity: e.opacity,
+      scale: e.scale,
+      rotate: e.rotate,
+      rotationMode: e.rotationMode,
+      skewX: e.skewX,
+      skewY: e.skewY,
+      offsetX: e.offsetX,
+      offsetY: e.offsetY,
+      fill: e.fill,
+      shadow: e.shadow,
+      duration: e.duration,
+      delay: e.delay,
+      iterations: String(e.iterations),
+      easing: e.easing,
+      direction: e.direction,
+      fillMode: e.fillMode,
+      offScreenBehavior: e.offScreenBehavior,
+    };
+  });
+}
+
+function readNodeEffects(node: IRNode): CanvasEffect[] | undefined {
+  if (!node.effects?.length) return undefined;
+  return node.effects.map((e) =>
+    resolveCanvasEffect({
+      preset: e.preset as CanvasEffect['preset'],
+      trigger: (e.trigger ?? 'onLoad') as CanvasEffectTrigger,
+      opacity: e.opacity,
+      scale: e.scale,
+      rotate: e.rotate,
+      rotationMode: (e.rotationMode ?? '2d') as CanvasEffect['rotationMode'],
+      skewX: e.skewX,
+      skewY: e.skewY,
+      offsetX: e.offsetX,
+      offsetY: e.offsetY,
+      fill: e.fill,
+      shadow: e.shadow,
+      duration: e.duration ?? 500,
+      delay: e.delay ?? 0,
+      iterations: e.iterations === 'infinite' ? 'infinite' : Number(e.iterations) || 1,
+      easing: (e.easing ?? 'ease') as CanvasEffect['easing'],
+      direction: (e.direction ?? 'normal') as CanvasEffect['direction'],
+      fillMode: (e.fillMode ?? 'forwards') as CanvasEffect['fillMode'],
+      offScreenBehavior: (e.offScreenBehavior ?? 'play') as CanvasEffect['offScreenBehavior'],
+    }),
+  );
 }
 
 function buildNodeStyle(element: CanvasElement): IRStyle {
@@ -911,6 +972,7 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     tag: normalizeStoredCanvasTag(mappedType, importedTag, linkType !== undefined),
     ariaLabel: normalizeCanvasAccessibilityLabel(importedAriaLabel),
     cursor: (readOptionalStringStyle(node.style, 'cursor') as CanvasElement['cursor']) ?? undefined,
+    effects: readNodeEffects(node),
     ...transformFields,
     irMeta: {
       type: node.type,

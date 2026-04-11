@@ -27,6 +27,32 @@ public class IRNode
 
   // Editor-only metadata
   public IRMeta Meta { get; set; } = new();
+
+  // CSS animation effect
+  public List<IREffect>? Effects { get; set; }
+}
+
+public class IREffect
+{
+  public string Preset { get; set; } = "";
+  public string Trigger { get; set; } = "onLoad"; // onLoad | hover | click | focus | loop
+  public double? Opacity { get; set; }
+  public double? Scale { get; set; }
+  public double? Rotate { get; set; }
+  public string RotationMode { get; set; } = "2d";
+  public double? SkewX { get; set; }
+  public double? SkewY { get; set; }
+  public double? OffsetX { get; set; }
+  public double? OffsetY { get; set; }
+  public string? Fill { get; set; }
+  public string? Shadow { get; set; }
+  public int Duration { get; set; } = 500;
+  public int Delay { get; set; } = 0;
+  public string Iterations { get; set; } = "1";
+  public string Easing { get; set; } = "ease";
+  public string Direction { get; set; } = "normal";
+  public string FillMode { get; set; } = "forwards";
+  public string OffScreenBehavior { get; set; } = "play";
 }
 
 public class IRLayout
