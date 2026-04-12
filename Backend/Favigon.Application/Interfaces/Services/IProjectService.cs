@@ -10,8 +10,12 @@ public interface IProjectService
   Task<ProjectResponse?> GetByIdAsync(int id, int userId);
   Task<ProjectResponse> CreateAsync(ProjectCreateRequest request, int userId);
   Task<ProjectResponse?> UpdateAsync(int id, ProjectUpdateRequest request, int userId);
-  Task<bool> DeleteAsync(int id, int userId);
+  Task<bool> DeleteAsync(int id, int userId, CancellationToken cancellationToken = default);
   Task<ProjectDesignResponse?> GetDesignByProjectIdAsync(int projectId, int userId);
   Task<ProjectDesignResponse?> SaveDesignAsync(int projectId, int userId, ProjectDesignSaveRequest request);
-  Task<bool> SaveThumbnailAsync(int projectId, int userId, ProjectThumbnailSaveRequest request);
+  Task<bool> SaveThumbnailAsync(
+    int projectId,
+    int userId,
+    ProjectImageUploadRequest request,
+    CancellationToken cancellationToken = default);
 }

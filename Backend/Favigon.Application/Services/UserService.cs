@@ -66,6 +66,7 @@ public class UserService : IUserService
       Username = request.Username,
       DisplayName = request.DisplayName,
       Email = request.Email,
+      HasPassword = true,
       PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
       ProfilePictureUrl = request.ProfilePictureUrl,
       Role = string.IsNullOrWhiteSpace(request.Role) ? "User" : request.Role
@@ -110,6 +111,7 @@ public class UserService : IUserService
     existing.Email = request.Email;
     if (!string.IsNullOrWhiteSpace(request.Password))
     {
+      existing.HasPassword = true;
       existing.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
     }
     existing.ProfilePictureUrl = request.ProfilePictureUrl;

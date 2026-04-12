@@ -14,6 +14,7 @@ public class ProjectServiceTests
 {
   private readonly Mock<IProjectRepository> _projectRepo = new();
   private readonly Mock<IConverterEngine> _converterEngine = new();
+  private readonly Mock<IProjectAssetStorage> _projectAssetStorage = new();
   private readonly IMapper _mapper;
   private readonly ProjectService _sut;
 
@@ -21,7 +22,11 @@ public class ProjectServiceTests
   {
     var config = new MapperConfiguration(cfg => cfg.AddProfile<MappingProfile>());
     _mapper = config.CreateMapper();
-    _sut = new ProjectService(_projectRepo.Object, _mapper, _converterEngine.Object);
+    _sut = new ProjectService(
+      _projectRepo.Object,
+      _mapper,
+      _converterEngine.Object,
+      _projectAssetStorage.Object);
   }
 
   // --- GetByUserId ---
@@ -130,6 +135,7 @@ public class ProjectServiceTests
 
     // Assert
     Assert.True(result);
+    _projectAssetStorage.Verify(s => s.DeleteProjectAssetsAsync(3, 10, It.IsAny<CancellationToken>()), Times.Once);
     _projectRepo.Verify(r => r.DeleteAsync(project), Times.Once);
   }
 
@@ -144,6 +150,7 @@ public class ProjectServiceTests
 
     // Assert
     Assert.False(result);
+    _projectAssetStorage.Verify(s => s.DeleteProjectAssetsAsync(It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
     _projectRepo.Verify(r => r.DeleteAsync(It.IsAny<Project>()), Times.Never);
   }
 
@@ -263,6 +270,178 @@ public class ProjectServiceTests
     Assert.Equal(33.34m, element.GetProperty("rotation").GetDecimal());
   }
 
+  [Fact]
+  public async Task SaveDesign_WhenImageAssetIsReplaced_DeletesUnusedPreviousAsset()
+  {
+    // Arrange
+    var project = new Project
+    {
+      Id = 1,
+      UserId = 5,
+      Name = "P",
+      DesignJson = BuildDesignJsonWithAsset("http://localhost:5207/project-assets/5/1/old-image.jpg")
+    };
+    _projectRepo.Setup(r => r.GetByIdAsync(1, 5)).ReturnsAsync(project);
+
+    var request = new ProjectDesignSaveRequest
+    {
+      DesignJson = BuildDesignJsonWithAsset("http://localhost:5207/project-assets/5/1/new-image.jpg")
+    };
+
+    // Act
+    await _sut.SaveDesignAsync(1, 5, request);
+
+    // Assert
+    _projectAssetStorage.Verify(
+      s => s.DeleteAssetsAsync(
+        5,
+        1,
+        It.Is<IEnumerable<string>>(paths =>
+          paths.Count() == 1 &&
+          paths.Single() == "/project-assets/5/1/old-image.jpg"),
+        It.IsAny<CancellationToken>()),
+      Times.Once);
+  }
+
+  [Fact]
+  public async Task SaveDesign_WhenImageAssetIsStillReferenced_DoesNotDeleteIt()
+  {
+    // Arrange
+    var sharedAsset = "http://localhost:5207/project-assets/5/1/shared-image.jpg";
+    var project = new Project
+    {
+      Id = 1,
+      UserId = 5,
+      Name = "P",
+      DesignJson = BuildDesignJsonWithAssets(sharedAsset, sharedAsset)
+    };
+    _projectRepo.Setup(r => r.GetByIdAsync(1, 5)).ReturnsAsync(project);
+
+    var request = new ProjectDesignSaveRequest
+    {
+      DesignJson = BuildDesignJsonWithAsset(sharedAsset)
+    };
+
+    // Act
+    await _sut.SaveDesignAsync(1, 5, request);
+
+    // Assert
+    _projectAssetStorage.Verify(
+      s => s.DeleteAssetsAsync(
+        It.IsAny<int>(),
+        It.IsAny<int>(),
+        It.IsAny<IEnumerable<string>>(),
+        It.IsAny<CancellationToken>()),
+      Times.Never);
+  }
+
+  [Fact]
+  public async Task SaveThumbnail_WhenProjectExists_SavesThumbnailAsProjectAsset()
+  {
+    // Arrange
+    var project = new Project { Id = 8, UserId = 5, Name = "Thumb Project" };
+    _projectRepo.Setup(r => r.GetByIdAsync(8, 5)).ReturnsAsync(project);
+    _projectAssetStorage
+      .Setup(s => s.SaveThumbnailAsync(5, 8, It.IsAny<Stream>(), "image/jpeg", It.IsAny<CancellationToken>()))
+      .ReturnsAsync("/project-assets/5/8/thumbnail.jpg");
+
+    var request = new ProjectImageUploadRequest
+    {
+      Content = new MemoryStream(new byte[] { 1, 2, 3, 4 }),
+      FileName = "thumbnail.jpg",
+      ContentType = "image/jpeg",
+      Length = 4,
+    };
+
+    // Act
+    var saved = await _sut.SaveThumbnailAsync(8, 5, request);
+
+    // Assert
+    Assert.True(saved);
+    _projectAssetStorage.Verify(
+      s => s.SaveThumbnailAsync(5, 8, It.IsAny<Stream>(), "image/jpeg", It.IsAny<CancellationToken>()),
+      Times.Once);
+    _projectRepo.Verify(r => r.UpdateAsync(It.IsAny<Project>()), Times.Never);
+  }
+
+  [Fact]
+  public async Task SaveThumbnail_WhenLegacyDatabaseThumbnailExists_ClearsDatabaseValueAfterSavingAsset()
+  {
+    // Arrange
+    var project = new Project
+    {
+      Id = 8,
+      UserId = 5,
+      Name = "Thumb Project",
+      ThumbnailDataUrl = "data:image/jpeg;base64,legacy"
+    };
+    _projectRepo.Setup(r => r.GetByIdAsync(8, 5)).ReturnsAsync(project);
+    _projectAssetStorage
+      .Setup(s => s.SaveThumbnailAsync(5, 8, It.IsAny<Stream>(), "image/jpeg", It.IsAny<CancellationToken>()))
+      .ReturnsAsync("/project-assets/5/8/thumbnail.jpg");
+
+    var request = new ProjectImageUploadRequest
+    {
+      Content = new MemoryStream(new byte[] { 1, 2, 3, 4 }),
+      FileName = "thumbnail.jpg",
+      ContentType = "image/jpeg",
+      Length = 4,
+    };
+
+    // Act
+    var saved = await _sut.SaveThumbnailAsync(8, 5, request);
+
+    // Assert
+    Assert.True(saved);
+    Assert.Null(project.ThumbnailDataUrl);
+    _projectRepo.Verify(r => r.UpdateAsync(project), Times.Once);
+  }
+
+  [Fact]
+  public async Task GetById_WhenThumbnailAssetExists_ReturnsAssetUrlInsteadOfDatabaseValue()
+  {
+    // Arrange
+    var project = new Project
+    {
+      Id = 3,
+      UserId = 5,
+      Name = "MyProj",
+      ThumbnailDataUrl = "data:image/jpeg;base64,legacy",
+      CreatedAt = DateTime.UtcNow,
+      UpdatedAt = DateTime.UtcNow,
+    };
+    _projectRepo.Setup(r => r.GetByIdAsync(3, 5)).ReturnsAsync(project);
+    _projectAssetStorage
+      .Setup(s => s.GetThumbnailUrl(5, 3))
+      .Returns("/project-assets/5/3/thumbnail.jpg?v=123");
+
+    // Act
+    var result = await _sut.GetByIdAsync(3, 5);
+
+    // Assert
+    Assert.NotNull(result);
+    Assert.Equal("/project-assets/5/3/thumbnail.jpg?v=123", result!.ThumbnailDataUrl);
+  }
+
+  [Fact]
+  public async Task SaveThumbnail_WhenContentTypeIsUnsupported_ThrowsArgumentException()
+  {
+    // Arrange
+    var project = new Project { Id = 8, UserId = 5, Name = "Thumb Project" };
+    _projectRepo.Setup(r => r.GetByIdAsync(8, 5)).ReturnsAsync(project);
+
+    var request = new ProjectImageUploadRequest
+    {
+      Content = new MemoryStream(new byte[] { 1, 2, 3, 4 }),
+      FileName = "thumbnail.svg",
+      ContentType = "image/svg+xml",
+      Length = 4,
+    };
+
+    // Act & Assert
+    await Assert.ThrowsAsync<ArgumentException>(() => _sut.SaveThumbnailAsync(8, 5, request));
+  }
+
   // --- GetDesign ---
 
   [Fact]
@@ -291,5 +470,56 @@ public class ProjectServiceTests
     // Assert
     Assert.NotNull(result);
     Assert.Equal("{}", result.DesignJson);
+  }
+
+  private static string BuildDesignJsonWithAsset(string assetUrl)
+  {
+    return BuildDesignJsonWithAssets(assetUrl);
+  }
+
+  private static string BuildDesignJsonWithAssets(params string[] assetUrls)
+  {
+    var design = new
+    {
+      id = "canvas-1",
+      type = "Container",
+      style = new
+      {
+        backgroundImage = $"url({assetUrls.FirstOrDefault() ?? string.Empty})"
+      },
+      props = new
+      {
+        favigonCanvasDocument = new
+        {
+          version = "2.0",
+          projectId = "proj-1",
+          activePageId = "page-1",
+          pages = new[]
+          {
+            new
+            {
+              id = "page-1",
+              name = "Page 1",
+              elements = assetUrls.Select((assetUrl, index) => new
+              {
+                id = $"element-{index + 1}",
+                type = "rectangle",
+                x = 0,
+                y = 0,
+                width = 100,
+                height = 100,
+                visible = true,
+                fillMode = "image",
+                backgroundImage = assetUrl,
+              }).ToArray(),
+            }
+          }
+        }
+      },
+      children = Array.Empty<object>(),
+      variants = new { }
+    };
+
+    return JsonSerializer.Serialize(design);
   }
 }

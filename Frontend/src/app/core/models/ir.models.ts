@@ -37,6 +37,11 @@ export interface IRPosition {
 export interface IRStyle {
   color?: string;
   background?: string;
+  backgroundImage?: string;
+  backgroundSize?: string;
+  backgroundPosition?: string;
+  backgroundRepeat?: string;
+  objectFit?: string;
   transform?: string;
   transformOrigin?: string;
   backfaceVisibility?: string;

@@ -7,11 +7,19 @@ export type CanvasFontStyle = 'normal' | 'italic';
 export type CanvasFontSizeUnit = 'px' | 'rem';
 export type CanvasTextSpacingUnit = 'px' | 'em';
 export type CanvasOverflowMode = 'clip' | 'visible' | 'hidden' | 'scroll';
+export type CanvasFillMode = 'color' | 'image';
+export type CanvasObjectFit = 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
 export type CanvasShadowPreset = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 export type CanvasShadow = string;
 export type CanvasPageViewportPreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
 export type CanvasLinkType = 'page' | 'url';
-export type CanvasSizeMode = 'fixed' | 'relative' | 'fill' | 'fit-content' | 'viewport';
+export type CanvasSizeMode =
+  | 'fixed'
+  | 'relative'
+  | 'fill'
+  | 'fit-content'
+  | 'viewport'
+  | 'fit-image';
 export type CanvasConstraintSizeMode = 'fixed' | 'relative';
 export type CanvasSemanticTag =
   | 'a'
@@ -191,6 +199,13 @@ export interface CanvasElement {
   transformOptions?: CanvasTransformOption[];
   visible?: boolean;
   fill?: string;
+  fillMode?: CanvasFillMode;
+  backgroundImage?: string;
+  backgroundSize?: string;
+  backgroundPosition?: string;
+  backgroundRepeat?: string;
+  objectFit?: CanvasObjectFit;
+  imageAltText?: string;
   stroke?: string;
   strokeWidth?: number;
   strokeStyle?: string;

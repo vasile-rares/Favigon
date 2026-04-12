@@ -22,6 +22,8 @@ public class User
     [Required, MaxLength(255)]
     public string PasswordHash { get; set; } = null!;
 
+    public bool HasPassword { get; set; } = true;
+
     [MaxLength(255)]
     public string? ProfilePictureUrl { get; set; }
 

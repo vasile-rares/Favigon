@@ -1,4 +1,20 @@
-﻿/* â”€â”€ Sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+﻿:host {
+  display: block;
+  min-width: 0;
+}
+
+.properties-section,
+.properties-empty-state {
+  margin: 0;
+}
+
+.properties-section + .properties-section,
+.properties-section + .properties-empty-state,
+.properties-empty-state + .properties-section {
+  margin-top: 0.6rem;
+}
+
+/* â”€â”€ Sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .properties-section {
   display: flex;
   flex-direction: column;

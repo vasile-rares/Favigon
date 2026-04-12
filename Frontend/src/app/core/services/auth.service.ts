@@ -4,12 +4,14 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
   AuthMessageResponse,
+  ChangePasswordRequest,
   ForgotPasswordRequest,
   GithubAuthRequest,
   GoogleAuthRequest,
   LoginRequest,
   RegisterRequest,
   ResetPasswordRequest,
+  SetPasswordRequest,
 } from '../models/auth.models';
 
 @Injectable({ providedIn: 'root' })
@@ -53,6 +55,14 @@ export class AuthService {
 
   resetPassword(request: ResetPasswordRequest): Observable<AuthMessageResponse> {
     return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/reset-password`, request);
+  }
+
+  setPassword(request: SetPasswordRequest): Observable<AuthMessageResponse> {
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/set-password`, request);
+  }
+
+  changePassword(request: ChangePasswordRequest): Observable<AuthMessageResponse> {
+    return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/change-password`, request);
   }
 
   logout(): Observable<AuthMessageResponse> {

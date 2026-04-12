@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
     services.AddScoped<IUserService, UserService>();
     services.AddScoped<IAuthService, AuthService>();
     services.AddScoped<IProjectService, ProjectService>();
+    services.AddScoped<IProjectAssetService, ProjectAssetService>();
     services.AddScoped<IConverterService, ConverterService>();
     services.AddFavigonConverter();
 

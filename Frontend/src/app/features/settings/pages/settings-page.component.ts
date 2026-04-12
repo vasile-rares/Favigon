@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { UserService, CurrentUserService, extractApiErrorMessage } from '@app/core';
+import { AuthService, UserService, CurrentUserService, extractApiErrorMessage } from '@app/core';
 import type { UserMe } from '@app/core';
 import { environment } from '../../../../environments/environment';
 import {
@@ -12,6 +12,8 @@ import {
   ActionButtonComponent,
   DIALOG_BOX_IMPORTS,
 } from '@app/shared';
+
+const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 
 @Component({
   selector: 'app-settings-page',
@@ -28,6 +30,7 @@ import {
   styleUrl: './settings-page.component.css',
 })
 export class SettingsPage implements OnInit {
+  private readonly authService = inject(AuthService);
   private readonly userService = inject(UserService);
   private readonly currentUser = inject(CurrentUserService);
   private readonly router = inject(Router);
@@ -40,6 +43,8 @@ export class SettingsPage implements OnInit {
   email = '';
   currentPassword = '';
   newPassword = '';
+  confirmPassword = '';
+  passwordDialogMode: 'set' | 'change' = 'change';
 
   readonly isLoading = signal(false);
   readonly isSaving = signal(false);
@@ -47,8 +52,10 @@ export class SettingsPage implements OnInit {
   readonly isDeleteDialogOpen = signal(false);
   readonly isPasswordDialogOpen = signal(false);
   readonly isChangingPassword = signal(false);
+  readonly isPasswordDialogSuccess = signal(false);
   readonly savingProvider = signal<string | null>(null);
   readonly statusMessage = signal<{ type: 'error' | 'success'; text: string } | null>(null);
+  readonly passwordDialogMessage = signal<{ type: 'error' | 'success'; text: string } | null>(null);
 
   private userMe: UserMe | null = null;
 
@@ -120,38 +127,145 @@ export class SettingsPage implements OnInit {
   }
 
   openChangePasswordDialog() {
+    this.passwordDialogMode = this.userMe?.hasPassword ? 'change' : 'set';
     this.currentPassword = '';
     this.newPassword = '';
+    this.confirmPassword = '';
+    this.statusMessage.set(null);
+    this.passwordDialogMessage.set(null);
+    this.isPasswordDialogSuccess.set(false);
     this.isPasswordDialogOpen.set(true);
   }
 
   closeChangePasswordDialog() {
     if (!this.isChangingPassword()) {
       this.isPasswordDialogOpen.set(false);
+      this.passwordDialogMessage.set(null);
+      this.isPasswordDialogSuccess.set(false);
     }
   }
 
-  async changePassword() {
-    if (!this.currentPassword || !this.newPassword) return;
+  async submitPasswordDialog() {
+    if (!this.passwordDialogCanSubmit) {
+      return;
+    }
 
     this.isChangingPassword.set(true);
+    this.passwordDialogMessage.set(null);
+
     try {
-      // NOTE: Here you would call your backend API to change the password
-      // await firstValueFrom(this.userService.changePassword(...));
+      const response = this.isSetPasswordMode
+        ? await firstValueFrom(
+            this.authService.setPassword({
+              password: this.newPassword,
+            }),
+          )
+        : await firstValueFrom(
+            this.authService.changePassword({
+              currentPassword: this.currentPassword,
+              newPassword: this.newPassword,
+            }),
+          );
 
-      // Simulate network request
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      if (this.userMe && !this.userMe.hasPassword) {
+        const updatedUser: UserMe = {
+          ...this.userMe,
+          hasPassword: true,
+        };
+        this.currentUser.set(updatedUser);
+        this.userMe = updatedUser;
+      }
 
-      this.statusMessage.set({ type: 'success', text: 'Password changed successfully.' });
-      this.isPasswordDialogOpen.set(false);
+      const successMessage = {
+        type: 'success' as const,
+        text: response.message ||
+          (this.isSetPasswordMode
+            ? "You're all set. We've sent a confirmation email to your inbox."
+            : 'Password changed successfully.'),
+      };
+
+      this.passwordDialogMessage.set(successMessage);
+      this.statusMessage.set(successMessage);
+      this.isPasswordDialogSuccess.set(true);
     } catch (error: unknown) {
-      this.statusMessage.set({
+      this.passwordDialogMessage.set({
         type: 'error',
-        text: extractApiErrorMessage(error, 'Could not change password.'),
+        text: extractApiErrorMessage(
+          error,
+          this.isSetPasswordMode ? 'Could not set password.' : 'Could not change password.',
+        ),
       });
     } finally {
       this.isChangingPassword.set(false);
     }
+  }
+
+  get isSetPasswordMode(): boolean {
+    return this.passwordDialogMode === 'set';
+  }
+
+  get hasLocalPassword(): boolean {
+    return this.userMe?.hasPassword ?? true;
+  }
+
+  get passwordDialogTitle(): string {
+    if (this.isPasswordDialogSuccess()) {
+      return this.isSetPasswordMode ? "You're all set" : 'Password changed';
+    }
+
+    return this.isSetPasswordMode ? 'Set password' : 'Change password';
+  }
+
+  get passwordDialogDescription(): string {
+    if (this.isPasswordDialogSuccess()) {
+      return this.isSetPasswordMode
+        ? "Your sign-in details have been updated. You can now sign in with your email and password, and we've sent a confirmation email to your inbox."
+        : 'Your password has been updated successfully.';
+    }
+
+    return this.isSetPasswordMode
+      ? "Choose a password for your account. We'll send a confirmation email once it's saved."
+      : 'Enter your current password and choose a new secure password.';
+  }
+
+  get passwordDialogPrimaryLabel(): string {
+    if (this.isChangingPassword()) {
+      return 'Saving...';
+    }
+
+    return this.isSetPasswordMode ? 'Set password' : 'Change password';
+  }
+
+  get passwordDialogCanSubmit(): boolean {
+    if (this.isPasswordDialogSuccess()) {
+      return false;
+    }
+
+    if (!this.newPassword || !PASSWORD_PATTERN.test(this.newPassword)) {
+      return false;
+    }
+
+    if (!this.confirmPassword || this.newPassword !== this.confirmPassword) {
+      return false;
+    }
+
+    if (!this.isSetPasswordMode && !this.currentPassword) {
+      return false;
+    }
+
+    return true;
+  }
+
+  get passwordDialogValidationMessage(): string | null {
+    if (this.newPassword && !PASSWORD_PATTERN.test(this.newPassword)) {
+      return 'Password must contain at least one lowercase letter, one uppercase letter, one digit, and be at least 8 characters long.';
+    }
+
+    if (this.confirmPassword && this.newPassword !== this.confirmPassword) {
+      return 'Passwords do not match.';
+    }
+
+    return null;
   }
 
   getLinkedAccount(provider: string) {

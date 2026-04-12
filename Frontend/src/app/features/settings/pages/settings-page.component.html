@@ -113,10 +113,14 @@
         <div *ngIf="activeTab === 'password'" class="settings-card fade-in">
           <div class="card-header">
             <h3 class="card-title">Password</h3>
-            <p class="card-description">For your security, we highly recommend that you choose a unique password that you don't use for any other online account.</p>
+            <p class="card-description">
+              {{ hasLocalPassword
+                ? "For your security, we highly recommend that you choose a unique password that you don't use for any other online account."
+                : "You're currently signing in with Google or GitHub. Add a password if you'd also like to sign in with your email and password." }}
+            </p>
             <div class="mt-5">
               <app-action-button variant="outline" [fullWidth]="false" (clicked)="openChangePasswordDialog()">
-                Change password
+                {{ hasLocalPassword ? 'Change password' : 'Set password' }}
               </app-action-button>
             </div>
           </div>
@@ -236,40 +240,71 @@
 <!-- Change Password Dialog -->
 @if (isPasswordDialogOpen()) {
   <app-dialog-box
-    title="Change password"
-    description="Enter your current password and a new secure password."
+    [title]="passwordDialogTitle"
+    [description]="passwordDialogDescription"
     [isBusy]="isChangingPassword()"
-    [primaryAction]="{ label: isChangingPassword() ? 'Saving...' : 'Change password', variant: 'primary' }"
-    [secondaryAction]="{ label: 'Cancel' }"
+    [primaryAction]="isPasswordDialogSuccess() ? undefined : { label: passwordDialogPrimaryLabel, variant: 'primary', disabled: !passwordDialogCanSubmit }"
+    [secondaryAction]="{ label: isPasswordDialogSuccess() ? 'Close' : 'Cancel' }"
     (closed)="closeChangePasswordDialog()"
-    (primaryClicked)="changePassword()"
+    (primaryClicked)="submitPasswordDialog()"
     (secondaryClicked)="closeChangePasswordDialog()">
 
-    <div class="dialog-form-layout">
-      <!-- Hidden fake inputs to intercept aggressive browser autofill (stops it from hitting the header search bar) -->
-      <input type="text" autocomplete="username" class="autofill-trap" tabindex="-1" aria-hidden="true">
-      <input type="password" autocomplete="current-password" class="autofill-trap" tabindex="-1" aria-hidden="true">
+    @if (!isPasswordDialogSuccess()) {
+      <div class="dialog-form-layout">
+        <input type="text" autocomplete="username" class="autofill-trap" tabindex="-1" aria-hidden="true">
+        <input type="password" autocomplete="current-password" class="autofill-trap" tabindex="-1" aria-hidden="true">
 
-      <div class="form-group">
-        <app-text-input
-          id="current-password"
-          label="Current password"
-          type="password"
-          placeholder="Type your current password..."
-          [enablePasswordToggle]="true"
-          autocomplete="new-password"
-          [(ngModel)]="currentPassword"></app-text-input>
+        @if (!isSetPasswordMode) {
+          <div class="form-group">
+            <app-text-input
+              id="current-password"
+              label="Current password"
+              type="password"
+              placeholder="Type your current password..."
+              [enablePasswordToggle]="true"
+              autocomplete="current-password"
+              [(ngModel)]="currentPassword"></app-text-input>
+          </div>
+        }
+
+        <div class="form-group">
+          <app-text-input
+            id="new-password"
+            [label]="isSetPasswordMode ? 'Password' : 'New password'"
+            type="password"
+            [placeholder]="isSetPasswordMode ? 'Create your password...' : 'Type your new password...'"
+            [enablePasswordToggle]="true"
+            autocomplete="new-password"
+            [(ngModel)]="newPassword"></app-text-input>
+        </div>
+
+        <p class="dialog-helper-text">
+          Use at least 8 characters, including one uppercase letter, one lowercase letter, and one number.
+        </p>
+
+        <div class="form-group">
+          <app-text-input
+            id="confirm-password"
+            label="Confirm password"
+            type="password"
+            placeholder="Repeat your password..."
+            [enablePasswordToggle]="true"
+            autocomplete="new-password"
+            [(ngModel)]="confirmPassword"></app-text-input>
+        </div>
+
+        @if (passwordDialogValidationMessage) {
+          <div class="status-banner m-0 status-banner--error">{{ passwordDialogValidationMessage }}</div>
+        }
+
+        @if (passwordDialogMessage()?.type === 'error') {
+          <div class="status-banner m-0 status-banner--error">{{ passwordDialogMessage()!.text }}</div>
+        }
       </div>
-      <div class="form-group">
-        <app-text-input
-          id="new-password"
-          label="New password"
-          type="password"
-          placeholder="Type your new password..."
-          [enablePasswordToggle]="true"
-          autocomplete="new-password"
-          [(ngModel)]="newPassword"></app-text-input>
+    } @else {
+      <div class="dialog-form-layout">
+        <div class="status-banner m-0 status-banner--success">{{ passwordDialogMessage()!.text }}</div>
       </div>
-    </div>
+    }
   </app-dialog-box>
 }

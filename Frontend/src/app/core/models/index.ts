@@ -5,6 +5,8 @@ export type {
   GoogleAuthRequest,
   ForgotPasswordRequest,
   ResetPasswordRequest,
+  SetPasswordRequest,
+  ChangePasswordRequest,
   AuthMessageResponse,
 } from './auth.models';
 
@@ -16,6 +18,8 @@ export type {
   CanvasFontSizeUnit,
   CanvasTextSpacingUnit,
   CanvasOverflowMode,
+  CanvasFillMode,
+  CanvasObjectFit,
   CanvasShadowPreset,
   CanvasShadow,
   CanvasPageViewportPreset,
@@ -87,6 +91,7 @@ export type {
   ProjectUpdateRequest,
   ProjectDesignResponse,
   ProjectDesignSaveRequest,
+  ProjectImageUploadResponse,
 } from './project.models';
 
 export type {

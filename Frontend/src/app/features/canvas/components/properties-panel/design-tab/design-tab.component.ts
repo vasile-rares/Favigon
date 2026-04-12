@@ -193,6 +193,7 @@ const DIMENSION_MODE_DEFINITIONS: readonly DimensionModeDefinition[] = [
   { mode: 'fill', label: 'Fill' },
   { mode: 'fit-content', label: 'Fit Content' },
   { mode: 'viewport', label: 'Viewport' },
+  { mode: 'fit-image', label: 'Fit Image' },
 ] as const;
 
 const DIMENSION_CONSTRAINT_MODE_DEFINITIONS: readonly DimensionConstraintModeDefinition[] = [
@@ -237,6 +238,8 @@ const EFFECT_PREVIEW_CLICK_IDLE_MS = 1080;
 })
 export class DesignTabComponent {
   @Input() selectedElement: CanvasElement | null = null;
+  @Input() projectId: number | null = null;
+  @Input() autoOpenFillPopupElementId: string | null = null;
   @Input() pages: readonly CanvasPageModel[] = [];
   @Input() currentPageId: string | null = null;
   @Input() currentTool: CanvasElementType | 'select' = 'select';
@@ -263,6 +266,10 @@ export class DesignTabComponent {
   private readonly paddingModeOverrides = new Map<string, PaddingMode>();
   private readonly paddingLinkedValues = new Map<string, number>();
   private readonly accessibilityFieldOverrides = new Map<string, Set<AccessibilityField>>();
+  private readonly imageDimensionsCache = new Map<
+    string,
+    Promise<{ width: number; height: number } | null>
+  >();
 
   readonly borderStyleOptions = ['Solid', 'Dashed', 'Dotted', 'Double'];
   readonly fontFamilyOptions: DropdownSelectOption[] = [
@@ -982,7 +989,7 @@ export class DesignTabComponent {
     const fixedPixels = getCanvasFixedSize(element, axis);
     const sizingValue = getCanvasSizingValue(element, axis);
 
-    if (mode === 'fixed' || mode === 'fit-content') {
+    if (mode === 'fixed' || mode === 'fit-content' || mode === 'fit-image') {
       return fixedPixels;
     }
 
@@ -1021,23 +1028,28 @@ export class DesignTabComponent {
     const parent = this.parentElement(element);
     const page = this.currentPageModel();
     const normalizedValue = Math.max(1, roundToTwoDecimals(value));
+    const nextPixels =
+      mode === 'fixed'
+        ? normalizedValue
+        : resolveCanvasPixelsFromMode(
+            mode,
+            getCanvasFixedSize(element, axis),
+            axis,
+            normalizedValue,
+            parent,
+            page,
+          );
 
-    if (mode === 'fixed') {
-      this.emitPatch({ [axis]: normalizedValue } as Partial<CanvasElement>);
-      return;
-    }
+    this.emitPatch(
+      mode === 'fixed'
+        ? ({ [axis]: nextPixels } as Partial<CanvasElement>)
+        : ({
+            [axis]: nextPixels,
+            [getCanvasSizeValueField(axis)]: normalizeCanvasSizeValue(mode, normalizedValue),
+          } as Partial<CanvasElement>),
+    );
 
-    this.emitPatch({
-      [axis]: resolveCanvasPixelsFromMode(
-        mode,
-        getCanvasFixedSize(element, axis),
-        axis,
-        normalizedValue,
-        parent,
-        page,
-      ),
-      [getCanvasSizeValueField(axis)]: normalizeCanvasSizeValue(mode, normalizedValue),
-    } as Partial<CanvasElement>);
+    this.syncFitImageAxisFromOpposite(axis, element, nextPixels);
   }
 
   onDimensionModeChange(axis: CanvasSizeAxis, value: string | number | boolean | null): void {
@@ -1052,6 +1064,12 @@ export class DesignTabComponent {
 
     const parent = this.parentElement(element);
     const nextMode = normalizeCanvasSizeMode(value, element, parent);
+
+    if (nextMode === 'fit-image') {
+      void this.applyFitImageSize(axis, element);
+      return;
+    }
+
     const currentMode = this.dimensionModeValue(element, axis);
     if (nextMode === currentMode) {
       return;
@@ -1120,9 +1138,129 @@ export class DesignTabComponent {
         return 'Fit';
       case 'viewport':
         return 'View';
+      case 'fit-image':
+        return 'Fit Img';
       default:
         return 'Fixed';
     }
+  }
+
+  private supportsFitImageSizeMode(element: CanvasElement): boolean {
+    return element.fillMode === 'image' && !!element.backgroundImage;
+  }
+
+  private async applyFitImageSize(axis: CanvasSizeAxis, element: CanvasElement): Promise<void> {
+    if (!this.supportsFitImageSizeMode(element) || !element.backgroundImage) {
+      return;
+    }
+
+    const dimensions = await this.loadImageDimensions(element.backgroundImage);
+    if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0) {
+      return;
+    }
+
+    const aspectRatio = dimensions.width / dimensions.height;
+    if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+      return;
+    }
+
+    const oppositeAxis: CanvasSizeAxis = axis === 'width' ? 'height' : 'width';
+    const currentOppositeMode = this.dimensionModeValue(element, oppositeAxis);
+    const patch: Partial<CanvasElement> = {
+      [getCanvasSizeModeField(axis)]: 'fit-image',
+      [getCanvasSizeValueField(axis)]: undefined,
+    } as Partial<CanvasElement>;
+
+    if (currentOppositeMode === 'fit-image') {
+      patch[getCanvasSizeModeField(oppositeAxis)] = undefined;
+      patch[getCanvasSizeValueField(oppositeAxis)] = undefined;
+    }
+
+    if (axis === 'width') {
+      patch.width = Math.max(1, roundToTwoDecimals(element.height * aspectRatio));
+    } else {
+      patch.height = Math.max(1, roundToTwoDecimals(element.width / aspectRatio));
+    }
+
+    this.emitPatch(patch);
+  }
+
+  private syncFitImageAxisFromOpposite(
+    changedAxis: CanvasSizeAxis,
+    element: CanvasElement,
+    changedAxisPixels: number,
+  ): void {
+    const dependentAxis: CanvasSizeAxis = changedAxis === 'width' ? 'height' : 'width';
+    if (
+      this.dimensionModeValue(element, dependentAxis) !== 'fit-image' ||
+      !element.backgroundImage
+    ) {
+      return;
+    }
+
+    void this.applyFitImageSizeFromPixels(
+      dependentAxis,
+      element.backgroundImage,
+      changedAxisPixels,
+    );
+  }
+
+  private async applyFitImageSizeFromPixels(
+    axis: CanvasSizeAxis,
+    imageUrl: string,
+    oppositeAxisPixels: number,
+  ): Promise<void> {
+    const dimensions = await this.loadImageDimensions(imageUrl);
+    if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0) {
+      return;
+    }
+
+    const aspectRatio = dimensions.width / dimensions.height;
+    if (!Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+      return;
+    }
+
+    const patch: Partial<CanvasElement> = {
+      [getCanvasSizeValueField(axis)]: undefined,
+    } as Partial<CanvasElement>;
+
+    if (axis === 'width') {
+      patch.width = Math.max(1, roundToTwoDecimals(oppositeAxisPixels * aspectRatio));
+    } else {
+      patch.height = Math.max(1, roundToTwoDecimals(oppositeAxisPixels / aspectRatio));
+    }
+
+    this.emitPatch(patch);
+  }
+
+  private loadImageDimensions(imageUrl: string): Promise<{ width: number; height: number } | null> {
+    const cached = this.imageDimensionsCache.get(imageUrl);
+    if (cached) {
+      return cached;
+    }
+
+    const promise = new Promise<{ width: number; height: number } | null>((resolve) => {
+      const image = new Image();
+      image.decoding = 'async';
+      image.onload = () => {
+        resolve(
+          image.naturalWidth > 0 && image.naturalHeight > 0
+            ? {
+                width: image.naturalWidth,
+                height: image.naturalHeight,
+              }
+            : null,
+        );
+      };
+      image.onerror = () => {
+        this.imageDimensionsCache.delete(imageUrl);
+        resolve(null);
+      };
+      image.src = imageUrl;
+    });
+
+    this.imageDimensionsCache.set(imageUrl, promise);
+    return promise;
   }
 
   dimensionConstraintInputValue(element: CanvasElement, field: DimensionConstraintField): number {
@@ -1487,6 +1625,10 @@ export class DesignTabComponent {
   }
 
   fillLabel(element: CanvasElement): string {
+    if (element.fillMode === 'image') {
+      return 'Image';
+    }
+
     const value = this.fillInputValue(element);
     return value === 'transparent' ? 'Transparent' : preserveColorDisplayValue(value);
   }
@@ -1505,10 +1647,18 @@ export class DesignTabComponent {
   }
 
   isTransparentFill(element: CanvasElement): boolean {
+    if (element.fillMode === 'image') {
+      return false;
+    }
+
     return isTransparentColor(this.fillInputValue(element));
   }
 
   fillSwatchBackground(element: CanvasElement): string | null {
+    if (element.fillMode === 'image' && element.backgroundImage) {
+      return `url(${element.backgroundImage}) center/cover no-repeat`;
+    }
+
     const value = this.fillInputValue(element);
     return value === 'transparent' ? null : value;
   }

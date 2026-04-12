@@ -29,6 +29,7 @@ interface LayerEntry {
   isEffectivelyHidden: boolean;
   hasChildren: boolean;
   hasLayout: boolean;
+  hasImageFill: boolean;
   devicePreset: Exclude<DeviceFramePreset, 'custom'> | null;
 }
 
@@ -678,6 +679,10 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
     return layer.type === 'rectangle' && layer.hasChildren && !layer.hasLayout;
   }
 
+  usesImageLayerIcon(layer: LayerEntry): boolean {
+    return layer.hasImageFill;
+  }
+
   isText(type: CanvasElementType): boolean {
     return type === 'text';
   }
@@ -781,6 +786,7 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
           isEffectivelyHidden,
           hasChildren: (childrenByParent.get(child.id)?.length ?? 0) > 0,
           hasLayout: !!child.display,
+          hasImageFill: child.fillMode === 'image',
           devicePreset: this.getDeviceFramePreset(child),
         });
 

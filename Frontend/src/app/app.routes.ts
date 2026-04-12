@@ -1,5 +1,15 @@
-import { Routes } from '@angular/router';
+import { CanDeactivateFn, Routes } from '@angular/router';
 import { authGuard } from '@app/core';
+
+const canvasPageCanDeactivateGuard: CanDeactivateFn<{
+  flushPendingPersistence?: () => Promise<boolean> | boolean;
+}> = async (component) => {
+  if (typeof component.flushPendingPersistence !== 'function') {
+    return true;
+  }
+
+  return component.flushPendingPersistence();
+};
 
 export const routes: Routes = [
   { path: '', redirectTo: '/login', pathMatch: 'full' },
@@ -28,6 +38,7 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/canvas/pages/canvas-page.component').then((m) => m.CanvasPage),
     canActivate: [authGuard],
+    canDeactivate: [canvasPageCanDeactivateGuard],
   },
   {
     path: 'settings',

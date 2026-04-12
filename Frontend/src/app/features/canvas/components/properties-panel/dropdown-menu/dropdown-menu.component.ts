@@ -6,6 +6,7 @@ import {
   EventEmitter,
   HostListener,
   Input,
+  inject,
   OnChanges,
   OnDestroy,
   Output,
@@ -14,7 +15,8 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 import { CanvasElement } from '@app/core';
-import type { CanvasBorderSides, CanvasBorderWidths } from '@app/core';
+import type { CanvasBorderSides, CanvasBorderWidths, CanvasObjectFit } from '@app/core';
+import { ProjectService } from '@app/core/services/project.service';
 import { roundToTwoDecimals } from '../../../utils/canvas-math.util';
 import {
   buildCanvasShadowCss,
@@ -51,6 +53,7 @@ type EyeDropperConstructor = new () => EyeDropperInstance;
   encapsulation: ViewEncapsulation.None,
 })
 export class DropdownMenuComponent implements OnChanges, OnDestroy {
+  @Input() projectId: number | null = null;
   @Input() kind: StylePopupFieldKind = 'fill';
   @Input() colorValue = '#000000';
   @Input() pickerColor = '#000000';
@@ -62,6 +65,13 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
   @Input() strokeSides: CanvasBorderSides | null = null;
   @Input() strokeWidths: CanvasBorderWidths | null = null;
   @Input() effectTemplate: TemplateRef<unknown> | null = null;
+  @Input() backgroundImage: string | null = null;
+  @Input() backgroundSize = 'cover';
+  @Input() backgroundPosition = 'center';
+  @Input() backgroundRepeat = 'no-repeat';
+  @Input() objectFit: CanvasObjectFit = 'cover';
+  @Input() imageAltText = '';
+  @Input() initialColorMode: ColorPickerMode = 'solid';
 
   @Output() patchRequested = new EventEmitter<Partial<CanvasElement>>();
   @Output() numberGestureStarted = new EventEmitter<void>();
@@ -81,6 +91,8 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
   shadowBlur = DEFAULT_EDITABLE_CANVAS_SHADOW.blur;
   shadowSpread = DEFAULT_EDITABLE_CANVAS_SHADOW.spread;
   isScreenPickerActive = false;
+  isUploadingImage = false;
+  imageUploadError = '';
 
   readonly colorFormatOptions: DropdownSelectOption[] = [
     { label: 'HEX', value: 'hex' },
@@ -124,7 +136,25 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
     { key: 'bottom', label: 'B', ariaLabel: 'Bottom border width' },
     { key: 'left', label: 'L', ariaLabel: 'Left border width' },
   ];
+  readonly imageTypeOptions: DropdownSelectOption[] = [
+    { label: 'Fill', value: 'fill' },
+    { label: 'Fit', value: 'fit' },
+    { label: 'Stretch', value: 'stretch' },
+  ];
+  readonly backgroundPositionOptions: DropdownSelectOption[] = [
+    { label: 'Center', value: 'center' },
+    { label: 'Left', value: 'left' },
+    { label: 'Right', value: 'right' },
+    { label: 'Top Left', value: 'top left' },
+    { label: 'Top Center', value: 'top center' },
+    { label: 'Top Right', value: 'top right' },
+    { label: 'Bottom Left', value: 'bottom left' },
+    { label: 'Bottom Center', value: 'bottom center' },
+    { label: 'Bottom Right', value: 'bottom right' },
+  ];
+  imagePreviewUrl: string | null = null;
 
+  private readonly projectService = inject(ProjectService);
   private colorPickerDragTarget: ColorPickerDragTarget = null;
   private isColorGestureActive = false;
 
@@ -157,6 +187,15 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
 
     if (changes['shadowValue'] && this.kind === 'shadow') {
       this.syncShadowEditorFromValue(this.shadowValue);
+    }
+
+    if (changes['backgroundImage']) {
+      this.imagePreviewUrl = this.backgroundImage;
+      this.imageUploadError = '';
+    }
+
+    if (changes['initialColorMode'] && this.kind === 'fill') {
+      this.selectedColorMode = this.initialColorMode;
     }
   }
 
@@ -251,6 +290,114 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
     }
 
     this.selectedColorMode = value;
+
+    if (this.kind === 'fill') {
+      if (value === 'image') {
+        this.patchRequested.emit({
+          fillMode: 'image',
+          objectFit: 'cover',
+          backgroundSize: 'cover',
+          backgroundRepeat: 'no-repeat',
+        });
+      } else {
+        this.patchRequested.emit({ fillMode: 'color' });
+      }
+    }
+  }
+
+  onImageFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    const projectId = this.projectId;
+    if (!file) {
+      return;
+    }
+
+    input.value = '';
+    this.imageUploadError = '';
+
+    if (projectId === null || !Number.isInteger(projectId)) {
+      this.imageUploadError = 'Image upload is available only after the project is saved.';
+      return;
+    }
+
+    this.isUploadingImage = true;
+    this.projectService.uploadImageAsset(projectId, file).subscribe({
+      next: ({ assetUrl }) => {
+        this.isUploadingImage = false;
+        this.imagePreviewUrl = assetUrl;
+        this.patchRequested.emit({
+          backgroundImage: assetUrl,
+          fillMode: 'image',
+          objectFit: 'cover',
+          backgroundSize: 'cover',
+          backgroundRepeat: 'no-repeat',
+        });
+      },
+      error: () => {
+        this.isUploadingImage = false;
+        this.imageUploadError = 'Image upload failed. Try again.';
+      },
+    });
+  }
+
+  onRemoveImage(): void {
+    this.imagePreviewUrl = null;
+    this.imageUploadError = '';
+    this.patchRequested.emit({
+      backgroundImage: undefined,
+      fillMode: 'color',
+    });
+    this.selectedColorMode = 'solid';
+  }
+
+  imageTypeValue(): string {
+    if (this.objectFit === 'contain') return 'fit';
+    if (this.objectFit === 'fill' || this.backgroundSize === '100% 100%') return 'stretch';
+    return 'fill';
+  }
+
+  onImageTypeChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    switch (value) {
+      case 'fill':
+        this.patchRequested.emit({
+          objectFit: 'cover',
+          backgroundSize: 'cover',
+          backgroundRepeat: 'no-repeat',
+        });
+        break;
+      case 'fit':
+        this.patchRequested.emit({
+          objectFit: 'contain',
+          backgroundSize: 'contain',
+          backgroundRepeat: 'no-repeat',
+        });
+        break;
+      case 'stretch':
+        this.patchRequested.emit({
+          objectFit: 'fill',
+          backgroundSize: '100% 100%',
+          backgroundRepeat: 'no-repeat',
+        });
+        break;
+    }
+  }
+
+  onBackgroundPositionChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string') {
+      return;
+    }
+
+    this.patchRequested.emit({ backgroundPosition: value });
+  }
+
+  onImageAltTextChange(event: Event): void {
+    const value = (event.target as HTMLInputElement).value;
+    this.patchRequested.emit({ imageAltText: value, ariaLabel: value });
   }
 
   async onScreenPickerClick(): Promise<void> {

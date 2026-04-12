@@ -3,6 +3,7 @@
 <ng-container *ngIf="inlineContentOnly; else overlayMode">
   <app-dropdown-menu
     [kind]="kind"
+    [projectId]="projectId"
     [colorValue]="colorValue"
     [pickerColor]="pickerColor"
     [isTransparent]="isTransparent"
@@ -12,6 +13,13 @@
     [strokeSides]="strokeSides"
     [strokeWidths]="strokeWidths"
     [borderStyleOptions]="borderStyleOptions"
+    [backgroundImage]="backgroundImage"
+    [backgroundSize]="backgroundSize"
+    [backgroundPosition]="backgroundPosition"
+    [backgroundRepeat]="backgroundRepeat"
+    [objectFit]="objectFit"
+    [imageAltText]="imageAltText"
+    [initialColorMode]="initialColorMode"
     [effectTemplate]="effectSlot"
     (patchRequested)="patchRequested.emit($event)"
     (numberGestureStarted)="numberGestureStarted.emit()"
@@ -26,7 +34,7 @@
 
   <ng-template #triggerField>
     <div class="field-input__trigger field-input__trigger--color" [class.is-active]="isOpen">
-      <button type="button" class="field-input__trigger-main" (click)="onTriggerClick($event)">
+      <button #triggerButton type="button" class="field-input__trigger-main" (click)="onTriggerClick($event)">
         <ng-container [ngSwitch]="kind">
           <span
             *ngSwitchCase="'fill'"
@@ -78,6 +86,7 @@
     </div>
     <app-dropdown-menu
       [kind]="kind"
+      [projectId]="projectId"
       [colorValue]="colorValue"
       [pickerColor]="pickerColor"
       [isTransparent]="isTransparent"
@@ -87,6 +96,13 @@
       [strokeSides]="strokeSides"
       [strokeWidths]="strokeWidths"
       [borderStyleOptions]="borderStyleOptions"
+      [backgroundImage]="backgroundImage"
+      [backgroundSize]="backgroundSize"
+      [backgroundPosition]="backgroundPosition"
+      [backgroundRepeat]="backgroundRepeat"
+      [objectFit]="objectFit"
+      [imageAltText]="imageAltText"
+      [initialColorMode]="initialColorMode"
       [effectTemplate]="effectSlot"
       (patchRequested)="patchRequested.emit($event)"
       (numberGestureStarted)="numberGestureStarted.emit()"

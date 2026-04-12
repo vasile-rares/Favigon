@@ -3,10 +3,12 @@ using System.Threading.RateLimiting;
 using Favigon.API.Middlewares;
 using Favigon.Application;
 using Favigon.Infrastructure;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -123,6 +125,9 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 var app = builder.Build();
+var webRootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+
+Directory.CreateDirectory(webRootPath);
 
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
@@ -147,6 +152,17 @@ if (!app.Environment.IsDevelopment())
     app.UseHttpsRedirection();
     app.UseHsts();
 }
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(webRootPath),
+    OnPrepareResponse = context =>
+    {
+        context.Context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+        context.Context.Response.Headers.Append("Cross-Origin-Resource-Policy", "cross-origin");
+        context.Context.Response.Headers.Append("Cache-Control", "public,max-age=31536000,immutable");
+    }
+});
 
 app.UseCors("AllowAll");
 

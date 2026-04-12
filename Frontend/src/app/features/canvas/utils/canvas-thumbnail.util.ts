@@ -1,17 +1,76 @@
 import { CanvasElement, CanvasPageModel } from '@app/core';
 import { getResolvedCornerRadii } from './canvas-interaction.util';
 import { getAbsolutePos } from './canvas-interaction.util';
+import { Bounds } from '../canvas.types';
 
 const THUMB_W = 300;
 const THUMB_H = 168;
 const PADDING = 16;
+const THUMBNAIL_BACKGROUND = '#111213';
+
+export function generateThumbnailFromCanvas(
+  sourceCanvas: HTMLCanvasElement | null,
+  sourceBounds: Bounds | null,
+): string | null {
+  if (!sourceCanvas || !sourceBounds || sourceBounds.width <= 0 || sourceBounds.height <= 0) {
+    return null;
+  }
+
+  const sourceClientWidth = sourceCanvas.clientWidth || sourceCanvas.width;
+  const sourceClientHeight = sourceCanvas.clientHeight || sourceCanvas.height;
+  if (sourceClientWidth <= 0 || sourceClientHeight <= 0) {
+    return null;
+  }
+
+  const sourceScaleX = sourceCanvas.width / sourceClientWidth;
+  const sourceScaleY = sourceCanvas.height / sourceClientHeight;
+  const sx = Math.max(0, Math.round(sourceBounds.x * sourceScaleX));
+  const sy = Math.max(0, Math.round(sourceBounds.y * sourceScaleY));
+  const sw = Math.max(
+    1,
+    Math.min(sourceCanvas.width - sx, Math.round(sourceBounds.width * sourceScaleX)),
+  );
+  const sh = Math.max(
+    1,
+    Math.min(sourceCanvas.height - sy, Math.round(sourceBounds.height * sourceScaleY)),
+  );
+
+  const canvas = document.createElement('canvas');
+  canvas.width = THUMB_W;
+  canvas.height = THUMB_H;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return null;
+  }
+
+  const availableWidth = THUMB_W - PADDING * 2;
+  const availableHeight = THUMB_H - PADDING * 2;
+  const scale = Math.min(
+    availableWidth / sourceBounds.width,
+    availableHeight / sourceBounds.height,
+  );
+  const targetWidth = sourceBounds.width * scale;
+  const targetHeight = sourceBounds.height * scale;
+  const dx = (THUMB_W - targetWidth) / 2;
+  const dy = (THUMB_H - targetHeight) / 2;
+
+  ctx.fillStyle = THUMBNAIL_BACKGROUND;
+  ctx.fillRect(0, 0, THUMB_W, THUMB_H);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(sourceCanvas, sx, sy, sw, sh, dx, dy, targetWidth, targetHeight);
+
+  return canvas.toDataURL('image/jpeg', 0.86);
+}
 
 export function generateThumbnail(page: CanvasPageModel | null): string | null {
   if (!page || page.elements.length === 0) {
     return null;
   }
 
-  const visibleElements = page.elements.filter((el) => el.visible !== false);
+  const primaryFrame = getPrimaryRootFrame(page);
+  const visibleElements = getThumbnailElements(page, primaryFrame);
   if (visibleElements.length === 0) {
     return null;
   }
@@ -49,15 +108,62 @@ export function generateThumbnail(page: CanvasPageModel | null): string | null {
     return null;
   }
 
-  ctx.fillStyle = '#111213';
+  ctx.fillStyle = THUMBNAIL_BACKGROUND;
   ctx.fillRect(0, 0, THUMB_W, THUMB_H);
 
   for (const el of page.elements) {
-    if (el.visible === false) continue;
+    if (!visibleElements.some((visibleElement) => visibleElement.id === el.id)) continue;
     drawElement(ctx, el, page.elements, minX, minY, scale, offsetX, offsetY);
   }
 
   return canvas.toDataURL('image/jpeg', 0.75);
+}
+
+function getThumbnailElements(
+  page: CanvasPageModel,
+  primaryFrame: CanvasElement | null,
+): CanvasElement[] {
+  const visibleElements = page.elements.filter((element) => element.visible !== false);
+  if (!primaryFrame) {
+    return visibleElements;
+  }
+
+  return visibleElements.filter((element) =>
+    isElementInSubtree(element, primaryFrame.id, page.elements),
+  );
+}
+
+function getPrimaryRootFrame(page: CanvasPageModel): CanvasElement | null {
+  const rootFrames = page.elements.filter(
+    (element) => element.type === 'frame' && !element.parentId,
+  );
+  return (
+    rootFrames.find((element) => element.isPrimary) ??
+    rootFrames.find((element) => element.name?.toLowerCase() === 'desktop') ??
+    rootFrames[0] ??
+    null
+  );
+}
+
+function isElementInSubtree(
+  element: CanvasElement,
+  rootId: string,
+  allElements: CanvasElement[],
+): boolean {
+  let current: CanvasElement | null = element;
+
+  while (current) {
+    if (current.id === rootId) {
+      return true;
+    }
+
+    const parentId: string | null = current.parentId ?? null;
+    current = parentId
+      ? (allElements.find((candidate) => candidate.id === parentId) ?? null)
+      : null;
+  }
+
+  return false;
 }
 
 function drawElement(

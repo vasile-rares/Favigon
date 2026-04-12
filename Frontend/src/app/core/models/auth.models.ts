@@ -27,6 +27,15 @@ export interface ResetPasswordRequest {
   password: string;
 }
 
+export interface SetPasswordRequest {
+  password: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 export interface AuthMessageResponse {
   message: string;
 }

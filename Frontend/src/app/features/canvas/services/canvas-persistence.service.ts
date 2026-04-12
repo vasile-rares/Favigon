@@ -49,8 +49,8 @@ export class CanvasPersistenceService {
     return this.projectService.saveDesign(projectId, { designJson });
   }
 
-  saveProjectThumbnail(projectId: number, thumbnailDataUrl: string): Observable<void> {
-    return this.projectService.saveThumbnail(projectId, thumbnailDataUrl);
+  saveProjectThumbnail(projectId: number, thumbnailFile: Blob): Observable<void> {
+    return this.projectService.saveThumbnail(projectId, thumbnailFile);
   }
 
   private parseDesign(rawJson: string): unknown {

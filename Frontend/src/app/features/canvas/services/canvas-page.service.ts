@@ -966,6 +966,7 @@ export class CanvasPageService {
     const scaleY = sourceParent.height > 0 ? targetParent.height / sourceParent.height : 1;
     const shouldScalePosition =
       !this.isLayoutContainer(targetParent) || !this.isChildInFlow(sourceElement);
+    const syncedSize = this.getSyncedElementSize(sourceElement, scaleX, scaleY);
     const syncedElement: CanvasElement = {
       ...sourceElement,
       id: crypto.randomUUID(),
@@ -974,12 +975,40 @@ export class CanvasPageService {
       isPrimary: false,
       x: shouldScalePosition ? roundToTwoDecimals(sourceElement.x * scaleX) : 0,
       y: shouldScalePosition ? roundToTwoDecimals(sourceElement.y * scaleY) : 0,
-      width: this.getSyncedAxisSize(sourceElement.width, sourceElement.widthMode, scaleX),
-      height: this.getSyncedAxisSize(sourceElement.height, sourceElement.heightMode, scaleY),
+      width: syncedSize.width,
+      height: syncedSize.height,
     };
 
     mutateNormalizeElement(syncedElement, elements);
     return syncedElement;
+  }
+
+  private getSyncedElementSize(
+    sourceElement: CanvasElement,
+    scaleX: number,
+    scaleY: number,
+  ): { width: number; height: number } {
+    let width = this.getSyncedAxisSize(sourceElement.width, sourceElement.widthMode, scaleX);
+    let height = this.getSyncedAxisSize(sourceElement.height, sourceElement.heightMode, scaleY);
+    const sourceAspectRatio =
+      sourceElement.width > 0 && sourceElement.height > 0
+        ? sourceElement.width / sourceElement.height
+        : null;
+
+    if (sourceAspectRatio && sourceAspectRatio > 0) {
+      if (sourceElement.widthMode === 'fit-image') {
+        width = roundToTwoDecimals(height * sourceAspectRatio);
+      }
+
+      if (sourceElement.heightMode === 'fit-image') {
+        height = roundToTwoDecimals(width / sourceAspectRatio);
+      }
+    }
+
+    return {
+      width: Math.max(1, width),
+      height: Math.max(1, height),
+    };
   }
 
   private isLayoutContainer(element: CanvasElement): boolean {

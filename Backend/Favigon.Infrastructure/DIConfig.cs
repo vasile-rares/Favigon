@@ -1,5 +1,6 @@
 ﻿using Favigon.Application.Interfaces;
 using Favigon.Infrastructure.Context;
+using Favigon.Infrastructure.External.Assets;
 using Favigon.Infrastructure.External.Email;
 using Favigon.Infrastructure.External.OAuth;
 using Favigon.Infrastructure.Repositories;
@@ -21,6 +22,7 @@ public static class ServiceCollectionExtensions
     services.AddScoped<IUserRepository, UserRepository>();
     services.AddScoped<ILinkedAccountRepository, LinkedAccountRepository>();
     services.AddScoped<IProjectRepository, ProjectRepository>();
+    services.AddScoped<IProjectAssetStorage, ProjectAssetStorage>();
 
     services.AddHttpClient<IGithubOAuthClient, GithubOAuthClient>(client =>
     {

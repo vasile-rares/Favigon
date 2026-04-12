@@ -19,6 +19,7 @@ const CORNER_RADIUS_HANDLE_INSET_OFFSET = 6;
 const PAGE_SHELL_BORDER_COLOR = 0xffffff;
 const PAGE_SHELL_BORDER_ALPHA = 0.22;
 const PAGE_SHELL_BG_ALPHA = 0.03;
+const SYNCED_SELECTION_ALPHA = 0.28;
 
 export type HandleHitCallback = (handle: HandlePosition) => void;
 
@@ -42,6 +43,7 @@ export class CanvasPixiOverlaysService {
   private readonly snapLineH = new Graphics();
   private readonly pageShellOutline = new Graphics();
   private readonly multiSelectOutlines = new Graphics();
+  private readonly syncedSelectionOutlines = new Graphics();
 
   // Resize handles
   private readonly handles: Map<HandlePosition, Graphics> = new Map();
@@ -56,6 +58,7 @@ export class CanvasPixiOverlaysService {
 
     this.overlayRoot.addChild(this.pageShellOutline);
     this.overlayRoot.addChild(this.multiSelectOutlines);
+    this.overlayRoot.addChild(this.syncedSelectionOutlines);
     this.overlayRoot.addChild(this.hoverOutline);
 
     this.selectionOutline.eventMode = 'static';
@@ -204,6 +207,36 @@ export class CanvasPixiOverlaysService {
     }
 
     this.multiSelectOutlines.stroke({ width: 2, color: SELECTION_COLOR });
+  }
+
+  drawSyncedSelectionOutlines(
+    syncedElements: CanvasElement[],
+    allElements: CanvasElement[],
+    zoom: number,
+    pageLayout: PageCanvasLayout | null,
+  ): void {
+    if (!this.initialized) this.init();
+    this.syncedSelectionOutlines.clear();
+
+    if (syncedElements.length === 0 || !pageLayout) {
+      this.syncedSelectionOutlines.visible = false;
+      return;
+    }
+
+    this.syncedSelectionOutlines.visible = true;
+
+    for (const element of syncedElements) {
+      this.traceQuad(
+        this.syncedSelectionOutlines,
+        this.getElementOverlayQuad(element, allElements, zoom, pageLayout),
+      );
+    }
+
+    this.syncedSelectionOutlines.stroke({
+      width: 1.5,
+      color: SELECTION_COLOR,
+      alpha: SYNCED_SELECTION_ALPHA,
+    });
   }
 
   // ── Hover Outline ─────────────────────────────────────────

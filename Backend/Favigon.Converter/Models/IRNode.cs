@@ -89,6 +89,11 @@ public class IRStyle
 {
   public string? Color { get; set; }
   public string? Background { get; set; }
+  public string? BackgroundImage { get; set; }
+  public string? BackgroundSize { get; set; }
+  public string? BackgroundPosition { get; set; }
+  public string? BackgroundRepeat { get; set; }
+  public string? ObjectFit { get; set; }
   public string? Transform { get; set; }
   public string? TransformOrigin { get; set; }
   public string? BackfaceVisibility { get; set; }

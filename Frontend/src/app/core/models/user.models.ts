@@ -24,6 +24,7 @@ export interface UserMe {
   displayName: string;
   username: string;
   email: string;
+  hasPassword: boolean;
   role: string;
   profilePictureUrl: string | null;
   bio: string | null;

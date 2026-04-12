@@ -23,6 +23,16 @@ export class CanvasPixiGridService {
   private currentNormalizedScale = 1;
   private initialized = false;
 
+  setVisible(visible: boolean): void {
+    if (this.tilingSprite) {
+      this.tilingSprite.visible = visible;
+    }
+
+    if (this.glowGraphics) {
+      this.glowGraphics.visible = visible;
+    }
+  }
+
   init(): void {
     if (this.initialized || !this.pixiApp.pixiApp) return;
 

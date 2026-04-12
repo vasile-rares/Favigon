@@ -73,12 +73,14 @@ export class CanvasElementService {
       tool,
       frameTemplateSize,
     );
+    const createdType: CanvasElementType = tool === 'image' ? 'rectangle' : tool;
+    const isImageFillPreset = tool === 'image';
 
     let x = roundToTwoDecimals(pointer.x - defaultWidth / 2);
     let y = roundToTwoDecimals(pointer.y - defaultHeight / 2);
     let parentId: string | null = null;
 
-    if (tool === 'frame') {
+    if (createdType === 'frame') {
       const nextPosition = this.getNextFramePosition(elements, defaultWidth, defaultHeight);
       if (nextPosition) {
         x = nextPosition.x;
@@ -123,7 +125,7 @@ export class CanvasElementService {
     return {
       element: {
         id: crypto.randomUUID(),
-        type: tool,
+        type: createdType,
         name: this.getNextElementName(tool, elements),
         x,
         y,
@@ -131,29 +133,33 @@ export class CanvasElementService {
         height: defaultHeight,
         visible: true,
         fill:
-          tool === 'frame'
+          createdType === 'frame'
             ? DEFAULT_FRAME_FILL
-            : tool === 'text'
+            : createdType === 'text'
               ? '#000000'
               : DEFAULT_ELEMENT_FILL,
-        strokeWidth: tool === 'text' ? undefined : 1,
-        strokeStyle: tool === 'text' ? undefined : 'Solid',
+        fillMode: isImageFillPreset ? 'image' : undefined,
+        backgroundSize: isImageFillPreset ? 'cover' : undefined,
+        backgroundPosition: isImageFillPreset ? 'center' : undefined,
+        backgroundRepeat: isImageFillPreset ? 'no-repeat' : undefined,
+        objectFit: isImageFillPreset ? 'cover' : undefined,
+        strokeWidth: createdType === 'text' ? undefined : 1,
+        strokeStyle: createdType === 'text' ? undefined : 'Solid',
         opacity: 1,
-        cornerRadius: tool === 'image' ? 6 : 0,
-        text: tool === 'text' ? '' : undefined,
-        fontSize: tool === 'text' ? 16 : undefined,
-        fontSizeUnit: tool === 'text' ? 'px' : undefined,
-        fontFamily: tool === 'text' ? 'Inter' : undefined,
-        fontWeight: tool === 'text' ? 400 : undefined,
-        fontStyle: tool === 'text' ? 'normal' : undefined,
-        textAlign: tool === 'text' ? 'center' : undefined,
-        textVerticalAlign: tool === 'text' ? 'middle' : undefined,
-        letterSpacing: tool === 'text' ? 0 : undefined,
-        letterSpacingUnit: tool === 'text' ? 'px' : undefined,
-        lineHeight: tool === 'text' ? 1.2 : undefined,
-        lineHeightUnit: tool === 'text' ? 'em' : undefined,
-        imageUrl: tool === 'image' ? IMAGE_PLACEHOLDER_URL : undefined,
-        position: this.getDefaultPositionForPlacement(tool, selectedContainer),
+        cornerRadius: isImageFillPreset ? 6 : 0,
+        text: createdType === 'text' ? '' : undefined,
+        fontSize: createdType === 'text' ? 16 : undefined,
+        fontSizeUnit: createdType === 'text' ? 'px' : undefined,
+        fontFamily: createdType === 'text' ? 'Inter' : undefined,
+        fontWeight: createdType === 'text' ? 400 : undefined,
+        fontStyle: createdType === 'text' ? 'normal' : undefined,
+        textAlign: createdType === 'text' ? 'center' : undefined,
+        textVerticalAlign: createdType === 'text' ? 'middle' : undefined,
+        letterSpacing: createdType === 'text' ? 0 : undefined,
+        letterSpacingUnit: createdType === 'text' ? 'px' : undefined,
+        lineHeight: createdType === 'text' ? 1.2 : undefined,
+        lineHeightUnit: createdType === 'text' ? 'em' : undefined,
+        position: this.getDefaultPositionForPlacement(createdType, selectedContainer),
         parentId,
       },
       error: null,
@@ -198,6 +204,7 @@ export class CanvasElementService {
   }
 
   createRectangleFromBounds(
+    tool: 'rectangle' | 'image',
     bounds: Bounds,
     elements: CanvasElement[],
     selectedContainer: CanvasElement | null,
@@ -228,7 +235,7 @@ export class CanvasElementService {
       y: roundToTwoDecimals(bounds.y + height / 2),
     };
     const result = this.createElementAtPoint(
-      'rectangle',
+      tool,
       center,
       elements,
       selectedContainer,

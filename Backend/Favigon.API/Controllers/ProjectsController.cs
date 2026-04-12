@@ -1,5 +1,7 @@
 ﻿using Favigon.Application.DTOs.Requests;
+using Favigon.Application.DTOs.Responses;
 using Favigon.Application.Interfaces;
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -12,10 +14,14 @@ namespace Favigon.API.Controllers;
 public class ProjectsController : ControllerBase
 {
   private readonly IProjectService _projectService;
+  private readonly IProjectAssetService _projectAssetService;
 
-  public ProjectsController(IProjectService projectService)
+  public ProjectsController(
+    IProjectService projectService,
+    IProjectAssetService projectAssetService)
   {
     _projectService = projectService;
+    _projectAssetService = projectAssetService;
   }
 
   [HttpGet]
@@ -89,8 +95,52 @@ public class ProjectsController : ControllerBase
       return Unauthorized();
     }
 
-    var deleted = await _projectService.DeleteAsync(id, userId);
+    var deleted = await _projectService.DeleteAsync(id, userId, HttpContext.RequestAborted);
     return deleted ? NoContent() : NotFound();
+  }
+
+  [HttpPost("{id:int}/assets/images")]
+  public async Task<IActionResult> UploadImage(int id, IFormFile? file)
+  {
+    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdValue, out var userId))
+    {
+      return Unauthorized();
+    }
+
+    if (file == null)
+    {
+      return BadRequest("Image file is required.");
+    }
+
+    await using var stream = file.OpenReadStream();
+    var assetPath = await _projectAssetService.UploadImageAsync(
+      id,
+      userId,
+      new ProjectImageUploadRequest
+      {
+        Content = stream,
+        FileName = file.FileName,
+        ContentType = file.ContentType,
+        Length = file.Length,
+      },
+      HttpContext.RequestAborted);
+
+    if (assetPath == null)
+    {
+      return NotFound();
+    }
+
+    var assetUrl = UriHelper.BuildAbsolute(
+      Request.Scheme,
+      Request.Host,
+      Request.PathBase,
+      assetPath);
+
+    return Ok(new ProjectImageUploadResponse
+    {
+      AssetUrl = assetUrl
+    });
   }
 
   [HttpGet("{id:int}/design")]
@@ -129,8 +179,12 @@ public class ProjectsController : ControllerBase
     return Ok(saved);
   }
 
-  [HttpPut("{id:int}/thumbnail")]
-  public async Task<IActionResult> SaveThumbnail(int id, [FromBody] ProjectThumbnailSaveRequest request)
+  [HttpPost("{id:int}/flush")]
+  [Consumes("multipart/form-data")]
+  public async Task<IActionResult> FlushProjectState(
+    int id,
+    [FromForm] string? designJson,
+    IFormFile? thumbnailFile)
   {
     var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
     if (!int.TryParse(userIdValue, out var userId))
@@ -138,7 +192,79 @@ public class ProjectsController : ControllerBase
       return Unauthorized();
     }
 
-    var saved = await _projectService.SaveThumbnailAsync(id, userId, request);
+    if (string.IsNullOrWhiteSpace(designJson) && thumbnailFile == null)
+    {
+      return BadRequest("Design JSON or thumbnail file is required.");
+    }
+
+    if (!string.IsNullOrWhiteSpace(designJson))
+    {
+      var savedDesign = await _projectService.SaveDesignAsync(
+        id,
+        userId,
+        new ProjectDesignSaveRequest
+        {
+          DesignJson = designJson
+        });
+
+      if (savedDesign == null)
+      {
+        return NotFound();
+      }
+    }
+
+    if (thumbnailFile != null)
+    {
+      await using var stream = thumbnailFile.OpenReadStream();
+      var savedThumbnail = await _projectService.SaveThumbnailAsync(
+        id,
+        userId,
+        new ProjectImageUploadRequest
+        {
+          Content = stream,
+          FileName = thumbnailFile.FileName,
+          ContentType = thumbnailFile.ContentType,
+          Length = thumbnailFile.Length,
+        },
+        HttpContext.RequestAborted);
+
+      if (!savedThumbnail)
+      {
+        return NotFound();
+      }
+    }
+
+    return NoContent();
+  }
+
+  [HttpPut("{id:int}/thumbnail")]
+  [Consumes("multipart/form-data")]
+  public async Task<IActionResult> SaveThumbnail(int id, IFormFile? file)
+  {
+    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdValue, out var userId))
+    {
+      return Unauthorized();
+    }
+
+    if (file == null)
+    {
+      return BadRequest("Thumbnail file is required.");
+    }
+
+    await using var stream = file.OpenReadStream();
+    var saved = await _projectService.SaveThumbnailAsync(
+      id,
+      userId,
+      new ProjectImageUploadRequest
+      {
+        Content = stream,
+        FileName = file.FileName,
+        ContentType = file.ContentType,
+        Length = file.Length,
+      },
+      HttpContext.RequestAborted);
+
     return saved ? NoContent() : NotFound();
   }
 

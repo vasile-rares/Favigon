@@ -19,11 +19,13 @@ import {
   IRNode,
   ConverterPageRequest,
   extractApiErrorMessage,
+  PendingProjectFlushService,
 } from '@app/core';
 import {
   buildCanvasIR,
   buildCanvasIRPages,
   buildCanvasProjectDocument,
+  buildPersistedCanvasDesign,
 } from '../mappers/canvas-ir.mapper';
 import { HeaderBarComponent, ContextMenuComponent, DialogBoxComponent } from '@app/shared';
 import type { ContextMenuItem } from '@app/shared';
@@ -38,7 +40,7 @@ import {
   computeSnappedPosition,
   SNAP_THRESHOLD,
 } from '../utils/canvas-snap.util';
-import { generateThumbnail } from '../utils/canvas-thumbnail.util';
+import { generateThumbnail, generateThumbnailFromCanvas } from '../utils/canvas-thumbnail.util';
 import { calculateResizedBounds } from '../utils/canvas-resize.util';
 import {
   getTextFontFamily,
@@ -92,8 +94,13 @@ const ROOT_FRAME_INSERT_GAP = 48;
 const ELEMENT_DRAG_START_THRESHOLD = 3;
 const CONTAINER_DROP_TOLERANCE = 4;
 const DEFAULT_PROJECT_PANEL_WIDTH = 280;
+const PERSIST_FLUSH_POLL_MS = 50;
+const PERSIST_FLUSH_MAX_WAIT_MS = 4000;
+
+type RectangleDrawTool = 'rectangle' | 'image';
 
 interface RectangleDrawState {
+  tool: RectangleDrawTool;
   startPoint: Point;
   currentPoint: Point;
   containerId: string | null;
@@ -155,6 +162,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private readonly pixiGrid = inject(CanvasPixiGridService);
   private readonly pixiPageShells = inject(CanvasPixiPageShellService);
   private readonly pixiLayout = inject(CanvasPixiLayoutService);
+  private readonly pendingProjectFlush = inject(PendingProjectFlushService);
+  private readonly pixiSceneReady = signal(false);
   private pixiInitPending = false;
   private isPropertyNumberGestureActive = false;
 
@@ -187,6 +196,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
   readonly projectPanelWidth = signal(DEFAULT_PROJECT_PANEL_WIDTH);
+  readonly autoOpenFillPopupElementId = signal<string | null>(null);
 
   // ── API / Generation State ────────────────────────────────
 
@@ -208,9 +218,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   // ── Gesture State (local, not service-worthy) ─────────────
 
-  private readonly projectIdAsNumber = Number.parseInt(this.projectId, 10);
+  readonly projectIdAsNumber = Number.parseInt(this.projectId, 10);
   private canPersistDesign = false;
   private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private hasQueuedDesignPersist = false;
+  private hasTriggeredBrowserExitFlush = false;
+  private lastPersistedThumbnailDataUrl: string | null = null;
+  private pendingThumbnailDataUrl: string | null = null;
   private dragOffset: Point = { x: 0, y: 0 };
   private dragStartAbsolute: Point = { x: 0, y: 0 };
   private dragSelectionIds: string[] = [];
@@ -317,7 +331,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     // Sync elements + page layouts → PixiJS renderer
     effect(() => {
-      if (!this.pixiApp.ready()) return;
+      if (!this.pixiSceneReady()) return;
       const pages = this.pages();
       const currentPageId = this.currentPageId();
       const layouts = this.page.pageLayouts();
@@ -381,16 +395,18 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     // Sync selection overlay
     effect(() => {
-      if (!this.pixiApp.ready()) return;
+      if (!this.pixiSceneReady()) return;
       const selected = this.selectedElement();
       const elements = this.elements();
       const zoom = this.viewport.zoomLevel();
       const layout = this.page.activePageLayout();
       const isDragging = this.isDraggingEl();
       const editingText = this.editingTextElementId();
+      const selectedElements = this.selectedElements();
 
       if (isDragging || editingText) {
         this.pixiOverlays.drawSelectionOutline(null, elements, zoom, layout, false);
+        this.pixiOverlays.drawSyncedSelectionOutlines([], elements, zoom, layout);
         return;
       }
 
@@ -401,9 +417,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
         selected.widthMode !== 'fill' &&
         selected.heightMode !== 'fill';
       this.pixiOverlays.drawSelectionOutline(selected, elements, zoom, layout, showHandles);
+      this.pixiOverlays.drawSyncedSelectionOutlines(
+        this.getSyncedSelectionHighlightElements(selectedElements, elements),
+        elements,
+        zoom,
+        layout,
+      );
 
       // Multi-selection outlines
-      const selectedElements = this.selectedElements();
       if (selectedElements.length > 1) {
         this.pixiOverlays.drawMultiSelectionOutlines(selectedElements, elements, zoom, layout);
       }
@@ -411,7 +432,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     // Sync hover outline
     effect(() => {
-      if (!this.pixiApp.ready()) return;
+      if (!this.pixiSceneReady()) return;
       const hoveredId = this.hoveredElementId();
       const zoom = this.viewport.zoomLevel();
       const isDragging = this.isDraggingEl();
@@ -451,7 +472,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     // Sync snap lines
     effect(() => {
-      if (!this.pixiApp.ready()) return;
+      if (!this.pixiSceneReady()) return;
       const lines = this.snapLines();
       const zoom = this.viewport.zoomLevel();
       const layout = this.page.activePageLayout();
@@ -460,7 +481,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     // Sync rectangle draw preview
     effect(() => {
-      if (!this.pixiApp.ready()) return;
+      if (!this.pixiSceneReady()) return;
       const preview = this.rectangleDrawPreview();
       const layout = this.page.activePageLayout();
       this.pixiOverlays.drawRectanglePreview(preview, layout);
@@ -468,7 +489,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     // Sync page shell selection outline
     effect(() => {
-      if (!this.pixiApp.ready()) return;
+      if (!this.pixiSceneReady()) return;
       const isDragging = this.isDraggingEl();
       const zoom = this.viewport.zoomLevel();
 
@@ -493,6 +514,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
             this.pixiOverlays.init();
             this.pixiPageShells.init();
             this.setupPixiEventListeners();
+            this.zone.run(() => this.pixiSceneReady.set(true));
           });
         });
       }
@@ -508,12 +530,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   ngOnDestroy(): void {
-    if (this.saveTimeoutId) {
-      clearTimeout(this.saveTimeoutId);
-      this.saveTimeoutId = null;
-    }
-
-    this.persistThumbnailIfDue();
+    this.pixiSceneReady.set(false);
 
     // Cleanup PixiJS
     this.pixiRenderer.destroy();
@@ -521,6 +538,51 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.pixiGrid.destroy();
     this.pixiPageShells.destroy();
     this.pixiLayout.destroy();
+  }
+
+  async flushPendingPersistence(): Promise<boolean> {
+    if (!Number.isInteger(this.projectIdAsNumber)) {
+      return true;
+    }
+
+    if (this.saveTimeoutId) {
+      clearTimeout(this.saveTimeoutId);
+      this.saveTimeoutId = null;
+      this.persistDesign();
+    }
+
+    const deadline = Date.now() + PERSIST_FLUSH_MAX_WAIT_MS;
+    while (Date.now() < deadline) {
+      if (this.saveTimeoutId) {
+        clearTimeout(this.saveTimeoutId);
+        this.saveTimeoutId = null;
+        this.persistDesign();
+      }
+
+      if (!this.isSavingDesign() && !this.hasQueuedDesignPersist) {
+        break;
+      }
+
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, PERSIST_FLUSH_POLL_MS);
+      });
+    }
+
+    if (!this.pendingThumbnailDataUrl) {
+      this.persistThumbnailIfDue();
+    }
+
+    while (Date.now() < deadline) {
+      if (!this.pendingThumbnailDataUrl) {
+        return true;
+      }
+
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, PERSIST_FLUSH_POLL_MS);
+      });
+    }
+
+    return true;
   }
 
   // ── Tool Selection ────────────────────────────────────────
@@ -537,6 +599,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   selectTool(tool: CanvasElementType | 'select'): void {
     this.clearRectangleDraw();
     this.currentTool.set(tool);
+    if (tool !== 'image') {
+      this.autoOpenFillPopupElementId.set(null);
+    }
     if (tool === 'select') {
       return;
     }
@@ -1802,6 +1867,45 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return [...new Set(ids)].filter((id) => availableIds.has(id));
   }
 
+  private getSyncedSelectionHighlightElements(
+    selectedElements: CanvasElement[],
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    if (selectedElements.length === 0) {
+      return [];
+    }
+
+    const selectedIds = new Set(selectedElements.map((element) => element.id));
+    const syncedSourceIds = new Set(
+      elements
+        .map((element) => element.primarySyncId)
+        .filter((primarySyncId): primarySyncId is string => typeof primarySyncId === 'string'),
+    );
+    const highlightSourceIds = new Set<string>();
+
+    for (const selectedElement of selectedElements) {
+      if (selectedElement.primarySyncId) {
+        highlightSourceIds.add(selectedElement.primarySyncId);
+        continue;
+      }
+
+      if (syncedSourceIds.has(selectedElement.id)) {
+        highlightSourceIds.add(selectedElement.id);
+      }
+    }
+
+    if (highlightSourceIds.size === 0) {
+      return [];
+    }
+
+    return elements.filter(
+      (element) =>
+        !selectedIds.has(element.id) &&
+        (highlightSourceIds.has(element.id) ||
+          (!!element.primarySyncId && highlightSourceIds.has(element.primarySyncId))),
+    );
+  }
+
   private getSelectionRootIds(
     ids: string[] = this.selectedElementIds(),
     elements: CanvasElement[] = this.elements(),
@@ -2159,7 +2263,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   private getLivePixiSceneBounds(element: CanvasElement): Bounds | null {
-    if (!this.pixiApp.ready()) {
+    if (!this.pixiSceneReady()) {
       return null;
     }
 
@@ -2451,6 +2555,20 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.finalizeTextEditing(this.editingTextElementId());
   }
 
+  @HostListener('window:beforeunload')
+  handleBeforeUnload(): void {
+    this.dispatchBrowserExitFlush();
+  }
+
+  @HostListener('window:pagehide', ['$event'])
+  handlePageHide(event: PageTransitionEvent): void {
+    if (event.persisted) {
+      return;
+    }
+
+    this.dispatchBrowserExitFlush();
+  }
+
   // ── Code Generation ───────────────────────────────────────
 
   validateIR(): void {
@@ -2459,6 +2577,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   generateCode(): void {
+    this.pendingProjectFlush.clearPendingFlush(this.projectIdAsNumber);
     this.apiError.set(null);
     this.gen.generate(this.irPages());
   }
@@ -2509,6 +2628,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     this.saveTimeoutId = setTimeout(() => {
+      this.saveTimeoutId = null;
       this.persistDesign();
     }, 500);
   }
@@ -2518,30 +2638,233 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const document = buildCanvasProjectDocument(this.pages(), this.projectId, this.currentPageId());
+    if (this.isSavingDesign()) {
+      this.hasQueuedDesignPersist = true;
+      return;
+    }
+
+    if (this.saveTimeoutId) {
+      clearTimeout(this.saveTimeoutId);
+      this.saveTimeoutId = null;
+    }
+
+    const document = this.buildCurrentProjectDocument();
+    this.hasQueuedDesignPersist = false;
     this.isSavingDesign.set(true);
 
     this.canvasPersistenceService.saveProjectDesign(this.projectIdAsNumber, document).subscribe({
       next: (response) => {
         this.lastSavedAt.set(response.updatedAt ?? null);
-        this.isSavingDesign.set(false);
+        this.finishPersistDesign();
       },
       error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
         this.apiError.set(extractApiErrorMessage(error, 'Failed to save project design.'));
-        this.isSavingDesign.set(false);
+        this.finishPersistDesign();
       },
     });
   }
 
-  private persistThumbnailIfDue(): void {
-    const thumbnail = generateThumbnail(this.currentPage());
+  private finishPersistDesign(): void {
+    this.isSavingDesign.set(false);
+
+    if (!this.hasQueuedDesignPersist) {
+      return;
+    }
+
+    this.hasQueuedDesignPersist = false;
+    this.persistDesign();
+  }
+
+  private persistThumbnailIfDue(precomputedThumbnail?: string | null): void {
+    if (!Number.isInteger(this.projectIdAsNumber)) {
+      return;
+    }
+
+    const thumbnail =
+      precomputedThumbnail !== undefined
+        ? precomputedThumbnail
+        : (this.captureRenderedThumbnail() ?? generateThumbnail(this.currentPage()));
     if (!thumbnail) {
       return;
     }
 
+    if (
+      thumbnail === this.lastPersistedThumbnailDataUrl ||
+      thumbnail === this.pendingThumbnailDataUrl
+    ) {
+      return;
+    }
+
+    const thumbnailFile = this.createThumbnailBlob(thumbnail);
+    if (!thumbnailFile) {
+      return;
+    }
+
+    this.pendingThumbnailDataUrl = thumbnail;
+
     this.canvasPersistenceService
-      .saveProjectThumbnail(this.projectIdAsNumber, thumbnail)
-      .subscribe();
+      .saveProjectThumbnail(this.projectIdAsNumber, thumbnailFile)
+      .subscribe({
+        next: () => {
+          if (this.pendingThumbnailDataUrl === thumbnail) {
+            this.pendingThumbnailDataUrl = null;
+          }
+          this.lastPersistedThumbnailDataUrl = thumbnail;
+        },
+        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+          if (this.pendingThumbnailDataUrl === thumbnail) {
+            this.pendingThumbnailDataUrl = null;
+          }
+          this.apiError.set(extractApiErrorMessage(error, 'Failed to save project thumbnail.'));
+        },
+      });
+  }
+
+  private dispatchBrowserExitFlush(): void {
+    if (this.hasTriggeredBrowserExitFlush || !Number.isInteger(this.projectIdAsNumber)) {
+      return;
+    }
+
+    this.pendingProjectFlush.queueAndDispatch(
+      this.projectIdAsNumber,
+      this.buildCurrentPersistedDesignJson(),
+      this.captureRenderedThumbnail() ?? generateThumbnail(this.currentPage()),
+    );
+    this.hasTriggeredBrowserExitFlush = true;
+  }
+
+  private buildCurrentProjectDocument() {
+    return buildCanvasProjectDocument(this.pages(), this.projectId, this.currentPageId());
+  }
+
+  private buildCurrentPersistedDesignJson(): string {
+    return JSON.stringify(buildPersistedCanvasDesign(this.buildCurrentProjectDocument()));
+  }
+
+  private createThumbnailBlob(thumbnailDataUrl: string): Blob | null {
+    const match = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/i.exec(thumbnailDataUrl.trim());
+    if (!match) {
+      return null;
+    }
+
+    try {
+      const contentType = match[1].toLowerCase();
+      const base64Data = match[2];
+      const binary = atob(base64Data);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) {
+        bytes[index] = binary.charCodeAt(index);
+      }
+
+      return new Blob([bytes], { type: contentType });
+    } catch {
+      return null;
+    }
+  }
+
+  private captureRenderedThumbnail(): string | null {
+    const sourceCanvas = this.pixiApp.canvas;
+    const app = this.pixiApp.pixiApp as {
+      render?: () => void;
+      stage?: unknown;
+      renderer?: { render?: (target?: unknown) => void };
+    } | null;
+    const currentPage = this.currentPage();
+    const layout = this.page.activePageLayout();
+
+    if (!sourceCanvas || !app || !layout || !currentPage) {
+      return null;
+    }
+
+    const targetSceneBounds = this.resolveThumbnailSceneBounds(currentPage, layout);
+
+    const canvasWidth = sourceCanvas.clientWidth || sourceCanvas.width;
+    const canvasHeight = sourceCanvas.clientHeight || sourceCanvas.height;
+    if (
+      canvasWidth <= 0 ||
+      canvasHeight <= 0 ||
+      targetSceneBounds.width <= 0 ||
+      targetSceneBounds.height <= 0
+    ) {
+      return null;
+    }
+
+    const previousOffset = this.viewport.viewportOffset();
+    const previousZoom = this.viewport.zoomLevel();
+    const previousOverlayVisible = this.pixiApp.overlayContainer.visible;
+    const fitPadding = 32;
+    const availableWidth = Math.max(1, canvasWidth - fitPadding);
+    const availableHeight = Math.max(1, canvasHeight - fitPadding);
+    const captureZoom = Math.min(
+      availableWidth / targetSceneBounds.width,
+      availableHeight / targetSceneBounds.height,
+    );
+    const captureOffset = {
+      x: roundToTwoDecimals(
+        (canvasWidth - targetSceneBounds.width * captureZoom) / 2 -
+          targetSceneBounds.x * captureZoom,
+      ),
+      y: roundToTwoDecimals(
+        (canvasHeight - targetSceneBounds.height * captureZoom) / 2 -
+          targetSceneBounds.y * captureZoom,
+      ),
+    };
+
+    try {
+      this.pixiApp.overlayContainer.visible = false;
+      this.pixiGrid.setVisible(false);
+      this.pixiApp.syncViewport(captureOffset.x, captureOffset.y, captureZoom);
+      this.pixiGrid.syncGrid(captureOffset.x, captureOffset.y, captureZoom);
+      this.forcePixiRender(app);
+
+      return generateThumbnailFromCanvas(sourceCanvas, {
+        x: captureOffset.x + targetSceneBounds.x * captureZoom,
+        y: captureOffset.y + targetSceneBounds.y * captureZoom,
+        width: targetSceneBounds.width * captureZoom,
+        height: targetSceneBounds.height * captureZoom,
+      });
+    } finally {
+      this.pixiApp.syncViewport(previousOffset.x, previousOffset.y, previousZoom);
+      this.pixiGrid.setVisible(true);
+      this.pixiGrid.syncGrid(previousOffset.x, previousOffset.y, previousZoom);
+      this.pixiApp.overlayContainer.visible = previousOverlayVisible;
+      this.forcePixiRender(app);
+    }
+  }
+
+  private resolveThumbnailSceneBounds(page: CanvasPageModel, layout: PageCanvasLayout): Bounds {
+    const primaryFrame = this.getPrimaryFrame(page.elements);
+    if (!primaryFrame) {
+      return {
+        x: layout.x,
+        y: layout.y,
+        width: layout.width,
+        height: layout.height,
+      };
+    }
+
+    const primaryBounds = this.el.getAbsoluteBounds(primaryFrame, page.elements, page);
+    return {
+      x: roundToTwoDecimals(layout.x + primaryBounds.x),
+      y: roundToTwoDecimals(layout.y + primaryBounds.y),
+      width: primaryBounds.width,
+      height: primaryBounds.height,
+    };
+  }
+
+  private forcePixiRender(app: {
+    render?: () => void;
+    stage?: unknown;
+    renderer?: { render?: (target?: unknown) => void };
+  }): void {
+    if (typeof app.render === 'function') {
+      app.render();
+      return;
+    }
+
+    if (typeof app.renderer?.render === 'function') {
+      app.renderer.render(app.stage);
+    }
   }
 
   // ── Private: Gesture Handling ─────────────────────────────
@@ -2871,8 +3194,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   private startRectangleDraw(event: MouseEvent, suppressPageShellClick = false): boolean {
+    const tool = this.currentTool();
     if (
-      this.currentTool() !== 'rectangle' ||
+      (tool !== 'rectangle' && tool !== 'image') ||
       event.button !== 0 ||
       this.viewport.isSpacePressed()
     ) {
@@ -2905,6 +3229,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.selectedElementId.set(null);
 
     this.rectangleDrawState = {
+      tool,
       startPoint: pointer,
       currentPoint: pointer,
       containerId: container?.id ?? null,
@@ -2948,7 +3273,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
 
     if (distance < ELEMENT_DRAG_START_THRESHOLD) {
-      this.createElementAtCanvasPoint('rectangle', state.startPoint);
+      this.createElementAtCanvasPoint(state.tool, state.startPoint);
       return;
     }
 
@@ -2958,12 +3283,16 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       : null;
 
     const result = this.el.createRectangleFromBounds(
+      state.tool,
       bounds,
       this.elements(),
       container,
       containerBounds,
     );
-    this.commitElementCreationResult(result);
+    const newElement = this.commitElementCreationResult(result);
+    this.autoOpenFillPopupElementId.set(
+      state.tool === 'image' && newElement ? newElement.id : null,
+    );
   }
 
   private buildRectangleDrawBounds(startPoint: Point, endPoint: Point): Bounds {
@@ -3717,7 +4046,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.viewport.frameTemplate(),
     );
 
-    return this.commitElementCreationResult(result);
+    const newElement = this.commitElementCreationResult(result);
+    this.autoOpenFillPopupElementId.set(tool === 'image' && newElement ? newElement.id : null);
+    return newElement;
   }
 
   private commitElementCreationResult(result: {
@@ -4543,6 +4874,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const scaleY = sourceParentHeight > 0 ? targetParentHeight / sourceParentHeight : 1;
     const shouldScalePosition =
       !this.isLayoutContainer(targetParent) || !this.isChildInFlow(sourceElement);
+    const syncedSize = this.getSyncedElementSize(sourceElement, scaleX, scaleY);
     const syncedElement: CanvasElement = {
       ...sourceElement,
       id: existingCopy?.id ?? crypto.randomUUID(),
@@ -4551,12 +4883,40 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       isPrimary: false,
       x: shouldScalePosition ? roundToTwoDecimals(sourceElement.x * scaleX) : 0,
       y: shouldScalePosition ? roundToTwoDecimals(sourceElement.y * scaleY) : 0,
-      width: this.getSyncedAxisSize(sourceElement.width, sourceElement.widthMode, scaleX),
-      height: this.getSyncedAxisSize(sourceElement.height, sourceElement.heightMode, scaleY),
+      width: syncedSize.width,
+      height: syncedSize.height,
     };
 
     mutateNormalizeElement(syncedElement, elements);
     return syncedElement;
+  }
+
+  private getSyncedElementSize(
+    sourceElement: CanvasElement,
+    scaleX: number,
+    scaleY: number,
+  ): { width: number; height: number } {
+    let width = this.getSyncedAxisSize(sourceElement.width, sourceElement.widthMode, scaleX);
+    let height = this.getSyncedAxisSize(sourceElement.height, sourceElement.heightMode, scaleY);
+    const sourceAspectRatio =
+      sourceElement.width > 0 && sourceElement.height > 0
+        ? sourceElement.width / sourceElement.height
+        : null;
+
+    if (sourceAspectRatio && sourceAspectRatio > 0) {
+      if (sourceElement.widthMode === 'fit-image') {
+        width = roundToTwoDecimals(height * sourceAspectRatio);
+      }
+
+      if (sourceElement.heightMode === 'fit-image') {
+        height = roundToTwoDecimals(width / sourceAspectRatio);
+      }
+    }
+
+    return {
+      width: Math.max(1, width),
+      height: Math.max(1, height),
+    };
   }
 
   private getPrimarySourceSubtree(

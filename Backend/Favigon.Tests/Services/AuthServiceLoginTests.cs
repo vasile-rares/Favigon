@@ -75,6 +75,31 @@ public class AuthServiceLoginTests
   }
 
   [Fact]
+  public async Task Login_WithoutLocalPassword_ReturnsNull()
+  {
+    // Arrange
+    _userRepo.Setup(r => r.GetByEmailAsync("test@example.com"))
+        .ReturnsAsync(new User
+        {
+          Id = 1,
+          Username = "testuser",
+          DisplayName = "Test User",
+          Email = "test@example.com",
+          HasPassword = false,
+          PasswordHash = BCrypt.Net.BCrypt.HashPassword("UnusedPassword123"),
+          Role = "User"
+        });
+
+    var request = new LoginRequest { Email = "test@example.com", Password = "Password123!" };
+
+    // Act
+    var result = await _sut.LoginAsync(request);
+
+    // Assert
+    Assert.Null(result);
+  }
+
+  [Fact]
   public async Task Login_WithNonExistentEmail_ReturnsNull()
   {
     // Arrange

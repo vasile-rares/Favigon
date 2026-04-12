@@ -32,6 +32,10 @@ public class FavigonDbContext : Microsoft.EntityFrameworkCore.DbContext
             .ValueGeneratedOnAdd();
 
         modelBuilder.Entity<User>()
+            .Property(u => u.HasPassword)
+            .HasDefaultValue(true);
+
+        modelBuilder.Entity<User>()
             .HasMany(u => u.Projects)
             .WithOne(p => p.User)
             .HasForeignKey(p => p.UserId)

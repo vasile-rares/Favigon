@@ -565,11 +565,27 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
   applyNodeConstraintStyle(style, element, 'minHeight');
   applyNodeConstraintStyle(style, element, 'maxHeight');
 
-  if (element.fill) {
+  if (element.fill && element.fillMode !== 'image') {
     if (element.type === 'text') {
       style.color = element.fill;
     } else {
       style.background = element.fill;
+    }
+  }
+
+  if (element.fillMode === 'image' && element.backgroundImage) {
+    style.backgroundImage = `url(${element.backgroundImage})`;
+    if (element.backgroundSize) {
+      style.backgroundSize = element.backgroundSize;
+    }
+    if (element.backgroundPosition) {
+      style.backgroundPosition = element.backgroundPosition;
+    }
+    if (element.backgroundRepeat) {
+      style.backgroundRepeat = element.backgroundRepeat;
+    }
+    if (element.objectFit) {
+      style.objectFit = element.objectFit;
     }
   }
 
@@ -712,7 +728,7 @@ function applyNodeDimensionStyle(
     return;
   }
 
-  if (mode === 'fixed') {
+  if (mode === 'fixed' || mode === 'fit-image') {
     style[axis] = px(axis === 'width' ? element.width : element.height);
     return;
   }
@@ -757,6 +773,8 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
   const hasLink = hasCanvasElementLink(element);
   const tag = normalizeStoredCanvasTag(element.type, element.tag, hasLink);
   const ariaLabel = normalizeCanvasAccessibilityLabel(element.ariaLabel);
+  const imageAltText = normalizeCanvasAccessibilityLabel(element.imageAltText);
+  const accessibleLabel = element.fillMode === 'image' ? (imageAltText ?? ariaLabel) : ariaLabel;
 
   if (element.type === 'text') {
     props['content'] = element.text ?? '';
@@ -787,11 +805,11 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
     props['tag'] = tag;
   }
 
-  if (ariaLabel) {
+  if (accessibleLabel) {
     if (element.type === 'image') {
-      props['alt'] = ariaLabel;
+      props['alt'] = accessibleLabel;
     } else {
-      props['ariaLabel'] = ariaLabel;
+      props['ariaLabel'] = accessibleLabel;
     }
   }
 
@@ -1032,6 +1050,15 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
       mappedType === 'frame' || mappedType === 'rectangle'
         ? readOverflow(node.style?.overflow, 'clip')
         : undefined,
+    fillMode: node.style?.backgroundImage ? 'image' : undefined,
+    backgroundImage: readBackgroundImageUrl(node.style?.backgroundImage),
+    backgroundSize: node.style?.backgroundSize,
+    backgroundPosition: node.style?.backgroundPosition,
+    backgroundRepeat: node.style?.backgroundRepeat,
+    objectFit: node.style?.objectFit as CanvasElement['objectFit'],
+    imageAltText: node.style?.backgroundImage
+      ? normalizeCanvasAccessibilityLabel(importedAriaLabel)
+      : undefined,
     shadow: readShadow(node.style?.shadows),
     text: mappedType === 'text' ? readStringProp(node.props, 'content', 'New text') : undefined,
     fontSize: mappedType === 'text' ? readLength(node.style?.fontSize, 16) : undefined,
@@ -1364,7 +1391,13 @@ function readSizeModeFromProps(
   key: 'widthMode' | 'heightMode',
 ): CanvasSizeMode {
   const value = props?.[key];
-  if (value === 'relative' || value === 'fill' || value === 'fit-content' || value === 'viewport') {
+  if (
+    value === 'relative' ||
+    value === 'fill' ||
+    value === 'fit-content' ||
+    value === 'viewport' ||
+    value === 'fit-image'
+  ) {
     return value;
   }
 
@@ -1375,7 +1408,7 @@ function readImportedSizeValue(
   len: IRLength | undefined,
   mode: CanvasSizeMode,
 ): number | undefined {
-  if (mode === 'fixed' || mode === 'fit-content') {
+  if (mode === 'fixed' || mode === 'fit-content' || mode === 'fit-image') {
     return undefined;
   }
 
@@ -1478,6 +1511,12 @@ function readOverflow(
   if (value === 'Hidden') return 'hidden';
   if (value === 'Scroll') return 'scroll';
   return fallback;
+}
+
+function readBackgroundImageUrl(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const match = value.match(/^url\((.+)\)$/);
+  return match ? match[1] : value;
 }
 
 function mapCanvasOverflowToIr(value: 'clip' | 'visible' | 'hidden' | 'scroll'): OverflowMode {

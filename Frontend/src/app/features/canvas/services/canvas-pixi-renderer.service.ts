@@ -245,8 +245,43 @@ export class CanvasPixiRendererService {
 
     // Fill
     if (element.type !== 'text' && element.type !== 'image') {
-      const fillColor = element.fill || (element.type === 'frame' ? '#3f3f46' : '#e0e0e0');
-      this.drawRoundedRect(fillGraphics, 0, 0, width, height, cornerRadii, fillColor);
+      if (element.fillMode === 'image' && element.backgroundImage) {
+        const objectFit = element.objectFit ?? 'cover';
+        if (objectFit !== 'contain') {
+          // Keep a temporary backdrop only for modes that fully cover the box.
+          this.drawRoundedRect(fillGraphics, 0, 0, width, height, cornerRadii, '#1a1a1a');
+        } else {
+          // Preserve the element's full box for hover/selection overlays without visible bars.
+          this.drawRoundedRect(
+            fillGraphics,
+            0,
+            0,
+            width,
+            height,
+            cornerRadii,
+            'rgba(255,255,255,0)',
+          );
+        }
+        sprite = new Sprite();
+        this.addImageFillSpriteToContainer(sprite, element, width, height, cornerRadii, container);
+        const capturedSprite = sprite;
+        const backgroundPosition = element.backgroundPosition ?? 'center';
+        this.loadImageTexture(element.backgroundImage, capturedSprite, (tex) => {
+          if (!capturedSprite.destroyed) {
+            this.applySpriteObjectFit(
+              capturedSprite,
+              objectFit,
+              backgroundPosition,
+              tex,
+              width,
+              height,
+            );
+          }
+        });
+      } else {
+        const fillColor = element.fill || (element.type === 'frame' ? '#3f3f46' : '#e0e0e0');
+        this.drawRoundedRect(fillGraphics, 0, 0, width, height, cornerRadii, fillColor);
+      }
     }
 
     // Stroke
@@ -1017,13 +1052,110 @@ export class CanvasPixiRendererService {
     g.fill({ color: stroke.color, alpha: stroke.alpha });
   }
 
+  // ── Image Fill (background-image on frame/rectangle) ─────
+
+  /**
+   * Adds the sprite for an image-fill element to its container, with an optional
+   * corner-radius mask. Sizing is deferred until the texture loads via the
+   * loadImageTexture callback.
+   */
+  private addImageFillSpriteToContainer(
+    sprite: Sprite,
+    element: CanvasElement,
+    width: number,
+    height: number,
+    cornerRadii: ReturnType<typeof getResolvedCornerRadii>,
+    container: Container,
+  ): void {
+    // Clip to element shape with a mask
+    if ((element.cornerRadius ?? 0) > 0 || hasPerCornerRadius(element)) {
+      const mask = new Graphics();
+      this.drawRoundedRect(mask, 0, 0, width, height, cornerRadii, '#ffffff');
+      container.addChild(mask);
+      sprite.mask = mask;
+    }
+    container.addChild(sprite);
+  }
+
+  /**
+   * Sizes and positions a sprite according to CSS object-fit + background-position semantics.
+   * Must be called AFTER the texture is loaded so texture dimensions are known.
+   */
+  private applySpriteObjectFit(
+    sprite: Sprite,
+    objectFit: string,
+    backgroundPosition: string,
+    tex: Texture,
+    width: number,
+    height: number,
+  ): void {
+    const tw = tex.width;
+    const th = tex.height;
+    if (!tw || !th) return;
+
+    if (objectFit === 'cover') {
+      const scale = Math.max(width / tw, height / th);
+      const sw = tw * scale;
+      const sh = th * scale;
+      sprite.scale.set(scale);
+      const [ox, oy] = this.resolvePositionOffset(backgroundPosition, width, height, sw, sh);
+      sprite.position.set(ox, oy);
+    } else if (objectFit === 'contain') {
+      const scale = Math.min(width / tw, height / th);
+      const sw = tw * scale;
+      const sh = th * scale;
+      sprite.scale.set(scale);
+      // For contain, position only matters when there's letterboxing space
+      const [ox, oy] = this.resolvePositionOffset(backgroundPosition, width, height, sw, sh);
+      sprite.position.set(ox, oy);
+    } else {
+      // fill / stretch — distort to exactly fit the box; position has no effect
+      sprite.scale.set(width / tw, height / th);
+      sprite.position.set(0, 0);
+    }
+  }
+
+  /**
+   * Translates a CSS background-position keyword into a pixel offset for the sprite.
+   * Returns [x, y] where (0,0) = top-left.
+   */
+  private resolvePositionOffset(
+    position: string,
+    boxW: number,
+    boxH: number,
+    spriteW: number,
+    spriteH: number,
+  ): [number, number] {
+    const overflowX = boxW - spriteW; // negative = image wider than box (crop)
+    const overflowY = boxH - spriteH;
+
+    const h = position.includes('left')
+      ? 0
+      : position.includes('right')
+        ? overflowX
+        : overflowX / 2; // center (default)
+
+    const v = position.includes('top')
+      ? 0
+      : position.includes('bottom')
+        ? overflowY
+        : overflowY / 2; // center (default)
+
+    return [h, v];
+  }
+
   // ── Image Loading ─────────────────────────────────────────
 
-  private async loadImageTexture(url: string, sprite: Sprite): Promise<void> {
+  private async loadImageTexture(
+    url: string,
+    sprite: Sprite,
+    onLoaded?: (tex: Texture) => void,
+  ): Promise<void> {
     try {
       const texture = await Assets.load<Texture>(url);
       if (sprite.destroyed) return;
       sprite.texture = texture;
+      onLoaded?.(texture);
     } catch {
       // Failed to load image — leave sprite blank
     }
@@ -1095,6 +1227,11 @@ export class CanvasPixiRendererService {
       margin: el.margin,
       gridTemplateColumns: el.gridTemplateColumns,
       gridTemplateRows: el.gridTemplateRows,
+      fillMode: el.fillMode,
+      backgroundImage: el.backgroundImage,
+      backgroundSize: el.backgroundSize,
+      backgroundPosition: el.backgroundPosition,
+      objectFit: el.objectFit,
     });
   }
 

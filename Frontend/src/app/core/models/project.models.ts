@@ -27,3 +27,7 @@ export interface ProjectDesignResponse {
 export interface ProjectDesignSaveRequest {
   designJson: string;
 }
+
+export interface ProjectImageUploadResponse {
+  assetUrl: string;
+}

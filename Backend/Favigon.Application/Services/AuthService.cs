@@ -63,6 +63,7 @@ public class AuthService : IAuthService
       Username = request.Username,
       DisplayName = request.DisplayName,
       Email = request.Email,
+      HasPassword = true,
       PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
       ProfilePictureUrl = request.ProfilePictureUrl,
       Role = "User"
@@ -85,6 +86,11 @@ public class AuthService : IAuthService
     var user = await _userRepository.GetByEmailAsync(email);
 
     if (user is null)
+    {
+      return null;
+    }
+
+    if (!user.HasPassword || string.IsNullOrWhiteSpace(user.PasswordHash))
     {
       return null;
     }
@@ -162,7 +168,7 @@ public class AuthService : IAuthService
   {
     var normalizedEmail = request.Email.Trim().ToLowerInvariant();
     var user = await _userRepository.GetByEmailAsync(normalizedEmail);
-    if (user is null)
+    if (user is null || !user.HasPassword)
     {
       return;
     }
@@ -197,8 +203,55 @@ public class AuthService : IAuthService
     }
 
     user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+    user.HasPassword = true;
     user.PasswordResetTokenHash = null;
     user.PasswordResetExpiresAt = null;
+    await _userRepository.UpdateAsync(user);
+  }
+
+  public async Task SetPasswordAsync(int userId, SetPasswordRequest request)
+  {
+    var user = await _userRepository.GetByIdAsync(userId)
+      ?? throw new InvalidOperationException("User not found.");
+
+    if (user.HasPassword)
+    {
+      throw new InvalidOperationException("Password is already set for this account.");
+    }
+
+    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password);
+    user.HasPassword = true;
+    user.PasswordResetTokenHash = null;
+    user.PasswordResetExpiresAt = null;
+
+    await _userRepository.UpdateAsync(user);
+    await _emailSender.SendPasswordSetConfirmationEmailAsync(user.Email);
+  }
+
+  public async Task ChangePasswordAsync(int userId, ChangePasswordRequest request)
+  {
+    var user = await _userRepository.GetByIdAsync(userId)
+      ?? throw new InvalidOperationException("User not found.");
+
+    if (!user.HasPassword || string.IsNullOrWhiteSpace(user.PasswordHash))
+    {
+      throw new InvalidOperationException("You need to set a password before you can change it.");
+    }
+
+    if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
+    {
+      throw new InvalidOperationException("Current password is incorrect.");
+    }
+
+    if (BCrypt.Net.BCrypt.Verify(request.NewPassword, user.PasswordHash))
+    {
+      throw new InvalidOperationException("New password must be different from your current password.");
+    }
+
+    user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword);
+    user.PasswordResetTokenHash = null;
+    user.PasswordResetExpiresAt = null;
+
     await _userRepository.UpdateAsync(user);
   }
 
@@ -307,6 +360,7 @@ public class AuthService : IAuthService
         Username = username,
         DisplayName = displayName,
         Email = normalizedEmail,
+        HasPassword = false,
         PasswordHash = BCrypt.Net.BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
         ProfilePictureUrl = profilePictureUrl,
         Role = "User"

@@ -315,6 +315,13 @@
   padding: 0.5rem 0;
 }
 
+.dialog-helper-text {
+  margin: -0.75rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--color-text-subtle);
+}
+
 .autofill-trap {
   opacity: 0;
   position: absolute;

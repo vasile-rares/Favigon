@@ -123,4 +123,59 @@ public class SmtpEmailSender : IEmailSender
 
     return SendEmailAsync(toEmail, "Reset your Favigon password", htmlBody, textBody);
   }
+
+  public Task SendPasswordSetConfirmationEmailAsync(string toEmail)
+  {
+    var htmlBody = $$"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>You're all set</title>
+</head>
+<body style="margin:0;padding:0;background-color:#ffffff;font-family:'Inter',ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#475569;-webkit-font-smoothing:antialiased;">
+  <div style="width:100%;background-color:#ffffff;padding:48px 24px;box-sizing:border-box;">
+    <div style="max-width:512px;margin:0 auto;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px 0 rgba(0,0,0,0.1),0 1px 2px -1px rgba(0,0,0,0.1);">
+
+      <div style="padding:32px 32px 0 32px;margin-bottom:24px;">
+        <div style="font-size:24px;font-weight:600;letter-spacing:-0.5px;color:#171717;">
+          Favigon<span style="color:#0d99ff;">.</span>
+        </div>
+      </div>
+
+      <div style="padding:0 32px 32px 32px;background-color:#ffffff;">
+        <h1 style="font-size:18px;font-weight:600;color:#171717;margin:0 0 8px;">You're all set</h1>
+        <p style="font-size:14px;line-height:1.6;color:#475569;margin:0 0 16px;">
+          This is a confirmation that your sign-in details were updated for your Favigon account.
+        </p>
+        <p style="font-size:14px;line-height:1.6;color:#475569;margin:0;">
+          You can now sign in with your email and password.
+          If you didn't make this change, please contact support right away.
+        </p>
+      </div>
+
+      <div style="background-color:#f8fafc;border-top:1px solid #e2e8f0;padding:24px 32px;">
+        <p style="font-size:12px;color:#64748b;margin:0;">This message was sent to confirm a recent change to your account.</p>
+      </div>
+
+    </div>
+    <div style="text-align:center;margin-top:24px;">
+      <p style="font-size:12px;color:#94a3b8;margin:0;">&copy; {{DateTime.UtcNow.Year}} Favigon. All rights reserved.</p>
+    </div>
+  </div>
+</body>
+</html>
+""";
+
+    var textBody =
+      "You're all set" + Environment.NewLine +
+      Environment.NewLine +
+      "This is a confirmation that your sign-in details were updated for your Favigon account." + Environment.NewLine +
+      "You can now sign in with your email and password." + Environment.NewLine +
+      Environment.NewLine +
+      "If you didn't make this change, please contact support right away.";
+
+    return SendEmailAsync(toEmail, "Your Favigon sign-in details were updated", htmlBody, textBody);
+  }
 }

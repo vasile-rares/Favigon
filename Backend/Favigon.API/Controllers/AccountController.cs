@@ -103,6 +103,33 @@ public class AccountController : ControllerBase
     return Ok(new { message = "Password reset successful. You can now sign in with your new password." });
   }
 
+  [HttpPost("set-password")]
+  [Authorize]
+  public async Task<IActionResult> SetPassword([FromBody] SetPasswordRequest request)
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    await _authService.SetPasswordAsync(userId, request);
+    return Ok(new
+    {
+      message = "You're all set. We've sent a confirmation email to your inbox."
+    });
+  }
+
+  [HttpPost("change-password")]
+  [Authorize]
+  public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    await _authService.ChangePasswordAsync(userId, request);
+    return Ok(new { message = "Password changed successfully." });
+  }
+
   [HttpPost("refresh")]
   [DisableRateLimiting]
   public async Task<IActionResult> Refresh()

@@ -57,7 +57,7 @@ export function getCanvasViewportSize(
 
 export function supportsCanvasSizeMode(
   mode: CanvasSizeMode,
-  element: Pick<CanvasElement, 'type' | 'parentId' | 'position'>,
+  element: Pick<CanvasElement, 'type' | 'parentId' | 'position' | 'fillMode' | 'backgroundImage'>,
   parent: Pick<CanvasElement, 'id'> | null,
 ): boolean {
   switch (mode) {
@@ -76,12 +76,14 @@ export function supportsCanvasSizeMode(
       return element.type === 'text' || element.type === 'image';
     case 'viewport':
       return !parent;
+    case 'fit-image':
+      return element.fillMode === 'image' && !!element.backgroundImage;
   }
 }
 
 export function normalizeCanvasSizeMode(
   mode: string | null | undefined,
-  element: Pick<CanvasElement, 'type' | 'parentId' | 'position'>,
+  element: Pick<CanvasElement, 'type' | 'parentId' | 'position' | 'fillMode' | 'backgroundImage'>,
   parent: Pick<CanvasElement, 'id'> | null,
 ): CanvasSizeMode {
   if (
@@ -89,7 +91,8 @@ export function normalizeCanvasSizeMode(
     mode === 'relative' ||
     mode === 'fill' ||
     mode === 'fit-content' ||
-    mode === 'viewport'
+    mode === 'viewport' ||
+    mode === 'fit-image'
   ) {
     return supportsCanvasSizeMode(mode, element, parent) ? mode : 'fixed';
   }
@@ -101,7 +104,7 @@ export function normalizeCanvasSizeValue(
   mode: CanvasSizeMode,
   value: number | null | undefined,
 ): number | undefined {
-  if (mode === 'fixed' || mode === 'fit-content') {
+  if (mode === 'fixed' || mode === 'fit-content' || mode === 'fit-image') {
     return undefined;
   }
 
@@ -123,7 +126,7 @@ export function deriveCanvasSizeValueFromPixels(
   parent: CanvasParentSizeRef | null,
   page: CanvasPageModel | null | undefined,
 ): number | undefined {
-  if (mode === 'fixed' || mode === 'fit-content') {
+  if (mode === 'fixed' || mode === 'fit-content' || mode === 'fit-image') {
     return undefined;
   }
 
@@ -148,7 +151,7 @@ export function resolveCanvasPixelsFromMode(
   parent: CanvasParentSizeRef | null,
   page: CanvasPageModel | null | undefined,
 ): number {
-  if (mode === 'fixed' || mode === 'fit-content') {
+  if (mode === 'fixed' || mode === 'fit-content' || mode === 'fit-image') {
     return fallbackPixels;
   }
 
@@ -206,7 +209,7 @@ export function getCanvasSizeSuffix(mode: CanvasSizeMode, axis: CanvasSizeAxis):
 }
 
 export function shouldDisableCanvasSizeInput(mode: CanvasSizeMode): boolean {
-  return mode === 'fill' || mode === 'fit-content';
+  return mode === 'fill' || mode === 'fit-content' || mode === 'fit-image';
 }
 
 export function getCanvasConstraintAxis(field: CanvasConstraintField): CanvasSizeAxis {

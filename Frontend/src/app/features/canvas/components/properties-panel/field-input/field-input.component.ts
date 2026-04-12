@@ -1,19 +1,23 @@
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
+  AfterViewInit,
   Component,
   ElementRef,
   EventEmitter,
   HostBinding,
   HostListener,
   Input,
+  OnChanges,
   OnDestroy,
   Output,
+  SimpleChanges,
   ViewChild,
 } from '@angular/core';
 import { CanvasElement } from '@app/core';
 import { CanvasBorderWidths } from '@app/core';
 import { CanvasBorderSides } from '@app/core';
+import type { CanvasObjectFit } from '@app/core';
 import { resolveEditableCanvasShadow } from '../../../utils/canvas-shadow.util';
 import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component';
 
@@ -30,8 +34,10 @@ type PopoverElement = HTMLElement & {
   templateUrl: './field-input.component.html',
   styleUrl: './field-input.component.css',
 })
-export class FieldInputComponent implements OnDestroy {
+export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy {
   @Input() kind: StylePopupFieldKind = 'fill';
+  @Input() projectId: number | null = null;
+  @Input() autoOpenKey: string | null = null;
   @Input() hasValue = true;
   @Input() triggerText = '';
   @Input() swatchColor: string | null = null;
@@ -44,6 +50,13 @@ export class FieldInputComponent implements OnDestroy {
   @Input() borderStyleOptions: string[] = [];
   @Input() strokeSides: CanvasBorderSides | null = null;
   @Input() strokeWidths: CanvasBorderWidths | null = null;
+  @Input() backgroundImage: string | null = null;
+  @Input() backgroundSize = 'cover';
+  @Input() backgroundPosition = 'center';
+  @Input() backgroundRepeat = 'no-repeat';
+  @Input() objectFit: CanvasObjectFit = 'cover';
+  @Input() imageAltText = '';
+  @Input() initialColorMode: 'solid' | 'linear' | 'radial' | 'conic' | 'image' = 'solid';
   @Input() popupTitleOverride = '';
   @Input() popupWidthOverride: number | null = null;
   @Input() inlineContentOnly = false;
@@ -61,6 +74,7 @@ export class FieldInputComponent implements OnDestroy {
   @HostBinding('style.min-width') readonly hostMinWidth = '0';
 
   @ViewChild(DropdownMenuComponent) private dropdownMenu?: DropdownMenuComponent;
+  @ViewChild('triggerButton') private triggerButtonRef?: ElementRef<HTMLElement>;
   @ViewChild('popupPanel') private popupPanelRef?: ElementRef<HTMLElement>;
 
   isOpen = false;
@@ -70,6 +84,8 @@ export class FieldInputComponent implements OnDestroy {
   popupWidth = 248;
 
   private activePopupAnchor: HTMLElement | null = null;
+  private hasViewInitialized = false;
+  private lastAutoOpenKey: string | null = null;
   private readonly onGlobalScroll = (): void => {
     if (!this.isOpen || !this.activePopupAnchor) {
       return;
@@ -84,6 +100,17 @@ export class FieldInputComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     window.removeEventListener('scroll', this.onGlobalScroll, true);
+  }
+
+  ngAfterViewInit(): void {
+    this.hasViewInitialized = true;
+    this.tryAutoOpen();
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['autoOpenKey']) {
+      this.tryAutoOpen();
+    }
   }
 
   get popupTitle(): string {
@@ -162,15 +189,24 @@ export class FieldInputComponent implements OnDestroy {
       return;
     }
 
+    this.openPopup(event.currentTarget as HTMLElement);
+  }
+
+  private openPopup(anchor: HTMLElement | null): boolean {
+    if (!anchor) {
+      return false;
+    }
+
     if (!this.hasValue && this.activationPatch) {
       this.patchRequested.emit(this.activationPatch);
     }
 
-    this.activePopupAnchor = event.currentTarget as HTMLElement;
+    this.activePopupAnchor = anchor;
     this.updatePopupPlacement(this.activePopupAnchor);
     this.isOpen = true;
     this.openChange.emit(true);
     this.showPopover();
+    return true;
   }
 
   onClearClick(event: MouseEvent): void {
@@ -241,6 +277,39 @@ export class FieldInputComponent implements OnDestroy {
     const desiredLeft = panelBounds.left - this.popupWidth - 12;
     const maxLeft = Math.max(12, window.innerWidth - this.popupWidth - 12);
     this.popupLeft = Math.min(maxLeft, Math.max(12, desiredLeft));
+  }
+
+  private tryAutoOpen(): void {
+    const autoOpenKey = this.autoOpenKey;
+    if (
+      !this.hasViewInitialized ||
+      this.inlineContentOnly ||
+      !autoOpenKey ||
+      autoOpenKey === this.lastAutoOpenKey
+    ) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      if (
+        !this.hasViewInitialized ||
+        !this.autoOpenKey ||
+        this.autoOpenKey !== autoOpenKey ||
+        autoOpenKey === this.lastAutoOpenKey
+      ) {
+        return;
+      }
+
+      const anchor =
+        this.triggerButtonRef?.nativeElement ??
+        (this.hostRef.nativeElement.querySelector(
+          '.field-input__trigger-main',
+        ) as HTMLElement | null);
+
+      if (this.openPopup(anchor)) {
+        this.lastAutoOpenKey = autoOpenKey;
+      }
+    });
   }
 }
 

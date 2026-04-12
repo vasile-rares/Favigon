@@ -17,6 +17,8 @@
     <ng-container *ngIf="isTabActive('design'); else generationTab">
       <app-design-tab
         [selectedElement]="selectedElement"
+        [projectId]="projectId"
+        [autoOpenFillPopupElementId]="autoOpenFillPopupElementId"
         [pages]="pages"
         [currentPageId]="currentPageId"
         [currentTool]="currentTool"

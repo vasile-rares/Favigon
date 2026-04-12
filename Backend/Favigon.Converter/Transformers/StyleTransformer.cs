@@ -11,6 +11,11 @@ public static class StyleTransformer
 
     if (style.Color is not null) css["color"] = style.Color;
     if (style.Background is not null) css["background"] = style.Background;
+    if (style.BackgroundImage is not null) css["background-image"] = style.BackgroundImage;
+    if (style.BackgroundSize is not null) css["background-size"] = style.BackgroundSize;
+    if (style.BackgroundPosition is not null) css["background-position"] = style.BackgroundPosition;
+    if (style.BackgroundRepeat is not null) css["background-repeat"] = style.BackgroundRepeat;
+    if (style.ObjectFit is not null) css["object-fit"] = style.ObjectFit;
     if (style.Transform is not null) css["transform"] = style.Transform;
     if (style.TransformOrigin is not null) css["transform-origin"] = style.TransformOrigin;
     if (style.BackfaceVisibility is not null)

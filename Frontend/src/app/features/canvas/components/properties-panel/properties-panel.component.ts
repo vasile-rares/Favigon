@@ -1,5 +1,5 @@
 ﻿import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
 import { ToggleGroupComponent } from '@app/shared';
 import type { ToggleGroupOption } from '@app/shared';
 import {
@@ -22,8 +22,10 @@ type PropertiesTab = 'design' | 'generation';
   templateUrl: './properties-panel.component.html',
   styleUrl: './properties-panel.component.css',
 })
-export class PropertiesPanelComponent {
+export class PropertiesPanelComponent implements OnChanges {
   @Input() selectedElement: CanvasElement | null = null;
+  @Input() projectId: number | null = null;
+  @Input() autoOpenFillPopupElementId: string | null = null;
   @Input() pages: readonly CanvasPageModel[] = [];
   @Input() currentPageId: string | null = null;
   @Input() currentTool: CanvasElementType | 'select' = 'select';
@@ -74,5 +76,11 @@ export class PropertiesPanelComponent {
 
   isTabActive(tab: PropertiesTab): boolean {
     return this.activeTab === tab;
+  }
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['autoOpenFillPopupElementId']?.currentValue) {
+      this.activeTab = 'design';
+    }
   }
 }
