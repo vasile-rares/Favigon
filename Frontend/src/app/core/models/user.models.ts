@@ -25,6 +25,7 @@ export interface UserMe {
   username: string;
   email: string;
   hasPassword: boolean;
+  isTwoFactorEnabled: boolean;
   role: string;
   profilePictureUrl: string | null;
   bio: string | null;

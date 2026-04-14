@@ -24,6 +24,8 @@ public class User
 
     public bool HasPassword { get; set; } = true;
 
+    public bool IsTwoFactorEnabled { get; set; }
+
     [MaxLength(255)]
     public string? ProfilePictureUrl { get; set; }
 
@@ -37,6 +39,14 @@ public class User
     public string? PasswordResetTokenHash { get; set; }
 
     public DateTime? PasswordResetExpiresAt { get; set; }
+
+    [MaxLength(64)]
+    public string? TwoFactorCodeHash { get; set; }
+
+    public DateTime? TwoFactorCodeExpiresAt { get; set; }
+
+    [MaxLength(32)]
+    public string? TwoFactorCodePurpose { get; set; }
 
     public DateTime CreatedAt { get; set; }
 

@@ -12,6 +12,8 @@ import {
   RegisterRequest,
   ResetPasswordRequest,
   SetPasswordRequest,
+  TwoFactorCodeRequest,
+  TwoFactorLoginVerifyRequest,
 } from '../models/auth.models';
 
 @Injectable({ providedIn: 'root' })
@@ -33,6 +35,13 @@ export class AuthService {
 
   loginWithGoogle(request: GoogleAuthRequest): Observable<AuthMessageResponse> {
     return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/oauth2/google`, request);
+  }
+
+  verifyTwoFactorLogin(request: TwoFactorLoginVerifyRequest): Observable<AuthMessageResponse> {
+    return this.http.post<AuthMessageResponse>(
+      `${this.baseUrl}/account/two-factor/verify-login`,
+      request,
+    );
   }
 
   linkWithGithub(request: GithubAuthRequest): Observable<AuthMessageResponse> {
@@ -63,6 +72,34 @@ export class AuthService {
 
   changePassword(request: ChangePasswordRequest): Observable<AuthMessageResponse> {
     return this.http.post<AuthMessageResponse>(`${this.baseUrl}/account/change-password`, request);
+  }
+
+  requestEnableTwoFactor(): Observable<AuthMessageResponse> {
+    return this.http.post<AuthMessageResponse>(
+      `${this.baseUrl}/account/two-factor/enable/request`,
+      {},
+    );
+  }
+
+  confirmEnableTwoFactor(request: TwoFactorCodeRequest): Observable<AuthMessageResponse> {
+    return this.http.post<AuthMessageResponse>(
+      `${this.baseUrl}/account/two-factor/enable/confirm`,
+      request,
+    );
+  }
+
+  requestDisableTwoFactor(): Observable<AuthMessageResponse> {
+    return this.http.post<AuthMessageResponse>(
+      `${this.baseUrl}/account/two-factor/disable/request`,
+      {},
+    );
+  }
+
+  confirmDisableTwoFactor(request: TwoFactorCodeRequest): Observable<AuthMessageResponse> {
+    return this.http.post<AuthMessageResponse>(
+      `${this.baseUrl}/account/two-factor/disable/confirm`,
+      request,
+    );
   }
 
   logout(): Observable<AuthMessageResponse> {

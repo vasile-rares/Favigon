@@ -178,4 +178,78 @@ public class SmtpEmailSender : IEmailSender
 
     return SendEmailAsync(toEmail, "Your Favigon sign-in details were updated", htmlBody, textBody);
   }
+
+  public Task SendTwoFactorCodeEmailAsync(string toEmail, string code, string purpose, int expirationMinutes)
+  {
+    var (subject, title, intro, closing) = purpose switch
+    {
+      "enable" => (
+        "Confirm two-factor authentication",
+        "Confirm two-factor authentication",
+        "Use the verification code below to turn on two-factor authentication for your Favigon account.",
+        "If you didn't request this, you can safely ignore this email."),
+      "disable" => (
+        "Turn off two-factor authentication",
+        "Turn off two-factor authentication",
+        "Use the verification code below to turn off two-factor authentication for your Favigon account.",
+        "If you didn't request this, please review your account security settings."),
+      _ => (
+        "Your Favigon verification code",
+        "Verify it's you",
+        "Use the verification code below to finish signing in to your Favigon account.",
+        "If you didn't try to sign in, you can safely ignore this email."),
+    };
+
+    var encodedCode = WebUtility.HtmlEncode(code);
+
+    var htmlBody = $$"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{subject}}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#ffffff;font-family:'Inter',ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;color:#475569;-webkit-font-smoothing:antialiased;">
+  <div style="width:100%;background-color:#ffffff;padding:48px 24px;box-sizing:border-box;">
+    <div style="max-width:512px;margin:0 auto;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px 0 rgba(0,0,0,0.1),0 1px 2px -1px rgba(0,0,0,0.1);">
+      <div style="padding:32px 32px 0 32px;margin-bottom:24px;">
+        <div style="font-size:24px;font-weight:600;letter-spacing:-0.5px;color:#171717;">
+          Favigon<span style="color:#0d99ff;">.</span>
+        </div>
+      </div>
+
+      <div style="padding:0 32px 32px 32px;background-color:#ffffff;">
+        <h1 style="font-size:18px;font-weight:600;color:#171717;margin:0 0 8px;">{{title}}</h1>
+        <p style="font-size:14px;line-height:1.6;color:#475569;margin:0 0 20px;">{{intro}}</p>
+
+        <div style="margin:0 0 20px;padding:16px 18px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0;text-align:center;">
+          <div style="font-size:28px;font-weight:700;letter-spacing:0.35em;color:#171717;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace;padding-left:0.35em;">
+            {{encodedCode}}
+          </div>
+        </div>
+
+        <p style="font-size:14px;line-height:1.6;color:#475569;margin:0;">
+          This code expires in <span style="color:#171717;font-weight:600;">{{expirationMinutes}} minutes</span>.
+          {{closing}}
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+""";
+
+    var textBody =
+      subject + Environment.NewLine +
+      Environment.NewLine +
+      intro + Environment.NewLine +
+      Environment.NewLine +
+      $"Verification code: {code}" + Environment.NewLine +
+      $"This code expires in {expirationMinutes} minutes." + Environment.NewLine +
+      Environment.NewLine +
+      closing;
+
+    return SendEmailAsync(toEmail, subject, htmlBody, textBody);
+  }
 }

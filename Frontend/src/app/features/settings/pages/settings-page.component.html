@@ -110,28 +110,67 @@
         </div><!-- end .tab-panel (account) -->
 
         <!-- Security/Password Tab -->
-        <div *ngIf="activeTab === 'password'" class="settings-card fade-in">
-          <div class="card-header">
-            <h3 class="card-title">Password</h3>
-            <p class="card-description">
-              {{ hasLocalPassword
-                ? "For your security, we highly recommend that you choose a unique password that you don't use for any other online account."
-                : "You're currently signing in with Google or GitHub. Add a password if you'd also like to sign in with your email and password." }}
-            </p>
-            <div class="mt-5">
-              <app-action-button variant="outline" [fullWidth]="false" (clicked)="openChangePasswordDialog()">
-                {{ hasLocalPassword ? 'Change password' : 'Set password' }}
-              </app-action-button>
-            </div>
-          </div>
-
-          @if (statusMessage(); as msg) {
-            <div class="card-body pt-0">
-              <div class="status-banner m-0" [class.status-banner--success]="msg.type === 'success'" [class.status-banner--error]="msg.type === 'error'">
-                {{ msg.text }}
+        <div *ngIf="activeTab === 'password'" class="tab-panel fade-in">
+          <div class="settings-card">
+            <div class="card-header">
+              <h3 class="card-title">Password</h3>
+              <p class="card-description">
+                {{ hasLocalPassword
+                  ? "For your security, we highly recommend that you choose a unique password that you don't use for any other online account."
+                  : "You're currently signing in with Google or GitHub. Add a password if you'd also like to sign in with your email and password." }}
+              </p>
+              <div class="mt-5">
+                <app-action-button variant="outline" [fullWidth]="false" (clicked)="openChangePasswordDialog()">
+                  {{ hasLocalPassword ? 'Change password' : 'Set password' }}
+                </app-action-button>
               </div>
             </div>
-          }
+
+            @if (statusMessage(); as msg) {
+              <div class="card-body pt-0">
+                <div class="status-banner m-0" [class.status-banner--success]="msg.type === 'success'" [class.status-banner--error]="msg.type === 'error'">
+                  {{ msg.text }}
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="settings-card">
+            <div class="card-header card-header--with-action">
+              <div class="card-header__info">
+                <div class="security-card-meta">
+                  <h3 class="card-title">Two-factor authentication</h3>
+                  <span
+                    class="security-status-chip"
+                    [class.security-status-chip--enabled]="hasTwoFactorEnabled"
+                    [class.security-status-chip--disabled]="!hasTwoFactorEnabled">
+                    {{ hasTwoFactorEnabled ? 'Enabled' : 'Disabled' }}
+                  </span>
+                </div>
+                <p class="card-description">
+                  {{ hasTwoFactorEnabled
+                    ? 'Protect your account with a verification code sent to your email every time you sign in.'
+                    : 'Add an extra verification step when you sign in. We will send a 6-digit code to your email.' }}
+                </p>
+              </div>
+
+              <app-action-button variant="outline" [fullWidth]="false" (clicked)="openTwoFactorDialog()">
+                {{ hasTwoFactorEnabled ? 'Turn off' : 'Turn on' }}
+              </app-action-button>
+            </div>
+
+            <div class="card-body pt-0 security-card-body">
+              <p class="security-card-note">
+                Verification codes will be sent to <span>{{ email }}</span>.
+              </p>
+
+              @if (twoFactorStatusMessage(); as msg) {
+                <div class="status-banner m-0" [class.status-banner--success]="msg.type === 'success'" [class.status-banner--error]="msg.type === 'error'">
+                  {{ msg.text }}
+                </div>
+              }
+            </div>
+          </div>
         </div>
 
         <!-- Linked Accounts Tab -->
@@ -304,6 +343,58 @@
     } @else {
       <div class="dialog-form-layout">
         <div class="status-banner m-0 status-banner--success">{{ passwordDialogMessage()!.text }}</div>
+      </div>
+    }
+  </app-dialog-box>
+}
+
+@if (isTwoFactorDialogOpen()) {
+  <app-dialog-box
+    [title]="twoFactorDialogTitle"
+    [description]="twoFactorDialogDescription"
+    [isBusy]="isTwoFactorDialogSubmitting()"
+    [primaryAction]="isTwoFactorDialogSuccess() ? undefined : { label: twoFactorDialogPrimaryLabel, variant: 'primary', disabled: !twoFactorDialogCanSubmit }"
+    [secondaryAction]="{ label: isTwoFactorDialogSuccess() ? 'Close' : 'Cancel' }"
+    (closed)="closeTwoFactorDialog()"
+    (primaryClicked)="submitTwoFactorDialog()"
+    (secondaryClicked)="closeTwoFactorDialog()">
+
+    @if (!isTwoFactorDialogSuccess()) {
+      <div class="dialog-form-layout">
+        @if (isTwoFactorDialogAwaitingCode()) {
+          <div class="form-group">
+            <app-text-input
+              id="two-factor-code"
+              label="Verification code"
+              type="text"
+              placeholder="Enter the 6-digit code..."
+              autocomplete="one-time-code"
+              [maxLength]="6"
+              [(ngModel)]="twoFactorCode"></app-text-input>
+          </div>
+
+          <p class="dialog-helper-text">
+            The code expires after a few minutes. Check your spam folder if you do not see it right away.
+          </p>
+        } @else {
+          <p class="dialog-helper-text dialog-helper-text--spacious">
+            We will send the code to <span>{{ email }}</span> so you can confirm this change.
+          </p>
+        }
+
+        @if (twoFactorDialogValidationMessage) {
+          <div class="status-banner m-0 status-banner--error">{{ twoFactorDialogValidationMessage }}</div>
+        }
+
+        @if (twoFactorDialogMessage(); as msg) {
+          <div class="status-banner m-0" [class.status-banner--success]="msg.type === 'success'" [class.status-banner--error]="msg.type === 'error'">
+            {{ msg.text }}
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="dialog-form-layout">
+        <div class="status-banner m-0 status-banner--success">{{ twoFactorDialogMessage()!.text }}</div>
       </div>
     }
   </app-dialog-box>

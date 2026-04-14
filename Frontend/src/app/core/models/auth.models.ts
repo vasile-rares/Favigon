@@ -36,6 +36,18 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
+export interface TwoFactorCodeRequest {
+  code: string;
+}
+
+export interface TwoFactorLoginVerifyRequest {
+  token: string;
+  code: string;
+}
+
 export interface AuthMessageResponse {
   message: string;
+  requiresTwoFactor?: boolean;
+  twoFactorToken?: string | null;
+  twoFactorEmailHint?: string | null;
 }

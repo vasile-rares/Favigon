@@ -90,19 +90,19 @@
           </svg>
         </span>
       </button>
+
+      <app-user-menu-dropdown
+        #userMenuDropdownEl
+        [displayName]="displayName"
+        [email]="email"
+        [avatarUrl]="avatarUrl"
+        [username]="username"
+        [isOpen]="isUserMenuOpen"
+        (closeRequested)="closeUserMenu()"
+        (logoutClicked)="onLogout()"></app-user-menu-dropdown>
     </div>
   </div>
 </header>
-
-<app-user-menu-dropdown
-  #userMenuDropdownEl
-  [displayName]="displayName"
-  [email]="email"
-  [avatarUrl]="avatarUrl"
-  [username]="username"
-  [isOpen]="isUserMenuOpen"
-  (closeRequested)="closeUserMenu()"
-  (logoutClicked)="onLogout()"></app-user-menu-dropdown>
 
 @if (isCreateDialogOpen()) {
   <app-dialog-box

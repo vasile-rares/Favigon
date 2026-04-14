@@ -36,6 +36,10 @@ public class FavigonDbContext : Microsoft.EntityFrameworkCore.DbContext
             .HasDefaultValue(true);
 
         modelBuilder.Entity<User>()
+            .Property(u => u.IsTwoFactorEnabled)
+            .HasDefaultValue(false);
+
+        modelBuilder.Entity<User>()
             .HasMany(u => u.Projects)
             .WithOne(p => p.User)
             .HasForeignKey(p => p.UserId)
@@ -60,6 +64,20 @@ public class FavigonDbContext : Microsoft.EntityFrameworkCore.DbContext
         modelBuilder.Entity<User>()
             .Property(u => u.PasswordResetExpiresAt)
             .HasColumnName("password_reset_expires_at");
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.TwoFactorCodeHash)
+            .HasColumnName("two_factor_code_hash")
+            .HasMaxLength(64);
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.TwoFactorCodeExpiresAt)
+            .HasColumnName("two_factor_code_expires_at");
+
+        modelBuilder.Entity<User>()
+            .Property(u => u.TwoFactorCodePurpose)
+            .HasColumnName("two_factor_code_purpose")
+            .HasMaxLength(32);
 
         modelBuilder.Entity<LinkedAccount>()
             .ToTable("linked_accounts");

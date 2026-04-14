@@ -272,4 +272,59 @@
       </ng-template>
     </app-dialog-box>
   }
+
+@if (isTwoFactorDialogOpen()) {
+  <app-dialog-box
+    #twoFactorDialog
+    title="Check your email"
+    [description]="twoFactorDialogDescription"
+    [isBusy]="isTwoFactorSubmitting()"
+    width="420px"
+    (closed)="closeTwoFactorDialog()">
+    <form
+      class="forgot-password-form"
+      id="two-factor-form"
+      [formGroup]="twoFactorForm"
+      (ngSubmit)="submitTwoFactorLogin()">
+      <app-text-input
+        id="two-factor-code"
+        label="Verification code"
+        type="text"
+        placeholder="6-digit code"
+        autocomplete="one-time-code"
+        formControlName="code"
+        [maxLength]="6"
+        [errorText]="'Enter the 6-digit code.'"></app-text-input>
+
+      @if (twoFactorStatusMessage()?.type === 'error') {
+        <div class="validation-message">{{ twoFactorStatusMessage()!.text }}</div>
+      }
+
+      @if (twoFactorStatusMessage()?.type === 'success') {
+        <div class="validation-message success-message">{{ twoFactorStatusMessage()!.text }}</div>
+      }
+    </form>
+
+    <ng-template #dialogFooter>
+      <div class="forgot-password-footer">
+        <app-action-button
+          type="button"
+          variant="outline"
+          [fullWidth]="false"
+          [disabled]="isTwoFactorSubmitting() || twoFactorDialog.isClosing"
+          (clicked)="twoFactorDialog.requestClose()">
+          Cancel
+        </app-action-button>
+        <app-action-button
+          type="submit"
+          variant="primary"
+          form="two-factor-form"
+          [fullWidth]="false"
+          [disabled]="isTwoFactorSubmitting() || twoFactorDialog.isClosing || twoFactorForm.invalid">
+          {{ isTwoFactorSubmitting() ? 'Verifying...' : 'Verify code' }}
+        </app-action-button>
+      </div>
+    </ng-template>
+  </app-dialog-box>
+}
 </div>

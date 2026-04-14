@@ -6,25 +6,25 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Favigon.Infrastructure.Migrations
 {
-    [DbContext(typeof(FavigonDbContext))]
-    [Migration("20260412130000_AddHasPasswordFlag")]
-    public partial class AddHasPasswordFlag : Migration
+  [DbContext(typeof(FavigonDbContext))]
+  [Migration("20260412130000_AddHasPasswordFlag")]
+  public partial class AddHasPasswordFlag : Migration
+  {
+    protected override void Up(MigrationBuilder migrationBuilder)
     {
-        protected override void Up(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.AddColumn<bool>(
-                name: "HasPassword",
-                table: "users",
-                type: "boolean",
-                nullable: false,
-                defaultValue: true);
-        }
-
-        protected override void Down(MigrationBuilder migrationBuilder)
-        {
-            migrationBuilder.DropColumn(
-                name: "HasPassword",
-                table: "users");
-        }
+      migrationBuilder.AddColumn<bool>(
+          name: "HasPassword",
+          table: "users",
+          type: "boolean",
+          nullable: false,
+          defaultValue: true);
     }
+
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+      migrationBuilder.DropColumn(
+          name: "HasPassword",
+          table: "users");
+    }
+  }
 }

@@ -6,6 +6,7 @@ import {
   Input,
   OnInit,
   ViewChild,
+  effect,
   inject,
   signal,
 } from '@angular/core';
@@ -99,6 +100,26 @@ export class HeaderBarComponent implements OnInit {
   @ViewChild('projectMenuContainer')
   projectMenuContainer?: ElementRef<HTMLElement>;
 
+  private readonly syncCurrentUserState = effect(() => {
+    const user = this.currentUser.user();
+
+    if (user === undefined) {
+      return;
+    }
+
+    if (user) {
+      this.applyProfile({
+        displayName: user.displayName,
+        username: user.username,
+        email: user.email,
+        profilePictureUrl: user.profilePictureUrl,
+      });
+      return;
+    }
+
+    this.resetIdentity();
+  });
+
   get avatarUrl(): string {
     return this.profilePictureUrl?.trim() || this.fallbackAvatarUrl;
   }
@@ -119,18 +140,6 @@ export class HeaderBarComponent implements OnInit {
       .load()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (user) => {
-          if (user) {
-            this.applyProfile({
-              displayName: user.displayName,
-              username: user.username,
-              email: user.email,
-              profilePictureUrl: user.profilePictureUrl,
-            });
-          } else {
-            this.resetIdentity();
-          }
-        },
         error: () => this.resetIdentity(),
       });
   }

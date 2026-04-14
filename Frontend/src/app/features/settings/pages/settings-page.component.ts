@@ -45,6 +45,8 @@ export class SettingsPage implements OnInit {
   newPassword = '';
   confirmPassword = '';
   passwordDialogMode: 'set' | 'change' = 'change';
+  twoFactorCode = '';
+  twoFactorDialogMode: 'enable' | 'disable' = 'enable';
 
   readonly isLoading = signal(false);
   readonly isSaving = signal(false);
@@ -53,9 +55,19 @@ export class SettingsPage implements OnInit {
   readonly isPasswordDialogOpen = signal(false);
   readonly isChangingPassword = signal(false);
   readonly isPasswordDialogSuccess = signal(false);
+  readonly isTwoFactorDialogOpen = signal(false);
+  readonly isTwoFactorDialogSubmitting = signal(false);
+  readonly isTwoFactorDialogSuccess = signal(false);
+  readonly isTwoFactorDialogAwaitingCode = signal(false);
   readonly savingProvider = signal<string | null>(null);
   readonly statusMessage = signal<{ type: 'error' | 'success'; text: string } | null>(null);
   readonly passwordDialogMessage = signal<{ type: 'error' | 'success'; text: string } | null>(null);
+  readonly twoFactorStatusMessage = signal<{ type: 'error' | 'success'; text: string } | null>(
+    null,
+  );
+  readonly twoFactorDialogMessage = signal<{ type: 'error' | 'success'; text: string } | null>(
+    null,
+  );
 
   private userMe: UserMe | null = null;
 
@@ -145,6 +157,25 @@ export class SettingsPage implements OnInit {
     }
   }
 
+  openTwoFactorDialog() {
+    this.twoFactorDialogMode = this.userMe?.isTwoFactorEnabled ? 'disable' : 'enable';
+    this.twoFactorCode = '';
+    this.twoFactorStatusMessage.set(null);
+    this.twoFactorDialogMessage.set(null);
+    this.isTwoFactorDialogSuccess.set(false);
+    this.isTwoFactorDialogAwaitingCode.set(false);
+    this.isTwoFactorDialogOpen.set(true);
+  }
+
+  closeTwoFactorDialog() {
+    if (!this.isTwoFactorDialogSubmitting()) {
+      this.isTwoFactorDialogOpen.set(false);
+      this.twoFactorDialogMessage.set(null);
+      this.isTwoFactorDialogSuccess.set(false);
+      this.isTwoFactorDialogAwaitingCode.set(false);
+    }
+  }
+
   async submitPasswordDialog() {
     if (!this.passwordDialogCanSubmit) {
       return;
@@ -178,7 +209,8 @@ export class SettingsPage implements OnInit {
 
       const successMessage = {
         type: 'success' as const,
-        text: response.message ||
+        text:
+          response.message ||
           (this.isSetPasswordMode
             ? "You're all set. We've sent a confirmation email to your inbox."
             : 'Password changed successfully.'),
@@ -200,12 +232,92 @@ export class SettingsPage implements OnInit {
     }
   }
 
+  async submitTwoFactorDialog() {
+    if (!this.twoFactorDialogCanSubmit) {
+      return;
+    }
+
+    this.isTwoFactorDialogSubmitting.set(true);
+    this.twoFactorDialogMessage.set(null);
+
+    try {
+      if (!this.isTwoFactorDialogAwaitingCode()) {
+        const response = this.isEnableTwoFactorMode
+          ? await firstValueFrom(this.authService.requestEnableTwoFactor())
+          : await firstValueFrom(this.authService.requestDisableTwoFactor());
+
+        this.twoFactorDialogMessage.set({
+          type: 'success',
+          text: response.message || 'We sent a verification code to your email.',
+        });
+        this.isTwoFactorDialogAwaitingCode.set(true);
+        this.twoFactorCode = '';
+        return;
+      }
+
+      const response = this.isEnableTwoFactorMode
+        ? await firstValueFrom(
+            this.authService.confirmEnableTwoFactor({
+              code: this.twoFactorCode.trim(),
+            }),
+          )
+        : await firstValueFrom(
+            this.authService.confirmDisableTwoFactor({
+              code: this.twoFactorCode.trim(),
+            }),
+          );
+
+      const isNowEnabled = this.isEnableTwoFactorMode;
+      if (this.userMe) {
+        const updatedUser: UserMe = {
+          ...this.userMe,
+          isTwoFactorEnabled: isNowEnabled,
+        };
+        this.currentUser.set(updatedUser);
+        this.userMe = updatedUser;
+      }
+
+      const successMessage = {
+        type: 'success' as const,
+        text:
+          response.message ||
+          (isNowEnabled
+            ? 'Two-factor authentication is now on.'
+            : 'Two-factor authentication is now off.'),
+      };
+
+      this.twoFactorDialogMessage.set(successMessage);
+      this.twoFactorStatusMessage.set(successMessage);
+      this.isTwoFactorDialogSuccess.set(true);
+    } catch (error: unknown) {
+      this.twoFactorDialogMessage.set({
+        type: 'error',
+        text: extractApiErrorMessage(
+          error,
+          this.isTwoFactorDialogAwaitingCode()
+            ? 'Could not verify code.'
+            : 'Could not send verification code.',
+        ),
+      });
+    } finally {
+      this.isTwoFactorDialogSubmitting.set(false);
+    }
+  }
+
   get isSetPasswordMode(): boolean {
     return this.passwordDialogMode === 'set';
   }
 
   get hasLocalPassword(): boolean {
     return this.userMe?.hasPassword ?? true;
+  }
+
+  get isEnableTwoFactorMode(): boolean {
+    return this.twoFactorDialogMode === 'enable';
+  }
+
+  get hasTwoFactorEnabled(): boolean {
+    return this.userMe?.isTwoFactorEnabled ?? false;
   }
 
   get passwordDialogTitle(): string {
@@ -263,6 +375,74 @@ export class SettingsPage implements OnInit {
 
     if (this.confirmPassword && this.newPassword !== this.confirmPassword) {
       return 'Passwords do not match.';
+    }
+
+    return null;
+  }
+
+  get twoFactorDialogTitle(): string {
+    if (this.isTwoFactorDialogSuccess()) {
+      return this.isEnableTwoFactorMode
+        ? 'Two-factor authentication enabled'
+        : 'Two-factor authentication disabled';
+    }
+
+    if (this.isTwoFactorDialogAwaitingCode()) {
+      return this.isEnableTwoFactorMode ? 'Enter verification code' : 'Confirm turn off';
+    }
+
+    return this.isEnableTwoFactorMode
+      ? 'Turn on two-factor authentication'
+      : 'Turn off two-factor authentication';
+  }
+
+  get twoFactorDialogDescription(): string {
+    if (this.isTwoFactorDialogSuccess()) {
+      return this.isEnableTwoFactorMode
+        ? 'Your account will now require a verification code from your email each time you sign in.'
+        : 'Your account will no longer ask for an email verification code when you sign in.';
+    }
+
+    if (this.isTwoFactorDialogAwaitingCode()) {
+      return `Enter the 6-digit code we sent to ${this.email}.`;
+    }
+
+    return this.isEnableTwoFactorMode
+      ? 'Add an extra verification step to your sign-in. We will send a code to your email to confirm this change.'
+      : 'We will send a verification code to your email before turning off two-factor authentication.';
+  }
+
+  get twoFactorDialogPrimaryLabel(): string {
+    if (this.isTwoFactorDialogSubmitting()) {
+      return this.isTwoFactorDialogAwaitingCode() ? 'Verifying...' : 'Sending...';
+    }
+
+    if (this.isTwoFactorDialogAwaitingCode()) {
+      return this.isEnableTwoFactorMode ? 'Turn on 2FA' : 'Turn off 2FA';
+    }
+
+    return 'Send code';
+  }
+
+  get twoFactorDialogCanSubmit(): boolean {
+    if (this.isTwoFactorDialogSuccess()) {
+      return false;
+    }
+
+    if (!this.isTwoFactorDialogAwaitingCode()) {
+      return true;
+    }
+
+    return /^\d{6}$/.test(this.twoFactorCode.trim());
+  }
+
+  get twoFactorDialogValidationMessage(): string | null {
+    if (!this.isTwoFactorDialogAwaitingCode()) {
+      return null;
+    }
+
+    if (this.twoFactorCode && !/^\d{6}$/.test(this.twoFactorCode.trim())) {
+      return 'Enter the 6-digit code from your email.';
     }
 
     return null;

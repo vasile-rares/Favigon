@@ -278,6 +278,53 @@
   font-style: italic;
 }
 
+.security-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.security-status-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 1.625rem;
+  padding: 0.15rem 0.625rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+
+  &.security-status-chip--enabled {
+    background: rgba(34, 197, 94, 0.12);
+    border-color: rgba(34, 197, 94, 0.25);
+    color: #86efac;
+  }
+
+  &.security-status-chip--disabled {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-subtle);
+  }
+}
+
+.security-card-body {
+  gap: 1rem !important;
+}
+
+.security-card-note {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--color-text-subtle);
+
+  span {
+    color: var(--color-text-light);
+  }
+}
+
 /* Extracted Layout Utilities */
 .form-actions-row {
   grid-column: 1 / -1;
@@ -320,6 +367,14 @@
   font-size: 0.75rem;
   line-height: 1.5;
   color: var(--color-text-subtle);
+}
+
+.dialog-helper-text--spacious {
+  margin-top: 0;
+
+  span {
+    color: var(--color-text-light);
+  }
 }
 
 .autofill-trap {

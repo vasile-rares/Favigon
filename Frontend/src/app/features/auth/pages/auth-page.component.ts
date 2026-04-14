@@ -54,11 +54,19 @@ export class AuthPage implements OnInit {
   readonly isSubmitting = signal(false);
   readonly isForgotPasswordSubmitting = signal(false);
   readonly isForgotPasswordDialogOpen = signal(false);
+  readonly isTwoFactorSubmitting = signal(false);
+  readonly isTwoFactorDialogOpen = signal(false);
   readonly forgotPasswordEmailSent = signal(false);
   readonly forgotPasswordStatusMessage = signal<{ type: 'error' | 'success'; text: string } | null>(
     null,
   );
+  readonly twoFactorStatusMessage = signal<{ type: 'error' | 'success'; text: string } | null>(
+    null,
+  );
+  readonly twoFactorEmailHint = signal<string | null>(null);
   readonly statusMessage = signal<{ type: 'error' | 'success'; text: string } | null>(null);
+
+  private twoFactorToken: string | null = null;
 
   // --- Forms ---
   readonly loginForm = this.fb.nonNullable.group({
@@ -75,6 +83,10 @@ export class AuthPage implements OnInit {
       '',
       [Validators.required, Validators.email, Validators.maxLength(CREDENTIAL_MAX_LENGTH)],
     ],
+  });
+
+  readonly twoFactorForm = this.fb.nonNullable.group({
+    code: ['', [Validators.required, Validators.pattern(/^\d{6}$/), Validators.maxLength(6)]],
   });
 
   readonly registerForm = this.fb.nonNullable.group(
@@ -142,6 +154,14 @@ export class AuthPage implements OnInit {
     this.isForgotPasswordDialogOpen.set(false);
   }
 
+  closeTwoFactorDialog() {
+    if (this.isTwoFactorSubmitting()) {
+      return;
+    }
+
+    this.resetTwoFactorChallenge();
+  }
+
   async submitForgotPassword() {
     if (this.forgotPasswordForm.invalid) {
       this.forgotPasswordForm.markAllAsTouched();
@@ -176,6 +196,48 @@ export class AuthPage implements OnInit {
     }
   }
 
+  async submitTwoFactorLogin() {
+    if (!this.twoFactorToken) {
+      this.twoFactorStatusMessage.set({
+        type: 'error',
+        text: 'This verification session has expired. Please sign in again.',
+      });
+      return;
+    }
+
+    if (this.twoFactorForm.invalid) {
+      this.twoFactorForm.markAllAsTouched();
+      return;
+    }
+
+    this.isTwoFactorSubmitting.set(true);
+    this.twoFactorStatusMessage.set(null);
+
+    try {
+      const { code } = this.twoFactorForm.getRawValue();
+      const response = await firstValueFrom(
+        this.authService.verifyTwoFactorLogin({
+          token: this.twoFactorToken,
+          code: code.trim(),
+        }),
+      );
+
+      this.resetTwoFactorChallenge();
+      this.statusMessage.set({ type: 'success', text: response.message || 'Login successful.' });
+
+      const user = await firstValueFrom(this.userService.getMe());
+      this.currentUser.set(user);
+      await this.navigateAfterLogin(user.username);
+    } catch (error: unknown) {
+      this.twoFactorStatusMessage.set({
+        type: 'error',
+        text: extractApiErrorMessage(error, 'Could not verify code.'),
+      });
+    } finally {
+      this.isTwoFactorSubmitting.set(false);
+    }
+  }
+
   async submitLogin() {
     if (this.loginForm.invalid) {
       this.loginForm.markAllAsTouched();
@@ -194,10 +256,7 @@ export class AuthPage implements OnInit {
       );
 
       this.handleRememberMe(email.trim(), rememberMe);
-      this.statusMessage.set({ type: 'success', text: response.message || 'Login successful.' });
-      const user = await firstValueFrom(this.userService.getMe());
-      this.currentUser.set(user);
-      await this.navigateAfterLogin(user.username);
+      await this.handleLoginResponse(response, 'Login successful.');
     } catch (error: any) {
       this.handleError(error, 'Could not log in.');
     } finally {
@@ -364,15 +423,17 @@ export class AuthPage implements OnInit {
     this.startLoading();
 
     try {
-      if (state == 'google') {
-        await firstValueFrom(this.authService.loginWithGoogle({ code }));
-      } else {
-        await firstValueFrom(this.authService.loginWithGithub({ code }));
-      }
+      const response =
+        state == 'google'
+          ? await firstValueFrom(this.authService.loginWithGoogle({ code }))
+          : await firstValueFrom(this.authService.loginWithGithub({ code }));
 
-      const user = await firstValueFrom(this.userService.getMe());
-      this.currentUser.set(user);
-      await this.navigateAfterLogin(user.username);
+      await this.handleLoginResponse(
+        response,
+        state === 'google'
+          ? 'Google authentication successful.'
+          : 'GitHub authentication successful.',
+      );
     } catch (error: any) {
       this.handleError(
         error,
@@ -388,6 +449,65 @@ export class AuthPage implements OnInit {
 
   private handleError(error: any, defaultMsg: string) {
     this.statusMessage.set({ type: 'error', text: extractApiErrorMessage(error, defaultMsg) });
+  }
+
+  private async handleLoginResponse(
+    response: {
+      message: string;
+      requiresTwoFactor?: boolean;
+      twoFactorToken?: string | null;
+      twoFactorEmailHint?: string | null;
+    },
+    successMessage: string,
+  ) {
+    if (response.requiresTwoFactor) {
+      this.openTwoFactorDialog(response);
+      return;
+    }
+
+    this.statusMessage.set({ type: 'success', text: response.message || successMessage });
+    const user = await firstValueFrom(this.userService.getMe());
+    this.currentUser.set(user);
+    await this.navigateAfterLogin(user.username);
+  }
+
+  private openTwoFactorDialog(response: {
+    message: string;
+    twoFactorToken?: string | null;
+    twoFactorEmailHint?: string | null;
+  }) {
+    if (!response.twoFactorToken) {
+      this.handleError(
+        { error: { message: 'Verification session could not be started.' } },
+        'Could not start verification.',
+      );
+      return;
+    }
+
+    this.statusMessage.set(null);
+    this.twoFactorToken = response.twoFactorToken;
+    this.twoFactorEmailHint.set(response.twoFactorEmailHint ?? null);
+    this.twoFactorForm.reset();
+    this.twoFactorStatusMessage.set({
+      type: 'success',
+      text: response.message || 'We sent a verification code to your email.',
+    });
+    this.isTwoFactorDialogOpen.set(true);
+  }
+
+  private resetTwoFactorChallenge() {
+    this.twoFactorToken = null;
+    this.twoFactorEmailHint.set(null);
+    this.twoFactorForm.reset();
+    this.twoFactorStatusMessage.set(null);
+    this.isTwoFactorDialogOpen.set(false);
+  }
+
+  get twoFactorDialogDescription(): string {
+    const emailHint = this.twoFactorEmailHint();
+    return emailHint
+      ? `Enter the 6-digit code we sent to ${emailHint}.`
+      : 'Enter the 6-digit code we sent to your email.';
   }
 
   private navigateAfterLogin(username: string): Promise<boolean> {

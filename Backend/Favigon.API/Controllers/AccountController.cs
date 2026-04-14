@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Favigon.Application.DTOs.Requests;
+using Favigon.Application.DTOs.Responses;
 using Favigon.Application.Interfaces;
 using System.Security.Claims;
 
@@ -37,27 +38,39 @@ public class AccountController : ControllerBase
     if (response == null)
       return Unauthorized(new { message = "Invalid email or password." });
 
-    SetAccessTokenCookie(response.Token);
-    SetRefreshTokenCookie(response.RefreshToken);
-    return Ok(new { message = "Login successful." });
+    return CreateAuthResult(
+      response,
+      "Login successful.",
+      "We sent a verification code to your email to finish signing in.");
   }
 
   [HttpPost("oauth2/github")]
   public async Task<IActionResult> LoginWithGithub([FromBody] GithubAuthRequest request)
   {
     var response = await _authService.LoginWithGithubAsync(request);
-    SetAccessTokenCookie(response.Token);
-    SetRefreshTokenCookie(response.RefreshToken);
-    return Ok(new { message = "GitHub authentication successful." });
+    return CreateAuthResult(
+      response,
+      "GitHub authentication successful.",
+      "We sent a verification code to your email to finish signing in.");
   }
 
   [HttpPost("oauth2/google")]
   public async Task<IActionResult> LoginWithGoogle([FromBody] GoogleAuthRequest request)
   {
     var response = await _authService.LoginWithGoogleAsync(request);
+    return CreateAuthResult(
+      response,
+      "Google authentication successful.",
+      "We sent a verification code to your email to finish signing in.");
+  }
+
+  [HttpPost("two-factor/verify-login")]
+  public async Task<IActionResult> VerifyTwoFactorLogin([FromBody] TwoFactorLoginVerifyRequest request)
+  {
+    var response = await _authService.VerifyTwoFactorLoginAsync(request);
     SetAccessTokenCookie(response.Token);
     SetRefreshTokenCookie(response.RefreshToken);
-    return Ok(new { message = "Google authentication successful." });
+    return Ok(new { message = "Login successful." });
   }
 
   [HttpPost("oauth2/github/link")]
@@ -130,6 +143,54 @@ public class AccountController : ControllerBase
     return Ok(new { message = "Password changed successfully." });
   }
 
+  [HttpPost("two-factor/enable/request")]
+  [Authorize]
+  public async Task<IActionResult> RequestEnableTwoFactor()
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    await _authService.SendEnableTwoFactorCodeAsync(userId);
+    return Ok(new { message = "We sent a verification code to your email." });
+  }
+
+  [HttpPost("two-factor/enable/confirm")]
+  [Authorize]
+  public async Task<IActionResult> ConfirmEnableTwoFactor([FromBody] TwoFactorCodeRequest request)
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    await _authService.EnableTwoFactorAsync(userId, request);
+    return Ok(new { message = "Two-factor authentication is now on." });
+  }
+
+  [HttpPost("two-factor/disable/request")]
+  [Authorize]
+  public async Task<IActionResult> RequestDisableTwoFactor()
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    await _authService.SendDisableTwoFactorCodeAsync(userId);
+    return Ok(new { message = "We sent a verification code to your email." });
+  }
+
+  [HttpPost("two-factor/disable/confirm")]
+  [Authorize]
+  public async Task<IActionResult> ConfirmDisableTwoFactor([FromBody] TwoFactorCodeRequest request)
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    await _authService.DisableTwoFactorAsync(userId, request);
+    return Ok(new { message = "Two-factor authentication is now off." });
+  }
+
   [HttpPost("refresh")]
   [DisableRateLimiting]
   public async Task<IActionResult> Refresh()
@@ -162,6 +223,24 @@ public class AccountController : ControllerBase
   }
 
   private bool IsSecure => !_environment.IsDevelopment();
+
+  private IActionResult CreateAuthResult(AuthResponse response, string successMessage, string twoFactorMessage)
+  {
+    if (response.RequiresTwoFactor)
+    {
+      return Ok(new
+      {
+        message = twoFactorMessage,
+        requiresTwoFactor = true,
+        twoFactorToken = response.TwoFactorToken,
+        twoFactorEmailHint = response.TwoFactorEmailHint,
+      });
+    }
+
+    SetAccessTokenCookie(response.Token);
+    SetRefreshTokenCookie(response.RefreshToken);
+    return Ok(new { message = successMessage });
+  }
 
   private void SetAccessTokenCookie(string token)
   {

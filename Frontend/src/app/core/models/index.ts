@@ -7,6 +7,8 @@ export type {
   ResetPasswordRequest,
   SetPasswordRequest,
   ChangePasswordRequest,
+  TwoFactorCodeRequest,
+  TwoFactorLoginVerifyRequest,
   AuthMessageResponse,
 } from './auth.models';
 
