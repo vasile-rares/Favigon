@@ -177,6 +177,7 @@ public class UsersController : ControllerBase
       user.DisplayName,
       user.Username,
       user.ProfilePictureUrl,
+      user.Bio,
       user.CreatedAt
     });
   }

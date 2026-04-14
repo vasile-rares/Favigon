@@ -2,86 +2,205 @@
   <app-header-bar class="page-header" appearance="canvas"></app-header-bar>
 
   <div class="profile-main-shell">
-    <div class="profile-page-wrapper" [class.profile-page-wrapper--blurred]="isCreateDialogOpen()">
-
-      @if (errorMessage() && !profile()) {
-        <div class="profile-error">
+    <div class="profile-page-wrapper" [class.profile-page-wrapper--blurred]="isAnyDialogOpen()">
+      @if (isLoading() && !profile()) {
+        <div class="profile-state profile-state--loading">
+          <p>Loading profile...</p>
+        </div>
+      } @else if (errorMessage() && !profile()) {
+        <div class="profile-state profile-state--error">
           <p>{{ errorMessage() }}</p>
         </div>
-      } @else {
-        <!-- Profile Header -->
-        <section class="profile-header">
-          <div class="profile-header__avatar-wrap">
-            <img class="profile-header__avatar" [src]="avatarUrl" [alt]="profile()?.displayName" />
-          </div>
-          <div class="profile-header__info">
-            <h1 class="profile-header__display-name">{{ profile()?.displayName }}</h1>
-            <span class="profile-header__username">&#64;{{ profile()?.username }}</span>
-            @if (profile()?.createdAt) {
-              <span class="profile-header__joined">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg>
-                Member since {{ profile()!.createdAt | date:'MMMM yyyy' }}
-              </span>
-            }
-          </div>
-        </section>
+      } @else if (profile(); as profileData) {
+        <div class="profile-content">
+          <div class="profile-shell">
+            <aside class="profile-side-rail">
+              <div class="profile-side-rail__avatar-shell">
+                <img
+                  class="profile-side-rail__avatar"
+                  [src]="avatarUrl"
+                  [alt]="profileData.displayName + ' avatar'" />
+              </div>
 
-        <!-- Scrollable Projects Section -->
-        <main class="projects-scroll-area">
-          <section class="projects-section">
-          <div class="section-header">
-            <div class="section-header__texts">
-              <h2>{{ isOwnProfile() ? 'Your Projects' : 'Public Projects' }}</h2>
-              <span class="section-header__count">{{ projects().length }} project{{ projects().length !== 1 ? 's' : '' }}</span>
-            </div>
-            @if (isOwnProfile()) {
-              <app-action-button variant="primary" [fullWidth]="false" (clicked)="openCreateProjectDialog()">
-                <svg class="action-button__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                New Project
-              </app-action-button>
-            }
-          </div>
+              <div class="profile-side-rail__heading">
+                <h1 class="profile-side-rail__display-name">{{ profileData.displayName }}</h1>
+                <p class="profile-side-rail__username">&#64;{{ profileData.username }}</p>
+              </div>
 
-          @if (isLoading()) {
-            <div class="projects-loading">
-              <p>Loading projects...</p>
-            </div>
-          } @else if (projects().length === 0) {
-            <div class="projects-empty">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-              </svg>
+              @if (profileBio()) {
+                <p class="profile-side-rail__bio">{{ profileBio() }}</p>
+              }
+
               @if (isOwnProfile()) {
-                <p>No projects yet. Create your first project to get started.</p>
-                <app-action-button variant="outline" [fullWidth]="false" (clicked)="openCreateProjectDialog()">
-                  Create a project
-                </app-action-button>
-              } @else {
-                <p>No public projects yet.</p>
+                <div class="profile-side-rail__action-row">
+                  <app-action-button variant="outline" [fullWidth]="false" (clicked)="goToSettings()">
+                    Edit profile
+                  </app-action-button>
+                </div>
               }
+
+              <dl class="profile-side-rail__details">
+                <div class="profile-detail-item">
+                  <dt>Joined</dt>
+                  <dd>{{ profileData.createdAt | date:'MMMM y' }}</dd>
+                </div>
+
+                <div class="profile-detail-item">
+                  <dt>Projects</dt>
+                  <dd>{{ projectCount() }}</dd>
+                </div>
+
+                <div class="profile-detail-item">
+                  <dt>Public</dt>
+                  <dd>{{ publicProjectCount() }}</dd>
+                </div>
+
+                @if (isOwnProfile()) {
+                  <div class="profile-detail-item">
+                    <dt>Private</dt>
+                    <dd>{{ privateProjectCount() }}</dd>
+                  </div>
+                }
+              </dl>
+            </aside>
+
+            <div class="profile-main-column">
+              <section class="profile-projects-hub">
+                <div class="profile-projects-hub__header">
+                  <div class="profile-projects-hub__copy">
+                    <h2>Projects</h2>
+                    <span class="profile-status-pill">{{ projectResultsLabel() }}</span>
+                  </div>
+
+                  <div class="profile-projects-toolbar">
+                    <label class="profile-projects-search" aria-label="Search projects">
+                      <svg
+                        class="profile-projects-search__icon"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                      </svg>
+
+                      <input
+                        type="search"
+                        placeholder="Search projects"
+                        [value]="projectSearchQuery()"
+                        (input)="updateProjectSearchQuery($event)" />
+
+                      @if (projectSearchQuery()) {
+                        <button
+                          type="button"
+                          class="profile-projects-search__clear"
+                          aria-label="Clear search"
+                          (click)="clearProjectSearch()">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
+                        </button>
+                      }
+                    </label>
+
+                    <app-dropdown-select
+                      class="profile-projects-toolbar__select"
+                      id="profile-project-type"
+                      placeholder="Type"
+                      [enableSearch]="false"
+                      [options]="projectTypeOptions()"
+                      [ngModelOptions]="{ standalone: true }"
+                      [ngModel]="projectTypeFilter()"
+                      (ngModelChange)="setProjectType($event)"></app-dropdown-select>
+
+                    <app-dropdown-select
+                      class="profile-projects-toolbar__select profile-projects-toolbar__select--sort"
+                      id="profile-project-sort"
+                      placeholder="Sort"
+                      [enableSearch]="false"
+                      [options]="projectSortOptions"
+                      [ngModelOptions]="{ standalone: true }"
+                      [ngModel]="projectSortOption()"
+                      (ngModelChange)="setProjectSort($event)"></app-dropdown-select>
+
+                    @if (isOwnProfile()) {
+                      <app-action-button
+                        class="profile-projects-toolbar__new-button"
+                        variant="primary"
+                        [fullWidth]="false"
+                        (clicked)="openCreateProjectDialog()">
+                        <svg class="action-button__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <line x1="12" y1="5" x2="12" y2="19"></line>
+                          <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        New Project
+                      </app-action-button>
+                    }
+                  </div>
+                </div>
+
+                @if (errorMessage() && profile()) {
+                  <div class="profile-inline-banner profile-inline-banner--error">
+                    {{ errorMessage() }}
+                  </div>
+                }
+
+                @if (isLoading()) {
+                  <div class="profile-section-state">
+                    <p>Loading projects...</p>
+                  </div>
+                } @else if (projects().length === 0) {
+                  <div class="profile-section-state profile-section-state--empty">
+                    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                      <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    @if (isOwnProfile()) {
+                      <p>No projects yet. Start a new one and it will appear here immediately.</p>
+                      <app-action-button variant="primary" [fullWidth]="false" (clicked)="openCreateProjectDialog()">
+                        Create your first project
+                      </app-action-button>
+                    } @else {
+                      <p>No public projects are available yet.</p>
+                    }
+                  </div>
+                } @else if (filteredProjects().length === 0) {
+                  <div class="profile-section-state profile-section-state--empty">
+                    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <circle cx="11" cy="11" r="7"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <p>No projects match your current search or filters.</p>
+                    @if (hasActiveProjectFilters()) {
+                      <app-action-button variant="outline" [fullWidth]="false" (clicked)="resetProjectToolbar()">
+                        Clear filters
+                      </app-action-button>
+                    }
+                  </div>
+                } @else {
+                  <div class="projects-grid">
+                    @for (project of filteredProjects(); track project.id) {
+                      <app-project-card
+                        [project]="project"
+                        [isBusy]="isProjectBusy(project.id)"
+                        [isOwner]="isOwnProfile()"
+                        [openMode]="isOwnProfile() ? 'editor' : 'preview'"
+                        (renameRequested)="openRenameProjectDialog($event)"
+                        (deleteRequested)="openDeleteProjectDialog($event)"
+                        (visibilityToggleRequested)="toggleProjectVisibility($event)"></app-project-card>
+                    }
+                  </div>
+                }
+              </section>
             </div>
-          } @else {
-            <div class="projects-grid">
-              @for (project of projects(); track project.id) {
-                <app-project-card
-                  [project]="project"
-                  [isDeleting]="isDeletingProject(project.id)"
-                  (deleteRequested)="deleteProject($event)"></app-project-card>
-              }
-            </div>
-          }
-          </section>
-        </main>
+          </div>
+        </div>
       }
     </div>
 
@@ -89,7 +208,7 @@
       <app-dialog-box
         #createDialog
         title="Create project"
-        description="Set up your project details. You can adjust settings later from project options."
+        description="Give the project a name and set its starting visibility. You can change both later from the project card options."
         [isBusy]="isCreatingProject()"
         (closed)="closeCreateProjectDialog()">
         <form
@@ -135,6 +254,65 @@
             </app-action-button>
           </div>
         </ng-template>
+      </app-dialog-box>
+    }
+
+    @if (isRenameDialogOpen()) {
+      <app-dialog-box
+        #renameDialog
+        title="Rename project"
+        description="Update the project name shown throughout your workspace and on your profile."
+        [isBusy]="isRenamingProject()"
+        (closed)="closeRenameProjectDialog()">
+        <form
+          class="project-dialog-form"
+          [id]="renameProjectFormId"
+          [formGroup]="renameProjectForm"
+          (ngSubmit)="submitRenameProject()">
+          <app-text-input
+            id="rename-project-name"
+            label="Project name"
+            placeholder="Project name"
+            formControlName="name"
+            [requiredMarker]="true"
+            [maxLength]="120"
+            [errorText]="renameProjectNameError"
+            [forceInvalid]="!!renameProjectError()"></app-text-input>
+        </form>
+
+        <ng-template #dialogFooter>
+          <div class="project-dialog-footer">
+            <app-action-button
+              type="button"
+              variant="outline"
+              [fullWidth]="false"
+              [disabled]="isRenamingProject() || renameDialog.isClosing"
+              (clicked)="renameDialog.requestClose()">
+              Cancel
+            </app-action-button>
+            <app-action-button
+              type="submit"
+              variant="primary"
+              [form]="renameProjectFormId"
+              [fullWidth]="false"
+              [disabled]="isRenamingProject() || renameDialog.isClosing || renameProjectForm.invalid">
+              {{ isRenamingProject() ? 'Saving...' : 'Save name' }}
+            </app-action-button>
+          </div>
+        </ng-template>
+      </app-dialog-box>
+    }
+
+    @if (isDeleteDialogOpen()) {
+      <app-dialog-box
+        [title]="'Delete ' + (activeDeleteProject()?.name || 'project')"
+        description="This permanently removes the project from your workspace. This action cannot be undone."
+        [isBusy]="isDeleteDialogSubmitting()"
+        [primaryAction]="{ label: isDeleteDialogSubmitting() ? 'Deleting...' : 'Delete project', variant: 'danger' }"
+        [secondaryAction]="{ label: 'Cancel' }"
+        (closed)="closeDeleteProjectDialog()"
+        (primaryClicked)="confirmDeleteProject()"
+        (secondaryClicked)="closeDeleteProjectDialog()">
       </app-dialog-box>
     }
   </div>

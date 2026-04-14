@@ -1,8 +1,94 @@
+:host {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  min-height: 100vh;
+  width: 100%;
+  background:
+    radial-gradient(circle at 50% -12%, rgba(118, 177, 255, 0.04), transparent 28%),
+    linear-gradient(180deg, rgba(8, 10, 13, 1), rgba(3, 4, 6, 1));
+  color: var(--color-text-light);
+  overflow-x: hidden;
+  overflow-y: visible;
+}
+
+:host::before,
+:host::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+:host::before {
+  opacity: 0.68;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)) 8% 11% / 84% 1px no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)) 8% 23% / 84% 1px no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.035)) 8% 44% / 84% 1px
+      no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.035)) 8% 67% / 84% 1px
+      no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)) 8% 84% / 84% 1px no-repeat,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)) 8% 11% / 1px 73%
+      no-repeat,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.04)) 23% 11% / 1px 73%
+      no-repeat,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.035)) 47% 11% / 1px 73%
+      no-repeat,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.035)) 71% 11% / 1px 73%
+      no-repeat,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.05)) 92% 11% / 1px 73%
+      no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)) 23% 23% / 24% 1px
+      no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)) 47% 23% / 24% 1px
+      no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)) 23% 44% / 48% 1px
+      no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)) 71% 44% / 21% 1px
+      no-repeat,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)) 47% 23% / 1px 21%
+      no-repeat,
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.03)) 71% 44% / 1px 23%
+      no-repeat,
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 118px),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 96px);
+}
+
+:host::after {
+  background:
+    radial-gradient(
+      circle at 50% 46%,
+      transparent 38%,
+      rgba(3, 4, 6, 0.26) 62%,
+      rgba(3, 4, 6, 0.78) 88%,
+      rgba(3, 4, 6, 0.96) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(3, 4, 6, 0.58),
+      transparent 15%,
+      transparent 84%,
+      rgba(3, 4, 6, 0.76)
+    ),
+    linear-gradient(
+      90deg,
+      rgba(3, 4, 6, 0.78),
+      transparent 12%,
+      transparent 88%,
+      rgba(3, 4, 6, 0.78)
+    );
+}
+
 .settings-layout {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: linear-gradient(137deg, rgba(14, 14, 16, 1) 0%, rgba(5, 5, 7, 1) 100%);
+  background: transparent;
   color: var(--color-text-light);
 
   .settings-container {

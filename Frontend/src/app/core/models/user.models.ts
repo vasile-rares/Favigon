@@ -3,6 +3,7 @@ export interface UserProfile {
   displayName: string;
   username: string;
   profilePictureUrl: string | null;
+  bio: string | null;
   createdAt: string;
 }
 
