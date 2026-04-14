@@ -2,6 +2,7 @@
 using Favigon.Application.Interfaces;
 using Favigon.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
@@ -48,6 +49,40 @@ public class UsersController : ControllerBase
 
     var updated = await _userService.UpdateMyProfileAsync(userId, request);
     if (updated == null) return NotFound();
+
+    return Ok(updated);
+  }
+
+  [HttpPost("me/profile-image")]
+  public async Task<IActionResult> UploadMyProfileImage(IFormFile? file)
+  {
+    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdClaim, out var userId))
+      return Unauthorized();
+
+    if (file == null)
+    {
+      return BadRequest("Image file is required.");
+    }
+
+    await using var stream = file.OpenReadStream();
+    var publicBaseUrl = UriHelper.BuildAbsolute(Request.Scheme, Request.Host, Request.PathBase);
+    var updated = await _userService.UpdateMyProfileImageAsync(
+      userId,
+      new UserProfileImageUploadRequest
+      {
+        Content = stream,
+        FileName = file.FileName,
+        ContentType = file.ContentType,
+        Length = file.Length,
+      },
+      publicBaseUrl,
+      HttpContext.RequestAborted);
+
+    if (updated == null)
+    {
+      return NotFound();
+    }
 
     return Ok(updated);
   }

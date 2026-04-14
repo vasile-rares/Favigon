@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Favigon.Application.DTOs.Responses;
 using Moq;
 using Favigon.Application.DTOs.Requests;
 using Favigon.Application.Interfaces;
@@ -11,12 +12,17 @@ public class UserServiceTests
 {
   private readonly Mock<IUserRepository> _userRepo = new();
   private readonly Mock<ILinkedAccountRepository> _linkedAccountRepo = new();
+  private readonly Mock<IUserProfileImageStorage> _profileImageStorage = new();
   private readonly Mock<IMapper> _mapper = new();
   private readonly UserService _sut;
 
   public UserServiceTests()
   {
-    _sut = new UserService(_userRepo.Object, _linkedAccountRepo.Object, _mapper.Object);
+    _sut = new UserService(
+      _userRepo.Object,
+      _linkedAccountRepo.Object,
+      _profileImageStorage.Object,
+      _mapper.Object);
   }
 
   [Fact]
@@ -146,5 +152,82 @@ public class UserServiceTests
     // Assert
     Assert.False(result);
     _userRepo.Verify(r => r.DeleteAsync(It.IsAny<User>()), Times.Never);
+  }
+
+  [Fact]
+  public async Task UpdateMyProfileImage_WhenUploadSucceeds_StoresAbsoluteUrlAndDeletesPreviousLocalImage()
+  {
+    // Arrange
+    var user = new User
+    {
+      Id = 7,
+      Username = "designer",
+      DisplayName = "Designer",
+      Email = "designer@test.com",
+      ProfilePictureUrl = "https://api.favigon.test/user-profile-assets/7/old-image.png"
+    };
+
+    _userRepo.Setup(r => r.GetByIdAsync(7)).ReturnsAsync(user);
+    _profileImageStorage
+      .Setup(s => s.SaveImageAsync(7, It.IsAny<Stream>(), "avatar.png", "image/png", It.IsAny<CancellationToken>()))
+      .ReturnsAsync("/user-profile-assets/7/new-image.png");
+    _linkedAccountRepo
+      .Setup(r => r.GetByUserIdAsync(7))
+      .ReturnsAsync(Array.Empty<LinkedAccount>());
+    _mapper
+      .Setup(m => m.Map<UserResponse>(It.IsAny<User>()))
+      .Returns<User>(mappedUser => new UserResponse
+      {
+        UserId = mappedUser.Id,
+        DisplayName = mappedUser.DisplayName,
+        Username = mappedUser.Username,
+        Email = mappedUser.Email,
+        ProfilePictureUrl = mappedUser.ProfilePictureUrl,
+        LinkedAccounts = new List<LinkedAccountResponse>()
+      });
+    _mapper
+      .Setup(m => m.Map<List<LinkedAccountResponse>>(It.IsAny<object>()))
+      .Returns(new List<LinkedAccountResponse>());
+
+    var request = new UserProfileImageUploadRequest
+    {
+      Content = new MemoryStream(new byte[] { 1, 2, 3 }),
+      FileName = "avatar.png",
+      ContentType = "image/png",
+      Length = 3,
+    };
+
+    // Act
+    var result = await _sut.UpdateMyProfileImageAsync(
+      7,
+      request,
+      "https://api.favigon.test",
+      CancellationToken.None);
+
+    // Assert
+    Assert.NotNull(result);
+    Assert.Equal("https://api.favigon.test/user-profile-assets/7/new-image.png", result!.ProfilePictureUrl);
+    _userRepo.Verify(
+      r => r.UpdateAsync(It.Is<User>(u => u.ProfilePictureUrl == "https://api.favigon.test/user-profile-assets/7/new-image.png")),
+      Times.Once);
+    _profileImageStorage.Verify(
+      s => s.DeleteImageAsync(7, "https://api.favigon.test/user-profile-assets/7/old-image.png", It.IsAny<CancellationToken>()),
+      Times.Once);
+  }
+
+  [Fact]
+  public async Task DeleteMyAccount_WhenUserExists_DeletesStoredProfileAssets()
+  {
+    // Arrange
+    var user = new User { Id = 5, Username = "delme", Email = "delme@test.com" };
+    _userRepo.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(user);
+
+    // Act
+    var result = await _sut.DeleteMyAccountAsync(5);
+
+    // Assert
+    Assert.True(result);
+    _userRepo.Verify(r => r.DeleteAsync(user), Times.Once);
+    _profileImageStorage.Verify(s => s.DeleteUserAssetsAsync(5, It.IsAny<CancellationToken>()), Times.Once);
   }
 }

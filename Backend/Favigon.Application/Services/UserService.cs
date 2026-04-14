@@ -8,17 +8,31 @@ namespace Favigon.Application.Services;
 
 public class UserService : IUserService
 {
+  private const long MaxProfileImageSizeBytes = 10 * 1024 * 1024;
+
+  private static readonly HashSet<string> AllowedProfileImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
+  {
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/gif",
+    "image/avif"
+  };
+
   private readonly IUserRepository _userRepository;
   private readonly ILinkedAccountRepository _linkedAccountRepository;
+  private readonly IUserProfileImageStorage _userProfileImageStorage;
   private readonly IMapper _mapper;
 
   public UserService(
     IUserRepository userRepository,
     ILinkedAccountRepository linkedAccountRepository,
+    IUserProfileImageStorage userProfileImageStorage,
     IMapper mapper)
   {
     _userRepository = userRepository;
     _linkedAccountRepository = linkedAccountRepository;
+    _userProfileImageStorage = userProfileImageStorage;
     _mapper = mapper;
   }
 
@@ -138,10 +152,7 @@ public class UserService : IUserService
     var user = await _userRepository.GetByIdAsync(userId);
     if (user == null) return null;
 
-    var linkedAccounts = await _linkedAccountRepository.GetByUserIdAsync(userId);
-    var response = _mapper.Map<UserResponse>(user);
-    response.LinkedAccounts = _mapper.Map<List<LinkedAccountResponse>>(linkedAccounts);
-    return response;
+    return await BuildMyProfileResponseAsync(user);
   }
 
   public async Task<UserResponse?> UpdateMyProfileAsync(int userId, UserProfileUpdateRequest request)
@@ -165,10 +176,50 @@ public class UserService : IUserService
 
     await _userRepository.UpdateAsync(user);
 
-    var linkedAccounts = await _linkedAccountRepository.GetByUserIdAsync(userId);
-    var response = _mapper.Map<UserResponse>(user);
-    response.LinkedAccounts = _mapper.Map<List<LinkedAccountResponse>>(linkedAccounts);
-    return response;
+    return await BuildMyProfileResponseAsync(user);
+  }
+
+  public async Task<UserResponse?> UpdateMyProfileImageAsync(
+    int userId,
+    UserProfileImageUploadRequest request,
+    string publicBaseUrl,
+    CancellationToken cancellationToken = default)
+  {
+    var user = await _userRepository.GetByIdAsync(userId);
+    if (user == null) return null;
+
+    ValidateProfileImageUploadRequest(request);
+
+    var previousProfilePictureUrl = user.ProfilePictureUrl;
+    var assetPath = await _userProfileImageStorage.SaveImageAsync(
+      userId,
+      request.Content,
+      request.FileName,
+      request.ContentType,
+      cancellationToken);
+    var assetUrl = BuildAbsoluteAssetUrl(publicBaseUrl, assetPath);
+
+    try
+    {
+      user.ProfilePictureUrl = assetUrl;
+      await _userRepository.UpdateAsync(user);
+    }
+    catch
+    {
+      await _userProfileImageStorage.DeleteImageAsync(userId, assetPath, CancellationToken.None);
+      throw;
+    }
+
+    if (!string.IsNullOrWhiteSpace(previousProfilePictureUrl)
+      && !string.Equals(previousProfilePictureUrl, assetUrl, StringComparison.OrdinalIgnoreCase))
+    {
+      await _userProfileImageStorage.DeleteImageAsync(
+        userId,
+        previousProfilePictureUrl,
+        CancellationToken.None);
+    }
+
+    return await BuildMyProfileResponseAsync(user);
   }
 
   public async Task<bool> DeleteMyAccountAsync(int userId)
@@ -177,6 +228,7 @@ public class UserService : IUserService
     if (user == null) return false;
 
     await _userRepository.DeleteAsync(user);
+    await _userProfileImageStorage.DeleteUserAssetsAsync(userId, CancellationToken.None);
     return true;
   }
 
@@ -187,5 +239,59 @@ public class UserService : IUserService
 
     await _linkedAccountRepository.RemoveAsync(link);
     return true;
+  }
+
+  private async Task<UserResponse> BuildMyProfileResponseAsync(User user)
+  {
+    var linkedAccounts = await _linkedAccountRepository.GetByUserIdAsync(user.Id);
+    var response = _mapper.Map<UserResponse>(user);
+    response.LinkedAccounts = _mapper.Map<List<LinkedAccountResponse>>(linkedAccounts);
+    return response;
+  }
+
+  private static void ValidateProfileImageUploadRequest(UserProfileImageUploadRequest request)
+  {
+    if (request.Length <= 0)
+    {
+      throw new ArgumentException("Image file is empty.");
+    }
+
+    if (request.Length > MaxProfileImageSizeBytes)
+    {
+      throw new ArgumentException("Image file exceeds the 10 MB limit.");
+    }
+
+    if (string.IsNullOrWhiteSpace(request.FileName))
+    {
+      throw new ArgumentException("Image file name is required.");
+    }
+
+    if (request.Content == Stream.Null || !request.Content.CanRead)
+    {
+      throw new ArgumentException("Image file content is not readable.");
+    }
+
+    if (string.IsNullOrWhiteSpace(request.ContentType)
+      || !AllowedProfileImageContentTypes.Contains(request.ContentType))
+    {
+      throw new ArgumentException("Only PNG, JPEG, WebP, GIF, and AVIF images are supported.");
+    }
+  }
+
+  private static string BuildAbsoluteAssetUrl(string publicBaseUrl, string assetPath)
+  {
+    if (string.IsNullOrWhiteSpace(publicBaseUrl))
+    {
+      throw new ArgumentException("Public base URL is required.", nameof(publicBaseUrl));
+    }
+
+    if (string.IsNullOrWhiteSpace(assetPath))
+    {
+      throw new ArgumentException("Profile image path is required.", nameof(assetPath));
+    }
+
+    var normalizedBaseUrl = publicBaseUrl.TrimEnd('/');
+    var normalizedAssetPath = assetPath.StartsWith('/') ? assetPath : $"/{assetPath}";
+    return $"{normalizedBaseUrl}{normalizedAssetPath}";
   }
 }

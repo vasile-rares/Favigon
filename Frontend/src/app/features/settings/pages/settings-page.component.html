@@ -39,6 +39,55 @@
               <p class="card-description">Manage your personal information and biography.</p>
             </div>
           <div class="card-body form-grid">
+            <div class="form-group full-width-field">
+              <div class="profile-image-panel">
+                <div class="profile-image-panel__preview-shell">
+                  <img
+                    class="profile-image-panel__preview"
+                    [src]="accountAvatarUrl"
+                    [alt]="(displayName || username || 'Profile') + ' avatar'" />
+                </div>
+
+                <div class="profile-image-panel__content">
+                  <div class="profile-image-panel__top-row">
+                    <div class="profile-image-panel__copy">
+                      <span class="profile-image-panel__title">Profile photo</span>
+                    </div>
+
+                    <input
+                      #profileImageInput
+                      type="file"
+                      hidden
+                      [accept]="profileImageAccept"
+                      (change)="onProfileImageSelected($event)" />
+
+                    <app-action-button
+                      class="profile-image-panel__button"
+                      variant="outline"
+                      [fullWidth]="false"
+                      [disabled]="isUploadingProfileImage() || isSaving()"
+                      (clicked)="profileImageInput.click()">
+                      {{
+                        isUploadingProfileImage()
+                          ? 'Uploading...'
+                          : hasProfileImage
+                            ? 'Change photo'
+                            : 'Upload photo'
+                      }}
+                    </app-action-button>
+                  </div>
+
+                  <p class="profile-image-panel__description">
+                    Upload a PNG, JPEG, WebP, GIF, or AVIF image up to 10 MB.
+                  </p>
+
+                  <span class="profile-image-panel__hint">
+                    Changes apply immediately after upload.
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <div class="form-group">
               <app-text-input
                 id="display-name"
@@ -82,7 +131,7 @@
             <app-action-button
               variant="primary"
               [fullWidth]="false"
-              [disabled]="isSaving()"
+              [disabled]="isSaving() || isUploadingProfileImage()"
               (clicked)="saveAccountChanges()">
               {{ isSaving() ? 'Saving...' : 'Save changes' }}
             </app-action-button>

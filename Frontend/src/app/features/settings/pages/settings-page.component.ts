@@ -14,6 +14,15 @@ import {
 } from '@app/shared';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const MAX_PROFILE_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_PROFILE_IMAGE_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+  'image/avif',
+] as const;
+const PROFILE_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/avif';
 
 @Component({
   selector: 'app-settings-page',
@@ -34,6 +43,7 @@ export class SettingsPage implements OnInit {
   private readonly userService = inject(UserService);
   private readonly currentUser = inject(CurrentUserService);
   private readonly router = inject(Router);
+  private readonly fallbackAvatarUrl = 'https://github.com/shadcn.png';
 
   activeTab: 'account' | 'password' | 'linked-accounts' = 'account';
 
@@ -50,6 +60,7 @@ export class SettingsPage implements OnInit {
 
   readonly isLoading = signal(false);
   readonly isSaving = signal(false);
+  readonly isUploadingProfileImage = signal(false);
   readonly isDeleting = signal(false);
   readonly isDeleteDialogOpen = signal(false);
   readonly isPasswordDialogOpen = signal(false);
@@ -68,6 +79,7 @@ export class SettingsPage implements OnInit {
   readonly twoFactorDialogMessage = signal<{ type: 'error' | 'success'; text: string } | null>(
     null,
   );
+  readonly profileImageAccept = PROFILE_IMAGE_ACCEPT;
 
   private userMe: UserMe | null = null;
 
@@ -86,6 +98,14 @@ export class SettingsPage implements OnInit {
   setActiveTab(tab: 'account' | 'password' | 'linked-accounts') {
     this.activeTab = tab;
     this.statusMessage.set(null);
+  }
+
+  get accountAvatarUrl(): string {
+    return this.userMe?.profilePictureUrl?.trim() || this.fallbackAvatarUrl;
+  }
+
+  get hasProfileImage(): boolean {
+    return !!this.userMe?.profilePictureUrl?.trim();
   }
 
   async saveAccountChanges() {
@@ -109,6 +129,44 @@ export class SettingsPage implements OnInit {
       });
     } finally {
       this.isSaving.set(false);
+    }
+  }
+
+  async onProfileImageSelected(event: Event) {
+    const input = event.target as HTMLInputElement | null;
+    const file = input?.files?.item(0);
+    if (!file) {
+      return;
+    }
+
+    this.statusMessage.set(null);
+
+    const validationError = this.validateProfileImageFile(file);
+    if (validationError) {
+      this.statusMessage.set({ type: 'error', text: validationError });
+      if (input) {
+        input.value = '';
+      }
+      return;
+    }
+
+    this.isUploadingProfileImage.set(true);
+
+    try {
+      const updated = await firstValueFrom(this.userService.uploadMyProfileImage(file));
+      this.currentUser.set(updated);
+      this.populateForm(updated);
+      this.statusMessage.set({ type: 'success', text: 'Profile image updated successfully.' });
+    } catch (error: unknown) {
+      this.statusMessage.set({
+        type: 'error',
+        text: extractApiErrorMessage(error, 'Could not update profile image.'),
+      });
+    } finally {
+      this.isUploadingProfileImage.set(false);
+      if (input) {
+        input.value = '';
+      }
     }
   }
 
@@ -506,5 +564,25 @@ export class SettingsPage implements OnInit {
     this.username = me.username;
     this.bio = me.bio ?? '';
     this.email = me.email;
+  }
+
+  private validateProfileImageFile(file: File): string | null {
+    if (file.size <= 0) {
+      return 'Image file is empty.';
+    }
+
+    if (file.size > MAX_PROFILE_IMAGE_SIZE_BYTES) {
+      return 'Image file exceeds the 10 MB limit.';
+    }
+
+    if (
+      !ALLOWED_PROFILE_IMAGE_TYPES.includes(
+        file.type as (typeof ALLOWED_PROFILE_IMAGE_TYPES)[number],
+      )
+    ) {
+      return 'Only PNG, JPEG, WebP, GIF, and AVIF images are supported.';
+    }
+
+    return null;
   }
 }

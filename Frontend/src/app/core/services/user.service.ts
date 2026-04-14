@@ -22,6 +22,12 @@ export class UserService {
     return this.http.put<UserMe>(`${this.baseUrl}/users/me`, request);
   }
 
+  uploadMyProfileImage(file: File): Observable<UserMe> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<UserMe>(`${this.baseUrl}/users/me/profile-image`, formData);
+  }
+
   deleteMe(): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/users/me`);
   }

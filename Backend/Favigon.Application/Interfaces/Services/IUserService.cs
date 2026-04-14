@@ -15,6 +15,11 @@ public interface IUserService
   Task<bool> DeleteAsync(int id);
   Task<UserResponse?> GetMyProfileAsync(int userId);
   Task<UserResponse?> UpdateMyProfileAsync(int userId, UserProfileUpdateRequest request);
+  Task<UserResponse?> UpdateMyProfileImageAsync(
+    int userId,
+    UserProfileImageUploadRequest request,
+    string publicBaseUrl,
+    CancellationToken cancellationToken = default);
   Task<bool> DeleteMyAccountAsync(int userId);
   Task<bool> UnlinkProviderAsync(int userId, string provider);
 }

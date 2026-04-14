@@ -4,9 +4,10 @@ using Microsoft.AspNetCore.Hosting;
 
 namespace Favigon.Infrastructure.External.Assets;
 
-public class ProjectAssetStorage : IProjectAssetStorage
+public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorage
 {
   private const string ThumbnailFileStem = "thumbnail";
+  private const string UserProfileAssetDirectoryName = "user-profile-assets";
 
   private static readonly IReadOnlyDictionary<string, string> ContentTypeExtensions =
     new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -66,6 +67,61 @@ public class ProjectAssetStorage : IProjectAssetStorage
     await content.CopyToAsync(destination, cancellationToken);
 
     return BuildProjectAssetUrl(userId, projectId, storedFileName);
+  }
+
+  public async Task<string> SaveImageAsync(
+    int userId,
+    Stream content,
+    string fileName,
+    string? contentType,
+    CancellationToken cancellationToken = default)
+  {
+    var extension = ResolveExtension(fileName, contentType);
+    var assetDirectory = GetUserProfileAssetDirectory(userId);
+    Directory.CreateDirectory(assetDirectory);
+
+    var storedFileName = $"{Guid.NewGuid():N}{extension}";
+    var physicalPath = Path.Combine(assetDirectory, storedFileName);
+
+    await using var destination = new FileStream(physicalPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+    await content.CopyToAsync(destination, cancellationToken);
+
+    return BuildUserProfileAssetUrl(userId, storedFileName);
+  }
+
+  public Task DeleteImageAsync(
+    int userId,
+    string imageUrlOrPath,
+    CancellationToken cancellationToken = default)
+  {
+    cancellationToken.ThrowIfCancellationRequested();
+
+    var userDirectory = Path.GetFullPath(GetUserProfileAssetDirectory(userId));
+    var physicalPath = TryResolveUserProfileAssetPath(userDirectory, userId, imageUrlOrPath);
+    if (physicalPath == null || !File.Exists(physicalPath))
+    {
+      return Task.CompletedTask;
+    }
+
+    File.Delete(physicalPath);
+    DeleteDirectoryIfEmpty(userDirectory);
+
+    return Task.CompletedTask;
+  }
+
+  public Task DeleteUserAssetsAsync(
+    int userId,
+    CancellationToken cancellationToken = default)
+  {
+    cancellationToken.ThrowIfCancellationRequested();
+
+    var assetDirectory = GetUserProfileAssetDirectory(userId);
+    if (Directory.Exists(assetDirectory))
+    {
+      Directory.Delete(assetDirectory, recursive: true);
+    }
+
+    return Task.CompletedTask;
   }
 
   public string? GetThumbnailUrl(int userId, int projectId)
@@ -146,6 +202,14 @@ public class ProjectAssetStorage : IProjectAssetStorage
       projectId.ToString(CultureInfo.InvariantCulture));
   }
 
+  private string GetUserProfileAssetDirectory(int userId)
+  {
+    return Path.Combine(
+      GetWebRootPath(),
+      UserProfileAssetDirectoryName,
+      userId.ToString(CultureInfo.InvariantCulture));
+  }
+
   private string GetWebRootPath()
   {
     return string.IsNullOrWhiteSpace(_webHostEnvironment.WebRootPath)
@@ -217,9 +281,58 @@ public class ProjectAssetStorage : IProjectAssetStorage
     }
   }
 
+  private static string? TryResolveUserProfileAssetPath(
+    string userDirectory,
+    int userId,
+    string imageUrlOrPath)
+  {
+    if (string.IsNullOrWhiteSpace(imageUrlOrPath))
+    {
+      return null;
+    }
+
+    var normalizedPath = ExtractAssetPath(imageUrlOrPath).Replace('\\', '/');
+    if (!normalizedPath.StartsWith('/'))
+    {
+      normalizedPath = $"/{normalizedPath.TrimStart('/')}";
+    }
+
+    var expectedPrefix = $"/{UserProfileAssetDirectoryName}/{userId.ToString(CultureInfo.InvariantCulture)}/";
+    if (!normalizedPath.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
+    {
+      return null;
+    }
+
+    var relativePath = Uri.UnescapeDataString(normalizedPath[expectedPrefix.Length..]).TrimStart('/');
+    if (string.IsNullOrWhiteSpace(relativePath))
+    {
+      return null;
+    }
+
+    var physicalPath = Path.GetFullPath(Path.Combine(
+      userDirectory,
+      relativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+    return physicalPath.StartsWith(userDirectory, StringComparison.OrdinalIgnoreCase)
+      ? physicalPath
+      : null;
+  }
+
   private static string BuildProjectAssetUrl(int userId, int projectId, string fileName)
   {
     return $"/project-assets/{userId.ToString(CultureInfo.InvariantCulture)}/{projectId.ToString(CultureInfo.InvariantCulture)}/{fileName}";
+  }
+
+  private static string BuildUserProfileAssetUrl(int userId, string fileName)
+  {
+    return $"/{UserProfileAssetDirectoryName}/{userId.ToString(CultureInfo.InvariantCulture)}/{fileName}";
+  }
+
+  private static string ExtractAssetPath(string imageUrlOrPath)
+  {
+    return Uri.TryCreate(imageUrlOrPath, UriKind.Absolute, out var absoluteUri)
+      ? absoluteUri.AbsolutePath
+      : imageUrlOrPath;
   }
 
   private static string ResolveExtension(string? fileName, string? contentType)
