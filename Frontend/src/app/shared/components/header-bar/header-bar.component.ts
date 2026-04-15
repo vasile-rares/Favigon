@@ -2,9 +2,11 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  EventEmitter,
   HostListener,
   Input,
   OnInit,
+  Output,
   ViewChild,
   effect,
   inject,
@@ -50,7 +52,8 @@ interface HeaderUserProfile {
   styleUrl: './header-bar.component.css',
 })
 export class HeaderBarComponent implements OnInit {
-  @Input() appearance: 'default' | 'canvas' = 'default';
+  @Input() appearance: 'default' | 'canvas' | 'preview' = 'default';
+  @Output() readonly runPreviewClicked = new EventEmitter<void>();
 
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);

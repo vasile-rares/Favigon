@@ -93,6 +93,10 @@ input[type='number']::-webkit-inner-spin-button {
   }
 }
 
+.number-input--with-stepper-suffix .number-input__field {
+  padding-right: 1rem;
+}
+
 .number-input__suffix {
   position: absolute;
   top: 50%;
@@ -126,8 +130,49 @@ input[type='number']::-webkit-inner-spin-button {
   transition: opacity 0.14s ease;
 }
 
+.number-input__stepper-suffix {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--canvas-panel-section-muted-color, var(--color-zinc-400));
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+}
+
 .number-input:hover .number-input__stepper,
 .number-input:focus-within .number-input__stepper {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.number-input--with-stepper-suffix .number-input__stepper {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.number-input--with-stepper-suffix .number-input__stepper-btn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+}
+
+.number-input--with-stepper-suffix .number-input__stepper-suffix {
+  opacity: 1;
+}
+
+.number-input--with-stepper-suffix:hover .number-input__stepper-suffix,
+.number-input--with-stepper-suffix:focus-within .number-input__stepper-suffix {
+  opacity: 0;
+}
+
+.number-input--with-stepper-suffix:hover .number-input__stepper-btn,
+.number-input--with-stepper-suffix:focus-within .number-input__stepper-btn {
   opacity: 1;
   pointer-events: auto;
 }

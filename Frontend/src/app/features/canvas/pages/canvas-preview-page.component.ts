@@ -1,58 +1,97 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CanvasElement, CanvasPageModel, extractApiErrorMessage } from '@app/core';
-import { CanvasElementService } from '../services/canvas-element.service';
+import { CanvasPageModel, ConverterService, extractApiErrorMessage } from '@app/core';
+import { DropdownSelectComponent } from '../../../shared/components/dropdown-select/dropdown-select.component';
+import type { DropdownSelectOption } from '../../../shared/components/dropdown-select/dropdown-select.component';
+import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
 import { CanvasPersistenceService } from '../services/canvas-api.service';
-import {
-  getTextFontFamily,
-  getTextFontWeight,
-  getTextFontStyle,
-  getTextFontSize,
-  getTextLineHeight,
-  getTextLetterSpacing,
-  getTextAlignValue,
-} from '../utils/canvas-text.util';
+import { buildCanvasIRPages } from '../mappers/canvas-ir.mapper';
+import { VIEWPORT_PRESET_OPTIONS } from '../canvas.types';
+import { NumberInputComponent } from '../components/properties-panel/number-input/number-input.component';
 
-type PreviewDevicePreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
-
-interface PreviewDeviceOption {
-  id: PreviewDevicePreset;
+interface FrameSizeOption {
   label: string;
   width: number;
+  height: number;
 }
 
-interface PreviewLinkTarget {
-  kind: 'page' | 'url';
-  value: string;
-}
-
-const PREVIEW_DEVICE_OPTIONS: PreviewDeviceOption[] = [
-  { id: 'desktop', label: 'Desktop', width: 1280 },
-  { id: 'tablet', label: 'Tablet', width: 800 },
-  { id: 'mobile', label: 'Mobile', width: 375 },
-];
+const GOOGLE_FONTS_URL =
+  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Montserrat:wght@300;400;500;600;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap';
 
 @Component({
   selector: 'app-canvas-preview-page',
   standalone: true,
-  imports: [CommonModule],
-  providers: [CanvasElementService, CanvasPersistenceService],
+  imports: [
+    CommonModule,
+    FormsModule,
+    HeaderBarComponent,
+    DropdownSelectComponent,
+    NumberInputComponent,
+  ],
+  providers: [CanvasPersistenceService],
   templateUrl: './canvas-preview-page.component.html',
   styleUrl: './canvas-preview-page.component.css',
 })
 export class CanvasPreviewPage {
+  @ViewChild('stage') private stageRef!: ElementRef<HTMLElement>;
+
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly sanitizer = inject(DomSanitizer);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
-  private readonly el = inject(CanvasElementService);
+  private readonly converterService = inject(ConverterService);
 
   readonly pages = signal<CanvasPageModel[]>([]);
   readonly currentPageId = signal<string | null>(null);
-  readonly selectedDevice = signal<PreviewDevicePreset>('desktop');
-  readonly isPageMenuOpen = signal(false);
+  readonly selectedFrameIndex = signal(0);
   readonly isLoading = signal(false);
+  readonly isGenerating = signal(false);
   readonly error = signal<string | null>(null);
+  readonly pageSearchQuery = signal('');
+  readonly isPageDropdownOpen = signal(false);
+
+  readonly generatedHtml = signal('');
+  readonly generatedCss = signal('');
+
+  /** Manual resize overrides (null = use frame preset size). */
+  readonly resizeWidth = signal<number | null>(null);
+  readonly resizeHeight = signal<number | null>(null);
+  readonly isResizing = signal(false);
+
+  private resizeDragAxis: 'right' | 'bottom' | 'corner' | null = null;
+  private resizeDragStartX = 0;
+  private resizeDragStartY = 0;
+  private resizeDragStartW = 0;
+  private resizeDragStartH = 0;
+  private resizeMaxWidth = Infinity;
+  private resizeMaxHeight = Infinity;
+
+  private readonly onResizePointerMove = (e: PointerEvent): void => {
+    const dx = e.clientX - this.resizeDragStartX;
+    const dy = e.clientY - this.resizeDragStartY;
+
+    if (this.resizeDragAxis === 'right' || this.resizeDragAxis === 'corner') {
+      this.resizeWidth.set(
+        Math.max(120, Math.min(this.resizeMaxWidth, Math.round(this.resizeDragStartW + 2 * dx))),
+      );
+    }
+    if (this.resizeDragAxis === 'bottom' || this.resizeDragAxis === 'corner') {
+      this.resizeHeight.set(
+        Math.max(120, Math.min(this.resizeMaxHeight, Math.round(this.resizeDragStartH + 2 * dy))),
+      );
+    }
+  };
+
+  private readonly onResizePointerUp = (): void => {
+    this.isResizing.set(false);
+    this.resizeDragAxis = null;
+    document.body.style.cursor = '';
+    document.removeEventListener('pointermove', this.onResizePointerMove);
+    document.removeEventListener('pointerup', this.onResizePointerUp);
+  };
 
   readonly projectId = this.route.snapshot.paramMap.get('id') ?? '';
 
@@ -65,269 +104,272 @@ export class CanvasPreviewPage {
     return this.pages().find((page) => page.id === activePageId) ?? this.pages()[0] ?? null;
   });
 
-  readonly visibleElements = computed<CanvasElement[]>(() => {
-    const elements = this.currentPage()?.elements ?? [];
-    return elements
-      .filter((element) => this.el.isElementEffectivelyVisible(element.id, elements))
-      .reverse();
+  readonly frameSizeOptions = computed<FrameSizeOption[]>(() => {
+    const page = this.currentPage();
+    const options: FrameSizeOption[] = [];
+
+    const elements = page?.elements ?? [];
+    const rootFrames = elements.filter((el) => el.type === 'frame' && !el.parentId);
+    for (const frame of rootFrames) {
+      const w = Math.round(
+        frame.width + (frame.padding ? frame.padding.left + frame.padding.right : 0),
+      );
+      const h = Math.round(
+        frame.height + (frame.padding ? frame.padding.top + frame.padding.bottom : 0),
+      );
+      options.push({ label: frame.name || `Frame ${w}×${h}`, width: w, height: h });
+    }
+
+    if (options.length === 0) {
+      for (const preset of VIEWPORT_PRESET_OPTIONS) {
+        options.push({
+          label: `${preset.label} (${preset.width}×${preset.height})`,
+          width: preset.width,
+          height: preset.height,
+        });
+      }
+    }
+
+    return options;
+  });
+
+  readonly selectedFrameSize = computed<FrameSizeOption | null>(() => {
+    const options = this.frameSizeOptions();
+    const idx = this.selectedFrameIndex();
+    return options[idx] ?? options[0] ?? null;
+  });
+
+  readonly deviceSelectOptions = computed<DropdownSelectOption[]>(() => {
+    return this.frameSizeOptions().map((option, index) => ({
+      label: option.label,
+      triggerLabel: option.label,
+      value: index,
+    }));
   });
 
   readonly viewportWidth = computed<number>(() => {
-    const mode = this.selectedDevice();
-    const option = PREVIEW_DEVICE_OPTIONS.find((entry) => entry.id === mode);
-    if (option) {
-      return option.width;
-    }
-
-    return this.getPageViewportWidth(this.currentPage());
+    const override = this.resizeWidth();
+    if (override !== null) return override;
+    const frame = this.selectedFrameSize();
+    return frame ? frame.width : 1280;
   });
 
   readonly viewportHeight = computed<number>(() => {
-    const mode = this.selectedDevice();
-    if (mode === 'custom') {
-      return this.getPageViewportHeight(this.currentPage());
-    }
-
-    const width = this.viewportWidth();
-    const pageWidth = this.getPageViewportWidth(this.currentPage());
-    const pageHeight = this.getPageViewportHeight(this.currentPage());
-    const ratio = pageHeight / Math.max(pageWidth, 1);
-
-    return Math.max(120, Math.round(width * ratio));
+    const override = this.resizeHeight();
+    if (override !== null) return override;
+    const frame = this.selectedFrameSize();
+    return frame ? frame.height : 720;
   });
 
-  readonly deviceOptions = PREVIEW_DEVICE_OPTIONS;
+  readonly iframeSrcdoc = computed<SafeHtml>(() => {
+    const html = this.generatedHtml();
+    const css = this.generatedCss();
+
+    if (!html && !css) {
+      return this.sanitizer.bypassSecurityTrustHtml('');
+    }
+
+    const doc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="${GOOGLE_FONTS_URL}" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+body { overflow: auto; }
+${css}
+</style>
+</head>
+<body>
+${html}
+</body>
+</html>`;
+
+    return this.sanitizer.bypassSecurityTrustHtml(doc);
+  });
+
+  readonly filteredPages = computed<CanvasPageModel[]>(() => {
+    const query = this.pageSearchQuery().toLowerCase().trim();
+    const allPages = this.pages();
+    if (!query) {
+      return allPages;
+    }
+
+    return allPages.filter((page) => page.name.toLowerCase().includes(query));
+  });
 
   constructor() {
     this.loadPreview(this.route.snapshot.queryParamMap.get('pageId'));
+
+    // Re-generate whenever the current page changes
+    effect(() => {
+      const page = this.currentPage();
+      if (page && !this.isLoading()) {
+        this.generateForCurrentPage();
+      }
+    });
   }
 
-  selectDevice(device: PreviewDevicePreset): void {
-    this.selectedDevice.set(device);
+  goBack(): void {
+    void this.router.navigate(['/project', this.projectId]);
+  }
+
+  onFrameSizeChange(index: number | string | boolean | null): void {
+    const nextIndex = typeof index === 'number' ? index : Number(index);
+    if (!Number.isFinite(nextIndex)) {
+      return;
+    }
+
+    this.selectedFrameIndex.set(nextIndex);
+    this.resizeWidth.set(null);
+    this.resizeHeight.set(null);
+  }
+
+  onWidthInputChange(value: number): void {
+    this.resizeWidth.set(
+      Math.max(120, Math.min(this.getStageMaxViewportWidth(), Math.round(value))),
+    );
+  }
+
+  onHeightInputChange(value: number): void {
+    this.resizeHeight.set(
+      Math.max(120, Math.min(this.getStageMaxViewportHeight(), Math.round(value))),
+    );
+  }
+
+  onResizeHandlePointerDown(event: PointerEvent, axis: 'right' | 'bottom' | 'corner'): void {
+    event.preventDefault();
+    this.resizeDragAxis = axis;
+    this.resizeDragStartX = event.clientX;
+    this.resizeDragStartY = event.clientY;
+    this.resizeDragStartW = this.viewportWidth();
+    this.resizeDragStartH = this.viewportHeight();
+    this.isResizing.set(true);
+
+    document.body.style.cursor = axis === 'bottom' ? 'ns-resize' : 'ew-resize';
+
+    if (axis === 'right' || axis === 'corner') {
+      this.resizeMaxWidth = this.getStageMaxViewportWidth();
+    }
+
+    if (axis === 'bottom' || axis === 'corner') {
+      const stageEl = this.stageRef?.nativeElement;
+      if (stageEl) {
+        const stageRect = stageEl.getBoundingClientRect();
+        // Stage is center-aligned; max viewport height = stage height minus padding on both sides.
+        // The 2× factor in onResizePointerMove means the limit is symmetric around the center.
+        const stagePadding = 24; // matches .preview-stage padding (1.5rem)
+        this.resizeMaxHeight = Math.max(120, stageRect.height - stagePadding * 2);
+      } else {
+        this.resizeMaxHeight = Infinity;
+      }
+    }
+
+    document.addEventListener('pointermove', this.onResizePointerMove);
+    document.addEventListener('pointerup', this.onResizePointerUp);
   }
 
   selectPage(pageId: string): void {
     this.currentPageId.set(pageId);
-    this.isPageMenuOpen.set(false);
+    this.selectedFrameIndex.set(0);
+    this.isPageDropdownOpen.set(false);
+    this.pageSearchQuery.set('');
     this.syncQueryPage(pageId);
   }
 
-  onElementClick(event: MouseEvent, element: CanvasElement): void {
-    const target = this.resolveLinkTarget(element);
-    if (!target) {
-      return;
-    }
-
-    event.stopPropagation();
-    this.activateLinkTarget(target);
+  onSearchInput(value: string): void {
+    this.pageSearchQuery.set(value);
+    this.isPageDropdownOpen.set(true);
   }
 
-  onElementKeydown(event: KeyboardEvent, element: CanvasElement): void {
-    if (event.key !== 'Enter' && event.key !== ' ') {
-      return;
-    }
-
-    const target = this.resolveLinkTarget(element);
-    if (!target) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-    this.activateLinkTarget(target);
+  onSearchFocus(): void {
+    this.isPageDropdownOpen.set(true);
   }
 
-  togglePageMenu(): void {
-    this.isPageMenuOpen.update((open) => !open);
+  onSearchBlur(): void {
+    setTimeout(() => this.isPageDropdownOpen.set(false), 180);
   }
 
   refreshPreview(): void {
     this.loadPreview(this.currentPageId());
   }
 
-  closePageMenu(): void {
-    this.isPageMenuOpen.set(false);
-  }
-
-  getRenderedX(element: CanvasElement): number {
-    return this.el.getAbsoluteBounds(
-      element,
-      this.currentPage()?.elements ?? [],
-      this.currentPage(),
-    ).x;
-  }
-
-  getRenderedY(element: CanvasElement): number {
-    return this.el.getAbsoluteBounds(
-      element,
-      this.currentPage()?.elements ?? [],
-      this.currentPage(),
-    ).y;
-  }
-
-  getRenderedWidthStyle(element: CanvasElement): string {
-    return this.el.getRenderedWidthStyle(
-      element,
-      this.currentPage()?.elements ?? [],
-      this.currentPage(),
-    );
-  }
-
-  getRenderedHeightStyle(element: CanvasElement): string {
-    return this.el.getRenderedHeightStyle(
-      element,
-      this.currentPage()?.elements ?? [],
-      this.currentPage(),
-    );
-  }
-
-  getRenderedMinWidthStyle(element: CanvasElement): string | null {
-    return this.el.getRenderedMinWidthStyle(
-      element,
-      this.currentPage()?.elements ?? [],
-      this.currentPage(),
-    );
-  }
-
-  getRenderedMaxWidthStyle(element: CanvasElement): string | null {
-    return this.el.getRenderedMaxWidthStyle(
-      element,
-      this.currentPage()?.elements ?? [],
-      this.currentPage(),
-    );
-  }
-
-  getRenderedMinHeightStyle(element: CanvasElement): string | null {
-    return this.el.getRenderedMinHeightStyle(
-      element,
-      this.currentPage()?.elements ?? [],
-      this.currentPage(),
-    );
-  }
-
-  getRenderedMaxHeightStyle(element: CanvasElement): string | null {
-    return this.el.getRenderedMaxHeightStyle(
-      element,
-      this.currentPage()?.elements ?? [],
-      this.currentPage(),
-    );
-  }
-
-  getElementBorderStyle(element: CanvasElement): string {
-    return this.el.getElementStrokeStyle(element);
-  }
-
-  getElementBorderTopStyle(element: CanvasElement): string | null {
-    return this.el.getElementStrokeSideStyle(element, 'top');
-  }
-
-  getElementBorderRightStyle(element: CanvasElement): string | null {
-    return this.el.getElementStrokeSideStyle(element, 'right');
-  }
-
-  getElementBorderBottomStyle(element: CanvasElement): string | null {
-    return this.el.getElementStrokeSideStyle(element, 'bottom');
-  }
-
-  getElementBorderLeftStyle(element: CanvasElement): string | null {
-    return this.el.getElementStrokeSideStyle(element, 'left');
-  }
-
-  getElementBorderRadius(element: CanvasElement): string {
-    return this.el.getElementBorderRadius(element);
-  }
-
-  getElementBoxShadow(element: CanvasElement): string {
-    return this.el.getElementBoxShadow(element);
-  }
-
-  getElementTransform(element: CanvasElement): string | null {
-    return this.el.getElementTransform(element);
-  }
-
-  getElementTransformOrigin(element: CanvasElement): string | null {
-    return this.el.getElementTransformOrigin(element);
-  }
-
-  getElementBackfaceVisibility(element: CanvasElement): string | null {
-    return this.el.getElementBackfaceVisibility(element);
-  }
-
-  getElementTransformStyle(element: CanvasElement): string | null {
-    return this.el.getElementTransformStyle(element);
-  }
-
-  isInteractiveElement(element: CanvasElement): boolean {
-    return this.resolveLinkTarget(element) !== null;
-  }
-
-  hasDirectLink(element: CanvasElement): boolean {
-    return this.getDirectLinkTarget(element) !== null;
-  }
-
-  getElementTabIndex(element: CanvasElement): number | null {
-    return this.hasDirectLink(element) ? 0 : null;
-  }
-
-  getElementRole(element: CanvasElement): string | null {
-    return this.hasDirectLink(element) ? 'link' : null;
-  }
-
-  getElementClipPath(element: CanvasElement): string {
-    return this.el.getElementClipPath(element, this.currentPage()?.elements ?? []);
-  }
-
-  getElementPaddingStyle(element: CanvasElement): string | null {
-    const padding = element.padding;
-    if (!padding) {
-      return null;
-    }
-
-    if (
-      padding.top === padding.right &&
-      padding.right === padding.bottom &&
-      padding.bottom === padding.left
-    ) {
-      return `${padding.top}px`;
-    }
-
-    return `${padding.top}px ${padding.right}px ${padding.bottom}px ${padding.left}px`;
-  }
-
-  getTextFontFamily(element: CanvasElement): string {
-    return getTextFontFamily(element);
-  }
-
-  getTextFontWeight(element: CanvasElement): number {
-    return getTextFontWeight(element);
-  }
-
-  getTextFontStyle(element: CanvasElement): string {
-    return getTextFontStyle(element);
-  }
-
-  getTextFontSize(element: CanvasElement): string {
-    return getTextFontSize(element);
-  }
-
-  getTextLineHeight(element: CanvasElement): string {
-    return getTextLineHeight(element);
-  }
-
-  getTextLetterSpacing(element: CanvasElement): string {
-    return getTextLetterSpacing(element);
-  }
-
-  getTextAlignValue(element: CanvasElement): string {
-    return getTextAlignValue(element);
-  }
-
-  trackByElementId(_: number, element: CanvasElement): string {
-    return element.id;
-  }
-
   trackByPageId(_: number, page: CanvasPageModel): string {
     return page.id;
+  }
+
+  getStageMaxViewportHeight(): number {
+    const stageEl = this.stageRef?.nativeElement;
+    if (!stageEl) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    const stagePadding = 24;
+    return Math.max(120, stageEl.getBoundingClientRect().height - stagePadding * 2);
+  }
+
+  getStageMaxViewportWidth(): number {
+    const stageEl = this.stageRef?.nativeElement;
+    if (!stageEl) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    const stagePadding = 24;
+    return Math.max(120, stageEl.getBoundingClientRect().width - stagePadding * 2);
+  }
+
+  private generateForCurrentPage(): void {
+    const page = this.currentPage();
+    if (!page || page.elements.length === 0) {
+      this.generatedHtml.set('');
+      this.generatedCss.set('');
+      return;
+    }
+
+    const irPages = buildCanvasIRPages([page], this.projectId);
+    if (irPages.length === 0) {
+      this.generatedHtml.set('');
+      this.generatedCss.set('');
+      return;
+    }
+
+    this.isGenerating.set(true);
+    this.error.set(null);
+
+    const request = {
+      framework: 'html',
+      pages: irPages,
+    };
+
+    // Use generate for responsive HTML+CSS (single response)
+    if (irPages.length > 1) {
+      this.converterService.generate(request).subscribe({
+        next: (response) => {
+          this.generatedHtml.set(response.html);
+          this.generatedCss.set(response.css);
+          this.isGenerating.set(false);
+        },
+        error: (err: unknown) => {
+          this.error.set(extractApiErrorMessage(err, 'Failed to generate preview.'));
+          this.isGenerating.set(false);
+        },
+      });
+    } else {
+      this.converterService.generate({ framework: 'html', ir: irPages[0].ir }).subscribe({
+        next: (response) => {
+          this.generatedHtml.set(response.html);
+          this.generatedCss.set(response.css);
+          this.isGenerating.set(false);
+        },
+        error: (err: unknown) => {
+          this.error.set(extractApiErrorMessage(err, 'Failed to generate preview.'));
+          this.isGenerating.set(false);
+        },
+      });
+    }
   }
 
   private loadPreview(requestedPageId: string | null): void {
@@ -350,6 +392,7 @@ export class CanvasPreviewPage {
             : design.activePageId;
 
         this.currentPageId.set(preferredPageId ?? design.pages[0]?.id ?? null);
+        this.selectedFrameIndex.set(0);
         this.isLoading.set(false);
       },
       error: (error: unknown) => {
@@ -357,68 +400,6 @@ export class CanvasPreviewPage {
         this.isLoading.set(false);
       },
     });
-  }
-
-  private getPageViewportWidth(page: CanvasPageModel | null): number {
-    const width = page?.viewportWidth;
-    return typeof width === 'number' && Number.isFinite(width)
-      ? Math.max(100, Math.round(width))
-      : 1280;
-  }
-
-  private getPageViewportHeight(page: CanvasPageModel | null): number {
-    const height = page?.viewportHeight;
-    return typeof height === 'number' && Number.isFinite(height)
-      ? Math.max(100, Math.round(height))
-      : 720;
-  }
-
-  private activateLinkTarget(target: PreviewLinkTarget): void {
-    this.closePageMenu();
-
-    if (target.kind === 'page') {
-      this.selectPage(target.value);
-      return;
-    }
-
-    window.open(target.value, '_blank', 'noopener,noreferrer');
-  }
-
-  private resolveLinkTarget(element: CanvasElement): PreviewLinkTarget | null {
-    const elements = this.currentPage()?.elements ?? [];
-    let current: CanvasElement | undefined = element;
-
-    while (current) {
-      const directTarget = this.getDirectLinkTarget(current);
-      if (directTarget) {
-        return directTarget;
-      }
-
-      const parentId: string | null | undefined = current.parentId;
-      current = parentId ? elements.find((entry) => entry.id === parentId) : undefined;
-    }
-
-    return null;
-  }
-
-  private getDirectLinkTarget(element: CanvasElement): PreviewLinkTarget | null {
-    if (element.linkType === 'page') {
-      const pageId = typeof element.linkPageId === 'string' ? element.linkPageId : '';
-      if (pageId && this.pages().some((page) => page.id === pageId)) {
-        return { kind: 'page', value: pageId };
-      }
-
-      return null;
-    }
-
-    if (element.linkType === 'url') {
-      const url = normalizePreviewLinkUrl(element.linkUrl);
-      if (url) {
-        return { kind: 'url', value: url };
-      }
-    }
-
-    return null;
   }
 
   private syncQueryPage(pageId: string): void {
@@ -429,26 +410,4 @@ export class CanvasPreviewPage {
       replaceUrl: true,
     });
   }
-}
-
-function normalizePreviewLinkUrl(value: string | undefined): string | null {
-  if (typeof value !== 'string') {
-    return null;
-  }
-
-  const normalized = value.trim();
-  if (!normalized) {
-    return null;
-  }
-
-  if (
-    normalized.startsWith('/') ||
-    normalized.startsWith('#') ||
-    normalized.startsWith('//') ||
-    /^[a-z][a-z0-9+.-]*:/i.test(normalized)
-  ) {
-    return normalized;
-  }
-
-  return `https://${normalized}`;
 }

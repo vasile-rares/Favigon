@@ -155,9 +155,7 @@ export class ProjectMenuComponent {
   }
 
   openPreview(): void {
-    const urlTree = this.router.createUrlTree(['project', this.projectId(), 'preview']);
-    const url = this.router.serializeUrl(urlTree);
-    window.open(url, '_blank', 'noopener,noreferrer');
+    void this.router.navigate(['project', this.projectId(), 'preview']);
     this.previewRequested.emit();
   }
 

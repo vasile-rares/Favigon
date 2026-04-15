@@ -1,12 +1,16 @@
-<header class="header-bar" [class.header-bar--canvas]="appearance === 'canvas'">
+<header
+  class="header-bar"
+  [class.header-bar--canvas]="appearance === 'canvas' || appearance === 'preview'"
+  [class.header-bar--preview]="appearance === 'preview'">
   <!-- Left: Brand -->
   <div class="header-section header-section--left">
     <nav class="breadcrumb-nav" aria-label="Context breadcrumb">
       <img src="/favigon-text.svg" alt="Favigon" class="header-brand-logo" />
     </nav>
+    <ng-content select="[header-left-extra]"></ng-content>
   </div>
 
-  @if (isProjectContext && currentProjectName && currentProjectId !== null) {
+  @if (isProjectContext && currentProjectName && currentProjectId !== null && appearance !== 'preview') {
     <div class="header-project-center" #projectMenuContainer>
       <button
         type="button"
@@ -39,6 +43,12 @@
     </div>
   }
 
+  @if (appearance === 'preview') {
+    <div class="header-preview-center-slot">
+      <ng-content select="[header-center]"></ng-content>
+    </div>
+  }
+
   <!-- Right: Search + Actions + User menu -->
   <div class="header-section header-section--right">
     @if (!isProjectContext) {
@@ -68,7 +78,7 @@
         type="button"
         title="Run preview"
         aria-label="Run preview"
-        (click)="projectMenu?.openPreview()">
+        (click)="appearance === 'preview' ? runPreviewClicked.emit() : projectMenu?.openPreview()">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
       </button>
     }

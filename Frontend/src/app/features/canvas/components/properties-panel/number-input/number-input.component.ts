@@ -37,6 +37,7 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
   @Input() appearance: NumberInputAppearance = 'default';
   @Input() ariaLabel = 'Numeric input';
   @Input() suffix: string | null = null;
+  @Input() suffixMode: 'inline' | 'stepper' = 'inline';
   @Input() disabled = false;
 
   @Output() valueChange = new EventEmitter<number>();
@@ -67,7 +68,11 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
   private activeDrag: StepperDragState | null = null;
 
   get hasInlineSuffix(): boolean {
-    return !!this.suffix && this.displayValue.length > 0;
+    return this.suffixMode === 'inline' && !!this.suffix && this.displayValue.length > 0;
+  }
+
+  get hasStepperSuffix(): boolean {
+    return this.suffixMode === 'stepper' && !!this.suffix;
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -92,6 +97,7 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
       'number-input--compact': this.appearance === 'compact',
       'number-input--popup': this.appearance === 'popup',
       'number-input--with-suffix': this.hasInlineSuffix,
+      'number-input--with-stepper-suffix': this.hasStepperSuffix,
     };
   }
 

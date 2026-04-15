@@ -15,6 +15,9 @@
   }
 
   <div class="number-input__stepper">
+    @if (hasStepperSuffix) {
+      <span class="number-input__stepper-suffix" aria-hidden="true">{{ suffix }}</span>
+    }
     <button type="button" class="number-input__stepper-btn" [disabled]="disabled" [attr.aria-label]="'Increase ' + ariaLabel.toLowerCase()" (pointerdown)="onStepperPointerDown(1, $event)">
       <svg class="number-input__stepper-icon" width="8" height="6" viewBox="0 0 8 6" fill="none" aria-hidden="true">
         <path d="M1 5L4 1L7 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />

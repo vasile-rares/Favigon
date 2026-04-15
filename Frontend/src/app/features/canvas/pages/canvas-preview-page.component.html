@@ -1,115 +1,121 @@
-<div class="preview-page" (click)="closePageMenu()">
-  <header class="preview-toolbar" (click)="$event.stopPropagation()">
-    <div class="preview-toolbar__left">
-      <button
-        *ngFor="let option of deviceOptions"
-        type="button"
-        class="preview-device-btn"
-        [class.active]="selectedDevice() === option.id"
-        (click)="selectDevice(option.id)">
-        {{ option.label }}
+<div class="preview-page">
+  <app-header-bar
+    class="canvas-header preview-header"
+    appearance="preview"
+    (runPreviewClicked)="refreshPreview()">
+
+    <!-- Left extra: back, device select, w/h inputs -->
+    <div header-left-extra class="preview-nav-left">
+      <button type="button" class="preview-back-btn" (click)="goBack()" aria-label="Back to editor">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
       </button>
-      <button
-        type="button"
-        class="preview-device-btn"
-        [class.active]="selectedDevice() === 'custom'"
-        (click)="selectDevice('custom')">
-        Custom
-      </button>
+
+      <div class="preview-nav-divider"></div>
+
+      <div class="preview-device-dropdown">
+        <app-dropdown-select
+          [ngModel]="selectedFrameIndex()"
+          (ngModelChange)="onFrameSizeChange($event)"
+          [options]="deviceSelectOptions()"
+          [enableSearch]="false"
+          [closeOnSelect]="true"
+          placeholder="Select device">
+        </app-dropdown-select>
+      </div>
+
+      <div class="preview-dimension-inputs">
+        <app-number-input
+          [value]="viewportWidth()"
+          [min]="120"
+          [max]="getStageMaxViewportWidth()"
+          appearance="compact"
+          ariaLabel="Viewport width"
+          suffix="W"
+          suffixMode="stepper"
+          (valueChange)="onWidthInputChange($event)">
+        </app-number-input>
+        <app-number-input
+          [value]="viewportHeight()"
+          [min]="120"
+          [max]="getStageMaxViewportHeight()"
+          appearance="compact"
+          ariaLabel="Viewport height"
+          suffix="H"
+          suffixMode="stepper"
+          (valueChange)="onHeightInputChange($event)">
+        </app-number-input>
+      </div>
     </div>
 
-    <div class="preview-toolbar__center">
-      <button type="button" class="preview-page-switch" (click)="togglePageMenu()">
-        {{ currentPage()?.name ?? 'No page' }}
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
+    <!-- Center: address bar + reload -->
+    <div header-center class="preview-nav-center">
+      <div class="preview-address-bar">
+        <svg class="preview-address-bar__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input
+          type="text"
+          class="preview-address-bar__input"
+          [placeholder]="currentPage()?.name ?? 'Search pages...'"
+          [value]="pageSearchQuery()"
+          (input)="onSearchInput($any($event.target).value)"
+          (focus)="onSearchFocus()"
+          (blur)="onSearchBlur()" />
+      </div>
 
-      @if (isPageMenuOpen()) {
-        <div class="preview-page-menu">
+      @if (isPageDropdownOpen() && filteredPages().length > 0) {
+        <div class="preview-page-dropdown">
           <button
-            *ngFor="let page of pages(); trackBy: trackByPageId"
+            *ngFor="let page of filteredPages(); trackBy: trackByPageId"
             type="button"
-            class="preview-page-menu__item"
+            class="preview-page-dropdown__item"
             [class.active]="page.id === currentPageId()"
-            (click)="selectPage(page.id)">
+            (mousedown)="selectPage(page.id)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
             {{ page.name }}
           </button>
         </div>
       }
-    </div>
 
-    <div class="preview-toolbar__right">
-      <button type="button" class="preview-refresh" (click)="refreshPreview()" aria-label="Refresh preview">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
+      <button type="button" class="preview-reload-btn" (click)="refreshPreview()" aria-label="Reload preview">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>
       </button>
     </div>
-  </header>
 
-  <main class="preview-stage">
+  </app-header-bar>
+
+  <main class="preview-stage" #stage>
     @if (error()) {
       <p class="preview-status is-error">{{ error() }}</p>
-    } @else if (isLoading()) {
-      <p class="preview-status">Loading preview...</p>
+    } @else if (isLoading() || isGenerating()) {
+      <div class="preview-status-wrapper">
+        <div class="preview-spinner"></div>
+        <p class="preview-status">{{ isGenerating() ? 'Generating preview…' : 'Loading project…' }}</p>
+      </div>
     } @else if (!currentPage()) {
       <p class="preview-status">No pages available for preview.</p>
     } @else {
-      <div
-        class="preview-viewport"
-        [style.width.px]="viewportWidth()"
-        [style.height.px]="viewportHeight()"
-        [attr.data-device]="selectedDevice()">
+      <div class="preview-viewport-wrapper" [class.is-resizing]="isResizing()">
         <div
-          *ngFor="let el of visibleElements(); trackBy: trackByElementId"
-          class="preview-element"
-          [class.preview-element--interactive]="isInteractiveElement(el)"
-          [class.frame]="el.type === 'frame'"
-          [class.text]="el.type === 'text'"
-          [class.image]="el.type === 'image'"
-          [attr.role]="getElementRole(el)"
-          [attr.tabindex]="getElementTabIndex(el)"
-          [style.left.px]="getRenderedX(el)"
-          [style.top.px]="getRenderedY(el)"
-          [style.width]="getRenderedWidthStyle(el)"
-          [style.height]="getRenderedHeightStyle(el)"
-          [style.min-width]="getRenderedMinWidthStyle(el)"
-          [style.max-width]="getRenderedMaxWidthStyle(el)"
-          [style.min-height]="getRenderedMinHeightStyle(el)"
-          [style.max-height]="getRenderedMaxHeightStyle(el)"
-          [style.transform]="getElementTransform(el)"
-          [style.transform-origin]="getElementTransformOrigin(el)"
-          [style.backface-visibility]="getElementBackfaceVisibility(el)"
-          [style.transform-style]="getElementTransformStyle(el)"
-          [style.background-color]="el.type !== 'text' && el.type !== 'image' ? el.fill : 'transparent'"
-          [style.border]="getElementBorderStyle(el)"
-          [style.border-top]="getElementBorderTopStyle(el)"
-          [style.border-right]="getElementBorderRightStyle(el)"
-          [style.border-bottom]="getElementBorderBottomStyle(el)"
-          [style.border-left]="getElementBorderLeftStyle(el)"
-          [style.box-shadow]="getElementBoxShadow(el)"
-          [style.opacity]="el.opacity ?? 1"
-          [style.clip-path]="getElementClipPath(el)"
-          [style.border-radius]="getElementBorderRadius(el)"
-          [style.padding]="getElementPaddingStyle(el)"
-          (click)="onElementClick($event, el)"
-          (keydown)="onElementKeydown($event, el)">
+          class="preview-viewport"
+          [style.width.px]="viewportWidth()"
+          [style.height.px]="viewportHeight()">
+          <iframe
+            class="preview-iframe"
+            [srcdoc]="iframeSrcdoc()"
+            sandbox="allow-same-origin"
+            title="Design preview"
+            frameborder="0"></iframe>
+        </div>
 
-          <ng-container *ngIf="el.type === 'text'">
-            <div
-              class="preview-text"
-              [style.font-size]="getTextFontSize(el)"
-              [style.font-family]="getTextFontFamily(el)"
-              [style.font-weight]="getTextFontWeight(el)"
-              [style.font-style]="getTextFontStyle(el)"
-              [style.line-height]="getTextLineHeight(el)"
-              [style.letter-spacing]="getTextLetterSpacing(el)"
-              [style.text-align]="getTextAlignValue(el)">
-              <span>{{ el.text }}</span>
-            </div>
-          </ng-container>
-
-          <ng-container *ngIf="el.type === 'image'">
-            <img [src]="el.imageUrl" alt="Preview image" draggable="false" />
-          </ng-container>
+        <!-- Resize handles -->
+        <div
+          class="resize-handle resize-handle--right"
+          (pointerdown)="onResizeHandlePointerDown($event, 'right')">
+          <div class="resize-handle__grip"></div>
+        </div>
+        <div
+          class="resize-handle resize-handle--bottom"
+          (pointerdown)="onResizeHandlePointerDown($event, 'bottom')">
+          <div class="resize-handle__grip"></div>
         </div>
       </div>
     }

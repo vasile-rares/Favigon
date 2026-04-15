@@ -78,6 +78,12 @@
   overflow: hidden;
 }
 
+.header-bar--preview .header-section--left {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: visible;
+}
+
 .header-bar--canvas .header-section--right {
   gap: 0.45rem;
   flex: 0 1 auto;
@@ -96,6 +102,18 @@
   min-width: 0;
   max-width: calc(100% - 12rem);
   justify-content: center;
+  pointer-events: auto;
+}
+
+.header-preview-center-slot {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 480px;
+  max-width: calc(100% - 14rem);
   pointer-events: auto;
 }
 

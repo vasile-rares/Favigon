@@ -603,19 +603,15 @@ export class CanvasPageService {
 
   openPreview(projectId: string): void {
     const currentPageId = this.editorState.currentPageId();
-    const urlTree = this.router.createUrlTree(['project', projectId, 'preview'], {
+    void this.router.navigate(['project', projectId, 'preview'], {
       queryParams: currentPageId ? { pageId: currentPageId } : undefined,
     });
-    const url = this.router.serializeUrl(urlTree);
-    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   openPreviewForPage(projectId: string, pageId: string): void {
-    const urlTree = this.router.createUrlTree(['project', projectId, 'preview'], {
+    void this.router.navigate(['project', projectId, 'preview'], {
       queryParams: { pageId },
     });
-    const url = this.router.serializeUrl(urlTree);
-    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   // ── Page Queries ──────────────────────────────────────────
