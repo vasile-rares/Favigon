@@ -127,10 +127,14 @@ export class CanvasPageService {
   addPage(): void {
     this.runWithHistory(() => {
       const pages = this.editorState.pages;
-      const position = this.getNextPageCanvasPosition();
+      const pagesSnapshot = pages();
       const basePage = this.el.createPage(this.el.getNextPageName(pages()));
       const desktopWidth = this.normalizeViewportSize(basePage.viewportWidth, 1280);
       const desktopHeight = this.normalizeViewportSize(basePage.viewportHeight, 720);
+      const position = this.getNewPageInsertionPosition(
+        this.editorState.currentPageId() ?? pagesSnapshot.at(-1)?.id ?? null,
+        desktopWidth,
+      );
       const desktopFrame = {
         ...this.el.createFrameAtCenter(
           {
@@ -153,7 +157,17 @@ export class CanvasPageService {
         canvasY: position.y,
         elements: [desktopFrame],
       };
-      pages.update((p) => [...p, page]);
+      pages.update((currentPages) => {
+        const nextPages = currentPages.map((existingPage) => {
+          const shiftedCanvasX = position.shiftedPagePositions.get(existingPage.id);
+          return shiftedCanvasX === undefined
+            ? existingPage
+            : { ...existingPage, canvasX: shiftedCanvasX };
+        });
+
+        nextPages.splice(position.insertIndex, 0, page);
+        return nextPages;
+      });
       this.editorState.currentPageId.set(page.id);
       this.layersFocusedPageId.set(page.id);
       this.editorState.selectedElementId.set(null);
@@ -726,6 +740,83 @@ export class CanvasPageService {
     if (shouldFocus) {
       this.focusPageSmooth(pageId, this.getCanvasElement());
     }
+  }
+
+  private getNewPageInsertionPosition(
+    referencePageId: string | null,
+    newPageWidth: number,
+  ): {
+    x: number;
+    y: number;
+    insertIndex: number;
+    shiftedPagePositions: Map<string, number>;
+  } {
+    const pages = this.editorState.pages();
+    if (pages.length === 0) {
+      return {
+        x: 0,
+        y: 0,
+        insertIndex: 0,
+        shiftedPagePositions: new Map<string, number>(),
+      };
+    }
+
+    const layouts = this.pageLayouts();
+    const fallbackPosition = this.getNextPageCanvasPosition();
+    const referenceIndex = referencePageId
+      ? pages.findIndex((page) => page.id === referencePageId)
+      : pages.length - 1;
+    const safeInsertIndex = referenceIndex >= 0 ? referenceIndex + 1 : pages.length;
+    const referenceLayout = referencePageId
+      ? (layouts.find((layout) => layout.pageId === referencePageId) ?? null)
+      : null;
+
+    if (!referenceLayout || referenceIndex < 0) {
+      return {
+        x: fallbackPosition.x,
+        y: fallbackPosition.y,
+        insertIndex: pages.length,
+        shiftedPagePositions: new Map<string, number>(),
+      };
+    }
+
+    const referenceShellRight = this.layout.getPageShellRight(referenceLayout.pageId, layouts);
+    const insertionX = this.layout.getDefaultPageCanvasXAfterShellRight(
+      referenceShellRight,
+      PAGE_CANVAS_GAP,
+    );
+    const affectedLayouts = layouts.filter(
+      (layout) =>
+        layout.pageId !== referenceLayout.pageId &&
+        this.layout.getPageShellRight(layout.pageId, layouts) > referenceShellRight,
+    );
+    const shiftedPagePositions = new Map<string, number>();
+
+    if (affectedLayouts.length > 0) {
+      const firstAffectedCanvasX = Math.min(...affectedLayouts.map((layout) => layout.x));
+      const desiredFirstAffectedCanvasX = roundToTwoDecimals(
+        insertionX + newPageWidth + PAGE_CANVAS_GAP,
+      );
+      const shiftDelta = roundToTwoDecimals(
+        Math.max(0, desiredFirstAffectedCanvasX - firstAffectedCanvasX),
+      );
+
+      if (shiftDelta > 0) {
+        for (const affectedLayout of affectedLayouts) {
+          shiftedPagePositions.set(
+            affectedLayout.pageId,
+            roundToTwoDecimals(affectedLayout.x + shiftDelta),
+          );
+        }
+      }
+    }
+
+    return {
+      x: insertionX,
+      y: roundToTwoDecimals(referenceLayout.y),
+      insertIndex: safeInsertIndex,
+      shiftedPagePositions,
+    };
   }
 
   private getNextPageCanvasPosition(): Point {

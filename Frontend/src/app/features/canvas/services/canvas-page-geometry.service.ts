@@ -49,6 +49,12 @@ export class CanvasPageGeometryService {
     return roundToTwoDecimals(bounds.maxX - bounds.minX + PAGE_SHELL_SIDE_PADDING * 2);
   }
 
+  getPageShellRight(pageId: string, layouts: PageCanvasLayout[]): number {
+    return roundToTwoDecimals(
+      this.getPageShellLeft(pageId, layouts) + this.getPageShellWidth(pageId, layouts),
+    );
+  }
+
   getPageShellHeight(pageId: string, layouts: PageCanvasLayout[]): number {
     const layout = layouts.find((l) => l.pageId === pageId) ?? null;
     if (!layout) {
@@ -84,6 +90,10 @@ export class CanvasPageGeometryService {
 
   getPageShellSelectionWidth(pageId: string, layouts: PageCanvasLayout[]): number {
     return roundToTwoDecimals(this.getPageShellWidth(pageId, layouts) * this.viewport.zoomLevel());
+  }
+
+  getDefaultPageCanvasXAfterShellRight(shellRight: number, gap: number): number {
+    return roundToTwoDecimals(shellRight + gap - PAGE_SHELL_SIDE_PADDING);
   }
 
   getPageShellSelectionHeight(pageId: string, layouts: PageCanvasLayout[]): number {

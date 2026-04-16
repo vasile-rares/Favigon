@@ -2285,7 +2285,11 @@ export class DesignTabComponent {
   }
 
   addLayout(): void {
-    this.emitPatch({ display: 'flex' });
+    this.emitPatch({
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+    });
   }
 
   addLink(): void {

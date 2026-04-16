@@ -225,6 +225,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private hasTriggeredBrowserExitFlush = false;
   private lastPersistedThumbnailDataUrl: string | null = null;
   private pendingThumbnailDataUrl: string | null = null;
+  private pendingInitialPageFocusId: string | null = null;
   private dragOffset: Point = { x: 0, y: 0 };
   private dragStartAbsolute: Point = { x: 0, y: 0 };
   private dragSelectionIds: string[] = [];
@@ -501,6 +502,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   ngAfterViewChecked(): void {
     this.page.setCanvasElement(this.getCanvasElement());
+    this.restorePendingInitialPageFocus();
 
     // Initialize PixiJS once the canvas container DOM element is available
     if (!this.pixiInitPending) {
@@ -2605,6 +2607,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
         this.pages.set(pages);
         this.currentPageId.set(activePageId);
         this.selectedElementId.set(null);
+        this.page.clearSelectedPageLayer();
+        this.page.layersFocusedPageId.set(activePageId);
+        this.pendingInitialPageFocusId = activePageId;
         this.lastSavedAt.set(response.updatedAt ?? null);
         this.history.resetHistory();
         this.isLoadingDesign.set(false);
@@ -2631,6 +2636,26 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.saveTimeoutId = null;
       this.persistDesign();
     }, 500);
+  }
+
+  private restorePendingInitialPageFocus(): void {
+    const pageId = this.pendingInitialPageFocusId;
+    if (!pageId) {
+      return;
+    }
+
+    const canvasElement = this.getCanvasElement();
+    if (!canvasElement) {
+      return;
+    }
+
+    if (!this.pages().some((page) => page.id === pageId)) {
+      this.pendingInitialPageFocusId = null;
+      return;
+    }
+
+    this.page.focusPageSmooth(pageId, canvasElement);
+    this.pendingInitialPageFocusId = null;
   }
 
   private persistDesign(): void {
