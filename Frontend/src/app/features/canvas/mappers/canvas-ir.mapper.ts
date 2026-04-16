@@ -279,7 +279,7 @@ export function buildCanvasProjectDocumentFromUnknown(
 
   if (isCanvasProjectDocument(rawDesign)) {
     const rawPages = Array.isArray(rawDesign.pages) ? rawDesign.pages : [];
-    const pages = rawPages.length > 0 ? rawPages : [createDefaultPageModel()];
+    const pages = rawPages;
     const fallbackActivePageId = pages[0]?.id ?? null;
 
     return {
@@ -1197,19 +1197,6 @@ function normalizeCanvasPage(rawPage: unknown, pageIndex: number): CanvasPageMod
           visible: element.visible !== false,
         }))
       : [],
-  };
-}
-
-function createDefaultPageModel(): CanvasPageModel {
-  return {
-    id: crypto.randomUUID(),
-    name: 'Page 1',
-    viewportPreset: 'desktop',
-    viewportWidth: DEFAULT_PAGE_VIEWPORT_WIDTH,
-    viewportHeight: DEFAULT_PAGE_VIEWPORT_HEIGHT,
-    canvasX: 0,
-    canvasY: 0,
-    elements: [],
   };
 }
 

@@ -17,6 +17,9 @@ public class Project
     [Required, MaxLength(100)]
     public string Name { get; set; } = null!;
 
+    [Required, MaxLength(150)]
+    public string Slug { get; set; } = null!;
+
     [Required]
     public string DesignJson { get; set; } = "{}";
 

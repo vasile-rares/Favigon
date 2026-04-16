@@ -62,12 +62,19 @@ public class ProjectService : IProjectService
     return project == null ? null : MapProjectResponse(project);
   }
 
+  public async Task<ProjectResponse?> GetBySlugAsync(string slug, int userId)
+  {
+    var project = await _projectRepository.GetBySlugAsync(slug, userId);
+    return project == null ? null : MapProjectResponse(project);
+  }
+
   public async Task<ProjectResponse> CreateAsync(ProjectCreateRequest request, int userId)
   {
     request.Name = request.Name.Trim();
 
     var project = _mapper.Map<Project>(request);
     project.UserId = userId;
+    project.Slug = await GenerateUniqueSlugAsync(request.Name, userId);
 
     var created = await _projectRepository.AddAsync(project);
     return MapProjectResponse(created);
@@ -79,7 +86,13 @@ public class ProjectService : IProjectService
     if (existing == null) return null;
 
     request.Name = request.Name.Trim();
+    var nameChanged = !string.Equals(existing.Name, request.Name, StringComparison.Ordinal);
     _mapper.Map(request, existing);
+
+    if (nameChanged)
+    {
+      existing.Slug = await GenerateUniqueSlugAsync(request.Name, userId, excludeProjectId: id);
+    }
 
     await _projectRepository.UpdateAsync(existing);
     return MapProjectResponse(existing);
@@ -170,6 +183,31 @@ public class ProjectService : IProjectService
       _projectAssetStorage.GetThumbnailUrl(project.UserId, project.Id) ??
       project.ThumbnailDataUrl;
     return response;
+  }
+
+  private async Task<string> GenerateUniqueSlugAsync(string name, int userId, int? excludeProjectId = null)
+  {
+    var baseSlug = BuildSlug(name);
+    var candidate = baseSlug;
+    var suffix = 2;
+
+    while (true)
+    {
+      var exists = await _projectRepository.SlugExistsForUserAsync(candidate, userId, excludeProjectId);
+      if (!exists) return candidate;
+      candidate = $"{baseSlug}-{suffix++}";
+    }
+  }
+
+  private static string BuildSlug(string name)
+  {
+    var slug = name.Trim().ToLowerInvariant();
+    slug = System.Text.RegularExpressions.Regex.Replace(slug, @"[^a-z0-9\s-]", "");
+    slug = System.Text.RegularExpressions.Regex.Replace(slug, @"\s+", "-");
+    slug = System.Text.RegularExpressions.Regex.Replace(slug, @"-{2,}", "-");
+    slug = slug.Trim('-');
+    if (string.IsNullOrEmpty(slug)) slug = "project";
+    return slug.Length > 100 ? slug[..100] : slug;
   }
 
   private static void ValidateThumbnailUploadRequest(ProjectImageUploadRequest request)

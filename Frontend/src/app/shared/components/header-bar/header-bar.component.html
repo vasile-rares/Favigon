@@ -10,7 +10,7 @@
     <ng-content select="[header-left-extra]"></ng-content>
   </div>
 
-  @if (isProjectContext && currentProjectName && currentProjectId !== null && appearance !== 'preview') {
+  @if (isProjectContext && currentProjectName && currentProjectId !== null && currentProjectSlug !== null && appearance !== 'preview') {
     <div class="header-project-center" #projectMenuContainer>
       <button
         type="button"
@@ -36,6 +36,7 @@
       <app-project-menu
         #projectMenu
         [projectId]="currentProjectId"
+        [projectSlug]="currentProjectSlug"
         [projectName]="currentProjectName"
         [projectIsPublic]="currentProjectIsPublic ?? false"
         (projectRenamed)="onProjectRenamed($event)"

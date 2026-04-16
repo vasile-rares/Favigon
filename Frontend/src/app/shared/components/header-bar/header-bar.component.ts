@@ -69,6 +69,7 @@ export class HeaderBarComponent implements OnInit {
   username = '';
   email = '';
   currentProjectId: number | null = null;
+  currentProjectSlug: string | null = null;
   currentProjectName: string | null = null;
   currentProjectIsPublic: boolean | null = null;
   isProjectContext = false;
@@ -131,13 +132,13 @@ export class HeaderBarComponent implements OnInit {
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
       .pipe(
-        map(() => this.getProjectIdFromRoute()),
+        map(() => this.getProjectSlugFromRoute()),
         distinctUntilChanged(),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((projectId) => this.syncRouteContext(projectId));
+      .subscribe((slug) => this.syncRouteContext(slug));
 
-    this.syncRouteContext(this.getProjectIdFromRoute());
+    this.syncRouteContext(this.getProjectSlugFromRoute());
 
     this.currentUser
       .load()
@@ -188,7 +189,7 @@ export class HeaderBarComponent implements OnInit {
       next: (project) => {
         this.isCreatingProject.set(false);
         this.isCreateDialogOpen.set(false);
-        void this.router.navigate(['/project', project.projectId]);
+        void this.router.navigate(['/project', project.slug]);
       },
       error: (error: unknown) => {
         this.createDialogError.set(extractApiErrorMessage(error, 'Failed to create project.'));
@@ -230,48 +231,45 @@ export class HeaderBarComponent implements OnInit {
     this.profilePictureUrl = null;
   }
 
-  private syncRouteContext(projectId: number | null) {
-    if (projectId === null) {
+  private syncRouteContext(slug: string | null) {
+    if (slug === null) {
       this.currentProjectId = null;
+      this.currentProjectSlug = null;
       this.isProjectContext = false;
       this.currentProjectName = null;
       this.currentProjectIsPublic = null;
       return;
     }
 
-    this.currentProjectId = projectId;
+    this.currentProjectSlug = slug;
     this.isProjectContext = true;
-    this.currentProjectName = `Project #${projectId}`;
+    this.currentProjectName = null;
     this.currentProjectIsPublic = null;
 
     this.projectService
-      .getById(projectId)
+      .getBySlug(slug)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (project) => {
+          this.currentProjectId = project.projectId;
           this.currentProjectName = project.name;
           this.currentProjectIsPublic = project.isPublic;
         },
         error: () => {
-          this.currentProjectName = `Project #${projectId}`;
+          this.currentProjectId = null;
+          this.currentProjectName = 'Unknown project';
           this.currentProjectIsPublic = null;
         },
       });
   }
 
-  private getProjectIdFromRoute(): number | null {
+  private getProjectSlugFromRoute(): string | null {
     let route: ActivatedRoute | null = this.activatedRoute;
     while (route?.firstChild) {
       route = route.firstChild;
     }
 
-    const routeId = route?.snapshot.paramMap.get('id');
-    if (!routeId) {
-      return null;
-    }
-
-    const projectId = Number.parseInt(routeId, 10);
-    return Number.isInteger(projectId) ? projectId : null;
+    return route?.snapshot.paramMap.get('slug') ?? null;
   }
 
   @HostListener('document:click', ['$event'])

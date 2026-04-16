@@ -32,6 +32,17 @@ public class ProjectRepository : IProjectRepository
     return _context.Projects.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
   }
 
+  public Task<Project?> GetBySlugAsync(string slug, int userId)
+  {
+    return _context.Projects.FirstOrDefaultAsync(p => p.Slug == slug && p.UserId == userId);
+  }
+
+  public Task<bool> SlugExistsForUserAsync(string slug, int userId, int? excludeProjectId = null)
+  {
+    return _context.Projects.AnyAsync(p =>
+      p.Slug == slug && p.UserId == userId && (excludeProjectId == null || p.Id != excludeProjectId));
+  }
+
   public async Task<Project> AddAsync(Project project)
   {
     _context.Projects.Add(project);

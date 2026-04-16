@@ -39,6 +39,7 @@ export class ProjectMenuComponent {
   private readonly projectService = inject(ProjectService);
 
   readonly projectId = input.required<number>();
+  readonly projectSlug = input.required<string>();
   readonly projectName = input.required<string>();
   readonly projectIsPublic = input.required<boolean>();
 
@@ -155,7 +156,7 @@ export class ProjectMenuComponent {
   }
 
   openPreview(): void {
-    void this.router.navigate(['project', this.projectId(), 'preview']);
+    void this.router.navigate(['project', this.projectSlug(), 'preview']);
     this.previewRequested.emit();
   }
 

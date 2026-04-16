@@ -3,7 +3,12 @@ import { Component, ElementRef, ViewChild, computed, effect, inject, signal } fr
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CanvasPageModel, ConverterService, extractApiErrorMessage } from '@app/core';
+import {
+  CanvasPageModel,
+  ConverterService,
+  ProjectService,
+  extractApiErrorMessage,
+} from '@app/core';
 import { DropdownSelectComponent } from '../../../shared/components/dropdown-select/dropdown-select.component';
 import type { DropdownSelectOption } from '../../../shared/components/dropdown-select/dropdown-select.component';
 import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
@@ -43,6 +48,9 @@ export class CanvasPreviewPage {
   private readonly sanitizer = inject(DomSanitizer);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
   private readonly converterService = inject(ConverterService);
+  private readonly projectApiService = inject(ProjectService);
+
+  private projectIdAsNumber = NaN;
 
   readonly pages = signal<CanvasPageModel[]>([]);
   readonly currentPageId = signal<string | null>(null);
@@ -93,7 +101,7 @@ export class CanvasPreviewPage {
     document.removeEventListener('pointerup', this.onResizePointerUp);
   };
 
-  readonly projectId = this.route.snapshot.paramMap.get('id') ?? '';
+  readonly projectSlug = this.route.snapshot.paramMap.get('slug') ?? '';
 
   readonly currentPage = computed<CanvasPageModel | null>(() => {
     const activePageId = this.currentPageId();
@@ -214,7 +222,7 @@ ${html}
   }
 
   goBack(): void {
-    void this.router.navigate(['/project', this.projectId]);
+    void this.router.navigate(['/project', this.projectSlug]);
   }
 
   onFrameSizeChange(index: number | string | boolean | null): void {
@@ -329,7 +337,7 @@ ${html}
       return;
     }
 
-    const irPages = buildCanvasIRPages([page], this.projectId);
+    const irPages = buildCanvasIRPages([page], this.projectSlug);
     if (irPages.length === 0) {
       this.generatedHtml.set('');
       this.generatedCss.set('');
@@ -373,30 +381,38 @@ ${html}
   }
 
   private loadPreview(requestedPageId: string | null): void {
-    const projectId = Number.parseInt(this.projectId, 10);
-    if (!Number.isInteger(projectId)) {
-      this.error.set('Invalid project id.');
+    if (!this.projectSlug) {
+      this.error.set('Invalid project.');
       return;
     }
 
     this.isLoading.set(true);
     this.error.set(null);
 
-    this.canvasPersistenceService.loadProjectDesign(projectId).subscribe({
-      next: (design) => {
-        this.pages.set(design.pages);
+    this.projectApiService.getBySlug(this.projectSlug).subscribe({
+      next: (project) => {
+        this.projectIdAsNumber = project.projectId;
+        this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
+          next: (design) => {
+            this.pages.set(design.pages);
 
-        const preferredPageId =
-          requestedPageId && design.pages.some((page) => page.id === requestedPageId)
-            ? requestedPageId
-            : design.activePageId;
+            const preferredPageId =
+              requestedPageId && design.pages.some((page) => page.id === requestedPageId)
+                ? requestedPageId
+                : design.activePageId;
 
-        this.currentPageId.set(preferredPageId ?? design.pages[0]?.id ?? null);
-        this.selectedFrameIndex.set(0);
-        this.isLoading.set(false);
+            this.currentPageId.set(preferredPageId ?? design.pages[0]?.id ?? null);
+            this.selectedFrameIndex.set(0);
+            this.isLoading.set(false);
+          },
+          error: (error: unknown) => {
+            this.error.set(extractApiErrorMessage(error, 'Failed to load preview.'));
+            this.isLoading.set(false);
+          },
+        });
       },
       error: (error: unknown) => {
-        this.error.set(extractApiErrorMessage(error, 'Failed to load preview.'));
+        this.error.set(extractApiErrorMessage(error, 'Project not found.'));
         this.isLoading.set(false);
       },
     });

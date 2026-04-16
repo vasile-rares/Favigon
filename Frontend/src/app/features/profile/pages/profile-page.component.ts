@@ -278,7 +278,7 @@ export class ProfilePage implements OnInit {
         next: (project) => {
           this.isCreatingProject.set(false);
           this.isCreateDialogOpen.set(false);
-          void this.router.navigate(['/project', project.projectId]);
+          void this.router.navigate(['/project', project.slug]);
         },
         error: (error: unknown) => {
           this.errorMessage.set(extractApiErrorMessage(error, 'Failed to create project.'));
@@ -450,6 +450,7 @@ export class ProfilePage implements OnInit {
   private mapProjectToCard(project: ProjectResponse): ProjectCardViewModel {
     return {
       id: project.projectId,
+      slug: project.slug,
       name: project.name,
       isPublic: project.isPublic,
       createdAt: new Date(project.createdAt),

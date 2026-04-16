@@ -2,6 +2,7 @@ export interface ProjectResponse {
   projectId: number;
   userId: number;
   name: string;
+  slug: string;
   isPublic: boolean;
   createdAt: string;
   updatedAt: string;

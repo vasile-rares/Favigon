@@ -13,6 +13,7 @@ import { Router } from '@angular/router';
 
 export interface ProjectCardViewModel {
   id: number;
+  slug: string;
   name: string;
   isPublic: boolean;
   createdAt: Date;
@@ -67,8 +68,8 @@ export class ProjectCardComponent {
 
     const commands =
       this.openMode === 'editor'
-        ? ['/project', this.project.id]
-        : ['/project', this.project.id, 'preview'];
+        ? ['/project', this.project.slug]
+        : ['/project', this.project.slug, 'preview'];
     void this.router.navigate(commands);
   }
 

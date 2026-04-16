@@ -20,6 +20,7 @@ import {
   ConverterPageRequest,
   extractApiErrorMessage,
   PendingProjectFlushService,
+  ProjectService,
 } from '@app/core';
 import {
   buildCanvasIR,
@@ -142,6 +143,7 @@ interface RectangleDrawState {
 export class CanvasPage implements OnDestroy, AfterViewChecked {
   private readonly route = inject(ActivatedRoute);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
+  private readonly projectService = inject(ProjectService);
   readonly gen = inject(CanvasGenerationService);
   private readonly zone = inject(NgZone);
 
@@ -207,18 +209,18 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly irPreview = computed<IRNode>(() => {
     const currentPage = this.currentPage();
-    return buildCanvasIR(this.visibleElements(), this.projectId, currentPage?.name);
+    return buildCanvasIR(this.visibleElements(), this.projectSlug, currentPage?.name);
   });
 
   readonly irPages = computed<ConverterPageRequest[]>(() =>
-    buildCanvasIRPages(this.pages(), this.projectId),
+    buildCanvasIRPages(this.pages(), this.projectSlug),
   );
 
-  readonly projectId = this.route.snapshot.paramMap.get('id') ?? 'new-project';
+  readonly projectSlug = this.route.snapshot.paramMap.get('slug') ?? 'new-project';
 
   // ── Gesture State (local, not service-worthy) ─────────────
 
-  readonly projectIdAsNumber = Number.parseInt(this.projectId, 10);
+  projectIdAsNumber = NaN;
   private canPersistDesign = false;
   private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private hasQueuedDesignPersist = false;
@@ -2587,8 +2589,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   // ── Private: Persistence ──────────────────────────────────
 
   private loadProjectDesign(): void {
-    if (!Number.isInteger(this.projectIdAsNumber)) {
-      this.apiError.set('Invalid project id.');
+    if (!this.projectSlug || this.projectSlug === 'new-project') {
+      this.apiError.set('Invalid project.');
       return;
     }
 
@@ -2596,27 +2598,37 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.apiError.set(null);
     this.canPersistDesign = false;
 
-    this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
-      next: (response) => {
-        const pages = response.pages;
-        const activePageId =
-          response.activePageId && pages.some((page) => page.id === response.activePageId)
-            ? response.activePageId
-            : (pages[0]?.id ?? null);
+    this.projectService.getBySlug(this.projectSlug).subscribe({
+      next: (project) => {
+        this.projectIdAsNumber = project.projectId;
+        this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
+          next: (response) => {
+            const pages = response.pages;
+            const activePageId =
+              response.activePageId && pages.some((page) => page.id === response.activePageId)
+                ? response.activePageId
+                : (pages[0]?.id ?? null);
 
-        this.pages.set(pages);
-        this.currentPageId.set(activePageId);
-        this.selectedElementId.set(null);
-        this.page.clearSelectedPageLayer();
-        this.page.layersFocusedPageId.set(activePageId);
-        this.pendingInitialPageFocusId = activePageId;
-        this.lastSavedAt.set(response.updatedAt ?? null);
-        this.history.resetHistory();
-        this.isLoadingDesign.set(false);
-        this.canPersistDesign = true;
+            this.pages.set(pages);
+            this.currentPageId.set(activePageId);
+            this.selectedElementId.set(null);
+            this.page.clearSelectedPageLayer();
+            this.page.layersFocusedPageId.set(activePageId);
+            this.pendingInitialPageFocusId = activePageId;
+            this.lastSavedAt.set(response.updatedAt ?? null);
+            this.history.resetHistory();
+            this.isLoadingDesign.set(false);
+            this.canPersistDesign = true;
+          },
+          error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
+            this.apiError.set(extractApiErrorMessage(error, 'Failed to load project design.'));
+            this.isLoadingDesign.set(false);
+            this.canPersistDesign = true;
+          },
+        });
       },
       error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-        this.apiError.set(extractApiErrorMessage(error, 'Failed to load project design.'));
+        this.apiError.set(extractApiErrorMessage(error, 'Project not found.'));
         this.isLoadingDesign.set(false);
         this.canPersistDesign = true;
       },
@@ -2759,7 +2771,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   private buildCurrentProjectDocument() {
-    return buildCanvasProjectDocument(this.pages(), this.projectId, this.currentPageId());
+    return buildCanvasProjectDocument(this.pages(), this.projectSlug, this.currentPageId());
   }
 
   private buildCurrentPersistedDesignJson(): string {
@@ -3497,7 +3509,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.pixiPageShells.onHeaderPlayClick((pageId) => {
       this.zone.run(() => {
         this.selectPageFromToolbar(pageId);
-        this.page.openPreviewForPage(this.projectId, pageId);
+        this.page.openPreviewForPage(this.projectSlug, pageId);
       });
     });
 

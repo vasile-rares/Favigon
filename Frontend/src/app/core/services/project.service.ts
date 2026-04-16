@@ -28,6 +28,12 @@ export class ProjectService {
       .pipe(map((project) => this.normalizeProjectResponse(project)));
   }
 
+  getBySlug(slug: string): Observable<ProjectResponse> {
+    return this.http
+      .get<ProjectResponse>(`${this.baseUrl}/projects/by-slug/${encodeURIComponent(slug)}`)
+      .pipe(map((project) => this.normalizeProjectResponse(project)));
+  }
+
   create(request: ProjectCreateRequest): Observable<ProjectResponse> {
     return this.http
       .post<ProjectResponse>(`${this.baseUrl}/projects`, request)

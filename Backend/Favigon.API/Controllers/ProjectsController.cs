@@ -55,6 +55,24 @@ public class ProjectsController : ControllerBase
     return Ok(project);
   }
 
+  [HttpGet("by-slug/{slug}")]
+  public async Task<IActionResult> GetBySlug(string slug)
+  {
+    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (!int.TryParse(userIdValue, out var userId))
+    {
+      return Unauthorized();
+    }
+
+    var project = await _projectService.GetBySlugAsync(slug, userId);
+    if (project == null)
+    {
+      return NotFound();
+    }
+
+    return Ok(project);
+  }
+
   [HttpPost]
   public async Task<IActionResult> Create([FromBody] ProjectCreateRequest request)
   {

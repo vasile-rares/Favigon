@@ -10,7 +10,8 @@ public class MappingProfile : Profile
   public MappingProfile()
   {
     CreateMap<Project, ProjectResponse>()
-      .ForMember(dest => dest.ProjectId, opt => opt.MapFrom(src => src.Id));
+      .ForMember(dest => dest.ProjectId, opt => opt.MapFrom(src => src.Id))
+      .ForMember(dest => dest.Slug, opt => opt.MapFrom(src => src.Slug));
 
     CreateMap<ProjectCreateRequest, Project>()
       .ForMember(dest => dest.Id, opt => opt.Ignore())
