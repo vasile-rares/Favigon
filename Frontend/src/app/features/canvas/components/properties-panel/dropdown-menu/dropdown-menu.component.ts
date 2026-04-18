@@ -2,15 +2,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   Component,
+  effect,
   ElementRef,
-  EventEmitter,
   HostListener,
-  Input,
+  input,
   inject,
-  OnChanges,
   OnDestroy,
-  Output,
-  SimpleChanges,
+  output,
   TemplateRef,
   ViewEncapsulation,
 } from '@angular/core';
@@ -52,30 +50,30 @@ type EyeDropperConstructor = new () => EyeDropperInstance;
   styleUrl: './dropdown-menu.component.css',
   encapsulation: ViewEncapsulation.None,
 })
-export class DropdownMenuComponent implements OnChanges, OnDestroy {
-  @Input() projectId: number | null = null;
-  @Input() kind: StylePopupFieldKind = 'fill';
-  @Input() colorValue = '#000000';
-  @Input() pickerColor = '#000000';
-  @Input() isTransparent = false;
-  @Input() shadowValue: string | null = null;
-  @Input() strokeWidth = 1;
-  @Input() strokeStyle = 'Solid';
-  @Input() borderStyleOptions: string[] = [];
-  @Input() strokeSides: CanvasBorderSides | null = null;
-  @Input() strokeWidths: CanvasBorderWidths | null = null;
-  @Input() effectTemplate: TemplateRef<unknown> | null = null;
-  @Input() backgroundImage: string | null = null;
-  @Input() backgroundSize = 'cover';
-  @Input() backgroundPosition = 'center';
-  @Input() backgroundRepeat = 'no-repeat';
-  @Input() objectFit: CanvasObjectFit = 'cover';
-  @Input() imageAltText = '';
-  @Input() initialColorMode: ColorPickerMode = 'solid';
+export class DropdownMenuComponent implements OnDestroy {
+  readonly projectId = input<number | null>(null);
+  readonly kind = input<StylePopupFieldKind>('fill');
+  readonly colorValue = input('#000000');
+  readonly pickerColor = input('#000000');
+  readonly isTransparent = input(false);
+  readonly shadowValue = input<string | null>(null);
+  readonly strokeWidth = input(1);
+  readonly strokeStyle = input('Solid');
+  readonly borderStyleOptions = input<string[]>([]);
+  readonly strokeSides = input<CanvasBorderSides | null>(null);
+  readonly strokeWidths = input<CanvasBorderWidths | null>(null);
+  readonly effectTemplate = input<TemplateRef<unknown> | null>(null);
+  readonly backgroundImage = input<string | null>(null);
+  readonly backgroundSize = input('cover');
+  readonly backgroundPosition = input('center');
+  readonly backgroundRepeat = input('no-repeat');
+  readonly objectFit = input<CanvasObjectFit>('cover');
+  readonly imageAltText = input('');
+  readonly initialColorMode = input<ColorPickerMode>('solid');
 
-  @Output() patchRequested = new EventEmitter<Partial<CanvasElement>>();
-  @Output() numberGestureStarted = new EventEmitter<void>();
-  @Output() numberGestureCommitted = new EventEmitter<void>();
+  readonly patchRequested = output<Partial<CanvasElement>>();
+  readonly numberGestureStarted = output<void>();
+  readonly numberGestureCommitted = output<void>();
 
   pickerHue = 0;
   pickerSaturation = 0;
@@ -158,45 +156,50 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
   private colorPickerDragTarget: ColorPickerDragTarget = null;
   private isColorGestureActive = false;
 
-  constructor(private readonly hostRef: ElementRef<HTMLElement>) {}
+  constructor(private readonly hostRef: ElementRef<HTMLElement>) {
+    effect(() => {
+      const pickerColor = this.pickerColor();
+      const colorValue = this.colorValue();
+      const isTransparent = this.isTransparent();
+      if (this.isColorKind() && !this.colorPickerDragTarget) {
+        this.syncPickerFromColor(this.getInitialPickerColor());
+        this.selectedColorFormat =
+          inferCssColorFormat(
+            this.kind() === 'fill' && isTransparent ? this.getInitialPickerColor() : colorValue,
+          ) ??
+          inferCssColorFormat(this.getInitialPickerColor()) ??
+          this.selectedColorFormat;
+      }
+    });
 
-  ngOnChanges(changes: SimpleChanges): void {
-    if (
-      (changes['pickerColor'] || changes['colorValue'] || changes['isTransparent']) &&
-      this.isColorKind() &&
-      !this.colorPickerDragTarget
-    ) {
-      this.syncPickerFromColor(this.getInitialPickerColor());
-      this.selectedColorFormat =
-        inferCssColorFormat(
-          this.kind === 'fill' && this.isTransparent
-            ? this.getInitialPickerColor()
-            : this.colorValue,
-        ) ??
-        inferCssColorFormat(this.getInitialPickerColor()) ??
-        this.selectedColorFormat;
-    }
+    effect(() => {
+      this.selectedStrokeStyleOption = this.strokeStyle();
+    });
 
-    if (changes['strokeStyle']) {
-      this.selectedStrokeStyleOption = this.strokeStyle;
-    }
+    effect(() => {
+      const strokeSides = this.strokeSides();
+      const strokeWidths = this.strokeWidths();
+      this.borderSideMode = strokeSides || strokeWidths ? 'per-side' : 'all';
+    });
 
-    if (changes['strokeSides'] || changes['strokeWidths']) {
-      this.borderSideMode = this.strokeSides || this.strokeWidths ? 'per-side' : 'all';
-    }
+    effect(() => {
+      const shadowValue = this.shadowValue();
+      if (this.kind() === 'shadow') {
+        this.syncShadowEditorFromValue(shadowValue);
+      }
+    });
 
-    if (changes['shadowValue'] && this.kind === 'shadow') {
-      this.syncShadowEditorFromValue(this.shadowValue);
-    }
-
-    if (changes['backgroundImage']) {
-      this.imagePreviewUrl = this.backgroundImage;
+    effect(() => {
+      this.imagePreviewUrl = this.backgroundImage();
       this.imageUploadError = '';
-    }
+    });
 
-    if (changes['initialColorMode'] && this.kind === 'fill') {
-      this.selectedColorMode = this.initialColorMode;
-    }
+    effect(() => {
+      const initialColorMode = this.initialColorMode();
+      if (this.kind() === 'fill') {
+        this.selectedColorMode = initialColorMode;
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -277,7 +280,7 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
     }
 
     this.selectedColorFormat = value;
-    if (this.kind === 'fill' && this.isTransparent) {
+    if (this.kind() === 'fill' && this.isTransparent()) {
       return;
     }
 
@@ -291,7 +294,7 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
 
     this.selectedColorMode = value;
 
-    if (this.kind === 'fill') {
+    if (this.kind() === 'fill') {
       if (value === 'image') {
         this.patchRequested.emit({
           fillMode: 'image',
@@ -308,7 +311,7 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
   onImageFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
-    const projectId = this.projectId;
+    const projectId = this.projectId();
     if (!file) {
       return;
     }
@@ -352,8 +355,8 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
   }
 
   imageTypeValue(): string {
-    if (this.objectFit === 'contain') return 'fit';
-    if (this.objectFit === 'fill' || this.backgroundSize === '100% 100%') return 'stretch';
+    if (this.objectFit() === 'contain') return 'fit';
+    if (this.objectFit() === 'fill' || this.backgroundSize() === '100% 100%') return 'stretch';
     return 'fill';
   }
 
@@ -514,7 +517,7 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
   }
 
   fullStrokeWidthValue(): number | null {
-    return this.borderSideMode === 'per-side' ? null : this.strokeWidth;
+    return this.borderSideMode === 'per-side' ? null : this.strokeWidth();
   }
 
   borderSideWidthValue(side: BorderNumericField): number {
@@ -622,7 +625,7 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
   }
 
   get strokeStyleDropdownOptions(): DropdownSelectOption[] {
-    return this.borderStyleOptions.map((option) => ({ label: option, value: option }));
+    return this.borderStyleOptions().map((option) => ({ label: option, value: option }));
   }
 
   get isScreenPickerSupported(): boolean {
@@ -638,7 +641,7 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
   }
 
   private isColorKind(): boolean {
-    return this.kind === 'fill' || this.kind === 'stroke' || this.kind === 'shadow';
+    return this.kind() === 'fill' || this.kind() === 'stroke' || this.kind() === 'shadow';
   }
 
   private beginColorGesture(): void {
@@ -651,33 +654,33 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
   }
 
   private getInitialPickerColor(): string {
-    if (this.kind === 'shadow') {
-      return resolveEditableCanvasShadow(this.shadowValue).color;
+    if (this.kind() === 'shadow') {
+      return resolveEditableCanvasShadow(this.shadowValue()).color;
     }
 
-    if (this.pickerColor) {
-      return this.pickerColor;
+    if (this.pickerColor()) {
+      return this.pickerColor();
     }
 
-    if (this.kind === 'fill' && this.isTransparent) {
+    if (this.kind() === 'fill' && this.isTransparent()) {
       return '#E0E0E0';
     }
 
-    return this.colorValue;
+    return this.colorValue();
   }
 
   private resolveStrokeWidths(): CanvasBorderWidths {
-    if (this.strokeWidths) {
+    if (this.strokeWidths()) {
       return {
-        top: Math.max(0, roundToTwoDecimals(this.strokeWidths.top)),
-        right: Math.max(0, roundToTwoDecimals(this.strokeWidths.right)),
-        bottom: Math.max(0, roundToTwoDecimals(this.strokeWidths.bottom)),
-        left: Math.max(0, roundToTwoDecimals(this.strokeWidths.left)),
+        top: Math.max(0, roundToTwoDecimals(this.strokeWidths()!.top)),
+        right: Math.max(0, roundToTwoDecimals(this.strokeWidths()!.right)),
+        bottom: Math.max(0, roundToTwoDecimals(this.strokeWidths()!.bottom)),
+        left: Math.max(0, roundToTwoDecimals(this.strokeWidths()!.left)),
       };
     }
 
-    const baseWidth = Math.max(0, roundToTwoDecimals(this.strokeWidth));
-    const sides = this.strokeSides ?? { top: true, right: true, bottom: true, left: true };
+    const baseWidth = Math.max(0, roundToTwoDecimals(this.strokeWidth()));
+    const sides = this.strokeSides() ?? { top: true, right: true, bottom: true, left: true };
 
     return {
       top: sides.top ? baseWidth : 0,
@@ -753,12 +756,12 @@ export class DropdownMenuComponent implements OnChanges, OnDestroy {
 
   private commitPickerColor(): void {
     const colorValue = this.pickerColorValue();
-    if (this.kind === 'fill') {
+    if (this.kind() === 'fill') {
       this.patchRequested.emit({ fill: colorValue });
       return;
     }
 
-    if (this.kind === 'stroke') {
+    if (this.kind() === 'stroke') {
       this.patchRequested.emit({ stroke: colorValue });
       return;
     }

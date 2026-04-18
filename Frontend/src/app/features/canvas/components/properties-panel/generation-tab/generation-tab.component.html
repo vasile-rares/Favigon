@@ -7,14 +7,16 @@
     </div>
 
     <div class="generation-frameworks">
-      <button
-        *ngFor="let option of frameworkOptions"
+      @for (option of frameworkOptions; track option) {
+<button
+
         type="button"
         class="generation-framework"
-        [class.generation-framework--active]="selectedFramework === option.value"
+        [class.generation-framework--active]="selectedFramework() === option.value"
         (click)="selectFramework(option.value)">
         <span class="generation-framework__label">{{ option.label }}</span>
       </button>
+}
     </div>
   </section>
 
@@ -31,26 +33,27 @@
       <button
         type="button"
         class="generation-button"
-        [disabled]="isValidating || isGenerating"
+        [disabled]="isValidating() || isGenerating()"
         (click)="validateRequested.emit()">
-        {{ isValidating ? 'Checking…' : 'Validate' }}
+        {{ isValidating() ? 'Checking…' : 'Validate' }}
       </button>
 
       <button
         type="button"
         class="generation-button generation-button--primary"
-        [disabled]="isGenerating || isValidating"
+        [disabled]="isGenerating() || isValidating()"
         (click)="generateRequested.emit()">
-        {{ isGenerating ? 'Generating…' : 'Generate' }}
+        {{ isGenerating() ? 'Generating…' : 'Generate' }}
       </button>
     </div>
   </section>
 
-  <section class="generation-card generation-card--code" *ngIf="hasGeneratedCode(); else emptyState">
+  @if (hasGeneratedCode()) {
+<section class="generation-card generation-card--code">
     <div class="generation-card__header">
       <div>
         <p class="generation-kicker">Output</p>
-        <h4 class="generation-subtitle">{{ generatedFiles.length }} files</h4>
+        <h4 class="generation-subtitle">{{ generatedFiles().length }} files</h4>
       </div>
 
       <div class="generation-copy-actions">
@@ -73,8 +76,9 @@
     </div>
 
     <div class="generation-file-tree">
-      <button
-        *ngFor="let file of generatedFiles; let i = index"
+      @for (file of generatedFiles(); track file; let i = $index) {
+<button
+
         type="button"
         class="generation-file-item"
         [class.generation-file-item--active]="activeFileIndex === i"
@@ -83,6 +87,7 @@
         <span class="generation-file-path">{{ file.path }}</span>
         <small class="generation-file-lines">{{ lineCount(file.content) }}L</small>
       </button>
+}
     </div>
 
     <div class="generation-code-shell">
@@ -93,8 +98,8 @@
       <pre class="generation-code"><code class="generation-code__content" [innerHTML]="highlightedCode"></code></pre>
     </div>
   </section>
+} @else {
 
-  <ng-template #emptyState>
     <section class="generation-card generation-card--empty">
       <div class="generation-empty-icon" aria-hidden="true">
         <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
@@ -104,9 +109,13 @@
       </div>
       <p>Generate once to preview code files here.</p>
     </section>
-  </ng-template>
 
-  <details class="generation-debug" *ngIf="irPreview">
+}
+
+
+
+  @if (irPreview()) {
+<details class="generation-debug">
     <summary>
       <span>IR snapshot</span>
       <button type="button" class="generation-copy-button" (click)="$event.preventDefault(); copy('ir')">
@@ -116,4 +125,5 @@
 
     <pre class="generation-code generation-code--debug"><code class="generation-code__content" [innerHTML]="highlightedIr"></code></pre>
   </details>
+}
 </div>

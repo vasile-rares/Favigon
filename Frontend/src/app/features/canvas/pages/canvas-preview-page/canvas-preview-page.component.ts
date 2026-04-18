@@ -1,5 +1,14 @@
-import { CommonModule } from '@angular/common';
-import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 
 import { ActivatedRoute, Router } from '@angular/router';
@@ -29,22 +38,18 @@ const GOOGLE_FONTS_URL =
 @Component({
   selector: 'app-canvas-preview-page',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    HeaderBarComponent,
-    DropdownSelectComponent,
-    NumberInputComponent,
-  ],
+  imports: [FormsModule, HeaderBarComponent, DropdownSelectComponent, NumberInputComponent],
   providers: [CanvasPersistenceService],
   templateUrl: './canvas-preview-page.component.html',
   styleUrl: './canvas-preview-page.component.css',
 })
 export class CanvasPreviewPage {
-  @ViewChild('stage') private stageRef!: ElementRef<HTMLElement>;
+  private readonly stageRef = viewChild<ElementRef<HTMLElement>>('stage');
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+
+  private readonly destroyRef = inject(DestroyRef);
 
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
   private readonly converterService = inject(ConverterService);
@@ -270,7 +275,7 @@ ${html}
     }
 
     if (axis === 'bottom' || axis === 'corner') {
-      const stageEl = this.stageRef?.nativeElement;
+      const stageEl = this.stageRef()?.nativeElement;
       if (stageEl) {
         const stageRect = stageEl.getBoundingClientRect();
         // Stage is center-aligned; max viewport height = stage height minus padding on both sides.
@@ -311,12 +316,8 @@ ${html}
     this.loadPreview(this.currentPageId());
   }
 
-  trackByPageId(_: number, page: CanvasPageModel): string {
-    return page.id;
-  }
-
   getStageMaxViewportHeight(): number {
-    const stageEl = this.stageRef?.nativeElement;
+    const stageEl = this.stageRef()?.nativeElement;
     if (!stageEl) {
       return Number.POSITIVE_INFINITY;
     }
@@ -326,7 +327,7 @@ ${html}
   }
 
   getStageMaxViewportWidth(): number {
-    const stageEl = this.stageRef?.nativeElement;
+    const stageEl = this.stageRef()?.nativeElement;
     if (!stageEl) {
       return Number.POSITIVE_INFINITY;
     }
@@ -360,29 +361,35 @@ ${html}
 
     // Use generate for responsive HTML+CSS (single response)
     if (irPages.length > 1) {
-      this.converterService.generate(request).subscribe({
-        next: (response) => {
-          this.generatedHtml.set(response.html);
-          this.generatedCss.set(response.css);
-          this.isGenerating.set(false);
-        },
-        error: (err: unknown) => {
-          this.error.set(extractApiErrorMessage(err, 'Failed to generate preview.'));
-          this.isGenerating.set(false);
-        },
-      });
+      this.converterService
+        .generate(request)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (response) => {
+            this.generatedHtml.set(response.html);
+            this.generatedCss.set(response.css);
+            this.isGenerating.set(false);
+          },
+          error: (err: unknown) => {
+            this.error.set(extractApiErrorMessage(err, 'Failed to generate preview.'));
+            this.isGenerating.set(false);
+          },
+        });
     } else {
-      this.converterService.generate({ framework: 'html', ir: irPages[0].ir }).subscribe({
-        next: (response) => {
-          this.generatedHtml.set(response.html);
-          this.generatedCss.set(response.css);
-          this.isGenerating.set(false);
-        },
-        error: (err: unknown) => {
-          this.error.set(extractApiErrorMessage(err, 'Failed to generate preview.'));
-          this.isGenerating.set(false);
-        },
-      });
+      this.converterService
+        .generate({ framework: 'html', ir: irPages[0].ir })
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (response) => {
+            this.generatedHtml.set(response.html);
+            this.generatedCss.set(response.css);
+            this.isGenerating.set(false);
+          },
+          error: (err: unknown) => {
+            this.error.set(extractApiErrorMessage(err, 'Failed to generate preview.'));
+            this.isGenerating.set(false);
+          },
+        });
     }
   }
 
@@ -395,33 +402,39 @@ ${html}
     this.isLoading.set(true);
     this.error.set(null);
 
-    this.projectApiService.getBySlug(this.projectSlug).subscribe({
-      next: (project) => {
-        this.projectIdAsNumber = project.projectId;
-        this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
-          next: (design) => {
-            this.pages.set(design.pages);
+    this.projectApiService
+      .getBySlug(this.projectSlug)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (project) => {
+          this.projectIdAsNumber = project.projectId;
+          this.canvasPersistenceService
+            .loadProjectDesign(this.projectIdAsNumber)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+              next: (design) => {
+                this.pages.set(design.pages);
 
-            const preferredPageId =
-              requestedPageId && design.pages.some((page) => page.id === requestedPageId)
-                ? requestedPageId
-                : design.activePageId;
+                const preferredPageId =
+                  requestedPageId && design.pages.some((page) => page.id === requestedPageId)
+                    ? requestedPageId
+                    : design.activePageId;
 
-            this.currentPageId.set(preferredPageId ?? design.pages[0]?.id ?? null);
-            this.selectedFrameIndex.set(0);
-            this.isLoading.set(false);
-          },
-          error: (error: unknown) => {
-            this.error.set(extractApiErrorMessage(error, 'Failed to load preview.'));
-            this.isLoading.set(false);
-          },
-        });
-      },
-      error: (error: unknown) => {
-        this.error.set(extractApiErrorMessage(error, 'Project not found.'));
-        this.isLoading.set(false);
-      },
-    });
+                this.currentPageId.set(preferredPageId ?? design.pages[0]?.id ?? null);
+                this.selectedFrameIndex.set(0);
+                this.isLoading.set(false);
+              },
+              error: (error: unknown) => {
+                this.error.set(extractApiErrorMessage(error, 'Failed to load preview.'));
+                this.isLoading.set(false);
+              },
+            });
+        },
+        error: (error: unknown) => {
+          this.error.set(extractApiErrorMessage(error, 'Project not found.'));
+          this.isLoading.set(false);
+        },
+      });
   }
 
   private syncQueryPage(pageId: string): void {

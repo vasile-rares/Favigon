@@ -1,40 +1,45 @@
 ﻿
     <!-- Frame templates -->
-    <section class="properties-section" *ngIf="isFrameToolSelected()">
-      <p class="properties-section-title">Frame presets</p>
-      <p class="properties-section-hint">Select a preset to add a new frame.</p>
-      <div class="frame-template-grid">
-        <button
-          type="button"
-          class="frame-template-button"
-          *ngFor="let template of frameTemplates"
-          (click)="applyFrameTemplate(template)">
-          <span class="frame-template-name">{{ template.name }}</span>
-          <span class="frame-template-size">{{ template.sizeLabel }}</span>
-        </button>
-      </div>
-    </section>
+    @if (isFrameToolSelected()) {
+      <section class="properties-section">
+        <p class="properties-section-title">Frame presets</p>
+        <p class="properties-section-hint">Select a preset to add a new frame.</p>
+        <div class="frame-template-grid">
+          @for (template of frameTemplates; track template.name) {
+            <button
+              type="button"
+              class="frame-template-button"
+              (click)="applyFrameTemplate(template)">
+              <span class="frame-template-name">{{ template.name }}</span>
+              <span class="frame-template-size">{{ template.sizeLabel }}</span>
+            </button>
+          }
+        </div>
+      </section>
+    }
 
     <!-- Empty state -->
-    <div class="properties-empty-state" *ngIf="!selectedElement && !isFrameToolSelected()">
-      <div class="pp-empty-icon">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-          <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-          <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-          <rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
-        </svg>
+    @if (!selectedElement() && !isFrameToolSelected()) {
+      <div class="properties-empty-state">
+        <div class="pp-empty-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect x="2" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+            <rect x="11" y="2" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+            <rect x="2" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+            <rect x="11" y="11" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+          </svg>
+        </div>
+        <p>Select an element to edit its properties.</p>
       </div>
-      <p>Select an element to edit its properties.</p>
-    </div>
+    }
 
     <!-- -- Element properties --------------------------- -->
-    <ng-container *ngIf="selectedElement as element">
+    @if (selectedElement(); as element) {
 
       <app-dt-extras-section
         [element]="element"
-        [pages]="pages"
-        [currentPageId]="currentPageId"
+        [pages]="pages()"
+        [currentPageId]="currentPageId()"
         (elementPatch)="elementPatch.emit($event)"></app-dt-extras-section>
 
 
@@ -53,22 +58,24 @@
 
       <app-dt-appearance-section
         [element]="element"
-        [projectId]="projectId"
-        [autoOpenFillPopupElementId]="autoOpenFillPopupElementId"
+        [projectId]="projectId()"
+        [autoOpenFillPopupElementId]="autoOpenFillPopupElementId()"
         (elementPatch)="elementPatch.emit($event)"
         (numberInputGestureStarted)="numberInputGestureStarted.emit()"
         (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-appearance-section>
 
-      <app-dt-typography-section
-        *ngIf="isText(element.type)"
+      @if (isText(element.type)) {
+        <app-dt-typography-section
         [element]="element"
-        [projectId]="projectId"
+        [projectId]="projectId()"
         (elementPatch)="elementPatch.emit($event)"
         (numberInputGestureStarted)="numberInputGestureStarted.emit()"
         (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-typography-section>
+      }
 
       <!-- -- Image -- -->
-      <section class="properties-section" *ngIf="isImage(element.type)">
+      @if (isImage(element.type)) {
+        <section class="properties-section">
         <p class="properties-section-title">Image</p>
         <input
           type="text"
@@ -76,11 +83,13 @@
           [value]="element.imageUrl || ''"
           (input)="onTextChange('imageUrl', $event)"
           placeholder="https://example.com/image.png" />
-      </section>
+        </section>
+      }
 
       <app-dt-transforms-effects-section
         [element]="element"
-        [projectId]="projectId"
+        [projectId]="projectId()"
         (elementPatch)="elementPatch.emit($event)"
         (numberInputGestureStarted)="numberInputGestureStarted.emit()"
         (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-transforms-effects-section>
+    }

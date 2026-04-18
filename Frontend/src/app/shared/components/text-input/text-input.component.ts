@@ -1,37 +1,36 @@
-import { CommonModule } from '@angular/common';
-import { Component, ElementRef, Input, Optional, Self, ViewChild } from '@angular/core';
+import { Component, ElementRef, Optional, Self, input, viewChild } from '@angular/core';
 import { ControlValueAccessor, FormsModule, NgControl } from '@angular/forms';
 
 @Component({
   selector: 'app-text-input',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './text-input.component.html',
   styleUrl: './text-input.component.css',
 })
 export class TextInputComponent implements ControlValueAccessor {
-  @Input() id?: string;
-  @Input() label = '';
-  @Input() placeholder = '';
-  @Input() type: 'text' | 'email' | 'password' | 'url' | 'search' = 'text';
-  @Input() autocomplete = 'off';
-  @Input() requiredMarker = false;
-  @Input() maxLength?: number;
-  @Input() errorText = '';
-  @Input() forceInvalid = false;
-  @Input() enablePasswordToggle = false;
-  @Input() readonly = false;
+  readonly id = input<string | undefined>(undefined);
+  readonly label = input('');
+  readonly placeholder = input('');
+  readonly type = input<'text' | 'email' | 'password' | 'url' | 'search'>('text');
+  readonly autocomplete = input('off');
+  readonly requiredMarker = input(false);
+  readonly maxLength = input<number | undefined>(undefined);
+  readonly errorText = input('');
+  readonly forceInvalid = input(false);
+  readonly enablePasswordToggle = input(false);
+  readonly readonly = input(false);
 
   // Multiline specific
-  @Input() multiline = false;
-  @Input() rows = 3;
+  readonly multiline = input(false);
+  readonly rows = input(3);
 
   value = '';
   disabled = false;
   passwordVisible = false;
 
-  @ViewChild('inputElement')
-  private inputElement?: ElementRef<HTMLInputElement | HTMLTextAreaElement>;
+  readonly inputElement =
+    viewChild<ElementRef<HTMLInputElement | HTMLTextAreaElement>>('inputElement');
 
   private onChange: (value: string) => void = () => undefined;
   private onTouched: () => void = () => undefined;
@@ -43,7 +42,7 @@ export class TextInputComponent implements ControlValueAccessor {
   }
 
   get isInvalid(): boolean {
-    if (this.forceInvalid) {
+    if (this.forceInvalid()) {
       return true;
     }
 
@@ -52,11 +51,11 @@ export class TextInputComponent implements ControlValueAccessor {
   }
 
   get computedType(): string {
-    if (this.type === 'password' && this.enablePasswordToggle && this.passwordVisible) {
+    if (this.type() === 'password' && this.enablePasswordToggle() && this.passwordVisible) {
       return 'text';
     }
 
-    return this.type;
+    return this.type();
   }
 
   writeValue(value: string | null): void {
@@ -87,7 +86,7 @@ export class TextInputComponent implements ControlValueAccessor {
   }
 
   togglePasswordVisibility(): void {
-    if (this.disabled || this.type !== 'password' || !this.enablePasswordToggle) {
+    if (this.disabled || this.type() !== 'password' || !this.enablePasswordToggle()) {
       return;
     }
 
@@ -95,7 +94,7 @@ export class TextInputComponent implements ControlValueAccessor {
   }
 
   focus(selectText = false): void {
-    const input = this.inputElement?.nativeElement;
+    const input = this.inputElement()?.nativeElement;
     if (!input || this.disabled) {
       return;
     }

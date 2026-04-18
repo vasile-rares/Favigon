@@ -1,15 +1,13 @@
-import { CommonModule } from '@angular/common';
 import {
   Component,
   ElementRef,
-  EventEmitter,
   HostListener,
-  Input,
-  OnChanges,
   OnDestroy,
   OnInit,
-  Output,
-  SimpleChanges,
+  effect,
+  inject,
+  input,
+  output,
 } from '@angular/core';
 
 export interface ContextMenuItem {
@@ -31,17 +29,17 @@ export type ContextMenuVerticalDirection = 'below' | 'above';
 @Component({
   selector: 'app-context-menu',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './context-menu.component.html',
   styleUrl: './context-menu.component.css',
 })
-export class ContextMenuComponent implements OnChanges, OnInit, OnDestroy {
-  @Input() x = 0;
-  @Input() y = 0;
-  @Input() items: ContextMenuItem[] = [];
-  @Input() verticalDirection: ContextMenuVerticalDirection = 'below';
+export class ContextMenuComponent implements OnInit, OnDestroy {
+  readonly x = input(0);
+  readonly y = input(0);
+  readonly items = input<ContextMenuItem[]>([]);
+  readonly verticalDirection = input<ContextMenuVerticalDirection>('below');
 
-  @Output() closed = new EventEmitter<void>();
+  readonly closed = output<void>();
 
   adjustedX = 0;
   adjustedY = 0;
@@ -49,13 +47,25 @@ export class ContextMenuComponent implements OnChanges, OnInit, OnDestroy {
   isClosing = false;
   private closeTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  private readonly el = inject<ElementRef<HTMLElement>>(ElementRef);
+
   private readonly onDocumentPointerDownCapture = (event: PointerEvent): void => {
     if (!this.el.nativeElement.contains(event.target as Node)) {
       this.requestClose();
     }
   };
 
-  constructor(private readonly el: ElementRef<HTMLElement>) {}
+  constructor() {
+    effect(() => {
+      const _x = this.x();
+      const _y = this.y();
+      const _items = this.items();
+      const _dir = this.verticalDirection();
+      this.isClosing = false;
+      this.openSubmenuId = null;
+      this.adjustPosition();
+    });
+  }
 
   ngOnInit(): void {
     document.addEventListener('pointerdown', this.onDocumentPointerDownCapture, true);
@@ -69,17 +79,9 @@ export class ContextMenuComponent implements OnChanges, OnInit, OnDestroy {
     }
   }
 
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['x'] || changes['y'] || changes['items'] || changes['verticalDirection']) {
-      this.isClosing = false;
-      this.openSubmenuId = null;
-      this.adjustPosition();
-    }
-  }
-
   private adjustPosition(): void {
-    this.adjustedX = this.x;
-    this.adjustedY = this.y;
+    this.adjustedX = this.x();
+    this.adjustedY = this.y();
 
     requestAnimationFrame(() => {
       const panel = this.el.nativeElement.querySelector('.context-menu__panel') as HTMLElement;
@@ -90,11 +92,11 @@ export class ContextMenuComponent implements OnChanges, OnInit, OnDestroy {
       const vh = window.innerHeight;
 
       this.adjustedY =
-        this.verticalDirection === 'above' ? Math.max(8, this.y - rect.height) : this.y;
+        this.verticalDirection() === 'above' ? Math.max(8, this.y() - rect.height) : this.y();
 
-      if (rect.right > vw) this.adjustedX = Math.max(0, this.x - rect.width);
-      if (this.verticalDirection === 'below' && rect.bottom > vh) {
-        this.adjustedY = Math.max(0, this.y - rect.height);
+      if (rect.right > vw) this.adjustedX = Math.max(0, this.x() - rect.width);
+      if (this.verticalDirection() === 'below' && rect.bottom > vh) {
+        this.adjustedY = Math.max(0, this.y() - rect.height);
       }
     });
   }

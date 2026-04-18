@@ -1,22 +1,21 @@
-import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 
 @Component({
   selector: 'app-action-button',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './action-button.component.html',
   styleUrl: './action-button.component.css',
 })
 export class ActionButtonComponent {
-  @Input() variant: 'primary' | 'outline' | 'danger' = 'primary';
-  @Input() type: 'button' | 'submit' | 'reset' = 'button';
-  @Input() form?: string;
-  @Input() disabled = false;
-  @Input() fullWidth = true;
-  @Input() ariaLabel?: string;
+  readonly variant = input<'primary' | 'outline' | 'danger'>('primary');
+  readonly type = input<'button' | 'submit' | 'reset'>('button');
+  readonly form = input<string | undefined>(undefined);
+  readonly disabled = input(false);
+  readonly fullWidth = input(true);
+  readonly ariaLabel = input<string | undefined>(undefined);
 
-  @Output() clicked = new EventEmitter<MouseEvent>();
+  readonly clicked = output<MouseEvent>();
 
   onClick(event: MouseEvent): void {
     this.clicked.emit(event);

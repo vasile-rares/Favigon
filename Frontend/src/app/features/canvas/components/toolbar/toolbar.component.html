@@ -1,21 +1,35 @@
 <aside class="toolbar glass-panel" aria-label="Canvas toolbar">
   <div class="toolbar__rail">
-    <button
-      *ngFor="let action of actions; trackBy: trackByTool"
+    @for (action of actions; track trackByTool($index, action)) {
+<button
+
       type="button"
       class="toolbar__button"
-      [class.is-active]="activeTool === action.tool"
+      [class.is-active]="activeTool() === action.tool"
       [attr.aria-label]="action.label + ' tool'"
       [title]="action.label + ' (' + action.shortcut + ')'"
       (click)="onToolSelect(action.tool)">
-      <ng-container [ngSwitch]="action.tool">
-        <svg *ngSwitchCase="'select'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>
-        <svg *ngSwitchCase="'frame'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-        <svg *ngSwitchCase="'rectangle'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
-        <svg *ngSwitchCase="'text'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>
-        <svg *ngSwitchCase="'image'" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
-      </ng-container>
+
+@switch (action.tool) {
+        @case ('select') {
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="m13 13 6 6"/></svg>
+}
+        @case ('frame') {
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+}
+        @case ('rectangle') {
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/></svg>
+}
+        @case ('text') {
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>
+}
+        @case ('image') {
+<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+}
+      }
+
     </button>
+}
 
     <span class="toolbar__divider" aria-hidden="true"></span>
 
@@ -34,7 +48,7 @@
       title="Reset zoom"
       aria-label="Reset zoom"
       (click)="zoomResetRequested.emit()">
-      {{ zoomLevel }}%
+      {{ zoomLevel() }}%
     </button>
 
     <button

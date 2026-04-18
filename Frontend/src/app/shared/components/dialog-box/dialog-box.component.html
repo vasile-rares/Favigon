@@ -1,30 +1,30 @@
 <div
   class="dialog-box__layer"
-  [class.dialog-box__layer--blur]="blurBackdrop"
+  [class.dialog-box__layer--blur]="blurBackdrop()"
   [class.is-closing]="isClosing"
-  [style.--dialog-box-width]="width"
+  [style.--dialog-box-width]="width()"
   (pointerdown)="onBackdropPointerDown($event)"
   (click)="onBackdropClick($event)">
   <section
     class="dialog-box__card"
     role="dialog"
     aria-modal="true"
-    [attr.aria-label]="ariaLabel || title || null"
+    [attr.aria-label]="ariaLabel() || title() || null"
     (pointerdown)="onDialogPointerDown()"
     (click)="$event.stopPropagation()">
-    @if (hasHeader || showCloseButton) {
+    @if (hasHeader || showCloseButton()) {
       <header class="dialog-box__header" [class.dialog-box__header--compact]="!hasHeader">
         <div class="dialog-box__header-main">
-          @if (title) {
-            <div class="dialog-box__title">{{ title }}</div>
+          @if (title()) {
+            <div class="dialog-box__title">{{ title() }}</div>
           }
 
-          @if (showCloseButton) {
+          @if (showCloseButton()) {
             <button
               type="button"
               class="dialog-box__close-btn"
               (click)="requestClose()"
-              [disabled]="isBusy || isClosing"
+              [disabled]="isBusy() || isClosing"
               aria-label="Close dialog">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="18" y1="6" x2="6" y2="18"></line>
@@ -34,16 +34,16 @@
           }
         </div>
 
-        @if (description) {
-          <div class="dialog-box__description">{{ description }}</div>
+        @if (description()) {
+          <div class="dialog-box__description">{{ description() }}</div>
         }
       </header>
     }
 
     <div class="dialog-box__content">
-      @if (fields.length > 0) {
+      @if (fields().length > 0) {
         <div class="dialog-box__fields">
-          @for (field of fields; track field.key) {
+          @for (field of fields(); track field.key) {
             <div class="dialog-box__field">
               <label class="dialog-box__field-label" [for]="field.key">{{ field.label }}</label>
               <input
@@ -52,7 +52,7 @@
                 [type]="field.type ?? 'text'"
                 [placeholder]="field.placeholder ?? ''"
                 [(ngModel)]="fieldValues[field.key]"
-                [disabled]="isBusy" />
+                [disabled]="isBusy()" />
             </div>
           }
         </div>
@@ -62,28 +62,28 @@
 
     @if (hasFooter) {
       <footer class="dialog-box__footer">
-        @if (footerTemplate) {
-          <ng-container *ngTemplateOutlet="footerTemplate"></ng-container>
+        @if (resolvedFooter) {
+          <ng-container *ngTemplateOutlet="resolvedFooter"></ng-container>
         } @else {
           <div class="dialog-box__footer-actions">
-            @if (secondaryAction) {
+            @if (secondaryAction()) {
               <app-action-button
                 type="button"
                 variant="outline"
                 [fullWidth]="false"
-                [disabled]="isBusy || isClosing || !!secondaryAction.disabled"
+                [disabled]="isBusy() || isClosing || !!secondaryAction()?.disabled"
                 (clicked)="onSecondaryClick()">
-                {{ secondaryAction.label }}
+                {{ secondaryAction()?.label }}
               </app-action-button>
             }
-            @if (primaryAction) {
+            @if (primaryAction()) {
               <app-action-button
                 type="button"
                 variant="primary"
                 [fullWidth]="false"
-                [disabled]="isBusy || isClosing || !!primaryAction.disabled"
+                [disabled]="isBusy() || isClosing || !!primaryAction()?.disabled"
                 (clicked)="onPrimaryClick()">
-                {{ primaryAction.label }}
+                {{ primaryAction()?.label }}
               </app-action-button>
             }
           </div>

@@ -1,18 +1,15 @@
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   AfterViewInit,
   Component,
   ElementRef,
-  EventEmitter,
   HostBinding,
   HostListener,
-  Input,
-  OnChanges,
   OnDestroy,
-  Output,
-  SimpleChanges,
-  ViewChild,
+  effect,
+  input,
+  output,
+  viewChild,
 } from '@angular/core';
 import { CanvasElement } from '@app/core';
 import { CanvasBorderWidths } from '@app/core';
@@ -30,52 +27,52 @@ type PopoverElement = HTMLElement & {
 @Component({
   selector: 'app-field-input',
   standalone: true,
-  imports: [CommonModule, FormsModule, DropdownMenuComponent],
+  imports: [FormsModule, DropdownMenuComponent],
   templateUrl: './field-input.component.html',
   styleUrl: './field-input.component.css',
 })
-export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy {
-  @Input() kind: StylePopupFieldKind = 'fill';
-  @Input() projectId: number | null = null;
-  @Input() autoOpenKey: string | null = null;
-  @Input() hasValue = true;
-  @Input() triggerText = '';
-  @Input() swatchColor: string | null = null;
-  @Input() isTransparent = false;
-  @Input() shadowValue: string | null = null;
-  @Input() colorValue = '#000000';
-  @Input() pickerColor = '#000000';
-  @Input() strokeWidth = 1;
-  @Input() strokeStyle = 'Solid';
-  @Input() borderStyleOptions: string[] = [];
-  @Input() strokeSides: CanvasBorderSides | null = null;
-  @Input() strokeWidths: CanvasBorderWidths | null = null;
-  @Input() backgroundImage: string | null = null;
-  @Input() backgroundSize = 'cover';
-  @Input() backgroundPosition = 'center';
-  @Input() backgroundRepeat = 'no-repeat';
-  @Input() objectFit: CanvasObjectFit = 'cover';
-  @Input() imageAltText = '';
-  @Input() initialColorMode: 'solid' | 'linear' | 'radial' | 'conic' | 'image' = 'solid';
-  @Input() popupTitleOverride = '';
-  @Input() popupWidthOverride: number | null = null;
-  @Input() inlineContentOnly = false;
-  @Input() activationPatch: Partial<CanvasElement> | null = null;
-  @Input() clearPatch: Partial<CanvasElement> | null = null;
+export class FieldInputComponent implements AfterViewInit, OnDestroy {
+  readonly kind = input<StylePopupFieldKind>('fill');
+  readonly projectId = input<number | null>(null);
+  readonly autoOpenKey = input<string | null>(null);
+  readonly hasValue = input(true);
+  readonly triggerText = input('');
+  readonly swatchColor = input<string | null>(null);
+  readonly isTransparent = input(false);
+  readonly shadowValue = input<string | null>(null);
+  readonly colorValue = input('#000000');
+  readonly pickerColor = input('#000000');
+  readonly strokeWidth = input(1);
+  readonly strokeStyle = input('Solid');
+  readonly borderStyleOptions = input<string[]>([]);
+  readonly strokeSides = input<CanvasBorderSides | null>(null);
+  readonly strokeWidths = input<CanvasBorderWidths | null>(null);
+  readonly backgroundImage = input<string | null>(null);
+  readonly backgroundSize = input('cover');
+  readonly backgroundPosition = input('center');
+  readonly backgroundRepeat = input('no-repeat');
+  readonly objectFit = input<CanvasObjectFit>('cover');
+  readonly imageAltText = input('');
+  readonly initialColorMode = input<'solid' | 'linear' | 'radial' | 'conic' | 'image'>('solid');
+  readonly popupTitleOverride = input('');
+  readonly popupWidthOverride = input<number | null>(null);
+  readonly inlineContentOnly = input(false);
+  readonly activationPatch = input<Partial<CanvasElement> | null>(null);
+  readonly clearPatch = input<Partial<CanvasElement> | null>(null);
 
-  @Output() patchRequested = new EventEmitter<Partial<CanvasElement>>();
-  @Output() clearRequested = new EventEmitter<void>();
-  @Output() openChange = new EventEmitter<boolean>();
-  @Output() numberGestureStarted = new EventEmitter<void>();
-  @Output() numberGestureCommitted = new EventEmitter<void>();
+  readonly patchRequested = output<Partial<CanvasElement>>();
+  readonly clearRequested = output<void>();
+  readonly openChange = output<boolean>();
+  readonly numberGestureStarted = output<void>();
+  readonly numberGestureCommitted = output<void>();
 
   @HostBinding('style.display') readonly hostDisplay = 'block';
   @HostBinding('style.width') readonly hostWidth = '100%';
   @HostBinding('style.min-width') readonly hostMinWidth = '0';
 
-  @ViewChild(DropdownMenuComponent) private dropdownMenu?: DropdownMenuComponent;
-  @ViewChild('triggerButton') private triggerButtonRef?: ElementRef<HTMLElement>;
-  @ViewChild('popupPanel') private popupPanelRef?: ElementRef<HTMLElement>;
+  private readonly dropdownMenu = viewChild(DropdownMenuComponent);
+  private readonly triggerButtonRef = viewChild<ElementRef<HTMLElement>>('triggerButton');
+  private readonly popupPanelRef = viewChild<ElementRef<HTMLElement>>('popupPanel');
 
   isOpen = false;
   popupTop: number | null = 16;
@@ -96,6 +93,10 @@ export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy 
 
   constructor(private readonly hostRef: ElementRef<HTMLElement>) {
     window.addEventListener('scroll', this.onGlobalScroll, true);
+    effect(() => {
+      this.autoOpenKey();
+      this.tryAutoOpen();
+    });
   }
 
   ngOnDestroy(): void {
@@ -107,18 +108,12 @@ export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.tryAutoOpen();
   }
 
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['autoOpenKey']) {
-      this.tryAutoOpen();
-    }
-  }
-
   get popupTitle(): string {
-    if (this.popupTitleOverride.trim().length > 0) {
-      return this.popupTitleOverride;
+    if (this.popupTitleOverride().trim().length > 0) {
+      return this.popupTitleOverride();
     }
 
-    switch (this.kind) {
+    switch (this.kind()) {
       case 'fill':
         return 'Fill';
       case 'stroke':
@@ -133,15 +128,15 @@ export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   get showAddButton(): boolean {
-    return this.kind !== 'fill' && !this.hasValue;
+    return this.kind() !== 'fill' && !this.hasValue();
   }
 
   get showClearButton(): boolean {
-    return this.hasValue;
+    return this.hasValue();
   }
 
   get clearButtonTitle(): string {
-    switch (this.kind) {
+    switch (this.kind()) {
       case 'fill':
         return 'Clear fill';
       case 'stroke':
@@ -197,8 +192,8 @@ export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy 
       return false;
     }
 
-    if (!this.hasValue && this.activationPatch) {
-      this.patchRequested.emit(this.activationPatch);
+    if (!this.hasValue() && this.activationPatch()) {
+      this.patchRequested.emit(this.activationPatch()!);
     }
 
     this.activePopupAnchor = anchor;
@@ -213,13 +208,13 @@ export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy 
     event.preventDefault();
     event.stopPropagation();
 
-    if (this.clearPatch) {
-      this.patchRequested.emit(this.clearPatch);
+    if (this.clearPatch()) {
+      this.patchRequested.emit(this.clearPatch()!);
     } else {
       this.clearRequested.emit();
     }
 
-    if (this.kind !== 'fill') {
+    if (this.kind() !== 'fill') {
       this.closePopup();
     }
   }
@@ -229,7 +224,7 @@ export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   get shadowSwatchColor(): string {
-    return resolveEditableCanvasShadow(this.shadowValue).color;
+    return resolveEditableCanvasShadow(this.shadowValue()).color;
   }
 
   get isShadowSwatchTransparent(): boolean {
@@ -239,7 +234,7 @@ export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy 
   private closePopup(): void {
     const wasOpen = this.isOpen;
 
-    this.dropdownMenu?.finalizeGesture();
+    this.dropdownMenu()?.finalizeGesture();
     this.hidePopover();
 
     this.isOpen = false;
@@ -251,14 +246,14 @@ export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   private showPopover(): void {
-    const el = this.popupPanelRef?.nativeElement as PopoverElement | undefined;
+    const el = this.popupPanelRef()?.nativeElement as PopoverElement | undefined;
     if (el?.showPopover) {
       el.showPopover();
     }
   }
 
   private hidePopover(): void {
-    const el = this.popupPanelRef?.nativeElement as PopoverElement | undefined;
+    const el = this.popupPanelRef()?.nativeElement as PopoverElement | undefined;
     if (el?.hidePopover) {
       el.hidePopover();
     }
@@ -272,7 +267,7 @@ export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy 
     this.popupTop = null;
     this.popupBottom = 12;
 
-    const preferredWidth = this.popupWidthOverride ?? 248;
+    const preferredWidth = this.popupWidthOverride() ?? 248;
     this.popupWidth = Math.min(preferredWidth, Math.max(220, window.innerWidth - 24));
     const desiredLeft = panelBounds.left - this.popupWidth - 12;
     const maxLeft = Math.max(12, window.innerWidth - this.popupWidth - 12);
@@ -280,10 +275,10 @@ export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy 
   }
 
   private tryAutoOpen(): void {
-    const autoOpenKey = this.autoOpenKey;
+    const autoOpenKey = this.autoOpenKey();
     if (
       !this.hasViewInitialized ||
-      this.inlineContentOnly ||
+      this.inlineContentOnly() ||
       !autoOpenKey ||
       autoOpenKey === this.lastAutoOpenKey
     ) {
@@ -293,15 +288,15 @@ export class FieldInputComponent implements AfterViewInit, OnChanges, OnDestroy 
     queueMicrotask(() => {
       if (
         !this.hasViewInitialized ||
-        !this.autoOpenKey ||
-        this.autoOpenKey !== autoOpenKey ||
+        !this.autoOpenKey() ||
+        this.autoOpenKey() !== autoOpenKey ||
         autoOpenKey === this.lastAutoOpenKey
       ) {
         return;
       }
 
       const anchor =
-        this.triggerButtonRef?.nativeElement ??
+        this.triggerButtonRef()?.nativeElement ??
         (this.hostRef.nativeElement.querySelector(
           '.field-input__trigger-main',
         ) as HTMLElement | null);

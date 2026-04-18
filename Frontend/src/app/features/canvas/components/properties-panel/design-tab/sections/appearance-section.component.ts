@@ -1,5 +1,5 @@
-import { Component, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
-import { CommonModule } from '@angular/common';
+﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { ToggleGroupComponent } from '@app/shared';
 import { NumberInputComponent } from '../../number-input/number-input.component';
@@ -49,7 +49,6 @@ const CORNER_RADIUS_FIELD_DEFINITIONS: readonly CornerRadiusFieldDefinition[] = 
   selector: 'app-dt-appearance-section',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     DropdownSelectComponent,
     ToggleGroupComponent,
@@ -60,13 +59,13 @@ const CORNER_RADIUS_FIELD_DEFINITIONS: readonly CornerRadiusFieldDefinition[] = 
   encapsulation: ViewEncapsulation.None,
 })
 export class AppearanceSectionComponent {
-  @Input() element!: CanvasElement;
-  @Input() projectId: number | null = null;
-  @Input() autoOpenFillPopupElementId: string | null = null;
+  readonly element = input.required<CanvasElement>();
+  readonly projectId = input<number | null>(null);
+  readonly autoOpenFillPopupElementId = input<string | null>(null);
 
-  @Output() elementPatch = new EventEmitter<Partial<CanvasElement>>();
-  @Output() numberInputGestureStarted = new EventEmitter<void>();
-  @Output() numberInputGestureCommitted = new EventEmitter<void>();
+  readonly elementPatch = output<Partial<CanvasElement>>();
+  readonly numberInputGestureStarted = output<void>();
+  readonly numberInputGestureCommitted = output<void>();
 
   readonly overflowOptions: DropdownSelectOption[] = [
     { label: 'Clip', value: 'clip' },
@@ -120,7 +119,7 @@ export class AppearanceSectionComponent {
         : Number((valueOrEvent.target as HTMLInputElement).value);
     if (!Number.isFinite(value)) return;
 
-    const element = this.element;
+    const element = this.element();
     if (field === 'cornerRadius' && this.cornerRadiusMode(element) === 'per-corner') {
       this.elementPatch.emit({
         cornerRadius: Math.max(0, roundToTwoDecimals(value)),
@@ -209,7 +208,7 @@ export class AppearanceSectionComponent {
 
   onCornerRadiusModeChange(value: string | number | boolean | null): void {
     if (value !== 'full' && value !== 'per-corner') return;
-    const element = this.element;
+    const element = this.element();
     const uniformValue = getDefaultCornerRadius(element);
     if (value === 'per-corner') {
       this.elementPatch.emit({
@@ -224,7 +223,7 @@ export class AppearanceSectionComponent {
   onCornerRadiusCornerChange(corner: keyof CanvasCornerRadii, value: number): void {
     if (!Number.isFinite(value)) return;
     const nextRadii = {
-      ...getResolvedCornerRadii(this.element),
+      ...getResolvedCornerRadii(this.element()),
       [corner]: Math.max(0, roundToTwoDecimals(value)),
     } satisfies CanvasCornerRadii;
     this.elementPatch.emit({ cornerRadii: nextRadii });

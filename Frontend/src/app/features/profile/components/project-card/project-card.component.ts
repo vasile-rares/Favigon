@@ -1,14 +1,5 @@
 import { CommonModule } from '@angular/common';
-import {
-  Component,
-  ElementRef,
-  EventEmitter,
-  HostListener,
-  Input,
-  Output,
-  inject,
-  signal,
-} from '@angular/core';
+import { Component, ElementRef, HostListener, inject, input, output, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
 export interface ProjectCardViewModel {
@@ -40,43 +31,43 @@ export class ProjectCardComponent {
   readonly isMenuOpen = signal(false);
   readonly isMenuClosing = signal(false);
 
-  @Input({ required: true }) project!: ProjectCardViewModel;
-  @Input() isBusy = false;
-  @Input() isOwner = false;
-  @Input() openMode: 'editor' | 'preview' = 'editor';
+  readonly project = input.required<ProjectCardViewModel>();
+  readonly isBusy = input(false);
+  readonly isOwner = input(false);
+  readonly openMode = input<'editor' | 'preview'>('editor');
 
-  @Output() renameRequested = new EventEmitter<ProjectCardViewModel>();
-  @Output() deleteRequested = new EventEmitter<ProjectCardViewModel>();
-  @Output() visibilityToggleRequested = new EventEmitter<ProjectCardViewModel>();
+  readonly renameRequested = output<ProjectCardViewModel>();
+  readonly deleteRequested = output<ProjectCardViewModel>();
+  readonly visibilityToggleRequested = output<ProjectCardViewModel>();
 
   get openLabel(): string {
-    if (this.isBusy) {
+    if (this.isBusy()) {
       return 'Working...';
     }
 
-    return this.openMode === 'editor' ? 'Open editor' : 'Open preview';
+    return this.openMode() === 'editor' ? 'Open editor' : 'Open preview';
   }
 
   get visibilityActionLabel(): string {
-    return this.project.isPublic ? 'Make Private' : 'Make Public';
+    return this.project().isPublic ? 'Make Private' : 'Make Public';
   }
 
   openProject(): void {
-    if (this.isBusy) {
+    if (this.isBusy()) {
       return;
     }
 
     const commands =
-      this.openMode === 'editor'
-        ? ['/project', this.project.slug]
-        : ['/project', this.project.slug, 'preview'];
+      this.openMode() === 'editor'
+        ? ['/project', this.project().slug]
+        : ['/project', this.project().slug, 'preview'];
     void this.router.navigate(commands);
   }
 
   toggleMenu(event: MouseEvent): void {
     event.stopPropagation();
 
-    if (!this.isOwner || this.isBusy) {
+    if (!this.isOwner() || this.isBusy()) {
       return;
     }
 
@@ -94,33 +85,33 @@ export class ProjectCardComponent {
     event.stopPropagation();
     this.closeMenu();
 
-    if (this.isBusy) {
+    if (this.isBusy()) {
       return;
     }
 
-    this.renameRequested.emit(this.project);
+    this.renameRequested.emit(this.project());
   }
 
   requestVisibilityToggle(event: MouseEvent): void {
     event.stopPropagation();
     this.closeMenu();
 
-    if (this.isBusy) {
+    if (this.isBusy()) {
       return;
     }
 
-    this.visibilityToggleRequested.emit(this.project);
+    this.visibilityToggleRequested.emit(this.project());
   }
 
   requestDelete(event: MouseEvent): void {
     event.stopPropagation();
     this.closeMenu();
 
-    if (this.isBusy) {
+    if (this.isBusy()) {
       return;
     }
 
-    this.deleteRequested.emit(this.project);
+    this.deleteRequested.emit(this.project());
   }
 
   @HostListener('document:click', ['$event'])

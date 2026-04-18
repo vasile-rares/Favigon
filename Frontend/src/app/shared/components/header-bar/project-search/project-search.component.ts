@@ -1,5 +1,5 @@
-import { Component, ElementRef, ViewChild, inject, signal, output } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, ElementRef, inject, output, signal, viewChild } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { UserService } from '@app/core';
@@ -10,7 +10,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 @Component({
   selector: 'app-project-search',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [FormsModule],
   templateUrl: './project-search.component.html',
   styleUrl: './project-search.component.css',
 })
@@ -24,7 +24,7 @@ export class ProjectSearchComponent {
   readonly isSearchOpen = signal(false);
   readonly isSearchLoading = signal(false);
 
-  @ViewChild('searchContainer') searchContainer?: ElementRef<HTMLElement>;
+  readonly searchContainer = viewChild<ElementRef<HTMLElement>>('searchContainer');
 
   constructor() {
     this.searchSubject
@@ -86,7 +86,7 @@ export class ProjectSearchComponent {
   }
 
   closeIfClickedOutside(target: Node): void {
-    const searchEl = this.searchContainer?.nativeElement;
+    const searchEl = this.searchContainer()?.nativeElement;
     if (target && searchEl && !searchEl.contains(target)) {
       this.isSearchOpen.set(false);
     }

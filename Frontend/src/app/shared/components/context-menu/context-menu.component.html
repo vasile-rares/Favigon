@@ -1,13 +1,13 @@
 <div
   class="context-menu__panel glass-panel"
   [class.context-menu__panel--closing]="isClosing"
-  [class.context-menu__panel--above]="verticalDirection === 'above'"
+  [class.context-menu__panel--above]="verticalDirection() === 'above'"
   role="menu"
   [style.left.px]="adjustedX"
   [style.top.px]="adjustedY"
   (click)="$event.stopPropagation()">
 
-  @for (item of items; track item.id) {
+  @for (item of items(); track item.id) {
     @if (item.separator) {
       <div class="context-menu__separator"></div>
     }

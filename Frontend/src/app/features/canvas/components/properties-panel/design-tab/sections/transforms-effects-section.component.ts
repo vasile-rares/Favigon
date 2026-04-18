@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
+﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DropdownSelectComponent, ToggleGroupComponent, ContextMenuComponent } from '@app/shared';
@@ -75,12 +75,12 @@ const EFFECT_PREVIEW_CLICK_IDLE_MS = 1080;
   encapsulation: ViewEncapsulation.None,
 })
 export class TransformsEffectsSectionComponent {
-  @Input() element!: CanvasElement;
-  @Input() projectId: number | null = null;
+  readonly element = input.required<CanvasElement>();
+  readonly projectId = input<number | null>(null);
 
-  @Output() elementPatch = new EventEmitter<Partial<CanvasElement>>();
-  @Output() numberInputGestureStarted = new EventEmitter<void>();
-  @Output() numberInputGestureCommitted = new EventEmitter<void>();
+  readonly elementPatch = output<Partial<CanvasElement>>();
+  readonly numberInputGestureStarted = output<void>();
+  readonly numberInputGestureCommitted = output<void>();
 
   private readonly effectPopupViews = new Map<number, EffectPopupView>();
   private readonly effectPreviewVersions = new Map<number, number>();
@@ -223,7 +223,7 @@ export class TransformsEffectsSectionComponent {
 
   onTransformScaleChange(value: number): void {
     if (!Number.isFinite(value)) return;
-    const element = this.element;
+    const element = this.element();
     const magnitude = Math.max(0.1, roundToTwoDecimals(Math.abs(value)));
     const scaleXSign = (element.scaleX ?? 1) < 0 ? -1 : 1;
     const scaleYSign = (element.scaleY ?? 1) < 0 ? -1 : 1;
@@ -236,7 +236,7 @@ export class TransformsEffectsSectionComponent {
 
   onRotationChange(value: number): void {
     if (!Number.isFinite(value)) return;
-    const element = this.element;
+    const element = this.element();
     this.elementPatch.emit({
       transformOptions: this.mergeTransformOptions(element, 'rotate'),
       rotation: roundToTwoDecimals(value),
@@ -245,7 +245,7 @@ export class TransformsEffectsSectionComponent {
 
   onRotationModeChange(value: string | number | boolean | null): void {
     if (value !== '2d' && value !== '3d') return;
-    const element = this.element;
+    const element = this.element();
     this.elementPatch.emit({
       transformOptions: this.mergeTransformOptions(element, 'rotate'),
       rotationMode: value,
@@ -254,7 +254,7 @@ export class TransformsEffectsSectionComponent {
 
   onSkewChange(axis: 'x' | 'y', value: number): void {
     if (!Number.isFinite(value)) return;
-    const element = this.element;
+    const element = this.element();
     this.elementPatch.emit({
       transformOptions: this.mergeTransformOptions(element, 'skew'),
       skewX: axis === 'x' ? roundToTwoDecimals(value) : this.skewXValue(element),
@@ -264,7 +264,7 @@ export class TransformsEffectsSectionComponent {
 
   onDepthChange(value: number): void {
     if (!Number.isFinite(value)) return;
-    const element = this.element;
+    const element = this.element();
     this.elementPatch.emit({
       transformOptions: this.mergeTransformOptions(element, 'depth'),
       depth: Math.max(
@@ -276,7 +276,7 @@ export class TransformsEffectsSectionComponent {
 
   onPerspectiveChange(value: number): void {
     if (!Number.isFinite(value)) return;
-    const element = this.element;
+    const element = this.element();
     this.elementPatch.emit({
       transformOptions: this.mergeTransformOptions(element, 'perspective'),
       perspective: Math.max(
@@ -288,7 +288,7 @@ export class TransformsEffectsSectionComponent {
 
   onOriginChange(axis: 'x' | 'y', value: number): void {
     if (!Number.isFinite(value)) return;
-    const element = this.element;
+    const element = this.element();
     const normalized = Math.max(0, Math.min(100, roundToTwoDecimals(value)));
     this.elementPatch.emit({
       transformOptions: this.mergeTransformOptions(element, 'origin'),
@@ -299,7 +299,7 @@ export class TransformsEffectsSectionComponent {
 
   onBackfaceVisibilityChange(value: string | number | boolean | null): void {
     if (value !== 'visible' && value !== 'hidden') return;
-    const element = this.element;
+    const element = this.element();
     this.elementPatch.emit({
       transformOptions: this.mergeTransformOptions(element, 'backface'),
       backfaceVisibility: value,
@@ -308,7 +308,7 @@ export class TransformsEffectsSectionComponent {
 
   onPreserve3DChange(value: string | number | boolean | null): void {
     if (typeof value !== 'boolean') return;
-    const element = this.element;
+    const element = this.element();
     this.elementPatch.emit({
       transformOptions: this.mergeTransformOptions(element, 'preserve3d'),
       preserve3D: value,
@@ -343,12 +343,12 @@ export class TransformsEffectsSectionComponent {
   }
 
   addEffect(trigger: CanvasEffectTrigger = createDefaultCanvasEffect().trigger): void {
-    const current = this.element.effects ?? [];
+    const current = this.element().effects ?? [];
     this.elementPatch.emit({ effects: [...current, createDefaultCanvasEffect(trigger)] });
   }
 
   removeEffect(index: number): void {
-    const current = this.element.effects;
+    const current = this.element().effects;
     if (!current) return;
     const updated = current.filter((_, i) => i !== index);
     this.effectPopupViews.clear();
@@ -493,14 +493,14 @@ export class TransformsEffectsSectionComponent {
   effectFillInputValue(effect: CanvasEffect): string {
     const fill = effect.fill?.trim();
     if (fill) return fill;
-    const element = this.element;
+    const element = this.element();
     return this.hasFill(element.type) ? this.fillInputValue(element) : this.defaultFillColor;
   }
 
   effectFillPickerValue(effect: CanvasEffect): string {
     const fillValue = this.effectFillInputValue(effect);
     if (fillValue !== 'transparent') return fillValue;
-    const element = this.element;
+    const element = this.element();
     return this.hasFill(element.type) ? this.fillPickerValue(element) : this.defaultFillColor;
   }
 
@@ -523,7 +523,7 @@ export class TransformsEffectsSectionComponent {
   effectShadowEditorValue(effect: CanvasEffect): string | null {
     return (
       normalizeCanvasShadowValue(effect.shadow) ??
-      normalizeCanvasShadowValue(this.element.shadow) ??
+      normalizeCanvasShadowValue(this.element().shadow) ??
       null
     );
   }
@@ -594,7 +594,7 @@ export class TransformsEffectsSectionComponent {
 
   onEffectPresetChange(index: number, value: string | number | boolean | null): void {
     if (typeof value !== 'string') return;
-    const current = this.element.effects?.[index];
+    const current = this.element().effects?.[index];
     if (!current) return;
     this.closeEffectPopupSubview(index);
     const resolved = resolveCanvasEffect(current);
@@ -736,7 +736,7 @@ export class TransformsEffectsSectionComponent {
   }
 
   private patchEffectAt(index: number, patch: Partial<CanvasEffect>): void {
-    const effects = this.element.effects;
+    const effects = this.element().effects;
     if (!effects) return;
     this.bumpEffectPreviewVersion(index);
     this.elementPatch.emit({
@@ -745,7 +745,7 @@ export class TransformsEffectsSectionComponent {
   }
 
   private openEffectPopupSubview(index: number, view: Exclude<EffectPopupView, 'main'>): void {
-    const current = this.element.effects?.[index];
+    const current = this.element().effects?.[index];
     if (!current) return;
     if (view === 'transition' && !this.effectSupportsTransition(current)) return;
     if ((view === 'fill' || view === 'shadow') && !this.effectUsesHoverEditor(current)) return;
@@ -757,7 +757,7 @@ export class TransformsEffectsSectionComponent {
   }
 
   private openTransformMenu(event: MouseEvent | null, trigger: HTMLElement | null): void {
-    const element = this.element;
+    const element = this.element();
     const position = this.resolveMenuPosition(event, trigger);
     if (!position) return;
     this.closeEffectMenu();
@@ -820,7 +820,7 @@ export class TransformsEffectsSectionComponent {
   }
 
   private toggleTransformOption(option: CanvasTransformOption): void {
-    const element = this.element;
+    const element = this.element();
     const patch = this.isTransformOptionAdded(element, option)
       ? this.buildRemoveTransformOptionPatch(element, option)
       : this.buildTransformOptionPatch(element, option);

@@ -2,13 +2,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   Component,
-  ContentChild,
-  EventEmitter,
-  Input,
   OnDestroy,
   OnInit,
-  Output,
   TemplateRef,
+  contentChild,
+  input,
+  output,
 } from '@angular/core';
 import { ActionButtonComponent } from '../action-button/action-button.component';
 
@@ -36,24 +35,29 @@ const CLOSE_ANIMATION_DURATION_MS = 120;
   styleUrl: './dialog-box.component.css',
 })
 export class DialogBoxComponent implements OnInit, OnDestroy {
-  @Input() title = '';
-  @Input() description?: string;
-  @Input() fields: DialogBoxField[] = [];
-  @Input() primaryAction?: DialogBoxAction;
-  @Input() secondaryAction?: DialogBoxAction;
+  readonly title = input('');
+  readonly description = input<string | undefined>(undefined);
+  readonly fields = input<DialogBoxField[]>([]);
+  readonly primaryAction = input<DialogBoxAction | undefined>(undefined);
+  readonly secondaryAction = input<DialogBoxAction | undefined>(undefined);
 
-  @Input() blurBackdrop = true;
-  @Input() closeOnBackdropClick = true;
-  @Input() showCloseButton = true;
-  @Input() width = '400px';
-  @Input() ariaLabel?: string;
-  @Input() isBusy = false;
+  readonly blurBackdrop = input(true);
+  readonly closeOnBackdropClick = input(true);
+  readonly showCloseButton = input(true);
+  readonly width = input('400px');
+  readonly ariaLabel = input<string | undefined>(undefined);
+  readonly isBusy = input(false);
 
-  @Output() closed = new EventEmitter<void>();
-  @Output() primaryClicked = new EventEmitter<Record<string, string>>();
-  @Output() secondaryClicked = new EventEmitter<void>();
+  readonly closed = output<void>();
+  readonly primaryClicked = output<Record<string, string>>();
+  readonly secondaryClicked = output<void>();
 
-  @ContentChild('dialogFooter') footerTemplate?: TemplateRef<void>;
+  private readonly _contentFooterTemplate = contentChild<TemplateRef<void>>('dialogFooter');
+  readonly footerTemplate = input<TemplateRef<void> | undefined>(undefined);
+
+  get resolvedFooter(): TemplateRef<void> | undefined {
+    return this.footerTemplate() ?? this._contentFooterTemplate();
+  }
 
   fieldValues: Record<string, string> = {};
 
@@ -64,31 +68,31 @@ export class DialogBoxComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.fieldValues = {};
-    for (const field of this.fields) {
+    for (const field of this.fields()) {
       this.fieldValues[field.key] = field.initialValue ?? '';
     }
   }
 
   get hasHeader(): boolean {
-    return !!this.title || !!this.description;
+    return !!this.title() || !!this.description();
   }
 
   get hasFooter(): boolean {
-    return !!this.footerTemplate || !!this.primaryAction || !!this.secondaryAction;
+    return !!this.resolvedFooter || !!this.primaryAction() || !!this.secondaryAction();
   }
 
   onPrimaryClick(): void {
-    if (this.isBusy || this.isClosing) return;
+    if (this.isBusy() || this.isClosing) return;
     this.primaryClicked.emit({ ...this.fieldValues });
   }
 
   onSecondaryClick(): void {
-    if (this.isBusy || this.isClosing) return;
+    if (this.isBusy() || this.isClosing) return;
     this.secondaryClicked.emit();
   }
 
   requestClose(): void {
-    if (this.isBusy || this.isClosing) {
+    if (this.isBusy() || this.isClosing) {
       return;
     }
 
@@ -100,7 +104,7 @@ export class DialogBoxComponent implements OnInit, OnDestroy {
   }
 
   onBackdropPointerDown(event: PointerEvent): void {
-    if (!this.closeOnBackdropClick) {
+    if (!this.closeOnBackdropClick()) {
       return;
     }
 
@@ -108,7 +112,7 @@ export class DialogBoxComponent implements OnInit, OnDestroy {
   }
 
   onBackdropClick(event: MouseEvent): void {
-    if (!this.closeOnBackdropClick) {
+    if (!this.closeOnBackdropClick()) {
       return;
     }
 

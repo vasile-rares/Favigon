@@ -279,6 +279,7 @@
     title="Check your email"
     [description]="twoFactorDialogDescription"
     [isBusy]="isTwoFactorSubmitting()"
+    [footerTemplate]="twoFactorDialogFooter"
     width="420px"
     (closed)="closeTwoFactorDialog()">
     <form
@@ -304,27 +305,26 @@
         <div class="validation-message success-message">{{ twoFactorStatusMessage()!.text }}</div>
       }
     </form>
-
-    <ng-template #dialogFooter>
-      <div class="forgot-password-footer">
-        <app-action-button
-          type="button"
-          variant="outline"
-          [fullWidth]="false"
-          [disabled]="isTwoFactorSubmitting() || twoFactorDialog.isClosing"
-          (clicked)="twoFactorDialog.requestClose()">
-          Cancel
-        </app-action-button>
-        <app-action-button
-          type="submit"
-          variant="primary"
-          form="two-factor-form"
-          [fullWidth]="false"
-          [disabled]="isTwoFactorSubmitting() || twoFactorDialog.isClosing || twoFactorForm.invalid">
-          {{ isTwoFactorSubmitting() ? 'Verifying...' : 'Verify code' }}
-        </app-action-button>
-      </div>
-    </ng-template>
   </app-dialog-box>
+  <ng-template #twoFactorDialogFooter>
+    <div class="forgot-password-footer">
+      <app-action-button
+        type="button"
+        variant="outline"
+        [fullWidth]="false"
+        [disabled]="isTwoFactorSubmitting() || twoFactorDialog.isClosing"
+        (clicked)="twoFactorDialog.requestClose()">
+        Cancel
+      </app-action-button>
+      <app-action-button
+        type="submit"
+        variant="primary"
+        form="two-factor-form"
+        [fullWidth]="false"
+        [disabled]="isTwoFactorSubmitting() || twoFactorDialog.isClosing || twoFactorForm.invalid">
+        {{ isTwoFactorSubmitting() ? 'Verifying...' : 'Verify code' }}
+      </app-action-button>
+    </div>
+  </ng-template>
 }
 </div>

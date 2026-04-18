@@ -1,24 +1,24 @@
-<article class="project-card" [class.project-card--busy]="isBusy">
+<article class="project-card" [class.project-card--busy]="isBusy()">
   <button
     type="button"
     class="project-card__open project-card__open--media"
-    [disabled]="isBusy"
-    [attr.aria-label]="'Open ' + project.name"
+    [disabled]="isBusy()"
+    [attr.aria-label]="'Open ' + project().name"
     (click)="openProject()">
     <div class="project-card__media">
       <div class="project-card__media-top">
         <span
           class="project-card__visibility-chip"
-          [class.project-card__visibility-chip--public]="project.isPublic"
-          [class.project-card__visibility-chip--private]="!project.isPublic">
-          {{ project.isPublic ? 'Public' : 'Private' }}
+          [class.project-card__visibility-chip--public]="project().isPublic"
+          [class.project-card__visibility-chip--private]="!project().isPublic">
+          {{ project().isPublic ? 'Public' : 'Private' }}
         </span>
       </div>
 
-      @if (project.thumbnailDataUrl) {
+      @if (project().thumbnailDataUrl) {
         <img
           class="project-card__thumbnail"
-          [src]="project.thumbnailDataUrl"
+          [src]="project().thumbnailDataUrl"
           alt="Project preview"
           draggable="false" />
       } @else {
@@ -34,27 +34,27 @@
   </button>
 
   <div class="project-card__body">
-    <p class="project-card__eyebrow">Updated {{ project.lastEdited | date:'MMM d, y' }}</p>
+    <p class="project-card__eyebrow">Updated {{ project().lastEdited | date:'MMM d, y' }}</p>
 
     <div class="project-card__headline-row">
       <button
         type="button"
         class="project-card__open project-card__open--copy"
-        [disabled]="isBusy"
-        [attr.aria-label]="'Open ' + project.name"
+        [disabled]="isBusy()"
+        [attr.aria-label]="'Open ' + project().name"
         (click)="openProject()">
         <div class="project-card__copy">
-          <h3>{{ project.name }}</h3>
-          <p>Created {{ project.createdAt | date:'MMM d, y' }}</p>
+          <h3>{{ project().name }}</h3>
+          <p>Created {{ project().createdAt | date:'MMM d, y' }}</p>
         </div>
       </button>
 
-      @if (isOwner) {
+      @if (isOwner()) {
         <div class="project-card__menu-anchor">
           <button
             type="button"
             class="project-card__menu-trigger"
-            [disabled]="isBusy"
+            [disabled]="isBusy()"
             [attr.aria-expanded]="isMenuOpen() && !isMenuClosing()"
             aria-label="Project options"
             (click)="toggleMenu($event)">

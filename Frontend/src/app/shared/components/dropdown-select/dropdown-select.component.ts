@@ -1,5 +1,4 @@
-import { CommonModule } from '@angular/common';
-import { Component, ElementRef, HostListener, Input, Optional, Self } from '@angular/core';
+import { Component, ElementRef, HostListener, Optional, Self, input } from '@angular/core';
 import { ControlValueAccessor, FormsModule, NgControl } from '@angular/forms';
 import { TextInputComponent } from '../text-input/text-input.component';
 
@@ -13,21 +12,21 @@ export interface DropdownSelectOption {
 @Component({
   selector: 'app-dropdown-select',
   standalone: true,
-  imports: [CommonModule, FormsModule, TextInputComponent],
+  imports: [FormsModule, TextInputComponent],
   templateUrl: './dropdown-select.component.html',
   styleUrl: './dropdown-select.component.css',
 })
 export class DropdownSelectComponent implements ControlValueAccessor {
-  @Input() id?: string;
-  @Input() label = '';
-  @Input() placeholder = 'Select an option';
-  @Input() requiredMarker = false;
-  @Input() emptyText = 'No items found.';
-  @Input() enableSearch = true;
-  @Input() options: DropdownSelectOption[] = [];
-  @Input() closeOnSelect = true;
-  @Input() outsideClickBoundarySelector = '';
-  @Input() disabled = false;
+  readonly id = input<string | undefined>(undefined);
+  readonly label = input('');
+  readonly placeholder = input('Select an option');
+  readonly requiredMarker = input(false);
+  readonly emptyText = input('No items found.');
+  readonly enableSearch = input(true);
+  readonly options = input<DropdownSelectOption[]>([]);
+  readonly closeOnSelect = input(true);
+  readonly outsideClickBoundarySelector = input('');
+  disabled = false;
 
   isOpen = false;
   isClosing = false;
@@ -57,17 +56,17 @@ export class DropdownSelectComponent implements ControlValueAccessor {
   }
 
   get selectedTriggerLabel(): string {
-    const selectedOption = this.options.find((option) => option.value === this.selectedValue);
+    const selectedOption = this.options().find((option) => option.value === this.selectedValue);
     return selectedOption?.triggerLabel ?? selectedOption?.label ?? '';
   }
 
   get filteredOptions(): DropdownSelectOption[] {
     const query = this.searchQuery.trim().toLowerCase();
     if (!query) {
-      return this.options;
+      return this.options();
     }
 
-    return this.options.filter((option) => option.label.toLowerCase().includes(query));
+    return this.options().filter((option) => option.label.toLowerCase().includes(query));
   }
 
   writeValue(value: string | number | boolean | null): void {
@@ -111,7 +110,7 @@ export class DropdownSelectComponent implements ControlValueAccessor {
     this.onChange(option.value);
     this.onTouched();
 
-    if (this.closeOnSelect) {
+    if (this.closeOnSelect()) {
       this.closePanel();
     }
   }
@@ -170,7 +169,7 @@ export class DropdownSelectComponent implements ControlValueAccessor {
   }
 
   private isInsideOutsideClickBoundary(target: Node): boolean {
-    if (!this.outsideClickBoundarySelector.trim()) {
+    if (!this.outsideClickBoundarySelector().trim()) {
       return false;
     }
 
@@ -178,7 +177,7 @@ export class DropdownSelectComponent implements ControlValueAccessor {
       return false;
     }
 
-    const boundary = this.hostRef.nativeElement.closest(this.outsideClickBoundarySelector);
+    const boundary = this.hostRef.nativeElement.closest(this.outsideClickBoundarySelector());
     return !!boundary && boundary.contains(target);
   }
 

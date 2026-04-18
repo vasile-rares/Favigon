@@ -1,5 +1,4 @@
-﻿import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+﻿import { Component, effect, input, output } from '@angular/core';
 import { ToggleGroupComponent } from '@app/shared';
 import type { ToggleGroupOption } from '@app/shared';
 import {
@@ -18,36 +17,44 @@ type PropertiesTab = 'design' | 'generation';
 @Component({
   selector: 'app-properties-panel',
   standalone: true,
-  imports: [CommonModule, ToggleGroupComponent, GenerationTabComponent, DesignTabComponent],
+  imports: [ToggleGroupComponent, GenerationTabComponent, DesignTabComponent],
   templateUrl: './properties-panel.component.html',
   styleUrl: './properties-panel.component.css',
 })
-export class PropertiesPanelComponent implements OnChanges {
-  @Input() selectedElement: CanvasElement | null = null;
-  @Input() projectId: number | null = null;
-  @Input() autoOpenFillPopupElementId: string | null = null;
-  @Input() pages: readonly CanvasPageModel[] = [];
-  @Input() currentPageId: string | null = null;
-  @Input() currentTool: CanvasElementType | 'select' = 'select';
-  @Input() selectedFramework: SupportedFramework = 'html';
-  @Input() validationResult: boolean | null = null;
-  @Input() apiError: string | null = null;
-  @Input() isValidating = false;
-  @Input() isGenerating = false;
-  @Input() generatedHtml = '';
-  @Input() generatedCss = '';
-  @Input() generatedFiles: GeneratedFile[] = [];
-  @Input() irPreview: IRNode | null = null;
+export class PropertiesPanelComponent {
+  readonly selectedElement = input<CanvasElement | null>(null);
+  readonly projectId = input<number | null>(null);
+  readonly autoOpenFillPopupElementId = input<string | null>(null);
+  readonly pages = input<readonly CanvasPageModel[]>([]);
+  readonly currentPageId = input<string | null>(null);
+  readonly currentTool = input<CanvasElementType | 'select'>('select');
+  readonly selectedFramework = input<SupportedFramework>('html');
+  readonly validationResult = input<boolean | null>(null);
+  readonly apiError = input<string | null>(null);
+  readonly isValidating = input(false);
+  readonly isGenerating = input(false);
+  readonly generatedHtml = input('');
+  readonly generatedCss = input('');
+  readonly generatedFiles = input<GeneratedFile[]>([]);
+  readonly irPreview = input<IRNode | null>(null);
 
-  @Output() elementPatch = new EventEmitter<Partial<CanvasElement>>();
-  @Output() numberInputGestureStarted = new EventEmitter<void>();
-  @Output() numberInputGestureCommitted = new EventEmitter<void>();
-  @Output() frameTemplateSelected = new EventEmitter<FrameTemplateSelection>();
-  @Output() frameworkChanged = new EventEmitter<SupportedFramework>();
-  @Output() validateRequested = new EventEmitter<void>();
-  @Output() generateRequested = new EventEmitter<void>();
+  readonly elementPatch = output<Partial<CanvasElement>>();
+  readonly numberInputGestureStarted = output<void>();
+  readonly numberInputGestureCommitted = output<void>();
+  readonly frameTemplateSelected = output<FrameTemplateSelection>();
+  readonly frameworkChanged = output<SupportedFramework>();
+  readonly validateRequested = output<void>();
+  readonly generateRequested = output<void>();
 
   activeTab: PropertiesTab = 'design';
+
+  constructor() {
+    effect(() => {
+      if (this.autoOpenFillPopupElementId()) {
+        this.activeTab = 'design';
+      }
+    });
+  }
 
   readonly propertiesTabOptions: readonly ToggleGroupOption[] = [
     {
@@ -76,11 +83,5 @@ export class PropertiesPanelComponent implements OnChanges {
 
   isTabActive(tab: PropertiesTab): boolean {
     return this.activeTab === tab;
-  }
-
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['autoOpenFillPopupElementId']?.currentValue) {
-      this.activeTab = 'design';
-    }
   }
 }

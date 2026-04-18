@@ -1,5 +1,5 @@
-import { Component, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
-import { CommonModule } from '@angular/common';
+﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { DropdownSelectComponent, ToggleGroupComponent } from '@app/shared';
 import { NumberInputComponent } from '../../number-input/number-input.component';
@@ -32,22 +32,16 @@ const PADDING_FIELD_DEFINITIONS: readonly PaddingFieldDefinition[] = [
 @Component({
   selector: 'app-dt-layout-section',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    DropdownSelectComponent,
-    ToggleGroupComponent,
-    NumberInputComponent,
-  ],
+  imports: [FormsModule, DropdownSelectComponent, ToggleGroupComponent, NumberInputComponent],
   templateUrl: './layout-section.component.html',
   encapsulation: ViewEncapsulation.None,
 })
 export class LayoutSectionComponent {
-  @Input() element!: CanvasElement;
+  readonly element = input.required<CanvasElement>();
 
-  @Output() elementPatch = new EventEmitter<Partial<CanvasElement>>();
-  @Output() numberInputGestureStarted = new EventEmitter<void>();
-  @Output() numberInputGestureCommitted = new EventEmitter<void>();
+  readonly elementPatch = output<Partial<CanvasElement>>();
+  readonly numberInputGestureStarted = output<void>();
+  readonly numberInputGestureCommitted = output<void>();
 
   private readonly paddingModeOverrides = new Map<string, PaddingMode>();
   private readonly paddingLinkedValues = new Map<string, number>();
@@ -165,7 +159,7 @@ export class LayoutSectionComponent {
   }
 
   onLayoutSectionHeaderClick(): void {
-    if (this.hasLayout(this.element)) {
+    if (this.hasLayout(this.element())) {
       this.removeLayout();
       return;
     }
@@ -307,7 +301,7 @@ export class LayoutSectionComponent {
 
   onGridGapChange(axis: 'x' | 'y', value: number): void {
     if (!Number.isFinite(value)) return;
-    const element = this.element;
+    const element = this.element();
     const normalized = Math.max(0, roundToTwoDecimals(value));
     this.elementPatch.emit({
       gap: undefined,
@@ -335,7 +329,7 @@ export class LayoutSectionComponent {
 
   onPaddingModeChange(value: string | number | boolean | null): void {
     if (value !== 'full' && value !== 'per-side') return;
-    const element = this.element;
+    const element = this.element();
     const currentPadding = this.getSpacingValues(element, 'padding');
     const linkedValue = this.uniformPaddingValue(element);
     this.paddingModeOverrides.set(element.id, value);
@@ -352,7 +346,7 @@ export class LayoutSectionComponent {
 
   onPaddingFullChange(value: number): void {
     if (!Number.isFinite(value)) return;
-    const element = this.element;
+    const element = this.element();
     const nextValue = Math.max(0, roundToTwoDecimals(value));
     this.paddingModeOverrides.set(element.id, 'full');
     this.paddingLinkedValues.set(element.id, nextValue);
@@ -371,7 +365,7 @@ export class LayoutSectionComponent {
 
   onPaddingSideChange(side: keyof CanvasSpacing, value: number): void {
     if (!Number.isFinite(value)) return;
-    const element = this.element;
+    const element = this.element();
     const currentPadding = this.getSpacingValues(element, 'padding');
     this.paddingModeOverrides.set(element.id, 'per-side');
     this.elementPatch.emit({

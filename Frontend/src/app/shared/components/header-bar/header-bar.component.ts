@@ -2,15 +2,14 @@ import {
   Component,
   DestroyRef,
   ElementRef,
-  EventEmitter,
   HostListener,
-  Input,
   OnInit,
-  Output,
-  ViewChild,
   effect,
   inject,
+  input,
+  output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -29,7 +28,7 @@ import type { DropdownSelectOption } from '../dropdown-select/dropdown-select.co
 import { ActionButtonComponent } from '../action-button/action-button.component';
 import { filter, map, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { CommonModule } from '@angular/common';
+
 import { ProjectSearchComponent } from './project-search/project-search.component';
 import { ProjectMenuComponent } from './project-menu/project-menu.component';
 
@@ -44,7 +43,6 @@ interface HeaderUserProfile {
   selector: 'app-header-bar',
   standalone: true,
   imports: [
-    CommonModule,
     ReactiveFormsModule,
     UserMenuDropdownComponent,
     ...DIALOG_BOX_IMPORTS,
@@ -58,8 +56,8 @@ interface HeaderUserProfile {
   styleUrl: './header-bar.component.css',
 })
 export class HeaderBarComponent implements OnInit {
-  @Input() appearance: 'default' | 'canvas' | 'preview' = 'default';
-  @Output() readonly runPreviewClicked = new EventEmitter<void>();
+  readonly appearance = input<'default' | 'canvas' | 'preview'>('default');
+  readonly runPreviewClicked = output<void>();
 
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
@@ -95,20 +93,15 @@ export class HeaderBarComponent implements OnInit {
     { label: 'Public', value: true },
   ];
 
-  @ViewChild('userMenuContainer')
-  userMenuContainer?: ElementRef<HTMLElement>;
+  readonly userMenuContainer = viewChild<ElementRef<HTMLElement>>('userMenuContainer');
 
-  @ViewChild('userMenuDropdownEl', { read: ElementRef })
-  userMenuDropdownEl?: ElementRef<HTMLElement>;
+  readonly userMenuDropdownEl = viewChild('userMenuDropdownEl', { read: ElementRef });
 
-  @ViewChild('projectSearch')
-  projectSearch?: ProjectSearchComponent;
+  readonly projectSearch = viewChild<ProjectSearchComponent>('projectSearch');
 
-  @ViewChild('projectMenu')
-  projectMenu?: ProjectMenuComponent;
+  readonly projectMenu = viewChild<ProjectMenuComponent>('projectMenu');
 
-  @ViewChild('projectMenuContainer')
-  projectMenuContainer?: ElementRef<HTMLElement>;
+  readonly projectMenuContainer = viewChild<ElementRef<HTMLElement>>('projectMenuContainer');
 
   private readonly syncCurrentUserState = effect(() => {
     const user = this.currentUser.user();
@@ -157,7 +150,7 @@ export class HeaderBarComponent implements OnInit {
   // ── Project Menu Delegates ────────────────────────────────
 
   toggleProjectMenu(): void {
-    this.projectMenu?.toggle();
+    this.projectMenu()?.toggle();
   }
 
   onProjectRenamed(name: string): void {
@@ -283,23 +276,23 @@ export class HeaderBarComponent implements OnInit {
     const target = event.target as Node | null;
     if (!target) return;
 
-    this.projectMenu?.closeIfClickedOutside(target, this.projectMenuContainer?.nativeElement);
+    this.projectMenu()?.closeIfClickedOutside(target, this.projectMenuContainer()?.nativeElement);
 
     if (this.isUserMenuOpen) {
-      const triggerEl = this.userMenuContainer?.nativeElement;
-      const panelEl = this.userMenuDropdownEl?.nativeElement;
+      const triggerEl = this.userMenuContainer()?.nativeElement;
+      const panelEl = this.userMenuDropdownEl()?.nativeElement;
       if (!(triggerEl && triggerEl.contains(target)) && !(panelEl && panelEl.contains(target))) {
         this.closeUserMenu();
       }
     }
 
-    this.projectSearch?.closeIfClickedOutside(target);
+    this.projectSearch()?.closeIfClickedOutside(target);
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
-    this.projectMenu?.close();
+    this.projectMenu()?.close();
     this.closeUserMenu();
-    this.projectSearch?.closeDropdown();
+    this.projectSearch()?.closeDropdown();
   }
 }

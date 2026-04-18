@@ -263,6 +263,7 @@
         title="Rename project"
         description="Update the project name shown throughout your workspace and on your profile."
         [isBusy]="isRenamingProject()"
+        [footerTemplate]="renameDialogFooter"
         (closed)="closeRenameProjectDialog()">
         <form
           class="project-dialog-form"
@@ -279,28 +280,27 @@
             [errorText]="renameProjectNameError"
             [forceInvalid]="!!renameProjectError()"></app-text-input>
         </form>
-
-        <ng-template #dialogFooter>
-          <div class="project-dialog-footer">
-            <app-action-button
-              type="button"
-              variant="outline"
-              [fullWidth]="false"
-              [disabled]="isRenamingProject() || renameDialog.isClosing"
-              (clicked)="renameDialog.requestClose()">
-              Cancel
-            </app-action-button>
-            <app-action-button
-              type="submit"
-              variant="primary"
-              [form]="renameProjectFormId"
-              [fullWidth]="false"
-              [disabled]="isRenamingProject() || renameDialog.isClosing || renameProjectForm.invalid">
-              {{ isRenamingProject() ? 'Saving...' : 'Save name' }}
-            </app-action-button>
-          </div>
-        </ng-template>
       </app-dialog-box>
+      <ng-template #renameDialogFooter>
+        <div class="project-dialog-footer">
+          <app-action-button
+            type="button"
+            variant="outline"
+            [fullWidth]="false"
+            [disabled]="isRenamingProject() || renameDialog.isClosing"
+            (clicked)="renameDialog.requestClose()">
+            Cancel
+          </app-action-button>
+          <app-action-button
+            type="submit"
+            variant="primary"
+            [form]="renameProjectFormId"
+            [fullWidth]="false"
+            [disabled]="isRenamingProject() || renameDialog.isClosing || renameProjectForm.invalid">
+            {{ isRenamingProject() ? 'Saving...' : 'Save name' }}
+          </app-action-button>
+        </div>
+      </ng-template>
     }
 
     @if (isDeleteDialogOpen()) {

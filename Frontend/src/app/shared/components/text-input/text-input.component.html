@@ -1,45 +1,45 @@
 <div class="input-wrapper" [class.failed-validation]="isInvalid">
-  @if (label) {
-    <label class="input-label" [attr.for]="id">
-      {{ label }}
-      @if (requiredMarker) {
+  @if (label()) {
+    <label class="input-label" [attr.for]="id()">
+      {{ label() }}
+      @if (requiredMarker()) {
         <span class="failed-validation">*</span>
       }
     </label>
   }
 
   <div class="input-control-wrap">
-    @if (multiline) {
+    @if (multiline()) {
       <textarea
         #inputElement
         class="text-input text-input--textarea"
-        [id]="id"
-        [placeholder]="placeholder"
+        [id]="id()"
+        [placeholder]="placeholder()"
         [value]="value"
         [disabled]="disabled"
-        [readonly]="readonly"
-        [attr.maxlength]="maxLength ?? null"
-        [rows]="rows"
+        [readonly]="readonly()"
+        [attr.maxlength]="maxLength() ?? null"
+        [rows]="rows()"
         (input)="handleInput($event)"
         (blur)="handleBlur()"></textarea>
     } @else {
       <input
         #inputElement
         class="text-input"
-        [class.text-input--with-toggle]="type === 'password' && enablePasswordToggle"
-        [id]="id"
+        [class.text-input--with-toggle]="type() === 'password' && enablePasswordToggle()"
+        [id]="id()"
         [type]="computedType"
-        [placeholder]="placeholder"
+        [placeholder]="placeholder()"
         [value]="value"
         [disabled]="disabled"
-        [readonly]="readonly"
-        [autocomplete]="autocomplete"
-        [attr.maxlength]="maxLength ?? null"
+        [readonly]="readonly()"
+        [autocomplete]="autocomplete()"
+        [attr.maxlength]="maxLength() ?? null"
         (input)="handleInput($event)"
         (blur)="handleBlur()" />
     }
 
-    @if (!multiline && type === 'password' && enablePasswordToggle) {
+    @if (!multiline() && type() === 'password' && enablePasswordToggle()) {
       <div class="toggle-visibility-wrapper">
         <button
           type="button"
@@ -57,7 +57,7 @@
     }
   </div>
 
-  @if (errorText && isInvalid) {
-    <div class="validation-message">{{ errorText }}</div>
+  @if (errorText() && isInvalid) {
+    <div class="validation-message">{{ errorText() }}</div>
   }
 </div>

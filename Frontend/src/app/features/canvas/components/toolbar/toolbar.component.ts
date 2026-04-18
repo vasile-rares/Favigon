@@ -1,5 +1,4 @@
-import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 import { CanvasElementType } from '@app/core';
 
 type ToolbarTool = CanvasElementType | 'select';
@@ -13,18 +12,18 @@ interface ToolbarAction {
 @Component({
   selector: 'app-toolbar',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './toolbar.component.html',
   styleUrl: './toolbar.component.css',
 })
 export class ToolbarComponent {
-  @Input() activeTool: ToolbarTool = 'select';
-  @Input() zoomLevel: number = 100;
+  readonly activeTool = input<ToolbarTool>('select');
+  readonly zoomLevel = input(100);
 
-  @Output() toolSelected = new EventEmitter<ToolbarTool>();
-  @Output() zoomInRequested = new EventEmitter<void>();
-  @Output() zoomOutRequested = new EventEmitter<void>();
-  @Output() zoomResetRequested = new EventEmitter<void>();
+  readonly toolSelected = output<ToolbarTool>();
+  readonly zoomInRequested = output<void>();
+  readonly zoomOutRequested = output<void>();
+  readonly zoomResetRequested = output<void>();
 
   readonly actions: ToolbarAction[] = [
     { tool: 'select', label: 'Select', shortcut: 'V' },

@@ -1,5 +1,4 @@
-import { Component, Directive, Input, HostBinding } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, Directive, HostBinding, input } from '@angular/core';
 
 @Directive({
   selector: '[appAlertTitle]',
@@ -24,10 +23,10 @@ export class AlertDescriptionDirective {
 @Component({
   selector: 'app-alert',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './alert.component.html',
   styleUrls: ['./alert.component.css'],
 })
 export class AlertComponent {
-  @Input() variant: 'default' | 'destructive' | 'success' = 'default';
+  readonly variant = input<'default' | 'destructive' | 'success'>('default');
 }

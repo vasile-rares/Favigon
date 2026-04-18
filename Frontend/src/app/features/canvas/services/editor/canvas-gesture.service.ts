@@ -197,15 +197,6 @@ export class CanvasGestureService {
     this.suppressNextPageShellClick = value;
   }
 
-  // ── Gesture state queries ─────────────────────────────────
-
-  isCurrentlyResizing(): boolean {
-    return this.isResizing;
-  }
-  isCurrentlyRotating(): boolean {
-    return this.isRotating;
-  }
-
   cancelDragState(): void {
     this.isDragging = false;
     this.isResizing = false;

@@ -1,5 +1,5 @@
-import { Component, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
-import { CommonModule } from '@angular/common';
+﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { DropdownSelectComponent, ToggleGroupComponent, ContextMenuComponent } from '@app/shared';
 import type { DropdownSelectOption, ToggleGroupOption, ContextMenuItem } from '@app/shared';
@@ -36,22 +36,16 @@ const ACCESSIBILITY_FIELD_DEFINITIONS: readonly AccessibilityFieldDefinition[] =
 @Component({
   selector: 'app-dt-extras-section',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    DropdownSelectComponent,
-    ToggleGroupComponent,
-    ContextMenuComponent,
-  ],
+  imports: [FormsModule, DropdownSelectComponent, ToggleGroupComponent, ContextMenuComponent],
   templateUrl: './extras-section.component.html',
   encapsulation: ViewEncapsulation.None,
 })
 export class ExtrasSectionComponent {
-  @Input() element!: CanvasElement;
-  @Input() pages: readonly CanvasPageModel[] = [];
-  @Input() currentPageId: string | null = null;
+  readonly element = input.required<CanvasElement>();
+  readonly pages = input<readonly CanvasPageModel[]>([]);
+  readonly currentPageId = input<string | null>(null);
 
-  @Output() elementPatch = new EventEmitter<Partial<CanvasElement>>();
+  readonly elementPatch = output<Partial<CanvasElement>>();
 
   accessibilityMenuItems: ContextMenuItem[] = [];
   accessibilityMenuX = 0;
@@ -101,7 +95,7 @@ export class ExtrasSectionComponent {
   }
 
   onLinkSectionHeaderClick(): void {
-    if (this.hasLink(this.element)) {
+    if (this.hasLink(this.element())) {
       this.removeLink();
       return;
     }
@@ -122,10 +116,10 @@ export class ExtrasSectionComponent {
       element.linkType === 'page' && typeof element.linkPageId === 'string'
         ? element.linkPageId
         : null;
-    return this.pages
-      .filter((page) => page.id !== this.currentPageId || page.id === selectedPageId)
+    return this.pages()
+      .filter((page) => page.id !== this.currentPageId() || page.id === selectedPageId)
       .map((page) => ({
-        label: page.id === this.currentPageId ? `${page.name} (current)` : page.name,
+        label: page.id === this.currentPageId() ? `${page.name} (current)` : page.name,
         value: page.id,
       }));
   }
@@ -162,7 +156,7 @@ export class ExtrasSectionComponent {
   }
 
   onLinkPageChange(value: string | number | boolean | null): void {
-    if (typeof value !== 'string' || !this.pages.some((page) => page.id === value)) return;
+    if (typeof value !== 'string' || !this.pages().some((page) => page.id === value)) return;
     this.elementPatch.emit({
       linkType: 'page',
       linkPageId: value,
@@ -205,11 +199,12 @@ export class ExtrasSectionComponent {
 
   private firstAvailableLinkPageId(): string | undefined {
     const selectedPageId =
-      this.element.linkType === 'page' && typeof this.element.linkPageId === 'string'
-        ? this.element.linkPageId
+      this.element().linkType === 'page' && typeof this.element().linkPageId === 'string'
+        ? this.element().linkPageId
         : null;
-    return this.pages.find((page) => page.id !== this.currentPageId || page.id === selectedPageId)
-      ?.id;
+    return this.pages().find(
+      (page) => page.id !== this.currentPageId() || page.id === selectedPageId,
+    )?.id;
   }
 
   // -- Position --
@@ -236,7 +231,7 @@ export class ExtrasSectionComponent {
   }
 
   onCursorSectionHeaderClick(): void {
-    if (this.hasCursor(this.element)) {
+    if (this.hasCursor(this.element())) {
       this.removeCursor();
       return;
     }
@@ -331,12 +326,12 @@ export class ExtrasSectionComponent {
   }
 
   onAccessibilityTagChange(value: string | number | boolean | null): void {
-    if (this.hasLink(this.element) || typeof value !== 'string') return;
-    this.elementPatch.emit({ tag: normalizeStoredCanvasTag(this.element.type, value, false) });
+    if (this.hasLink(this.element()) || typeof value !== 'string') return;
+    this.elementPatch.emit({ tag: normalizeStoredCanvasTag(this.element().type, value, false) });
   }
 
   onAccessibilityLabelChange(event: Event): void {
-    this.setAccessibilityFieldOverride(this.element.id, 'ariaLabel', true);
+    this.setAccessibilityFieldOverride(this.element().id, 'ariaLabel', true);
     this.elementPatch.emit({
       ariaLabel: normalizeCanvasAccessibilityLabel((event.target as HTMLInputElement).value),
     });
@@ -348,7 +343,7 @@ export class ExtrasSectionComponent {
 
     if (this.accessibilityMenuItems.length > 0) return;
 
-    this.accessibilityMenuItems = this.buildAccessibilityMenuItems(this.element);
+    this.accessibilityMenuItems = this.buildAccessibilityMenuItems(this.element());
     this.accessibilityMenuX = position.x;
     this.accessibilityMenuY = position.y;
   }
@@ -366,20 +361,20 @@ export class ExtrasSectionComponent {
 
   private toggleAccessibilityField(field: AccessibilityField): void {
     if (field === 'tag') {
-      if (this.hasLink(this.element)) {
+      if (this.hasLink(this.element())) {
         this.closeAccessibilityMenu();
         return;
       }
-      if (this.hasAccessibilityField(this.element, 'tag')) {
+      if (this.hasAccessibilityField(this.element(), 'tag')) {
         this.elementPatch.emit({ tag: undefined });
       } else {
-        this.elementPatch.emit({ tag: getDefaultAccessibilityTag(this.element.type) });
+        this.elementPatch.emit({ tag: getDefaultAccessibilityTag(this.element().type) });
       }
       this.closeAccessibilityMenu();
       return;
     }
-    const isActive = this.hasAccessibilityField(this.element, field);
-    this.setAccessibilityFieldOverride(this.element.id, field, !isActive);
+    const isActive = this.hasAccessibilityField(this.element(), field);
+    this.setAccessibilityFieldOverride(this.element().id, field, !isActive);
     if (isActive) {
       this.elementPatch.emit({ ariaLabel: undefined });
     }

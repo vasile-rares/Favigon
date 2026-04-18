@@ -1,5 +1,5 @@
-import { Component, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
-import { CommonModule } from '@angular/common';
+﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { DropdownSelectComponent, ContextMenuComponent } from '@app/shared';
 import { NumberInputComponent } from '../../number-input/number-input.component';
@@ -81,24 +81,18 @@ const DIMENSION_CONSTRAINT_FIELD_DEFINITIONS: readonly DimensionConstraintFieldD
 @Component({
   selector: 'app-dt-dimensions-section',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    DropdownSelectComponent,
-    NumberInputComponent,
-    ContextMenuComponent,
-  ],
+  imports: [FormsModule, DropdownSelectComponent, NumberInputComponent, ContextMenuComponent],
   templateUrl: './dimensions-section.component.html',
   encapsulation: ViewEncapsulation.None,
 })
 export class DimensionsSectionComponent {
-  @Input() element!: CanvasElement;
-  @Input() pages: readonly CanvasPageModel[] = [];
-  @Input() currentPageId: string | null = null;
+  readonly element = input.required<CanvasElement>();
+  readonly pages = input<readonly CanvasPageModel[]>([]);
+  readonly currentPageId = input<string | null>(null);
 
-  @Output() elementPatch = new EventEmitter<Partial<CanvasElement>>();
-  @Output() numberInputGestureStarted = new EventEmitter<void>();
-  @Output() numberInputGestureCommitted = new EventEmitter<void>();
+  readonly elementPatch = output<Partial<CanvasElement>>();
+  readonly numberInputGestureStarted = output<void>();
+  readonly numberInputGestureCommitted = output<void>();
 
   dimensionMenuItems: ContextMenuItem[] = [];
   dimensionMenuX = 0;
@@ -180,7 +174,7 @@ export class DimensionsSectionComponent {
   onDimensionValueChange(axis: CanvasSizeAxis, value: number): void {
     if (!Number.isFinite(value)) return;
 
-    const element = this.element;
+    const element = this.element();
     const mode = this.dimensionModeValue(element, axis);
     if (shouldDisableCanvasSizeInput(mode)) return;
 
@@ -214,7 +208,7 @@ export class DimensionsSectionComponent {
   onDimensionModeChange(axis: CanvasSizeAxis, value: string | number | boolean | null): void {
     if (typeof value !== 'string') return;
 
-    const element = this.element;
+    const element = this.element();
     const parent = this.parentElement(element);
     const nextMode = normalizeCanvasSizeMode(value, element, parent);
 
@@ -304,7 +298,7 @@ export class DimensionsSectionComponent {
   onDimensionConstraintValueChange(field: DimensionConstraintField, value: number): void {
     if (!Number.isFinite(value)) return;
 
-    const element = this.element;
+    const element = this.element();
     const mode = this.dimensionConstraintModeValue(element, field);
     const axis: CanvasSizeAxis = field === 'minWidth' || field === 'maxWidth' ? 'width' : 'height';
     const normalizedValue = Math.max(1, roundToTwoDecimals(value));
@@ -339,7 +333,7 @@ export class DimensionsSectionComponent {
   ): void {
     if (typeof value !== 'string') return;
 
-    const element = this.element;
+    const element = this.element();
     const parent = this.parentElement(element);
     const nextMode = normalizeCanvasConstraintMode(value, element, parent);
     const currentMode = this.dimensionConstraintModeValue(element, field);
@@ -489,7 +483,7 @@ export class DimensionsSectionComponent {
     const position = this.resolveMenuPosition(event, trigger);
     if (!position) return;
     if (this.dimensionMenuItems.length > 0) return;
-    this.dimensionMenuItems = this.buildDimensionMenuItems(this.element);
+    this.dimensionMenuItems = this.buildDimensionMenuItems(this.element());
     this.dimensionMenuX = position.x;
     this.dimensionMenuY = position.y;
   }
@@ -505,7 +499,7 @@ export class DimensionsSectionComponent {
   }
 
   private toggleDimensionConstraintField(field: DimensionConstraintField): void {
-    const element = this.element;
+    const element = this.element();
     if (this.hasDimensionConstraintField(element, field)) {
       this.elementPatch.emit({
         [field]: undefined,
@@ -525,9 +519,9 @@ export class DimensionsSectionComponent {
   }
 
   private currentPageModel(): CanvasPageModel | null {
-    const currentPageId = this.currentPageId;
-    if (!currentPageId) return this.pages[0] ?? null;
-    return this.pages.find((page) => page.id === currentPageId) ?? this.pages[0] ?? null;
+    const currentPageId = this.currentPageId();
+    if (!currentPageId) return this.pages()[0] ?? null;
+    return this.pages().find((page) => page.id === currentPageId) ?? this.pages()[0] ?? null;
   }
 
   private parentElement(element: CanvasElement): CanvasElement | null {

@@ -30,7 +30,8 @@
       <div class="settings-tab-content">
 
         <!-- Account Tab -->
-        <div *ngIf="activeTab === 'account'" class="tab-panel fade-in">
+        @if (activeTab === 'account') {
+<div class="tab-panel fade-in">
 
           <!-- Details Card -->
           <div class="settings-card">
@@ -156,10 +157,12 @@
               </app-action-button>
             </div>
           </div>
-        </div><!-- end .tab-panel (account) -->
+        </div>
+}<!-- end .tab-panel (account) -->
 
         <!-- Security/Password Tab -->
-        <div *ngIf="activeTab === 'password'" class="tab-panel fade-in">
+        @if (activeTab === 'password') {
+<div class="tab-panel fade-in">
           <div class="settings-card">
             <div class="card-header">
               <h3 class="card-title">Password</h3>
@@ -221,9 +224,11 @@
             </div>
           </div>
         </div>
+}
 
         <!-- Linked Accounts Tab -->
-        <div *ngIf="activeTab === 'linked-accounts'" class="settings-card fade-in">
+        @if (activeTab === 'linked-accounts') {
+<div class="settings-card fade-in">
           <div class="card-header">
             <h3 class="card-title">Linked Accounts</h3>
             <p class="card-description">Manage external platforms connected to your Favigon account.</p>
@@ -305,6 +310,7 @@
 
           </div>
         </div>
+}
 
       </div>
     </div>

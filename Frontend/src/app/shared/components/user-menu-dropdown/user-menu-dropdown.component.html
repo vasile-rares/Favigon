@@ -1,6 +1,7 @@
 <div class="user-menu">
-  <div
-    *ngIf="showPanel"
+  @if (showPanel) {
+<div
+
     class="user-menu__panel"
     [class.user-menu__panel--open]="!isClosing"
     [class.user-menu__panel--closing]="isClosing"
@@ -8,17 +9,19 @@
     aria-label="User actions">
     <div class="user-menu__identity">
       <span class="user-menu__identity-avatar">
-        <img [src]="avatarUrl" [alt]="displayName" />
+        <img [src]="avatarUrl()" [alt]="displayName()" />
       </span>
       <span class="user-menu__identity-text">
-        <span class="user-menu__identity-name">{{ displayName || 'Account' }}</span>
-        <span class="user-menu__identity-email" *ngIf="email">{{ email }}</span>
+        <span class="user-menu__identity-name">{{ displayName() || 'Account' }}</span>
+        @if (email()) {
+<span class="user-menu__identity-email">{{ email() }}</span>
+}
       </span>
     </div>
 
     <div class="user-menu__divider"></div>
 
-    <a class="user-menu__item" role="menuitem" [routerLink]="['/', username]" (click)="closeMenu()">
+      <a class="user-menu__item" role="menuitem" [routerLink]="['/', username()]" (click)="closeMenu()">
       <span class="user-menu__item-icon" aria-hidden="true">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
       </span>
@@ -41,4 +44,5 @@
       <span>Log out</span>
     </button>
   </div>
+}
 </div>

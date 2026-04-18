@@ -14,37 +14,41 @@
   <div class="properties-panel-content">
 
     <!-- ── Design Tab ───────────────────────────────────── -->
-    <ng-container *ngIf="isTabActive('design'); else generationTab">
+    @if (isTabActive('design')) {
+
       <app-design-tab
-        [selectedElement]="selectedElement"
-        [projectId]="projectId"
-        [autoOpenFillPopupElementId]="autoOpenFillPopupElementId"
-        [pages]="pages"
-        [currentPageId]="currentPageId"
-        [currentTool]="currentTool"
+        [selectedElement]="selectedElement()"
+        [projectId]="projectId()"
+        [autoOpenFillPopupElementId]="autoOpenFillPopupElementId()"
+        [pages]="pages()"
+        [currentPageId]="currentPageId()"
+        [currentTool]="currentTool()"
         (elementPatch)="elementPatch.emit($event)"
         (numberInputGestureStarted)="numberInputGestureStarted.emit()"
         (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"
         (frameTemplateSelected)="frameTemplateSelected.emit($event)">
       </app-design-tab>
-    </ng-container>
 
-    <!-- ── Generation Tab ───────────────────────────────── -->
-    <ng-template #generationTab>
+} @else {
+
       <app-generation-tab
-        [selectedFramework]="selectedFramework"
-        [validationResult]="validationResult"
-        [apiError]="apiError"
-        [isValidating]="isValidating"
-        [isGenerating]="isGenerating"
-        [generatedHtml]="generatedHtml"
-        [generatedCss]="generatedCss"
-        [generatedFiles]="generatedFiles"
-        [irPreview]="irPreview"
+        [selectedFramework]="selectedFramework()"
+        [validationResult]="validationResult()"
+        [apiError]="apiError()"
+        [isValidating]="isValidating()"
+        [isGenerating]="isGenerating()"
+        [generatedHtml]="generatedHtml()"
+        [generatedCss]="generatedCss()"
+        [generatedFiles]="generatedFiles()"
+        [irPreview]="irPreview()"
         (frameworkChanged)="frameworkChanged.emit($event)"
         (validateRequested)="validateRequested.emit()"
         (generateRequested)="generateRequested.emit()"></app-generation-tab>
-    </ng-template>
+
+}
+
+    <!-- ── Generation Tab ───────────────────────────────── -->
+
 
   </div>
 </aside>

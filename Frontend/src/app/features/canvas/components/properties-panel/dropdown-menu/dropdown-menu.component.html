@@ -1,5 +1,7 @@
-  <ng-container [ngSwitch]="kind">
-    <div class="field-input__popup-section" *ngSwitchCase="'fill'">
+
+@switch (kind()) {
+    @case ('fill') {
+<div class="field-input__popup-section">
       <div class="field-input__color-picker">
         <app-toggle-group
           class="field-input__mode-toggle"
@@ -10,7 +12,8 @@
           [minWidth]="null"
           (valueChange)="onColorModeValueChange($event)"></app-toggle-group>
 
-        <ng-container *ngIf="selectedColorMode !== 'image'">
+        @if (selectedColorMode !== 'image') {
+
           <div
             class="field-input__color-picker-surface"
             [style.background-color]="pickerHueColor()"
@@ -34,10 +37,13 @@
               </div>
             </div>
           </div>
-        </ng-container>
 
-        <ng-container *ngIf="selectedColorMode === 'image'">
-          <div class="field-input__image-upload-area" *ngIf="!imagePreviewUrl">
+}
+
+        @if (selectedColorMode === 'image') {
+
+          @if (!imagePreviewUrl) {
+<div class="field-input__image-upload-area">
             <label class="field-input__image-upload-label" [class.is-disabled]="isUploadingImage">
               <input
                 type="file"
@@ -51,8 +57,10 @@
               <span>{{ isUploadingImage ? 'Uploading...' : 'Upload Image' }}</span>
             </label>
           </div>
+}
 
-          <div class="field-input__image-preview-area" *ngIf="imagePreviewUrl">
+          @if (imagePreviewUrl) {
+<div class="field-input__image-preview-area">
             <img class="field-input__image-preview" [src]="imagePreviewUrl" alt="Fill image preview" />
             <div class="field-input__image-preview-actions">
               <label class="field-input__image-replace-button" [class.is-disabled]="isUploadingImage">
@@ -67,9 +75,14 @@
               <button type="button" class="field-input__image-remove-button" [disabled]="isUploadingImage" (click)="onRemoveImage()">Remove</button>
             </div>
           </div>
+}
 
-          <p class="field-input__image-status" *ngIf="isUploadingImage">Uploading image asset...</p>
-          <p class="field-input__image-status field-input__image-status--error" *ngIf="imageUploadError">{{ imageUploadError }}</p>
+          @if (isUploadingImage) {
+<p class="field-input__image-status">Uploading image asset...</p>
+}
+          @if (imageUploadError) {
+<p class="field-input__image-status field-input__image-status--error">{{ imageUploadError }}</p>
+}
 
           <div class="field-input__popup-divider" aria-hidden="true"></div>
 
@@ -85,16 +98,18 @@
                 (ngModelChange)="onImageTypeChange($event)"></app-dropdown-select>
             </div>
 
-            <div class="field-input__image-option-row" *ngIf="imageTypeValue() !== 'stretch'">
+            @if (imageTypeValue() !== 'stretch') {
+<div class="field-input__image-option-row">
               <span class="field-input__popup-field-label">Position</span>
               <app-dropdown-select
                 class="field-input__popup-dropdown"
                 [enableSearch]="false"
                 [placeholder]="'Position'"
                 [options]="backgroundPositionOptions"
-                [ngModel]="backgroundPosition"
+                [ngModel]="backgroundPosition()"
                 (ngModelChange)="onBackgroundPositionChange($event)"></app-dropdown-select>
             </div>
+}
 
             <div class="field-input__image-option-row">
               <span class="field-input__popup-field-label">Alt Text</span>
@@ -103,15 +118,17 @@
                   class="field-input__popup-text-input"
                   type="text"
                   placeholder="Describe this image"
-                  [value]="imageAltText"
+                  [value]="imageAltText()"
                   (change)="onImageAltTextChange($event)" />
               </div>
             </div>
           </div>
-        </ng-container>
+
+}
       </div>
 
-      <ng-container *ngIf="selectedColorMode !== 'image'">
+      @if (selectedColorMode !== 'image') {
+
         <div class="field-input__popup-color-row">
           <app-dropdown-select
             class="field-input__popup-dropdown field-input__popup-dropdown--color-format"
@@ -146,10 +163,13 @@
               fill="#ffffff" />
           </svg>
         </button>
-      </ng-container>
-    </div>
 
-    <div class="field-input__popup-section" *ngSwitchCase="'stroke'">
+}
+    </div>
+}
+
+    @case ('stroke') {
+<div class="field-input__popup-section">
       <div class="field-input__color-picker">
         <div
           class="field-input__color-picker-surface"
@@ -249,8 +269,10 @@
           </div>
         </div>
 
-          <div class="field-input__stroke-width-grid" *ngIf="borderSideMode === 'per-side'">
-            <div class="field-input__stroke-width-field" *ngFor="let side of borderWidthFields">
+          @if (borderSideMode === 'per-side') {
+<div class="field-input__stroke-width-grid">
+            @for (side of borderWidthFields; track side) {
+<div class="field-input__stroke-width-field">
               <div class="field-input__stroke-width-input">
                 <app-number-input
                   appearance="compact"
@@ -266,10 +288,14 @@
                 </span>
               </div>
             </div>
+}
         </div>
+}
       </div>
     </div>
-    <div class="field-input__popup-section" *ngSwitchCase="'shadow'">
+}
+    @case ('shadow') {
+<div class="field-input__popup-section">
       <div class="field-input__color-picker">
         <div
           class="field-input__color-picker-surface"
@@ -405,8 +431,12 @@
         </div>
       </div>
     </div>
+}
 
-    <div class="field-input__popup-section" *ngSwitchCase="'effect'">
-      <ng-container *ngTemplateOutlet="effectTemplate"></ng-container>
+    @case ('effect') {
+<div class="field-input__popup-section">
+      <ng-container *ngTemplateOutlet="effectTemplate()"></ng-container>
     </div>
-  </ng-container>
+}
+  }
+

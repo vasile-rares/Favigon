@@ -10,13 +10,13 @@
         min="0"
         max="1"
         step="0.01"
-        [style.--pp-slider-value]="opacitySliderPercent(element)"
-        [value]="element.opacity ?? 1"
+        [style.--pp-slider-value]="opacitySliderPercent(element())"
+        [value]="element().opacity ?? 1"
         (input)="onNumberChange('opacity', $event)" />
       <app-number-input
         appearance="compact"
         ariaLabel="Opacity"
-        [value]="element.opacity ?? 1"
+        [value]="element().opacity ?? 1"
         [min]="0"
         [max]="1"
         [step]="0.01"
@@ -31,31 +31,32 @@
     <app-toggle-group
       [ariaLabel]="'Visibility toggle'"
       [options]="visibleOptions"
-      [value]="isVisible(element)"
+      [value]="isVisible(element())"
       (valueChange)="setVisible($event === true)"></app-toggle-group>
   </div>
 
-  <div class="pp-style-row" *ngIf="hasFill(element.type)">
+  @if (hasFill(element().type)) {
+<div class="pp-style-row">
     <span class="pp-row-label">Fill</span>
     <div class="pp-style-control pp-style-control--popup">
       <app-field-input
         kind="fill"
-        [projectId]="projectId"
-        [autoOpenKey]="autoOpenFillPopupElementId === element.id ? autoOpenFillPopupElementId : null"
-        [hasValue]="!isTransparentFill(element)"
-        [triggerText]="fillLabel(element)"
-        [swatchColor]="fillSwatchBackground(element)"
-        [isTransparent]="isTransparentFill(element)"
-        [colorValue]="fillInputValue(element)"
-        [pickerColor]="fillPickerValue(element)"
-        [backgroundImage]="element.backgroundImage ?? null"
-        [backgroundSize]="element.backgroundSize ?? 'cover'"
-        [backgroundPosition]="element.backgroundPosition ?? 'center'"
-        [backgroundRepeat]="element.backgroundRepeat ?? 'no-repeat'"
-        [objectFit]="element.objectFit ?? 'cover'"
-        [imageAltText]="element.imageAltText ?? element.ariaLabel ?? ''"
-        [initialColorMode]="element.fillMode === 'image' ? 'image' : 'solid'"
-        [activationPatch]="{ fill: fillPickerValue(element) }"
+        [projectId]="projectId()"
+        [autoOpenKey]="autoOpenFillPopupElementId() === element().id ? autoOpenFillPopupElementId() : null"
+        [hasValue]="!isTransparentFill(element())"
+        [triggerText]="fillLabel(element())"
+        [swatchColor]="fillSwatchBackground(element())"
+        [isTransparent]="isTransparentFill(element())"
+        [colorValue]="fillInputValue(element())"
+        [pickerColor]="fillPickerValue(element())"
+        [backgroundImage]="element().backgroundImage ?? null"
+        [backgroundSize]="element().backgroundSize ?? 'cover'"
+        [backgroundPosition]="element().backgroundPosition ?? 'center'"
+        [backgroundRepeat]="element().backgroundRepeat ?? 'no-repeat'"
+        [objectFit]="element().objectFit ?? 'cover'"
+        [imageAltText]="element().imageAltText ?? element().ariaLabel ?? ''"
+        [initialColorMode]="element().fillMode === 'image' ? 'image' : 'solid'"
+        [activationPatch]="{ fill: fillPickerValue(element()) }"
         [clearPatch]="{ fill: 'transparent', fillMode: 'color', backgroundImage: undefined }"
         (patchRequested)="elementPatch.emit($event)"
         (numberGestureStarted)="onNumberInputGestureStarted()"
@@ -63,27 +64,31 @@
       </app-field-input>
     </div>
   </div>
+}
 
-  <div class="pp-style-row" *ngIf="supportsOverflow(element.type)">
+  @if (supportsOverflow(element().type)) {
+<div class="pp-style-row">
     <span class="pp-row-label">Overflow</span>
     <div class="pp-style-control pp-style-control--dropdown">
       <app-dropdown-select
         [enableSearch]="false"
         [placeholder]="'Overflow'"
         [options]="overflowOptions"
-        [ngModel]="overflowValue(element)"
+        [ngModel]="overflowValue(element())"
         (ngModelChange)="onOverflowChange($event)"></app-dropdown-select>
     </div>
   </div>
+}
 
-  <div class="pp-style-row pp-style-row--corner-radius" *ngIf="supportsCornerRadius(element.type)">
+  @if (supportsCornerRadius(element().type)) {
+<div class="pp-style-row pp-style-row--corner-radius">
     <span class="pp-row-label">Radius</span>
     <div class="pp-style-control pp-style-control--corner-radius">
       <div class="pp-corner-radius-header">
         <app-number-input
           appearance="compact"
           ariaLabel="Corner radius"
-          [value]="fullCornerRadiusInputValue(element)"
+          [value]="fullCornerRadiusInputValue(element())"
           [min]="0"
           [step]="1"
           (gestureStarted)="onNumberInputGestureStarted()"
@@ -93,76 +98,90 @@
           <app-toggle-group
             [ariaLabel]="'Corner radius mode'"
             [options]="cornerRadiusModeOptions"
-            [value]="cornerRadiusMode(element)"
+            [value]="cornerRadiusMode(element())"
             [stretch]="true"
             [minWidth]="null"
             (valueChange)="onCornerRadiusModeChange($event)"></app-toggle-group>
         </div>
       </div>
 
-      <div class="pp-corner-radius-grid" *ngIf="cornerRadiusMode(element) === 'per-corner'">
-        <div class="pp-corner-radius-field" *ngFor="let corner of cornerRadiusFields">
+      @if (cornerRadiusMode(element()) === 'per-corner') {
+<div class="pp-corner-radius-grid">
+        @for (corner of cornerRadiusFields; track corner) {
+<div class="pp-corner-radius-field">
           <div class="pp-corner-radius-input">
             <app-number-input
               appearance="compact"
               [ariaLabel]="corner.ariaLabel"
-              [value]="cornerRadiusValue(element, corner.key)"
+              [value]="cornerRadiusValue(element(), corner.key)"
               [min]="0"
               [step]="1"
               (gestureStarted)="onNumberInputGestureStarted()"
               (gestureCommitted)="onNumberInputGestureCommitted()"
               (valueChange)="onCornerRadiusCornerChange(corner.key, $event)"></app-number-input>
             <span class="pp-corner-radius-tag" aria-hidden="true">
-              <svg
-                *ngIf="corner.key === 'topLeft'"
+              @if (corner.key === 'topLeft') {
+<svg
+
                 class="pp-corner-radius-tag-icon"
                 viewBox="0 0 12 12"
                 fill="none">
                 <path d="M9.5 2H2V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
-              <svg
-                *ngIf="corner.key === 'topRight'"
+}
+              @if (corner.key === 'topRight') {
+<svg
+
                 class="pp-corner-radius-tag-icon"
                 viewBox="0 0 12 12"
                 fill="none">
                 <path d="M2.5 2H10V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
-              <svg
-                *ngIf="corner.key === 'bottomRight'"
+}
+              @if (corner.key === 'bottomRight') {
+<svg
+
                 class="pp-corner-radius-tag-icon"
                 viewBox="0 0 12 12"
                 fill="none">
                 <path d="M2.5 10H10V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
-              <svg
-                *ngIf="corner.key === 'bottomLeft'"
+}
+              @if (corner.key === 'bottomLeft') {
+<svg
+
                 class="pp-corner-radius-tag-icon"
                 viewBox="0 0 12 12"
                 fill="none">
                 <path d="M9.5 10H2V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
               </svg>
+}
             </span>
           </div>
         </div>
+}
       </div>
+}
     </div>
   </div>
+}
 
-  <ng-container *ngIf="hasStroke(element.type)">
+  @if (hasStroke(element().type)) {
+
     <div class="pp-style-row">
       <span class="pp-row-label">Border</span>
       <div class="pp-style-control pp-style-control--popup">
         <app-field-input
           kind="stroke"
-          [hasValue]="hasActiveBorder(element)"
-          [triggerText]="borderSummary(element)"
-          [swatchColor]="strokeSwatchBackground(element)"
-          [colorValue]="strokeInputValue(element)"
-          [pickerColor]="strokeInputValue(element)"
-          [strokeWidth]="element.strokeWidth ?? 1"
-          [strokeStyle]="borderStyleValue(element)"
-          [strokeSides]="strokeSidesValue(element)"
-          [strokeWidths]="strokeWidthsValue(element)"
+          [hasValue]="hasActiveBorder(element())"
+          [triggerText]="borderSummary(element())"
+          [swatchColor]="strokeSwatchBackground(element())"
+          [colorValue]="strokeInputValue(element())"
+          [pickerColor]="strokeInputValue(element())"
+          [strokeWidth]="element().strokeWidth ?? 1"
+          [strokeStyle]="borderStyleValue(element())"
+          [strokeSides]="strokeSidesValue(element())"
+          [strokeWidths]="strokeWidthsValue(element())"
           [borderStyleOptions]="borderStyleOptions"
           [activationPatch]="{ stroke: '#52525b', strokeWidth: 1, strokeStyle: 'Solid', strokeSides: undefined, strokeWidths: undefined }"
           [clearPatch]="{ stroke: undefined, strokeWidth: 0, strokeStyle: undefined, strokeSides: undefined, strokeWidths: undefined }"
@@ -172,16 +191,18 @@
         </app-field-input>
       </div>
     </div>
-  </ng-container>
 
-  <div class="pp-style-row" *ngIf="supportsShadow(element.type)">
+}
+
+  @if (supportsShadow(element().type)) {
+<div class="pp-style-row">
     <span class="pp-row-label">Shadows</span>
     <div class="pp-style-control pp-style-control--popup">
       <app-field-input
         kind="shadow"
-        [hasValue]="hasActiveShadow(element)"
-        [triggerText]="shadowSummary(element)"
-        [shadowValue]="shadowValue(element)"
+        [hasValue]="hasActiveShadow(element())"
+        [triggerText]="shadowSummary(element())"
+        [shadowValue]="shadowValue(element())"
         [activationPatch]="shadowActivationPatch"
         [clearPatch]="shadowClearPatch"
         (patchRequested)="elementPatch.emit($event)"
@@ -190,5 +211,6 @@
       </app-field-input>
     </div>
   </div>
+}
 
 </section>

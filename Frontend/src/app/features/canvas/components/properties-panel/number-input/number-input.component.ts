@@ -1,14 +1,12 @@
 import { CommonModule } from '@angular/common';
 import {
   Component,
-  EventEmitter,
+  effect,
   HostBinding,
   HostListener,
-  Input,
-  OnChanges,
+  input,
   OnDestroy,
-  Output,
-  SimpleChanges,
+  output,
 } from '@angular/core';
 import { roundToTwoDecimals } from '../../../utils/canvas-math.util';
 
@@ -29,32 +27,34 @@ const DRAG_PIXELS_PER_STEP = 4;
   templateUrl: './number-input.component.html',
   styleUrl: './number-input.component.css',
 })
-export class NumberInputComponent implements OnChanges, OnDestroy {
-  @Input() value: number | null = null;
-  @Input() min?: number;
-  @Input() max?: number;
-  @Input() step = 1;
-  @Input() appearance: NumberInputAppearance = 'default';
-  @Input() ariaLabel = 'Numeric input';
-  @Input() suffix: string | null = null;
-  @Input() suffixMode: 'inline' | 'stepper' = 'inline';
-  @Input() disabled = false;
+export class NumberInputComponent implements OnDestroy {
+  readonly value = input<number | null>(null);
+  readonly min = input<number | undefined>(undefined);
+  readonly max = input<number | undefined>(undefined);
+  readonly step = input(1);
+  readonly appearance = input<NumberInputAppearance>('default');
+  readonly ariaLabel = input('Numeric input');
+  readonly suffix = input<string | null>(null);
+  readonly suffixMode = input<'inline' | 'stepper'>('inline');
+  readonly disabled = input(false);
 
-  @Output() valueChange = new EventEmitter<number>();
-  @Output() gestureStarted = new EventEmitter<void>();
-  @Output() gestureCommitted = new EventEmitter<void>();
+  readonly valueChange = output<number>();
+  readonly gestureStarted = output<void>();
+  readonly gestureCommitted = output<void>();
 
   @HostBinding('style.display') readonly hostDisplay = 'block';
   @HostBinding('style.min-width') readonly hostMinWidth = '0';
 
   @HostBinding('style.width')
   get hostWidth(): string {
-    return this.appearance === 'compact' ? 'var(--number-input-compact-host-width, 72px)' : '100%';
+    return this.appearance() === 'compact'
+      ? 'var(--number-input-compact-host-width, 72px)'
+      : '100%';
   }
 
   @HostBinding('style.flex')
   get hostFlex(): string {
-    return this.appearance === 'compact'
+    return this.appearance() === 'compact'
       ? 'var(--number-input-compact-host-flex, 0 0 72px)'
       : '1 1 auto';
   }
@@ -67,18 +67,22 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
   displayValue = '';
   private activeDrag: StepperDragState | null = null;
 
+  constructor() {
+    effect(() => {
+      this.value();
+      this.step();
+      this.min();
+      this.max();
+      this.syncDisplayValue();
+    });
+  }
+
   get hasInlineSuffix(): boolean {
-    return this.suffixMode === 'inline' && !!this.suffix && this.displayValue.length > 0;
+    return this.suffixMode() === 'inline' && !!this.suffix() && this.displayValue.length > 0;
   }
 
   get hasStepperSuffix(): boolean {
-    return this.suffixMode === 'stepper' && !!this.suffix;
-  }
-
-  ngOnChanges(changes: SimpleChanges): void {
-    if ('value' in changes || 'step' in changes || 'min' in changes || 'max' in changes) {
-      this.syncDisplayValue();
-    }
+    return this.suffixMode() === 'stepper' && !!this.suffix();
   }
 
   ngOnDestroy(): void {
@@ -93,16 +97,16 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
   get rootClassNames(): Record<string, boolean> {
     return {
       'number-input': true,
-      'number-input--boxed': this.appearance === 'boxed',
-      'number-input--compact': this.appearance === 'compact',
-      'number-input--popup': this.appearance === 'popup',
+      'number-input--boxed': this.appearance() === 'boxed',
+      'number-input--compact': this.appearance() === 'compact',
+      'number-input--popup': this.appearance() === 'popup',
       'number-input--with-suffix': this.hasInlineSuffix,
       'number-input--with-stepper-suffix': this.hasStepperSuffix,
     };
   }
 
   onInputChange(event: Event): void {
-    if (this.disabled) {
+    if (this.disabled()) {
       return;
     }
 
@@ -115,14 +119,14 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
   }
 
   onStepperPointerDown(direction: 1 | -1, event: PointerEvent): void {
-    if (this.disabled) {
+    if (this.disabled()) {
       return;
     }
 
     event.preventDefault();
     event.stopPropagation();
 
-    const currentValue = this.value ?? 0;
+    const currentValue = this.value() ?? 0;
     this.gestureStarted.emit();
     this.activeDrag = {
       startY: event.clientY,
@@ -132,7 +136,7 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
 
     document.body.style.userSelect = 'none';
     document.body.style.cursor = 'ns-resize';
-    this.commitValue(currentValue + direction * this.step);
+    this.commitValue(currentValue + direction * this.step());
   }
 
   @HostListener('document:pointermove', ['$event'])
@@ -144,7 +148,7 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
     event.preventDefault();
     const dragDelta = Math.trunc((this.activeDrag.startY - event.clientY) / DRAG_PIXELS_PER_STEP);
     const nextValue =
-      this.activeDrag.startValue + (this.activeDrag.initialDirection + dragDelta) * this.step;
+      this.activeDrag.startValue + (this.activeDrag.initialDirection + dragDelta) * this.step();
     this.commitValue(nextValue);
   }
 
@@ -161,12 +165,12 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
   }
 
   private syncDisplayValue(): void {
-    if (!Number.isFinite(this.value ?? Number.NaN)) {
+    if (!Number.isFinite(this.value() ?? Number.NaN)) {
       this.displayValue = '';
       return;
     }
 
-    const normalized = this.normalizeValue(this.value as number);
+    const normalized = this.normalizeValue(this.value() as number);
     this.displayValue = this.formatValue(normalized);
   }
 
@@ -179,29 +183,29 @@ export class NumberInputComponent implements OnChanges, OnDestroy {
   private normalizeValue(value: number): number {
     let nextValue = roundToTwoDecimals(value);
 
-    if (this.min !== undefined) {
-      nextValue = Math.max(this.min, nextValue);
+    if (this.min() !== undefined) {
+      nextValue = Math.max(this.min() as number, nextValue);
     }
 
-    if (this.max !== undefined) {
-      nextValue = Math.min(this.max, nextValue);
+    if (this.max() !== undefined) {
+      nextValue = Math.min(this.max() as number, nextValue);
     }
 
-    if (this.step >= 1) {
+    if (this.step() >= 1) {
       return Math.round(nextValue);
     }
 
     const precision = this.decimalPrecision();
-    const steppedValue = Math.round(nextValue / this.step) * this.step;
+    const steppedValue = Math.round(nextValue / this.step()) * this.step();
     return Number(steppedValue.toFixed(precision));
   }
 
   private formatValue(value: number): string {
-    return this.step >= 1 ? Math.round(value).toString() : value.toFixed(this.decimalPrecision());
+    return this.step() >= 1 ? Math.round(value).toString() : value.toFixed(this.decimalPrecision());
   }
 
   private decimalPrecision(): number {
-    const stepText = this.step.toString();
+    const stepText = this.step().toString();
     const decimalSeparatorIndex = stepText.indexOf('.');
     return decimalSeparatorIndex === -1 ? 0 : stepText.length - decimalSeparatorIndex - 1;
   }

@@ -1,15 +1,12 @@
-import { CommonModule } from '@angular/common';
 import {
   Component,
-  EventEmitter,
   HostBinding,
   HostListener,
-  Input,
-  OnChanges,
   OnDestroy,
   OnInit,
-  Output,
-  SimpleChanges,
+  effect,
+  input,
+  output,
 } from '@angular/core';
 import { CanvasElement, CanvasElementType, CanvasPageModel } from '@app/core';
 import { ContextMenuComponent, ToggleGroupComponent } from '@app/shared';
@@ -56,42 +53,42 @@ const DEVICE_FRAME_PRESET_OPTIONS = VIEWPORT_PRESET_OPTIONS.filter(
 @Component({
   selector: 'app-project-panel',
   standalone: true,
-  imports: [CommonModule, ContextMenuComponent, ToggleGroupComponent],
+  imports: [ContextMenuComponent, ToggleGroupComponent],
   templateUrl: './project-panel.component.html',
   styleUrl: './project-panel.component.css',
 })
-export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
+export class ProjectPanelComponent implements OnInit, OnDestroy {
   @HostBinding('style.width.px') panelWidth = DEFAULT_PANEL_WIDTH;
   @HostBinding('class.is-resizing') isResizingPanel = false;
 
-  @Input() pages: CanvasPageModel[] = [];
-  @Input() currentPageId: string | null = null;
-  @Input() focusedPageId: string | null = null;
-  @Input() selectedPageLayerId: string | null = null;
-  @Input() canPastePage = false;
-  @Input() elements: CanvasElement[] = [];
-  @Input() selectedElementId: string | null = null;
-  @Input() selectedElementIds: string[] = [];
+  readonly pages = input<CanvasPageModel[]>([]);
+  readonly currentPageId = input<string | null>(null);
+  readonly focusedPageId = input<string | null>(null);
+  readonly selectedPageLayerId = input<string | null>(null);
+  readonly canPastePage = input(false);
+  readonly elements = input<CanvasElement[]>([]);
+  readonly selectedElementId = input<string | null>(null);
+  readonly selectedElementIds = input<string[]>([]);
 
-  @Output() panelWidthChanged = new EventEmitter<number>();
-  @Output() pageSelected = new EventEmitter<string>();
-  @Output() pageLayerSelected = new EventEmitter<string>();
-  @Output() pageCreateRequested = new EventEmitter<void>();
-  @Output() pageCopyRequested = new EventEmitter<string>();
-  @Output() pagePasteRequested = new EventEmitter<string>();
-  @Output() pageDuplicateRequested = new EventEmitter<string>();
-  @Output() pageDeleteRequested = new EventEmitter<string>();
-  @Output() pageNameChanged = new EventEmitter<{ id: string; name: string }>();
-  @Output() layerSelected = new EventEmitter<{ pageId: string; id: string; additive: boolean }>();
-  @Output() layerNameChanged = new EventEmitter<{ pageId: string; id: string; name: string }>();
-  @Output() layerVisibilityToggled = new EventEmitter<{ pageId: string; id: string }>();
-  @Output() layerMoved = new EventEmitter<{
+  readonly panelWidthChanged = output<number>();
+  readonly pageSelected = output<string>();
+  readonly pageLayerSelected = output<string>();
+  readonly pageCreateRequested = output<void>();
+  readonly pageCopyRequested = output<string>();
+  readonly pagePasteRequested = output<string>();
+  readonly pageDuplicateRequested = output<string>();
+  readonly pageDeleteRequested = output<string>();
+  readonly pageNameChanged = output<{ id: string; name: string }>();
+  readonly layerSelected = output<{ pageId: string; id: string; additive: boolean }>();
+  readonly layerNameChanged = output<{ pageId: string; id: string; name: string }>();
+  readonly layerVisibilityToggled = output<{ pageId: string; id: string }>();
+  readonly layerMoved = output<{
     pageId: string;
     draggedId: string;
     targetId: string | null;
     position: LayerDropPosition;
   }>();
-  @Output() layerContextMenuRequested = new EventEmitter<{
+  readonly layerContextMenuRequested = output<{
     pageId: string;
     id: string;
     x: number;
@@ -144,21 +141,22 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
   };
 
   get layerEntries(): LayerEntry[] {
-    const focusedPageId = this.focusedPageId;
+    const focusedPageId = this.focusedPageId();
     return focusedPageId ? this.getLayerEntriesForPage(focusedPageId) : [];
   }
 
   get visiblePageLayers(): CanvasPageModel[] {
-    if (this.focusedPageId) {
-      return this.pages.filter((p) => p.id === this.focusedPageId);
+    if (this.focusedPageId()) {
+      return this.pages().filter((p) => p.id === this.focusedPageId());
     }
-    return this.pages;
+    return this.pages();
   }
 
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['pages'] || changes['elements']) {
+  constructor() {
+    effect(() => {
+      this.elements(); // track elements changes
       this.rebuildLayerEntriesByPage();
-    }
+    });
   }
 
   ngOnInit(): void {
@@ -224,7 +222,7 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
   startPageRename(pageId: string, event?: MouseEvent, source: PageRenameSource = 'pages'): void {
     event?.stopPropagation();
     this.closePageMenu();
-    const page = this.pages.find((p) => p.id === pageId);
+    const page = this.pages().find((p) => p.id === pageId);
     this.editingPageName = page?.name ?? '';
     this.editingPageId = pageId;
     this.editingPageSource = source;
@@ -313,7 +311,7 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
               id: 'paste',
               label: 'Paste',
               shortcut: 'Ctrl+V',
-              disabled: !this.canPastePage,
+              disabled: !this.canPastePage(),
               action: () => this.onPagePaste(pageId),
             },
             {
@@ -381,7 +379,7 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
     event?.stopPropagation();
     this.closePageMenu();
 
-    if (this.pages.length <= 1) {
+    if (this.pages().length <= 1) {
       return;
     }
 
@@ -405,7 +403,7 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
   }
 
   isLayerSelected(id: string): boolean {
-    return this.selectedElementIds.includes(id) || this.selectedElementId === id;
+    return this.selectedElementIds().includes(id) || this.selectedElementId() === id;
   }
 
   startRename(id: string, event?: MouseEvent): void {
@@ -719,12 +717,12 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
   }
 
   canDeletePage(): boolean {
-    return this.pages.length > 1;
+    return this.pages().length > 1;
   }
 
   private rebuildLayerEntriesByPage(): void {
     this.cachedLayerEntriesByPage = new Map(
-      this.pages.map((page) => [page.id, this.buildLayerEntries(page.elements, page.id)]),
+      this.pages().map((page) => [page.id, this.buildLayerEntries(page.elements, page.id)]),
     );
   }
 
@@ -869,6 +867,6 @@ export class ProjectPanelComponent implements OnChanges, OnInit, OnDestroy {
   }
 
   private getPageElements(pageId: string): CanvasElement[] {
-    return this.pages.find((page) => page.id === pageId)?.elements ?? [];
+    return this.pages().find((page) => page.id === pageId)?.elements ?? [];
   }
 }

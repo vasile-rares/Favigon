@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
+import { Component, ViewEncapsulation, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DropdownSelectComponent, ToggleGroupComponent, ContextMenuComponent } from '@app/shared';
 import { NumberInputComponent } from '../number-input/number-input.component';
@@ -247,17 +247,17 @@ const EFFECT_PREVIEW_CLICK_IDLE_MS = 1080;
   encapsulation: ViewEncapsulation.None,
 })
 export class DesignTabComponent {
-  @Input() selectedElement: CanvasElement | null = null;
-  @Input() projectId: number | null = null;
-  @Input() autoOpenFillPopupElementId: string | null = null;
-  @Input() pages: readonly CanvasPageModel[] = [];
-  @Input() currentPageId: string | null = null;
-  @Input() currentTool: CanvasElementType | 'select' = 'select';
+  readonly selectedElement = input<CanvasElement | null>(null);
+  readonly projectId = input<number | null>(null);
+  readonly autoOpenFillPopupElementId = input<string | null>(null);
+  readonly pages = input<readonly CanvasPageModel[]>([]);
+  readonly currentPageId = input<string | null>(null);
+  readonly currentTool = input<CanvasElementType | 'select'>('select');
 
-  @Output() elementPatch = new EventEmitter<Partial<CanvasElement>>();
-  @Output() numberInputGestureStarted = new EventEmitter<void>();
-  @Output() numberInputGestureCommitted = new EventEmitter<void>();
-  @Output() frameTemplateSelected = new EventEmitter<FrameTemplateSelection>();
+  readonly elementPatch = output<Partial<CanvasElement>>();
+  readonly numberInputGestureStarted = output<void>();
+  readonly numberInputGestureCommitted = output<void>();
+  readonly frameTemplateSelected = output<FrameTemplateSelection>();
 
   transformMenuItems: ContextMenuItem[] = [];
   transformMenuX = 0;
@@ -591,7 +591,7 @@ export class DesignTabComponent {
   }
 
   onLinkSectionHeaderClick(): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -610,7 +610,7 @@ export class DesignTabComponent {
   }
 
   onLayoutSectionHeaderClick(): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -656,7 +656,7 @@ export class DesignTabComponent {
   }
 
   private openTransformMenu(event: MouseEvent | null, trigger: HTMLElement | null): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     const position = this.resolveTransformMenuPosition(event, trigger);
     if (!element || !position) {
       return;
@@ -676,7 +676,7 @@ export class DesignTabComponent {
   }
 
   private openAccessibilityMenu(event: MouseEvent | null, trigger: HTMLElement | null): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     const position = this.resolveTransformMenuPosition(event, trigger);
     if (!element || !position) {
       return;
@@ -696,7 +696,7 @@ export class DesignTabComponent {
   }
 
   private openDimensionMenu(event: MouseEvent | null, trigger: HTMLElement | null): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     const position = this.resolveTransformMenuPosition(event, trigger);
     if (!element || !position) {
       return;
@@ -816,7 +816,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -840,7 +840,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -858,7 +858,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -890,7 +890,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -913,7 +913,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -933,7 +933,7 @@ export class DesignTabComponent {
   }
 
   isFrameToolSelected(): boolean {
-    return this.currentTool === 'frame';
+    return this.currentTool() === 'frame';
   }
 
   isText(type: CanvasElementType): boolean {
@@ -962,7 +962,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (field === 'cornerRadius' && element && this.cornerRadiusMode(element) === 'per-corner') {
       this.emitPatch({
         cornerRadius: Math.max(0, roundToTwoDecimals(value)),
@@ -1025,7 +1025,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -1067,7 +1067,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -1308,7 +1308,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -1349,7 +1349,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -1612,10 +1612,10 @@ export class DesignTabComponent {
         ? element.linkPageId
         : null;
 
-    return this.pages
-      .filter((page) => page.id !== this.currentPageId || page.id === selectedPageId)
+    return this.pages()
+      .filter((page) => page.id !== this.currentPageId() || page.id === selectedPageId)
       .map((page) => ({
-        label: page.id === this.currentPageId ? `${page.name} (current)` : page.name,
+        label: page.id === this.currentPageId() ? `${page.name} (current)` : page.name,
         value: page.id,
       }));
   }
@@ -1718,7 +1718,7 @@ export class DesignTabComponent {
   }
 
   onCursorSectionHeaderClick(): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -1783,12 +1783,12 @@ export class DesignTabComponent {
   }
 
   addEffect(trigger: CanvasEffectTrigger = this.defaultEffect.trigger): void {
-    const current = this.selectedElement?.effects ?? [];
+    const current = this.selectedElement()?.effects ?? [];
     this.emitPatch({ effects: [...current, createDefaultCanvasEffect(trigger)] });
   }
 
   removeEffect(index: number): void {
-    const current = this.selectedElement?.effects;
+    const current = this.selectedElement()?.effects;
     if (!current) return;
 
     const updated = current.filter((_, i) => i !== index);
@@ -1951,8 +1951,8 @@ export class DesignTabComponent {
       return fill;
     }
 
-    return this.selectedElement && this.hasFill(this.selectedElement.type)
-      ? this.fillInputValue(this.selectedElement)
+    return this.selectedElement() && this.hasFill(this.selectedElement()!.type)
+      ? this.fillInputValue(this.selectedElement()!)
       : this.defaultFillColor;
   }
 
@@ -1962,8 +1962,8 @@ export class DesignTabComponent {
       return fillValue;
     }
 
-    return this.selectedElement && this.hasFill(this.selectedElement.type)
-      ? this.fillPickerValue(this.selectedElement)
+    return this.selectedElement() && this.hasFill(this.selectedElement()!.type)
+      ? this.fillPickerValue(this.selectedElement()!)
       : this.defaultFillColor;
   }
 
@@ -1989,8 +1989,8 @@ export class DesignTabComponent {
   effectShadowEditorValue(effect: CanvasEffect): string | null {
     return (
       normalizeCanvasShadowValue(effect.shadow) ??
-      (this.selectedElement
-        ? (normalizeCanvasShadowValue(this.selectedElement.shadow) ?? null)
+      (this.selectedElement()
+        ? (normalizeCanvasShadowValue(this.selectedElement()!.shadow) ?? null)
         : null)
     );
   }
@@ -2061,7 +2061,7 @@ export class DesignTabComponent {
   }
 
   private patchEffectAt(index: number, patch: Partial<CanvasEffect>): void {
-    const effects = this.selectedElement?.effects;
+    const effects = this.selectedElement()?.effects;
     if (!effects) return;
     this.bumpEffectPreviewVersion(index);
     this.emitPatch({
@@ -2072,7 +2072,7 @@ export class DesignTabComponent {
   onEffectPresetChange(index: number, value: string | number | boolean | null): void {
     if (typeof value !== 'string') return;
 
-    const current = this.selectedElement?.effects?.[index];
+    const current = this.selectedElement()?.effects?.[index];
     if (!current) return;
 
     this.closeEffectPopupSubview(index);
@@ -2212,7 +2212,7 @@ export class DesignTabComponent {
   }
 
   private openEffectMenu(event: MouseEvent | null, trigger: HTMLElement | null): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     const position = this.resolveTransformMenuPosition(event, trigger);
     if (!element || !position) {
       return;
@@ -2405,7 +2405,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -2426,7 +2426,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -2442,7 +2442,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -2458,7 +2458,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -2475,7 +2475,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -2494,7 +2494,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -2513,7 +2513,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -2531,7 +2531,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -2547,7 +2547,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -2596,7 +2596,7 @@ export class DesignTabComponent {
       return;
     }
 
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -2651,7 +2651,7 @@ export class DesignTabComponent {
     field: EditableTextMetricUnitField,
     value: string | number | boolean | null,
   ): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element || typeof value !== 'string') {
       return;
     }
@@ -2711,7 +2711,7 @@ export class DesignTabComponent {
 
   onSpacingChange(type: 'padding' | 'margin', side: keyof CanvasSpacing, value: number): void {
     if (!Number.isFinite(value)) return;
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) return;
     const current: CanvasSpacing = element[type] ?? { top: 0, right: 0, bottom: 0, left: 0 };
     this.emitPatch({ [type]: { ...current, [side]: value } } as Partial<CanvasElement>);
@@ -2753,7 +2753,7 @@ export class DesignTabComponent {
   }
 
   onLinkPageChange(value: string | number | boolean | null): void {
-    if (typeof value !== 'string' || !this.pages.some((page) => page.id === value)) {
+    if (typeof value !== 'string' || !this.pages().some((page) => page.id === value)) {
       return;
     }
 
@@ -2775,7 +2775,7 @@ export class DesignTabComponent {
   }
 
   onAccessibilityTagChange(value: string | number | boolean | null): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element || this.hasLink(element) || typeof value !== 'string') {
       return;
     }
@@ -2786,7 +2786,7 @@ export class DesignTabComponent {
   }
 
   onAccessibilityLabelChange(event: Event): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (element) {
       this.setAccessibilityFieldOverride(element.id, 'ariaLabel', true);
     }
@@ -2813,7 +2813,7 @@ export class DesignTabComponent {
   }
 
   private openEffectPopupSubview(index: number, view: Exclude<EffectPopupView, 'main'>): void {
-    const current = this.selectedElement?.effects?.[index];
+    const current = this.selectedElement()?.effects?.[index];
     if (!current) {
       return;
     }
@@ -2872,12 +2872,12 @@ export class DesignTabComponent {
   }
 
   private currentPageModel(): CanvasPageModel | null {
-    const currentPageId = this.currentPageId;
+    const currentPageId = this.currentPageId();
     if (!currentPageId) {
-      return this.pages[0] ?? null;
+      return this.pages()[0] ?? null;
     }
 
-    return this.pages.find((page) => page.id === currentPageId) ?? this.pages[0] ?? null;
+    return this.pages().find((page) => page.id === currentPageId) ?? this.pages()[0] ?? null;
   }
 
   private parentElement(element: CanvasElement): CanvasElement | null {
@@ -2933,7 +2933,7 @@ export class DesignTabComponent {
   }
 
   private toggleDimensionConstraintField(field: DimensionConstraintField): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -2969,7 +2969,7 @@ export class DesignTabComponent {
   }
 
   private toggleAccessibilityField(field: AccessibilityField): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -3041,7 +3041,7 @@ export class DesignTabComponent {
   }
 
   private toggleTransformOption(option: CanvasTransformOption): void {
-    const element = this.selectedElement;
+    const element = this.selectedElement();
     if (!element) {
       return;
     }
@@ -3238,13 +3238,14 @@ export class DesignTabComponent {
 
   private firstAvailableLinkPageId(): string | undefined {
     const selectedPageId =
-      this.selectedElement?.linkType === 'page' &&
-      typeof this.selectedElement.linkPageId === 'string'
-        ? this.selectedElement.linkPageId
+      this.selectedElement()?.linkType === 'page' &&
+      typeof this.selectedElement()?.linkPageId === 'string'
+        ? this.selectedElement()?.linkPageId
         : null;
 
-    return this.pages.find((page) => page.id !== this.currentPageId || page.id === selectedPageId)
-      ?.id;
+    return this.pages().find(
+      (page) => page.id !== this.currentPageId() || page.id === selectedPageId,
+    )?.id;
   }
 
   private toHexColorOrFallback(value: string | undefined, fallback: string): string {

@@ -5,7 +5,7 @@ import {
   HostListener,
   NgZone,
   OnDestroy,
-  ViewChild,
+  viewChild,
   computed,
   effect,
   inject,
@@ -36,11 +36,9 @@ import { mutateNormalizeElement } from '../../utils/element/canvas-element-norma
 import { clamp, roundToTwoDecimals } from '../../utils/canvas-math.util';
 import { collectSubtreeIds, removeWithChildren } from '../../utils/canvas-tree.util';
 import {
-  buildSnapCandidates,
-  computeSnappedPosition,
-  SNAP_THRESHOLD,
-} from '../../utils/interaction/canvas-snap.util';
-import { generateThumbnail, generateThumbnailFromCanvas } from '../../utils/pixi/canvas-thumbnail.util';
+  generateThumbnail,
+  generateThumbnailFromCanvas,
+} from '../../utils/pixi/canvas-thumbnail.util';
 import { calculateResizedBounds } from '../../utils/interaction/canvas-resize.util';
 import {
   getTextFontFamily,
@@ -66,7 +64,6 @@ import {
   HistorySnapshot,
   SnapLine,
   CanvasPageLayout,
-  CanvasPageDragState,
   FlowDragRenderState,
 } from '../../canvas.types';
 import { CanvasViewportService } from '../../services/canvas-viewport.service';
@@ -171,7 +168,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private readonly pixiSceneReady = signal(false);
   private pixiInitPending = false;
 
-  @ViewChild('canvasScene', { static: false }) canvasSceneRef?: ElementRef<HTMLElement>;
+  readonly canvasSceneRef = viewChild<ElementRef<HTMLElement>>('canvasScene');
 
   readonly pages = this.editorState.pages;
   readonly currentPageId = this.editorState.currentPageId;
@@ -459,7 +456,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     this.zone.runOutsideAngular(() => {
       if (this.gesture.isFlowBoundsDirty()) {
-        this.gesture.updateFlowBoundsCache(this.canvasSceneRef?.nativeElement ?? null);
+        this.gesture.updateFlowBoundsCache(this.canvasSceneRef()?.nativeElement ?? null);
         this.gesture.markFlowBoundsCacheClean();
       }
     });
@@ -639,10 +636,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    this.gesture.beginPageDrag(event, pageId, layout);
-  }
-
-  private startPageDrag(event: MouseEvent, pageId: string, layout: CanvasPageLayout): void {
     this.gesture.beginPageDrag(event, pageId, layout);
   }
 
@@ -1661,10 +1654,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   getTextAlignValue(element: CanvasElement): string {
     return getTextAlignValue(element);
-  }
-
-  private getRootFrameCount(elements: CanvasElement[]): number {
-    return elements.filter((element) => this.isRootFrame(element)).length;
   }
 
   private reflowRootFrames(

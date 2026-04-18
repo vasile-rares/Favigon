@@ -2,13 +2,13 @@ import {
   Component,
   DestroyRef,
   ElementRef,
-  ViewChild,
   inject,
   input,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ProjectService } from '@app/core';
@@ -23,13 +23,7 @@ const PROJECT_MENU_ANIMATION_MS = 120;
 @Component({
   selector: 'app-project-menu',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    TextInputComponent,
-    ToggleGroupComponent,
-    ActionButtonComponent,
-  ],
+  imports: [FormsModule, TextInputComponent, ToggleGroupComponent, ActionButtonComponent],
   templateUrl: './project-menu.component.html',
   styleUrl: './project-menu.component.css',
 })
@@ -61,8 +55,8 @@ export class ProjectMenuComponent {
     { label: 'Public', value: true },
   ];
 
-  @ViewChild('projectMenuEl') projectMenuEl?: ElementRef<HTMLElement>;
-  @ViewChild('projectNameInput') projectNameInput?: TextInputComponent;
+  readonly projectMenuEl = viewChild<ElementRef<HTMLElement>>('projectMenuEl');
+  readonly projectNameInput = viewChild<TextInputComponent>('projectNameInput');
 
   private closeTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -89,7 +83,7 @@ export class ProjectMenuComponent {
     this.showMenu.set(true);
     this.isOpen.set(true);
 
-    setTimeout(() => this.projectNameInput?.focus(true));
+    setTimeout(() => this.projectNameInput()?.focus(true));
   }
 
   close(): void {
@@ -122,7 +116,7 @@ export class ProjectMenuComponent {
 
     if (!nextName) {
       this.updateError.set('Project name is required.');
-      setTimeout(() => this.projectNameInput?.focus(true));
+      setTimeout(() => this.projectNameInput()?.focus(true));
       return;
     }
 
@@ -150,7 +144,7 @@ export class ProjectMenuComponent {
         error: (error: unknown) => {
           this.updateError.set(extractApiErrorMessage(error, 'Failed to update project.'));
           this.isUpdating.set(false);
-          setTimeout(() => this.projectNameInput?.focus(true));
+          setTimeout(() => this.projectNameInput()?.focus(true));
         },
       });
   }
@@ -161,7 +155,7 @@ export class ProjectMenuComponent {
   }
 
   closeIfClickedOutside(target: Node, triggerEl?: HTMLElement): void {
-    const menuEl = this.projectMenuEl?.nativeElement;
+    const menuEl = this.projectMenuEl()?.nativeElement;
     if (
       target &&
       !(triggerEl && triggerEl.contains(target)) &&

@@ -1,5 +1,5 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
@@ -34,13 +34,12 @@ const PROFILE_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/av
   selector: 'app-settings-page',
   standalone: true,
   imports: [
-    CommonModule,
     HeaderBarComponent,
     FormsModule,
     TextInputComponent,
     ActionButtonComponent,
-    ...DIALOG_BOX_IMPORTS,
-  ],
+    ...DIALOG_BOX_IMPORTS
+],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
 })

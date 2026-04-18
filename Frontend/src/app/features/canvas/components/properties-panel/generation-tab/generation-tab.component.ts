@@ -1,13 +1,10 @@
-import { CommonModule } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
-  EventEmitter,
-  Input,
-  OnChanges,
+  effect,
+  input,
   OnDestroy,
-  Output,
-  SimpleChanges,
+  output,
   ViewEncapsulation,
 } from '@angular/core';
 import { GeneratedFile, IRNode } from '@app/core';
@@ -19,26 +16,26 @@ type CopyKind = 'current' | 'ir';
 @Component({
   selector: 'app-generation-tab',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   templateUrl: './generation-tab.component.html',
   styleUrl: './generation-tab.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
 })
-export class GenerationTabComponent implements OnChanges, OnDestroy {
-  @Input() selectedFramework: SupportedFramework = 'html';
-  @Input() validationResult: boolean | null = null;
-  @Input() apiError: string | null = null;
-  @Input() isValidating = false;
-  @Input() isGenerating = false;
-  @Input() generatedHtml = '';
-  @Input() generatedCss = '';
-  @Input() generatedFiles: GeneratedFile[] = [];
-  @Input() irPreview: IRNode | null = null;
+export class GenerationTabComponent implements OnDestroy {
+  readonly selectedFramework = input<SupportedFramework>('html');
+  readonly validationResult = input<boolean | null>(null);
+  readonly apiError = input<string | null>(null);
+  readonly isValidating = input(false);
+  readonly isGenerating = input(false);
+  readonly generatedHtml = input('');
+  readonly generatedCss = input('');
+  readonly generatedFiles = input<GeneratedFile[]>([]);
+  readonly irPreview = input<IRNode | null>(null);
 
-  @Output() frameworkChanged = new EventEmitter<SupportedFramework>();
-  @Output() validateRequested = new EventEmitter<void>();
-  @Output() generateRequested = new EventEmitter<void>();
+  readonly frameworkChanged = output<SupportedFramework>();
+  readonly validateRequested = output<void>();
+  readonly generateRequested = output<void>();
 
   activeFileIndex = 0;
   copiedKind: CopyKind | null = null;
@@ -46,6 +43,20 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   highlightedIr = '';
 
   private copyResetTimer: number | null = null;
+
+  constructor() {
+    effect(() => {
+      const files = this.generatedFiles();
+      if (this.activeFileIndex >= files.length) {
+        this.activeFileIndex = 0;
+      }
+      this.refreshHighlightedCode();
+    });
+    effect(() => {
+      const ir = this.irPreview();
+      this.highlightedIr = this.highlightJson(ir ? JSON.stringify(ir, null, 2) : '');
+    });
+  }
 
   readonly frameworkOptions: ReadonlyArray<{
     value: SupportedFramework;
@@ -56,20 +67,6 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
     { value: 'angular', label: 'Angular' },
   ];
 
-  ngOnChanges(changes: SimpleChanges): void {
-    if (changes['generatedFiles']) {
-      if (this.activeFileIndex >= this.generatedFiles.length) {
-        this.activeFileIndex = 0;
-      }
-      this.refreshHighlightedCode();
-    }
-    if (changes['irPreview']) {
-      this.highlightedIr = this.highlightJson(
-        this.irPreview ? JSON.stringify(this.irPreview, null, 2) : '',
-      );
-    }
-  }
-
   ngOnDestroy(): void {
     if (this.copyResetTimer !== null) {
       window.clearTimeout(this.copyResetTimer);
@@ -77,7 +74,7 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   }
 
   selectFramework(framework: SupportedFramework): void {
-    if (framework === this.selectedFramework) {
+    if (framework === this.selectedFramework()) {
       return;
     }
 
@@ -85,18 +82,18 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   }
 
   selectFile(index: number): void {
-    if (index >= 0 && index < this.generatedFiles.length) {
+    if (index >= 0 && index < this.generatedFiles().length) {
       this.activeFileIndex = index;
       this.refreshHighlightedCode();
     }
   }
 
   hasGeneratedCode(): boolean {
-    return this.generatedFiles.length > 0;
+    return this.generatedFiles().length > 0;
   }
 
   getActiveFile(): GeneratedFile | null {
-    return this.generatedFiles[this.activeFileIndex] ?? null;
+    return this.generatedFiles()[this.activeFileIndex] ?? null;
   }
 
   getActiveFileContent(): string {
@@ -122,15 +119,15 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   }
 
   getStatusTone(): 'idle' | 'working' | 'success' | 'error' {
-    if (this.apiError || this.validationResult === false) {
+    if (this.apiError() || this.validationResult() === false) {
       return 'error';
     }
 
-    if (this.isValidating || this.isGenerating) {
+    if (this.isValidating() || this.isGenerating()) {
       return 'working';
     }
 
-    if (this.hasGeneratedCode() || this.validationResult === true) {
+    if (this.hasGeneratedCode() || this.validationResult() === true) {
       return 'success';
     }
 
@@ -138,27 +135,27 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   }
 
   getStatusLabel(): string {
-    if (this.apiError) {
+    if (this.apiError()) {
       return 'Generation failed';
     }
 
-    if (this.isGenerating) {
+    if (this.isGenerating()) {
       return 'Generating code';
     }
 
-    if (this.isValidating) {
+    if (this.isValidating()) {
       return 'Checking IR';
     }
 
-    if (this.validationResult === false) {
+    if (this.validationResult() === false) {
       return 'IR needs attention';
     }
 
     if (this.hasGeneratedCode()) {
-      return `${this.generatedFiles.length} files ready`;
+      return `${this.generatedFiles().length} files ready`;
     }
 
-    if (this.validationResult === true) {
+    if (this.validationResult() === true) {
       return 'IR ready';
     }
 
@@ -166,8 +163,8 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   }
 
   getStatusHint(): string {
-    if (this.apiError) {
-      return this.apiError;
+    if (this.apiError()) {
+      return this.apiError()!;
     }
 
     if (this.hasGeneratedCode()) {
@@ -196,8 +193,8 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   copy(kind: CopyKind): void {
     const value =
       kind === 'ir'
-        ? this.irPreview
-          ? JSON.stringify(this.irPreview, null, 2)
+        ? this.irPreview()
+          ? JSON.stringify(this.irPreview(), null, 2)
           : ''
         : this.getActiveFileContent();
     if (!value) {
@@ -233,10 +230,10 @@ export class GenerationTabComponent implements OnChanges, OnDestroy {
   }
 
   async exportAsZip(): Promise<void> {
-    if (this.generatedFiles.length === 0) return;
+    if (this.generatedFiles().length === 0) return;
 
     const zip = new JSZip();
-    for (const file of this.generatedFiles) {
+    for (const file of this.generatedFiles()) {
       zip.file(file.path, file.content);
     }
 

@@ -1,5 +1,5 @@
-import { Component, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
-import { CommonModule } from '@angular/common';
+﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
+
 import { FormsModule } from '@angular/forms';
 import { DropdownSelectComponent, ToggleGroupComponent } from '@app/shared';
 import { NumberInputComponent } from '../../number-input/number-input.component';
@@ -28,7 +28,6 @@ type EditableNumericTypographyField = 'fontSize' | 'letterSpacing' | 'lineHeight
   selector: 'app-dt-typography-section',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     DropdownSelectComponent,
     ToggleGroupComponent,
@@ -39,12 +38,12 @@ type EditableNumericTypographyField = 'fontSize' | 'letterSpacing' | 'lineHeight
   encapsulation: ViewEncapsulation.None,
 })
 export class TypographySectionComponent {
-  @Input() element!: CanvasElement;
-  @Input() projectId: number | null = null;
+  readonly element = input.required<CanvasElement>();
+  readonly projectId = input<number | null>(null);
 
-  @Output() elementPatch = new EventEmitter<Partial<CanvasElement>>();
-  @Output() numberInputGestureStarted = new EventEmitter<void>();
-  @Output() numberInputGestureCommitted = new EventEmitter<void>();
+  readonly elementPatch = output<Partial<CanvasElement>>();
+  readonly numberInputGestureStarted = output<void>();
+  readonly numberInputGestureCommitted = output<void>();
 
   private readonly defaultFillColor = '#e0e0e0';
 
@@ -142,7 +141,7 @@ export class TypographySectionComponent {
     value: string | number | boolean | null,
   ): void {
     if (typeof value !== 'string') return;
-    const element = this.element;
+    const element = this.element();
 
     if (field === 'fontSizeUnit') {
       if (value !== 'px' && value !== 'rem') return;
