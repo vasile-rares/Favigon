@@ -2,6 +2,7 @@
 using Favigon.Application.Mappings;
 using Favigon.Application.Services;
 using Favigon.Converter;
+using FluentValidation;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Favigon.Application;
@@ -10,7 +11,8 @@ public static class ServiceCollectionExtensions
 {
   public static IServiceCollection AddApplication(this IServiceCollection services)
   {
-    services.AddAutoMapper(typeof(MappingProfile).Assembly);
+    services.AddAutoMapper(cfg => cfg.AddMaps(typeof(MappingProfile).Assembly));
+    services.AddValidatorsFromAssemblyContaining<MappingProfile>();
     services.AddScoped<IUserService, UserService>();
     services.AddScoped<IAuthService, AuthService>();
     services.AddScoped<IProjectService, ProjectService>();

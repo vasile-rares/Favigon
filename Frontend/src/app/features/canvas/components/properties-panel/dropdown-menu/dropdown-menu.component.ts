@@ -23,7 +23,7 @@ import {
   CanvasShadowPosition,
   DEFAULT_EDITABLE_CANVAS_SHADOW,
   resolveEditableCanvasShadow,
-} from '../../../utils/canvas-shadow.util';
+} from '../../../utils/element/canvas-shadow.util';
 import { DropdownSelectComponent, ToggleGroupComponent } from '@app/shared';
 import type { DropdownSelectOption, ToggleGroupOption, ToggleGroupValue } from '@app/shared';
 import { NumberInputComponent } from '../number-input/number-input.component';

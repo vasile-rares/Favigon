@@ -1,42 +1,59 @@
 ﻿using Favigon.Application.DTOs.Requests;
 using Favigon.Application.DTOs.Responses;
 using Favigon.Application.Interfaces;
+using Favigon.Application.Validators;
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Favigon.API.Controllers;
 
 [ApiController]
 [Route("api/converter")]
+[EnableRateLimiting("converter")]
 public class ConverterController(IConverterService converterService) : ControllerBase
 {
     [HttpPost("generate")]
-    public IActionResult Generate([FromBody] ConverterRequest request)
+    public IActionResult Generate(
+        [FromBody] ConverterRequest request,
+        [FromServices] ConverterGenerateValidator validator)
     {
+        var validation = validator.Validate(request);
+        if (!validation.IsValid)
+            return BadRequest(new ProblemDetails
+            {
+                Status = 400,
+                Title = validation.Errors[0].ErrorMessage
+            });
+
         ConverterResponse result;
 
         if (request.Pages is { Count: > 1 })
         {
             result = converterService.GenerateResponsive(request.Pages, request.Framework);
         }
-        else if (request.Ir is not null)
-        {
-            result = converterService.Generate(request.Ir, request.Framework);
-        }
         else
         {
-            throw new ArgumentException("Either 'ir' or 'pages' (2+ entries) is required.");
+            result = converterService.Generate(request.Ir!, request.Framework);
         }
 
         return Ok(result);
     }
 
     [HttpPost("validate")]
-    public IActionResult Validate([FromBody] ConverterRequest request)
+    public IActionResult Validate(
+        [FromBody] ConverterRequest request,
+        [FromServices] ConverterValidateValidator validator)
     {
-        if (request.Ir is null)
-            throw new ArgumentException("IR node is required.");
+        var validation = validator.Validate(request);
+        if (!validation.IsValid)
+            return BadRequest(new ProblemDetails
+            {
+                Status = 400,
+                Title = validation.Errors[0].ErrorMessage
+            });
 
-        var isValid = converterService.Validate(request.Ir);
+        var isValid = converterService.Validate(request.Ir!);
 
         return Ok(new ConverterResponse
         {
@@ -45,12 +62,19 @@ public class ConverterController(IConverterService converterService) : Controlle
     }
 
     [HttpPost("generate-files")]
-    public IActionResult GenerateFiles([FromBody] ConverterRequest request)
+    public IActionResult GenerateFiles(
+        [FromBody] ConverterRequest request,
+        [FromServices] ConverterGenerateFilesValidator validator)
     {
-        if (request.Pages is not { Count: > 0 })
-            throw new ArgumentException("'pages' (1+ entries) is required for multi-page generation.");
+        var validation = validator.Validate(request);
+        if (!validation.IsValid)
+            return BadRequest(new ProblemDetails
+            {
+                Status = 400,
+                Title = validation.Errors[0].ErrorMessage
+            });
 
-        var result = converterService.GenerateMultiPage(request.Pages, request.Framework);
+        var result = converterService.GenerateMultiPage(request.Pages!, request.Framework);
         return Ok(result);
     }
 }

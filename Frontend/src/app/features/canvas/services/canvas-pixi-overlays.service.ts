@@ -4,8 +4,8 @@ import { CanvasElement } from '@app/core';
 import { CanvasPixiApplicationService } from './canvas-pixi-application.service';
 import { CanvasPixiRendererService } from './canvas-pixi-renderer.service';
 import { CanvasElementService } from './canvas-element.service';
-import { Bounds, HandlePosition, Point, SnapLine, PageCanvasLayout } from '../canvas.types';
-import { getResolvedCornerRadii } from '../utils/canvas-interaction.util';
+import { Bounds, HandlePosition, Point, SnapLine, CanvasPageLayout } from '../canvas.types';
+import { getResolvedCornerRadii } from '../utils/element/canvas-element-normalization.util';
 import { roundToTwoDecimals } from '../utils/canvas-math.util';
 
 const SELECTION_COLOR = 0x3b82f6;
@@ -106,7 +106,7 @@ export class CanvasPixiOverlaysService {
     element: CanvasElement | null,
     elements: CanvasElement[],
     zoom: number,
-    pageLayout: PageCanvasLayout | null,
+    pageLayout: CanvasPageLayout | null,
     showHandles: boolean,
   ): void {
     if (!this.initialized) this.init();
@@ -187,7 +187,7 @@ export class CanvasPixiOverlaysService {
     selectedElements: CanvasElement[],
     allElements: CanvasElement[],
     zoom: number,
-    pageLayout: PageCanvasLayout | null,
+    pageLayout: CanvasPageLayout | null,
   ): void {
     if (!this.initialized) this.init();
     this.multiSelectOutlines.clear();
@@ -213,7 +213,7 @@ export class CanvasPixiOverlaysService {
     syncedElements: CanvasElement[],
     allElements: CanvasElement[],
     zoom: number,
-    pageLayout: PageCanvasLayout | null,
+    pageLayout: CanvasPageLayout | null,
   ): void {
     if (!this.initialized) this.init();
     this.syncedSelectionOutlines.clear();
@@ -245,7 +245,7 @@ export class CanvasPixiOverlaysService {
     element: CanvasElement | null,
     elements: CanvasElement[],
     zoom: number,
-    pageLayout: PageCanvasLayout | null,
+    pageLayout: CanvasPageLayout | null,
   ): void {
     if (!this.initialized) this.init();
     this.hoverOutline.clear();
@@ -265,7 +265,7 @@ export class CanvasPixiOverlaysService {
 
   // ── Snap Lines ────────────────────────────────────────────
 
-  drawSnapLines(lines: SnapLine[], zoom: number, pageLayout: PageCanvasLayout | null): void {
+  drawSnapLines(lines: SnapLine[], zoom: number, pageLayout: CanvasPageLayout | null): void {
     if (!this.initialized) this.init();
     this.snapLineV.clear();
     this.snapLineH.clear();
@@ -295,7 +295,7 @@ export class CanvasPixiOverlaysService {
 
   // ── Page Shell Selection Outline ──────────────────────────
 
-  drawPageShellSelectionOutline(pageLayout: PageCanvasLayout | null, zoom: number): void {
+  drawPageShellSelectionOutline(pageLayout: CanvasPageLayout | null, zoom: number): void {
     if (!this.initialized) this.init();
     this.pageShellOutline.clear();
 
@@ -330,7 +330,7 @@ export class CanvasPixiOverlaysService {
     element: CanvasElement,
     elements: CanvasElement[],
     zoom: number,
-    pageLayout: PageCanvasLayout,
+    pageLayout: CanvasPageLayout,
   ): OverlayQuad {
     const container = this.pixiRenderer.getContainerForElement(element.id);
 
@@ -527,7 +527,7 @@ export class CanvasPixiOverlaysService {
 
   private rectanglePreview: Graphics | null = null;
 
-  drawRectanglePreview(bounds: Bounds | null, pageLayout: PageCanvasLayout | null): void {
+  drawRectanglePreview(bounds: Bounds | null, pageLayout: CanvasPageLayout | null): void {
     if (!this.initialized) this.init();
 
     if (!bounds || !pageLayout) {

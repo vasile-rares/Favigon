@@ -1,7 +1,7 @@
 import { Injectable, computed, inject } from '@angular/core';
 import { CanvasElement, CanvasPageModel } from '@app/core';
 import { roundToTwoDecimals } from '../utils/canvas-math.util';
-import type { PageCanvasLayout } from '../canvas.types';
+import type { CanvasPageLayout } from '../canvas.types';
 import { CanvasEditorStateService } from './canvas-editor-state.service';
 import { CanvasElementService } from './canvas-element.service';
 import { CanvasViewportService } from './canvas-viewport.service';
@@ -19,7 +19,7 @@ export class CanvasPageGeometryService {
 
   // ── Page Shell Geometry ───────────────────────────────────
 
-  getPageShellLeft(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellLeft(pageId: string, layouts: CanvasPageLayout[]): number {
     const layout = layouts.find((l) => l.pageId === pageId) ?? null;
     if (!layout) {
       return 0;
@@ -29,7 +29,7 @@ export class CanvasPageGeometryService {
     return roundToTwoDecimals(layout.x + bounds.minX - PAGE_SHELL_SIDE_PADDING);
   }
 
-  getPageShellTop(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellTop(pageId: string, layouts: CanvasPageLayout[]): number {
     const layout = layouts.find((l) => l.pageId === pageId) ?? null;
     if (!layout) {
       return 0;
@@ -39,7 +39,7 @@ export class CanvasPageGeometryService {
     return roundToTwoDecimals(layout.y + bounds.minY - this.getPageShellTopPadding());
   }
 
-  getPageShellWidth(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellWidth(pageId: string, layouts: CanvasPageLayout[]): number {
     const layout = layouts.find((l) => l.pageId === pageId) ?? null;
     if (!layout) {
       return 0;
@@ -49,13 +49,13 @@ export class CanvasPageGeometryService {
     return roundToTwoDecimals(bounds.maxX - bounds.minX + PAGE_SHELL_SIDE_PADDING * 2);
   }
 
-  getPageShellRight(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellRight(pageId: string, layouts: CanvasPageLayout[]): number {
     return roundToTwoDecimals(
       this.getPageShellLeft(pageId, layouts) + this.getPageShellWidth(pageId, layouts),
     );
   }
 
-  getPageShellHeight(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellHeight(pageId: string, layouts: CanvasPageLayout[]): number {
     const layout = layouts.find((l) => l.pageId === pageId) ?? null;
     if (!layout) {
       return 0;
@@ -67,28 +67,28 @@ export class CanvasPageGeometryService {
     );
   }
 
-  getPageShellHeaderScreenLeft(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellHeaderScreenLeft(pageId: string, layouts: CanvasPageLayout[]): number {
     return roundToTwoDecimals(this.getPageShellLeft(pageId, layouts) * this.viewport.zoomLevel());
   }
 
-  getPageShellHeaderScreenTop(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellHeaderScreenTop(pageId: string, layouts: CanvasPageLayout[]): number {
     const shellScreenTop = this.getPageShellTop(pageId, layouts) * this.viewport.zoomLevel();
     return roundToTwoDecimals(shellScreenTop - PAGE_SHELL_HEADER_HEIGHT - 8);
   }
 
-  getPageShellHeaderScreenWidth(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellHeaderScreenWidth(pageId: string, layouts: CanvasPageLayout[]): number {
     return roundToTwoDecimals(this.getPageShellWidth(pageId, layouts) * this.viewport.zoomLevel());
   }
 
-  getPageShellSelectionLeft(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellSelectionLeft(pageId: string, layouts: CanvasPageLayout[]): number {
     return roundToTwoDecimals(this.getPageShellLeft(pageId, layouts) * this.viewport.zoomLevel());
   }
 
-  getPageShellSelectionTop(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellSelectionTop(pageId: string, layouts: CanvasPageLayout[]): number {
     return roundToTwoDecimals(this.getPageShellTop(pageId, layouts) * this.viewport.zoomLevel());
   }
 
-  getPageShellSelectionWidth(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellSelectionWidth(pageId: string, layouts: CanvasPageLayout[]): number {
     return roundToTwoDecimals(this.getPageShellWidth(pageId, layouts) * this.viewport.zoomLevel());
   }
 
@@ -96,13 +96,13 @@ export class CanvasPageGeometryService {
     return roundToTwoDecimals(shellRight + gap - PAGE_SHELL_SIDE_PADDING);
   }
 
-  getPageShellSelectionHeight(pageId: string, layouts: PageCanvasLayout[]): number {
+  getPageShellSelectionHeight(pageId: string, layouts: CanvasPageLayout[]): number {
     return roundToTwoDecimals(this.getPageShellHeight(pageId, layouts) * this.viewport.zoomLevel());
   }
 
   // ── Rendered Element Properties (per-page) ────────────────
 
-  getRenderedXForPage(element: CanvasElement, pageId: string, layouts: PageCanvasLayout[]): number {
+  getRenderedXForPage(element: CanvasElement, pageId: string, layouts: CanvasPageLayout[]): number {
     const page = this.getPageById(pageId);
     const layout = layouts.find((l) => l.pageId === pageId) ?? null;
     if (!page || !layout) {
@@ -112,7 +112,7 @@ export class CanvasPageGeometryService {
     return layout.x + this.el.getAbsoluteBounds(element, page.elements, page).x;
   }
 
-  getRenderedYForPage(element: CanvasElement, pageId: string, layouts: PageCanvasLayout[]): number {
+  getRenderedYForPage(element: CanvasElement, pageId: string, layouts: CanvasPageLayout[]): number {
     const page = this.getPageById(pageId);
     const layout = layouts.find((l) => l.pageId === pageId) ?? null;
     if (!page || !layout) {
@@ -253,11 +253,11 @@ export class CanvasPageGeometryService {
 
   // ── Snap Line Helpers ─────────────────────────────────────
 
-  getSnapLineX(position: number, activeLayout: PageCanvasLayout | null): number {
+  getSnapLineX(position: number, activeLayout: CanvasPageLayout | null): number {
     return position + (activeLayout?.x ?? 0);
   }
 
-  getSnapLineY(position: number, activeLayout: PageCanvasLayout | null): number {
+  getSnapLineY(position: number, activeLayout: CanvasPageLayout | null): number {
     return position + (activeLayout?.y ?? 0);
   }
 

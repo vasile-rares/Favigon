@@ -1,0 +1,173 @@
+<!-- Dimensions -->
+<section class="properties-section">
+  <div class="properties-section-header properties-section-header--actionable" (click)="onDimensionSectionHeaderClick($event)">
+    <p class="properties-section-title">Dimensions</p>
+    <button
+      type="button"
+      class="pp-section-toggle pp-section-toggle--plus"
+      aria-label="Dimension options"
+      title="Dimension options"
+      (click)="onDimensionSectionToggleClick($event)">
+      <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+        <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+        <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+      </svg>
+    </button>
+  </div>
+
+  <div class="pp-metric-list">
+    <div class="pp-style-row pp-style-row--metric">
+      <span class="pp-row-label">Width</span>
+      <div class="pp-style-control pp-style-control--dimension">
+        <app-number-input
+          appearance="boxed"
+          ariaLabel="Width"
+          [value]="dimensionInputValue(element, 'width')"
+          [disabled]="isDimensionInputDisabled(element, 'width')"
+          [min]="1"
+          [step]="1"
+          [suffix]="dimensionInputSuffix(element, 'width')"
+          (gestureStarted)="onNumberInputGestureStarted()"
+          (gestureCommitted)="onNumberInputGestureCommitted()"
+          (valueChange)="onDimensionValueChange('width', $event)" />
+        <div class="pp-dimension-mode-control">
+          <app-dropdown-select
+            [enableSearch]="false"
+            [placeholder]="'Sizing'"
+            [options]="dimensionModeOptions(element, 'width')"
+            [ngModel]="dimensionModeValue(element, 'width')"
+            (ngModelChange)="onDimensionModeChange('width', $event)"></app-dropdown-select>
+        </div>
+      </div>
+    </div>
+
+    <div class="pp-style-row pp-style-row--metric">
+      <span class="pp-row-label">Height</span>
+      <div class="pp-style-control pp-style-control--dimension">
+        <app-number-input
+          appearance="boxed"
+          ariaLabel="Height"
+          [value]="dimensionInputValue(element, 'height')"
+          [disabled]="isDimensionInputDisabled(element, 'height')"
+          [min]="1"
+          [step]="1"
+          [suffix]="dimensionInputSuffix(element, 'height')"
+          (gestureStarted)="onNumberInputGestureStarted()"
+          (gestureCommitted)="onNumberInputGestureCommitted()"
+          (valueChange)="onDimensionValueChange('height', $event)" />
+        <div class="pp-dimension-mode-control">
+          <app-dropdown-select
+            [enableSearch]="false"
+            [placeholder]="'Sizing'"
+            [options]="dimensionModeOptions(element, 'height')"
+            [ngModel]="dimensionModeValue(element, 'height')"
+            (ngModelChange)="onDimensionModeChange('height', $event)"></app-dropdown-select>
+        </div>
+      </div>
+    </div>
+
+    <div class="pp-style-row pp-style-row--metric" *ngIf="hasDimensionConstraintField(element, 'minWidth')">
+      <span class="pp-row-label">Min W</span>
+      <div class="pp-style-control pp-style-control--dimension">
+        <app-number-input
+          appearance="boxed"
+          ariaLabel="Minimum width"
+          [value]="dimensionConstraintInputValue(element, 'minWidth')"
+          [min]="1"
+          [step]="1"
+          [suffix]="dimensionConstraintInputSuffix(element, 'minWidth')"
+          (gestureStarted)="onNumberInputGestureStarted()"
+          (gestureCommitted)="onNumberInputGestureCommitted()"
+          (valueChange)="onDimensionConstraintValueChange('minWidth', $event)" />
+        <div class="pp-dimension-mode-control">
+          <app-dropdown-select
+            [enableSearch]="false"
+            [placeholder]="'Sizing'"
+            [options]="dimensionConstraintModeOptions(element, 'minWidth')"
+            [ngModel]="dimensionConstraintModeValue(element, 'minWidth')"
+            (ngModelChange)="onDimensionConstraintModeChange('minWidth', $event)"></app-dropdown-select>
+        </div>
+      </div>
+    </div>
+
+    <div class="pp-style-row pp-style-row--metric" *ngIf="hasDimensionConstraintField(element, 'maxWidth')">
+      <span class="pp-row-label">Max W</span>
+      <div class="pp-style-control pp-style-control--dimension">
+        <app-number-input
+          appearance="boxed"
+          ariaLabel="Maximum width"
+          [value]="dimensionConstraintInputValue(element, 'maxWidth')"
+          [min]="1"
+          [step]="1"
+          [suffix]="dimensionConstraintInputSuffix(element, 'maxWidth')"
+          (gestureStarted)="onNumberInputGestureStarted()"
+          (gestureCommitted)="onNumberInputGestureCommitted()"
+          (valueChange)="onDimensionConstraintValueChange('maxWidth', $event)" />
+        <div class="pp-dimension-mode-control">
+          <app-dropdown-select
+            [enableSearch]="false"
+            [placeholder]="'Sizing'"
+            [options]="dimensionConstraintModeOptions(element, 'maxWidth')"
+            [ngModel]="dimensionConstraintModeValue(element, 'maxWidth')"
+            (ngModelChange)="onDimensionConstraintModeChange('maxWidth', $event)"></app-dropdown-select>
+        </div>
+      </div>
+    </div>
+
+    <div class="pp-style-row pp-style-row--metric" *ngIf="hasDimensionConstraintField(element, 'minHeight')">
+      <span class="pp-row-label">Min H</span>
+      <div class="pp-style-control pp-style-control--dimension">
+        <app-number-input
+          appearance="boxed"
+          ariaLabel="Minimum height"
+          [value]="dimensionConstraintInputValue(element, 'minHeight')"
+          [min]="1"
+          [step]="1"
+          [suffix]="dimensionConstraintInputSuffix(element, 'minHeight')"
+          (gestureStarted)="onNumberInputGestureStarted()"
+          (gestureCommitted)="onNumberInputGestureCommitted()"
+          (valueChange)="onDimensionConstraintValueChange('minHeight', $event)" />
+        <div class="pp-dimension-mode-control">
+          <app-dropdown-select
+            [enableSearch]="false"
+            [placeholder]="'Sizing'"
+            [options]="dimensionConstraintModeOptions(element, 'minHeight')"
+            [ngModel]="dimensionConstraintModeValue(element, 'minHeight')"
+            (ngModelChange)="onDimensionConstraintModeChange('minHeight', $event)"></app-dropdown-select>
+        </div>
+      </div>
+    </div>
+
+    <div class="pp-style-row pp-style-row--metric" *ngIf="hasDimensionConstraintField(element, 'maxHeight')">
+      <span class="pp-row-label">Max H</span>
+      <div class="pp-style-control pp-style-control--dimension">
+        <app-number-input
+          appearance="boxed"
+          ariaLabel="Maximum height"
+          [value]="dimensionConstraintInputValue(element, 'maxHeight')"
+          [min]="1"
+          [step]="1"
+          [suffix]="dimensionConstraintInputSuffix(element, 'maxHeight')"
+          (gestureStarted)="onNumberInputGestureStarted()"
+          (gestureCommitted)="onNumberInputGestureCommitted()"
+          (valueChange)="onDimensionConstraintValueChange('maxHeight', $event)" />
+        <div class="pp-dimension-mode-control">
+          <app-dropdown-select
+            [enableSearch]="false"
+            [placeholder]="'Sizing'"
+            [options]="dimensionConstraintModeOptions(element, 'maxHeight')"
+            [ngModel]="dimensionConstraintModeValue(element, 'maxHeight')"
+            (ngModelChange)="onDimensionConstraintModeChange('maxHeight', $event)"></app-dropdown-select>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<app-context-menu
+  *ngIf="dimensionMenuItems.length > 0"
+  [x]="dimensionMenuX"
+  [y]="dimensionMenuY"
+  [verticalDirection]="'below'"
+  [items]="dimensionMenuItems"
+  (closed)="closeDimensionMenu()"></app-context-menu>

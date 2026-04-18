@@ -101,8 +101,8 @@
           [style.height.px]="viewportHeight()">
           <iframe
             class="preview-iframe"
-            [srcdoc]="iframeSrcdoc()"
-            sandbox="allow-same-origin"
+            [attr.srcdoc]="iframeSrcdoc()"
+            sandbox=""
             title="Design preview"
             frameborder="0"></iframe>
         </div>

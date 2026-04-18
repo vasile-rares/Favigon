@@ -13,7 +13,7 @@ export interface ViewportPresetOption {
   height: number;
 }
 
-export interface PageCanvasLayout {
+export interface CanvasPageLayout {
   pageId: string;
   x: number;
   y: number;
@@ -21,7 +21,7 @@ export interface PageCanvasLayout {
   height: number;
 }
 
-export interface PageDragState {
+export interface CanvasPageDragState {
   pageId: string;
   pointerX: number;
   pointerY: number;

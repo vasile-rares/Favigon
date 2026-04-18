@@ -18,7 +18,7 @@ import { CanvasElement } from '@app/core';
 import { CanvasBorderWidths } from '@app/core';
 import { CanvasBorderSides } from '@app/core';
 import type { CanvasObjectFit } from '@app/core';
-import { resolveEditableCanvasShadow } from '../../../utils/canvas-shadow.util';
+import { resolveEditableCanvasShadow } from '../../../utils/element/canvas-shadow.util';
 import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component';
 
 type StylePopupFieldKind = 'fill' | 'stroke' | 'shadow' | 'effect';

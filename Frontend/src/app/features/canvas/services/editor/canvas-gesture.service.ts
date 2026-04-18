@@ -1,0 +1,2918 @@
+import { Injectable, inject, signal } from '@angular/core';
+import { CanvasElement, CanvasElementType, CanvasPageModel } from '@app/core';
+import {
+  HandlePosition,
+  CornerHandle,
+  Point,
+  Bounds,
+  ResizeState,
+  RotateState,
+  CornerRadiusState,
+  SnapLine,
+  CanvasPageLayout,
+  CanvasPageDragState,
+} from '../../canvas.types';
+import { CanvasViewportService } from '../canvas-viewport.service';
+import { CanvasHistoryService } from './canvas-history.service';
+import { CanvasElementService } from '../canvas-element.service';
+import { CanvasEditorStateService } from '../canvas-editor-state.service';
+import { CanvasPageService } from '../canvas-page.service';
+import { CanvasPixiGridService } from '../pixi/canvas-pixi-grid.service';
+import { CanvasPixiApplicationService } from '../pixi/canvas-pixi-application.service';
+import { CanvasPixiRendererService } from '../pixi/canvas-pixi-renderer.service';
+import { mutateNormalizeElement } from '../../utils/element/canvas-element-normalization.util';
+import { clamp, roundToTwoDecimals } from '../../utils/canvas-math.util';
+import { collectSubtreeIds, removeWithChildren } from '../../utils/canvas-tree.util';
+import {
+  buildSnapCandidates,
+  computeSnappedPosition,
+  SNAP_THRESHOLD,
+} from '../../utils/interaction/canvas-snap.util';
+import { calculateResizedBounds } from '../../utils/interaction/canvas-resize.util';
+import {
+  getTextFontFamily,
+  getTextFontWeight,
+  getTextFontStyle,
+  getTextFontSize,
+  getTextLineHeight,
+  getTextLetterSpacing,
+} from '../../utils/element/canvas-text.util';
+
+const ROOT_FRAME_INSERT_GAP = 48;
+const ELEMENT_DRAG_START_THRESHOLD = 3;
+const CONTAINER_DROP_TOLERANCE = 4;
+
+type RectangleDrawTool = 'rectangle' | 'image';
+
+interface RectangleDrawState {
+  tool: RectangleDrawTool;
+  startPoint: Point;
+  currentPoint: Point;
+  containerId: string | null;
+}
+
+@Injectable()
+export class CanvasGestureService {
+  private readonly viewport = inject(CanvasViewportService);
+  private readonly history = inject(CanvasHistoryService);
+  private readonly element = inject(CanvasElementService);
+  private readonly editorState = inject(CanvasEditorStateService);
+  private readonly page = inject(CanvasPageService);
+  private readonly pixiGrid = inject(CanvasPixiGridService);
+  private readonly pixiApp = inject(CanvasPixiApplicationService);
+  private readonly pixiRenderer = inject(CanvasPixiRendererService);
+
+  // ── Canvas element + Pixi scene access (set by component) ─
+
+  private canvasElementGetter: (() => HTMLElement | null) | null = null;
+  private _pixiSceneReady = false;
+
+  setCanvasElementGetter(getter: () => HTMLElement | null): void {
+    this.canvasElementGetter = getter;
+  }
+
+  setPixiSceneReady(ready: boolean): void {
+    this._pixiSceneReady = ready;
+  }
+
+  private getCanvasElement(): HTMLElement | null {
+    return this.canvasElementGetter?.() ?? null;
+  }
+
+  // ── Public signals (used in template via gesture.*) ───────
+
+  readonly isDraggingEl = signal(false);
+  readonly hoveredElementId = signal<string | null>(null);
+  readonly snapLines = signal<SnapLine[]>([]);
+  readonly rectangleDrawPreview = signal<Bounds | null>(null);
+  readonly editingTextDraft = signal('');
+  readonly flowDragPlaceholder = signal<{ elementId: string; bounds: Bounds } | null>(null);
+  readonly draggingFlowChildId = signal<string | null>(null);
+  readonly layoutDropTarget = signal<{ containerId: string; index: number } | null>(null);
+  readonly autoOpenFillPopupElementId = signal<string | null>(null);
+
+  private readonly _flowCacheVersion = signal(0);
+  get flowCacheVersion() {
+    return this._flowCacheVersion.asReadonly();
+  }
+
+  // ── Private gesture state ─────────────────────────────────
+
+  private flowBoundsCache = new Map<string, Bounds>();
+  private flowBoundsDirty = true;
+
+  private dragOffset: Point = { x: 0, y: 0 };
+  private dragStartAbsolute: Point = { x: 0, y: 0 };
+  private dragSelectionIds: string[] = [];
+  private dragSelectionStartBounds = new Map<string, Bounds>();
+  private dragSelectionStartParentIds = new Map<string, string | null>();
+  private isElementDragPrimed = false;
+
+  private _isDragging = false;
+  private get isDragging(): boolean {
+    return this._isDragging;
+  }
+  private set isDragging(value: boolean) {
+    this._isDragging = value;
+    this.isDraggingEl.set(value);
+  }
+
+  private hasMovedElementDuringDrag = false;
+  private rectangleDrawState: RectangleDrawState | null = null;
+  private isFlowDragInsideContainer = false;
+  private isResizing = false;
+  private isRotating = false;
+  private isAdjustingCornerRadius = false;
+  private isDraggingPage = false;
+  private hasMovedPageDuringDrag = false;
+
+  private suppressNextPageShellClick = false;
+  private suppressNextCanvasClick = false;
+
+  private pageDragState: CanvasPageDragState = {
+    pageId: '',
+    pointerX: 0,
+    pointerY: 0,
+    startX: 0,
+    startY: 0,
+  };
+
+  private resizeSubtreeSnapshot = new Map<string, CanvasElement>();
+
+  private resizeStart: ResizeState = {
+    pointerX: 0,
+    pointerY: 0,
+    width: 0,
+    height: 0,
+    absoluteX: 0,
+    absoluteY: 0,
+    centerX: 0,
+    centerY: 0,
+    aspectRatio: 1,
+    elementId: '',
+    handle: 'se',
+  };
+
+  private rotateStart: RotateState = {
+    startAngle: 0,
+    initialRotation: 0,
+    centerX: 0,
+    centerY: 0,
+    elementId: '',
+  };
+
+  private cornerRadiusStart: CornerRadiusState = {
+    absoluteX: 0,
+    absoluteY: 0,
+    width: 0,
+    height: 0,
+    elementId: '',
+  };
+
+  private isPropertyNumberGestureActive = false;
+
+  // ── Suppress-flag public API ──────────────────────────────
+
+  consumeCanvasClickSuppression(): boolean {
+    if (this.suppressNextCanvasClick) {
+      this.suppressNextCanvasClick = false;
+      return true;
+    }
+    return false;
+  }
+
+  consumePageShellClickSuppression(): boolean {
+    if (this.suppressNextPageShellClick) {
+      this.suppressNextPageShellClick = false;
+      return true;
+    }
+    return false;
+  }
+
+  setSuppressNextCanvasClick(value: boolean): void {
+    this.suppressNextCanvasClick = value;
+  }
+
+  setSuppressNextPageShellClick(value: boolean): void {
+    this.suppressNextPageShellClick = value;
+  }
+
+  // ── Gesture state queries ─────────────────────────────────
+
+  isCurrentlyResizing(): boolean {
+    return this.isResizing;
+  }
+  isCurrentlyRotating(): boolean {
+    return this.isRotating;
+  }
+
+  cancelDragState(): void {
+    this.isDragging = false;
+    this.isResizing = false;
+  }
+
+  // ── Gesture starters ──────────────────────────────────────
+
+  beginResize(event: MouseEvent, id: string, handle: HandlePosition): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.suppressNextCanvasClick = true;
+
+    const el = this.element.findElementById(id, this.editorState.elements());
+    if (!el) return;
+
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer) return;
+
+    const bounds = this.element.getAbsoluteBounds(
+      el,
+      this.editorState.elements(),
+      this.editorState.currentPage(),
+    );
+    this.captureResizeSubtreeSnapshot(id, this.editorState.elements());
+    this.editorState.selectOnlyElement(id);
+    this.beginGestureHistory();
+    this.isDragging = false;
+    this.isResizing = true;
+    this.resizeStart = {
+      pointerX: pointer.x,
+      pointerY: pointer.y,
+      width: bounds.width,
+      height: bounds.height,
+      absoluteX: bounds.x,
+      absoluteY: bounds.y,
+      centerX: bounds.x + bounds.width / 2,
+      centerY: bounds.y + bounds.height / 2,
+      aspectRatio: bounds.width / Math.max(bounds.height, 1),
+      elementId: id,
+      handle,
+    };
+  }
+
+  beginRotate(event: MouseEvent, id: string, _corner: CornerHandle): void {
+    event.stopPropagation();
+    event.preventDefault();
+
+    const el = this.element.findElementById(id, this.editorState.elements());
+    if (!el) return;
+
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer) return;
+
+    const bounds = this.element.getAbsoluteBounds(
+      el,
+      this.editorState.elements(),
+      this.editorState.currentPage(),
+    );
+    const centerX = bounds.x + bounds.width / 2;
+    const centerY = bounds.y + bounds.height / 2;
+    const startAngle = Math.atan2(pointer.y - centerY, pointer.x - centerX) * (180 / Math.PI);
+
+    this.editorState.selectOnlyElement(id);
+    this.beginGestureHistory();
+    this.isDragging = false;
+    this.isResizing = false;
+    this.isRotating = true;
+    this.rotateStart = {
+      startAngle,
+      initialRotation: el.rotation ?? 0,
+      centerX,
+      centerY,
+      elementId: id,
+    };
+  }
+
+  beginCornerRadius(event: MouseEvent, id: string): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.suppressNextCanvasClick = true;
+
+    const el = this.element.findElementById(id, this.editorState.elements());
+    if (!el || !this.element.supportsCornerRadius(el)) return;
+
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer) return;
+
+    const bounds =
+      this.getLiveElementCanvasBounds(el) ??
+      this.element.getAbsoluteBounds(
+        el,
+        this.editorState.elements(),
+        this.editorState.currentPage(),
+      );
+    this.editorState.selectOnlyElement(id);
+    this.beginGestureHistory();
+    this.isDragging = false;
+    this.isResizing = false;
+    this.isRotating = false;
+    this.isAdjustingCornerRadius = true;
+    this.cornerRadiusStart = {
+      absoluteX: bounds.x,
+      absoluteY: bounds.y,
+      width: bounds.width,
+      height: bounds.height,
+      elementId: id,
+    };
+  }
+
+  beginPageDrag(event: MouseEvent, pageId: string, layout: CanvasPageLayout): void {
+    const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+    if (!pointer) return;
+
+    this.isDraggingPage = true;
+    this.hasMovedPageDuringDrag = false;
+    this.beginGestureHistory();
+    this.pageDragState = {
+      pageId,
+      pointerX: pointer.x,
+      pointerY: pointer.y,
+      startX: layout.x,
+      startY: layout.y,
+    };
+  }
+
+  primeElementDrag(pointer: Point, bounds: Bounds, elementId: string): void {
+    this.hasMovedElementDuringDrag = false;
+    this.isElementDragPrimed = true;
+    this.dragOffset = {
+      x: pointer.x - bounds.x,
+      y: pointer.y - bounds.y,
+    };
+    this.dragStartAbsolute = { x: bounds.x, y: bounds.y };
+  }
+
+  captureDragSelection(anchorId: string): void {
+    const elements = this.editorState.elements();
+    const candidateIds = this.editorState.selectedElementIds().includes(anchorId)
+      ? this.getSelectionRootIds()
+      : [anchorId];
+    const dragIds = this.canUseGroupDrag(candidateIds, elements) ? candidateIds : [anchorId];
+
+    this.dragSelectionIds = dragIds;
+    this.dragSelectionStartParentIds = new Map(
+      dragIds.map((id) => [id, this.element.findElementById(id, elements)?.parentId ?? null]),
+    );
+    this.dragSelectionStartBounds = new Map(
+      dragIds
+        .map((id) => {
+          const el = this.element.findElementById(id, elements);
+          return [
+            id,
+            el
+              ? this.element.getAbsoluteBounds(el, elements, this.editorState.currentPage())
+              : null,
+          ];
+        })
+        .filter((entry): entry is [string, Bounds] => entry[1] !== null),
+    );
+  }
+
+  beginFlowChildDrag(el: CanvasElement, parent: CanvasElement, elements: CanvasElement[]): Bounds {
+    this.draggingFlowChildId.set(el.id);
+    const liveSceneBounds = this.getLiveOverlaySceneBounds(el);
+    const liveCanvasBounds = this.getLiveElementCanvasBounds(el);
+    const cached = this.flowBoundsCache.get(el.id);
+    this.setFlowDragPlaceholder(el, liveSceneBounds ?? cached ?? null);
+    this.layoutDropTarget.set({
+      containerId: parent.id,
+      index: this.getFlowChildIndex(parent.id, el.id, elements),
+    });
+    this.isFlowDragInsideContainer = true;
+
+    const absoluteBounds = this.element.getAbsoluteBounds(
+      el,
+      elements,
+      this.editorState.currentPage(),
+    );
+    return liveCanvasBounds ?? absoluteBounds;
+  }
+
+  // ── Main pointer event handlers ───────────────────────────
+
+  handlePointerMove(event: MouseEvent): void {
+    const hasActivePointerGesture =
+      this.isDraggingPage ||
+      !!this.rectangleDrawState ||
+      this.viewport.isPanning() ||
+      this.isRotating ||
+      this.isResizing ||
+      this.isAdjustingCornerRadius ||
+      this.isElementDragPrimed ||
+      this.isDragging;
+
+    if (hasActivePointerGesture && event.buttons === 0) {
+      this.handlePointerUp(event);
+      return;
+    }
+
+    if (this.isDraggingPage) {
+      const pointer = this.viewport.getCanvasPoint(event, this.getCanvasElement());
+      if (!pointer) return;
+
+      const deltaX = pointer.x - this.pageDragState.pointerX;
+      const deltaY = pointer.y - this.pageDragState.pointerY;
+      if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+        this.hasMovedPageDuringDrag = true;
+      }
+      this.editorState.pages.update((pages) =>
+        pages.map((p) =>
+          p.id === this.pageDragState.pageId
+            ? {
+                ...p,
+                canvasX: roundToTwoDecimals(this.pageDragState.startX + deltaX),
+                canvasY: roundToTwoDecimals(this.pageDragState.startY + deltaY),
+              }
+            : p,
+        ),
+      );
+      return;
+    }
+
+    if (this.rectangleDrawState) {
+      this.updateRectangleDrawPreviewFromEvent(event);
+      return;
+    }
+
+    if (this.viewport.isPanning()) {
+      this.viewport.updatePan(event);
+      return;
+    }
+
+    if (this.isRotating) {
+      this.handleRotatePointerMove(event);
+      return;
+    }
+
+    if (this.isResizing) {
+      this.handleResizePointerMove(event);
+      return;
+    }
+
+    if (this.isAdjustingCornerRadius) {
+      this.handleCornerRadiusPointerMove(event);
+      return;
+    }
+
+    if (this.isElementDragPrimed && !this.isDragging) {
+      const selectedId = this.editorState.selectedElementId();
+      if (!selectedId) {
+        this.isElementDragPrimed = false;
+        return;
+      }
+
+      const pointer = this.getActivePageCanvasPoint(event);
+      if (!pointer) return;
+
+      const absoluteX = pointer.x - this.dragOffset.x;
+      const absoluteY = pointer.y - this.dragOffset.y;
+      const dragDistance = Math.hypot(
+        absoluteX - this.dragStartAbsolute.x,
+        absoluteY - this.dragStartAbsolute.y,
+      );
+
+      if (dragDistance < ELEMENT_DRAG_START_THRESHOLD) return;
+
+      this.beginGestureHistory();
+      this.hasMovedElementDuringDrag = true;
+      this.isDragging = true;
+      this.isElementDragPrimed = false;
+    }
+
+    if (!this.isDragging) return;
+
+    const selectedId = this.editorState.selectedElementId();
+    if (!selectedId) return;
+
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer) return;
+
+    const elements = this.editorState.elements();
+    const dragged = this.element.findElementById(selectedId, elements);
+    if (!dragged) return;
+
+    const isGroupDrag = this.dragSelectionIds.length > 1;
+
+    let absoluteX = pointer.x - this.dragOffset.x;
+    let absoluteY = pointer.y - this.dragOffset.y;
+    const dragDistance = Math.hypot(
+      absoluteX - this.dragStartAbsolute.x,
+      absoluteY - this.dragStartAbsolute.y,
+    );
+
+    if (!this.hasMovedElementDuringDrag) {
+      if (dragDistance < ELEMENT_DRAG_START_THRESHOLD) return;
+      this.hasMovedElementDuringDrag = true;
+    }
+
+    if (event.shiftKey) {
+      const dx = Math.abs(absoluteX - this.dragStartAbsolute.x);
+      const dy = Math.abs(absoluteY - this.dragStartAbsolute.y);
+      if (dx >= dy) {
+        absoluteY = this.dragStartAbsolute.y;
+      } else {
+        absoluteX = this.dragStartAbsolute.x;
+      }
+    }
+
+    if (isGroupDrag) {
+      this.snapLines.set([]);
+
+      const deltaX = absoluteX - this.dragStartAbsolute.x;
+      const deltaY = absoluteY - this.dragStartAbsolute.y;
+
+      this.editorState.updateCurrentPageElements((els) =>
+        els.map((el) => {
+          if (!this.dragSelectionIds.includes(el.id)) return el;
+
+          const startBounds = this.dragSelectionStartBounds.get(el.id);
+          if (!startBounds) return el;
+
+          const nextAbsoluteX = startBounds.x + deltaX;
+          const nextAbsoluteY = startBounds.y + deltaY;
+          return {
+            ...el,
+            ...this.resolveDraggedElementPatch(el, els, nextAbsoluteX, nextAbsoluteY),
+          };
+        }),
+      );
+      return;
+    }
+
+    // ── Flow child drag (reorder within layout container) ──
+    if (this.draggingFlowChildId()) {
+      this.handleFlowChildDragMove(dragged, absoluteX, absoluteY, elements);
+      return;
+    }
+
+    const { xCandidates, yCandidates } = buildSnapCandidates(selectedId, elements, (el, els) =>
+      this.element.getAbsoluteBounds(el, els, this.editorState.currentPage()),
+    );
+    const pageWidth = this.page.currentViewportWidth();
+    const pageHeight = this.page.currentViewportHeight();
+    xCandidates.push(0, pageWidth / 2, pageWidth);
+    yCandidates.push(0, pageHeight / 2, pageHeight);
+    const draggedBounds =
+      this.getLiveElementCanvasBounds(dragged) ??
+      this.element.getAbsoluteBounds(dragged, elements, this.editorState.currentPage());
+    const snap = computeSnappedPosition(
+      absoluteX,
+      absoluteY,
+      draggedBounds.width,
+      draggedBounds.height,
+      xCandidates,
+      yCandidates,
+    );
+    absoluteX = snap.x;
+    absoluteY = snap.y;
+    const isRootFrameDrag = dragged.type === 'frame' && !dragged.parentId;
+    if (isRootFrameDrag) {
+      absoluteY = this.dragStartAbsolute.y;
+      this.snapLines.set(snap.lines.filter((line) => line.type === 'vertical'));
+
+      this.editorState.updateCurrentPageElements((els) => {
+        if (this.getRootFrameCount(els) <= 1) return els;
+        return this.reflowRootFrames(els, selectedId, absoluteX);
+      });
+      return;
+    } else {
+      this.snapLines.set(snap.lines);
+    }
+
+    this.editorState.updateCurrentPageElements((els) => {
+      const mapped = els.map((el) => {
+        if (el.id !== selectedId) return el;
+
+        if (el.type === 'frame') {
+          if (isRootFrameDrag && !el.parentId) {
+            return {
+              ...el,
+              x: roundToTwoDecimals(absoluteX),
+              y: roundToTwoDecimals(this.dragStartAbsolute.y),
+            };
+          }
+          return {
+            ...el,
+            x: roundToTwoDecimals(absoluteX),
+            y: roundToTwoDecimals(absoluteY),
+          };
+        }
+
+        return {
+          ...el,
+          ...this.resolveDraggedElementPatch(el, els, absoluteX, absoluteY, true),
+        };
+      });
+      const movedEl = mapped.find((e) => e.id === selectedId) ?? null;
+      if (movedEl?.primarySyncId) return mapped;
+      return this.syncElementMoveToPrimary(movedEl, mapped);
+    });
+  }
+
+  handlePointerUp(event: MouseEvent): void {
+    if (this.rectangleDrawState) {
+      this.updateRectangleDrawPreviewFromEvent(event);
+      this.commitRectangleDraw();
+      this.clearRectangleDraw();
+      this.deferRectangleDrawClickSuppressionReset();
+      return;
+    }
+
+    const selectedOnDrop = this.editorState.selectedElement();
+    const prevParentId = selectedOnDrop
+      ? (this.dragSelectionStartParentIds.get(selectedOnDrop.id) ?? selectedOnDrop.parentId ?? null)
+      : null;
+    const isGroupDrag = this.dragSelectionIds.length > 1;
+    const shouldCommitGestureHistory =
+      this.isDragging ||
+      this.isResizing ||
+      this.isRotating ||
+      this.isAdjustingCornerRadius ||
+      this.isDraggingPage;
+
+    if (this.isDragging && this.hasMovedElementDuringDrag) {
+      if (this.draggingFlowChildId()) {
+        this.commitFlowChildDrop();
+      } else if (!isGroupDrag) {
+        this.autoGroupOnDrop();
+        if (selectedOnDrop?.type === 'frame' && !selectedOnDrop.parentId) {
+          this.alignRootFramesOnDrop();
+        }
+        if (selectedOnDrop) {
+          this.editorState.updateCurrentPageElements((els) =>
+            this.breakSyncOnParentChange(selectedOnDrop.id, prevParentId, els),
+          );
+        }
+      }
+    }
+
+    if (
+      (this.isResizing || (this.isDragging && this.hasMovedElementDuringDrag)) &&
+      selectedOnDrop &&
+      !isGroupDrag
+    ) {
+      this.editorState.updateCurrentPageElements((els) => {
+        const freshEl = els.find((e) => e.id === selectedOnDrop.id) ?? null;
+        if (freshEl?.primarySyncId) {
+          return els.map((e) => (e.id === freshEl.id ? { ...e, primarySyncId: undefined } : e));
+        }
+        if (this.isResizing && freshEl?.type === 'frame' && !freshEl.parentId) {
+          return this.syncPrimaryFrameResize(freshEl, els);
+        }
+        return this.syncElementMoveToPrimary(freshEl, els);
+      });
+    }
+
+    if (this.isDraggingPage && this.hasMovedPageDuringDrag) {
+      this.suppressNextPageShellClick = true;
+    }
+
+    if (this.viewport.isPanning() && this.viewport.panMoved) {
+      this.suppressNextCanvasClick = true;
+    }
+
+    this.viewport.endPan();
+    this.isElementDragPrimed = false;
+    this.isDragging = false;
+    this.isResizing = false;
+    this.isRotating = false;
+    this.isAdjustingCornerRadius = false;
+    this.isDraggingPage = false;
+    this.hasMovedElementDuringDrag = false;
+    this.hasMovedPageDuringDrag = false;
+    this.isFlowDragInsideContainer = false;
+    this.resizeSubtreeSnapshot = new Map();
+    this.snapLines.set([]);
+    this.flowDragPlaceholder.set(null);
+    this.draggingFlowChildId.set(null);
+    this.layoutDropTarget.set(null);
+    this.dragSelectionIds = [];
+    this.dragSelectionStartBounds = new Map();
+    this.dragSelectionStartParentIds = new Map();
+
+    if (shouldCommitGestureHistory) {
+      this.history.commitGestureHistory(() => this.editorState.createHistorySnapshot());
+    }
+  }
+
+  // ── Rectangle draw ────────────────────────────────────────
+
+  beginRectangleDraw(event: MouseEvent, suppressPageShellClick = false): boolean {
+    const tool = this.editorState.currentTool();
+    if (tool !== 'rectangle' && tool !== 'image') return false;
+
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer) return false;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (suppressPageShellClick) {
+      this.suppressNextPageShellClick = true;
+    }
+
+    const elements = this.editorState.elements();
+    const targetContainer = this.resolveInsertionContainer(pointer);
+    const containerId = targetContainer?.id ?? null;
+    const containerBounds = targetContainer
+      ? this.element.getAbsoluteBounds(targetContainer, elements, this.editorState.currentPage())
+      : null;
+
+    this.rectangleDrawState = {
+      tool: tool as RectangleDrawTool,
+      startPoint: pointer,
+      currentPoint: pointer,
+      containerId,
+    };
+
+    this.rectangleDrawPreview.set({
+      x: pointer.x + (containerBounds?.x ?? 0) - (containerBounds?.x ?? 0),
+      y: pointer.y + (containerBounds?.y ?? 0) - (containerBounds?.y ?? 0),
+      width: 0,
+      height: 0,
+    });
+
+    return true;
+  }
+
+  private updateRectangleDrawPreviewFromEvent(event: MouseEvent): void {
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer || !this.rectangleDrawState) return;
+
+    this.rectangleDrawState.currentPoint = pointer;
+    const start = this.rectangleDrawState.startPoint;
+    this.rectangleDrawPreview.set({
+      x: Math.min(start.x, pointer.x),
+      y: Math.min(start.y, pointer.y),
+      width: Math.abs(pointer.x - start.x),
+      height: Math.abs(pointer.y - start.y),
+    });
+  }
+
+  private commitRectangleDraw(): void {
+    const state = this.rectangleDrawState;
+    if (!state) return;
+
+    const preview = this.rectangleDrawPreview();
+    if (!preview || preview.width < 2 || preview.height < 2) return;
+
+    const { x, y, width, height } = preview;
+
+    const elements = this.editorState.elements();
+    const targetContainer = state.containerId
+      ? this.element.findElementById(state.containerId, elements)
+      : null;
+    const containerBounds = targetContainer
+      ? this.element.getAbsoluteBounds(targetContainer, elements, this.editorState.currentPage())
+      : null;
+
+    this.runWithHistory(() => {
+      const result = this.element.createRectangleFromBounds(
+        state.tool,
+        { x, y, width, height },
+        this.editorState.elements(),
+        targetContainer,
+        containerBounds,
+      );
+      this.commitElementCreationResult(result);
+    });
+  }
+
+  private clearRectangleDraw(): void {
+    this.rectangleDrawState = null;
+    this.rectangleDrawPreview.set(null);
+  }
+
+  private deferRectangleDrawClickSuppressionReset(): void {
+    setTimeout(() => {
+      this.suppressNextCanvasClick = false;
+      this.suppressNextPageShellClick = false;
+    }, 0);
+  }
+
+  // ── Private gesture handlers ──────────────────────────────
+
+  private handleRotatePointerMove(event: MouseEvent): void {
+    const start = this.rotateStart;
+    if (!start.elementId) return;
+
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer) return;
+
+    const currentAngle =
+      Math.atan2(pointer.y - start.centerY, pointer.x - start.centerX) * (180 / Math.PI);
+    const angleDelta = currentAngle - start.startAngle;
+    let newRotation = start.initialRotation + angleDelta;
+
+    if (event.shiftKey) {
+      newRotation = Math.round(newRotation / 15) * 15;
+    }
+
+    newRotation = ((newRotation % 360) + 360) % 360;
+    newRotation = roundToTwoDecimals(newRotation);
+
+    this.editorState.updateCurrentPageElements((els) =>
+      els.map((el) => {
+        if (el.id !== start.elementId) return el;
+        return { ...el, rotation: newRotation };
+      }),
+    );
+  }
+
+  private handleResizePointerMove(event: MouseEvent): void {
+    const start = this.resizeStart;
+    if (!start.elementId) return;
+
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer) return;
+
+    this.editorState.updateCurrentPageElements((els) => {
+      const resizedElements = els.map((el) => {
+        if (el.id !== start.elementId) return el;
+
+        const parent = this.element.findElementById(el.parentId ?? null, els);
+        const parentBounds = parent
+          ? this.element.getAbsoluteBounds(parent, els, this.editorState.currentPage())
+          : null;
+        const bounds = calculateResizedBounds(
+          this.resizeStart,
+          parentBounds,
+          pointer,
+          event.shiftKey,
+          event.altKey,
+        );
+
+        const nextElement: CanvasElement = {
+          ...el,
+          x: parentBounds ? bounds.x - parentBounds.x : bounds.x,
+          y: parentBounds ? bounds.y - parentBounds.y : bounds.y,
+          width: this.getStoredAxisSizeFromRendered(el, 'width', bounds.width),
+          height: this.getStoredAxisSizeFromRendered(el, 'height', bounds.height),
+        };
+
+        mutateNormalizeElement(nextElement, els);
+        return nextElement;
+      });
+
+      let resizedTarget = resizedElements.find((el) => el.id === start.elementId) ?? null;
+
+      let snappedElements = resizedElements;
+      if (resizedTarget && this.isRootFrame(resizedTarget) && start.handle.includes('s')) {
+        const candidates: number[] = els
+          .filter((el) => el.type === 'frame' && !el.parentId && el.id !== start.elementId)
+          .flatMap((el) => [
+            el.y + this.element.getRenderedHeight(el, els, this.editorState.currentPage()),
+            el.y,
+          ]);
+        const currentBottom =
+          resizedTarget.y +
+          this.element.getRenderedHeight(
+            resizedTarget,
+            resizedElements,
+            this.editorState.currentPage(),
+          );
+        let bestDelta = SNAP_THRESHOLD;
+        let snappedBottom: number | null = null;
+        for (const c of candidates) {
+          const delta = Math.abs(c - currentBottom);
+          if (delta < bestDelta) {
+            bestDelta = delta;
+            snappedBottom = c;
+          }
+        }
+        if (snappedBottom !== null) {
+          const snappedHeight = this.getStoredAxisSizeFromRendered(
+            resizedTarget,
+            'height',
+            snappedBottom - resizedTarget.y,
+          );
+          snappedElements = resizedElements.map((e) =>
+            e.id === start.elementId ? { ...e, height: snappedHeight } : e,
+          );
+          this.snapLines.set([{ type: 'horizontal', position: snappedBottom }]);
+        } else {
+          this.snapLines.set([]);
+        }
+        resizedTarget = snappedElements.find((e) => e.id === start.elementId) ?? null;
+      }
+
+      let result: CanvasElement[];
+      if (
+        !resizedTarget ||
+        !this.isRootFrame(resizedTarget) ||
+        this.getRootFrameCount(snappedElements) <= 1
+      ) {
+        result = snappedElements;
+      } else {
+        result = this.reflowRootFrames(snappedElements, resizedTarget.id, resizedTarget.x);
+      }
+
+      if (resizedTarget) {
+        result = this.applyResponsiveResizeToDescendants(result, resizedTarget.id);
+      }
+
+      const freshResized = result.find((e) => e.id === start.elementId) ?? null;
+      if (freshResized?.primarySyncId) return result;
+      if (freshResized?.type === 'frame' && !freshResized.parentId) {
+        return this.syncPrimaryFrameResize(freshResized, result);
+      }
+      return this.syncElementMoveToPrimary(freshResized, result);
+    });
+  }
+
+  private handleCornerRadiusPointerMove(event: MouseEvent): void {
+    const start = this.cornerRadiusStart;
+    if (!start.elementId) return;
+
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer) return;
+
+    const cornerX = start.absoluteX + start.width;
+    const cornerY = start.absoluteY;
+    const xRadius = cornerX - pointer.x;
+    const yRadius = pointer.y - cornerY;
+    const rawRadius = Math.min(xRadius, yRadius);
+    const maxRadius = Math.max(0, Math.min(start.width, start.height) / 2);
+    const nextRadius = clamp(rawRadius, 0, maxRadius);
+
+    this.editorState.updateCurrentPageElements((els) => {
+      const withRadius = els.map((el) => {
+        if (el.id !== start.elementId || !this.element.supportsCornerRadius(el)) return el;
+        return { ...el, cornerRadius: roundToTwoDecimals(nextRadius) };
+      });
+      return this.syncElementPatchToPrimary(
+        start.elementId,
+        { cornerRadius: roundToTwoDecimals(nextRadius) },
+        withRadius,
+      );
+    });
+  }
+
+  private captureResizeSubtreeSnapshot(elementId: string, elements: CanvasElement[]): void {
+    const subtreeIds = new Set(collectSubtreeIds(elements, elementId));
+    this.resizeSubtreeSnapshot = new Map(
+      elements.filter((el) => subtreeIds.has(el.id)).map((el) => [el.id, structuredClone(el)]),
+    );
+  }
+
+  private applyResponsiveResizeToDescendants(
+    elements: CanvasElement[],
+    resizedElementId: string,
+  ): CanvasElement[] {
+    const sourceRoot = this.resizeSubtreeSnapshot.get(resizedElementId);
+    const resizedRoot = this.element.findElementById(resizedElementId, elements);
+    if (
+      !sourceRoot ||
+      !resizedRoot ||
+      !this.element.isContainerElement(resizedRoot) ||
+      this.isLayoutContainer(resizedRoot) ||
+      this.resizeSubtreeSnapshot.size <= 1
+    ) {
+      return elements;
+    }
+
+    const sourceElements = Array.from(this.resizeSubtreeSnapshot.values());
+    const subtreeIds = new Set(this.resizeSubtreeSnapshot.keys());
+    const nextElements = elements.map((el) => (subtreeIds.has(el.id) ? { ...el } : el));
+    const nextById = new Map(nextElements.map((el) => [el.id, el]));
+
+    const descendants = sourceElements
+      .filter((el) => el.id !== resizedElementId)
+      .sort(
+        (l, r) =>
+          this.getElementNestingDepth(l, sourceElements) -
+          this.getElementNestingDepth(r, sourceElements),
+      );
+
+    for (const sourceEl of descendants) {
+      const nextEl = nextById.get(sourceEl.id);
+      const sourceParent = this.resizeSubtreeSnapshot.get(sourceEl.parentId ?? '');
+      const nextParent = nextById.get(sourceEl.parentId ?? '');
+      if (!nextEl || !sourceParent || !nextParent) continue;
+
+      const sourceParentWidth = this.element.getRenderedWidth(
+        sourceParent,
+        sourceElements,
+        this.editorState.currentPage(),
+      );
+      const sourceParentHeight = this.element.getRenderedHeight(
+        sourceParent,
+        sourceElements,
+        this.editorState.currentPage(),
+      );
+      const nextParentWidth = this.element.getRenderedWidth(
+        nextParent,
+        nextElements,
+        this.editorState.currentPage(),
+      );
+      const nextParentHeight = this.element.getRenderedHeight(
+        nextParent,
+        nextElements,
+        this.editorState.currentPage(),
+      );
+      const scaleX = sourceParentWidth > 0 ? nextParentWidth / sourceParentWidth : 1;
+      const scaleY = sourceParentHeight > 0 ? nextParentHeight / sourceParentHeight : 1;
+      const shouldScalePosition =
+        !this.isLayoutContainer(nextParent) || !this.isChildInFlow(sourceEl);
+      const textScale = Math.min(Math.abs(scaleX), Math.abs(scaleY));
+
+      const updatedElement: CanvasElement = {
+        ...nextEl,
+        x: shouldScalePosition ? roundToTwoDecimals(sourceEl.x * scaleX) : nextEl.x,
+        y: shouldScalePosition ? roundToTwoDecimals(sourceEl.y * scaleY) : nextEl.y,
+        width: roundToTwoDecimals(sourceEl.width * scaleX),
+        height: roundToTwoDecimals(sourceEl.height * scaleY),
+      };
+
+      if (updatedElement.type === 'text' && typeof sourceEl.fontSize === 'number') {
+        updatedElement.fontSize = roundToTwoDecimals(sourceEl.fontSize * textScale);
+
+        if (typeof sourceEl.letterSpacing === 'number' && sourceEl.letterSpacingUnit !== 'em') {
+          updatedElement.letterSpacing = roundToTwoDecimals(sourceEl.letterSpacing * textScale);
+        }
+
+        if (typeof sourceEl.lineHeight === 'number' && sourceEl.lineHeightUnit === 'px') {
+          updatedElement.lineHeight = roundToTwoDecimals(sourceEl.lineHeight * textScale);
+        }
+      }
+
+      mutateNormalizeElement(updatedElement, nextElements);
+      nextById.set(updatedElement.id, updatedElement);
+
+      const index = nextElements.findIndex((el) => el.id === updatedElement.id);
+      if (index >= 0) nextElements[index] = updatedElement;
+    }
+
+    return nextElements;
+  }
+
+  // ── Flow child drag ───────────────────────────────────────
+
+  updateFlowBoundsCache(sceneEl: HTMLElement | null): void {
+    if (!sceneEl) return;
+    const zoom = this.viewport.zoomLevel();
+    const sceneRect = sceneEl.getBoundingClientRect();
+    const flowEls = sceneEl.querySelectorAll<HTMLElement>('[data-flow-child="true"]');
+    const newCache = new Map<string, Bounds>();
+    for (const domEl of flowEls) {
+      const id = domEl.getAttribute('data-element-id');
+      if (!id) continue;
+      const rect = domEl.getBoundingClientRect();
+      newCache.set(id, {
+        x: roundToTwoDecimals((rect.left - sceneRect.left) / zoom),
+        y: roundToTwoDecimals((rect.top - sceneRect.top) / zoom),
+        width: roundToTwoDecimals(rect.width / zoom),
+        height: roundToTwoDecimals(rect.height / zoom),
+      });
+    }
+    this.flowBoundsCache = newCache;
+  }
+
+  invalidateFlowBoundsCache(): void {
+    this.flowBoundsDirty = true;
+    this._flowCacheVersion.update((v) => v + 1);
+  }
+
+  isFlowBoundsDirty(): boolean {
+    return this.flowBoundsDirty;
+  }
+
+  markFlowBoundsCacheClean(): void {
+    this.flowBoundsDirty = false;
+  }
+
+  private handleFlowChildDragMove(
+    dragged: CanvasElement,
+    absoluteX: number,
+    absoluteY: number,
+    elements: CanvasElement[],
+  ): void {
+    const parent = this.element.findElementById(dragged.parentId ?? null, elements);
+    if (!parent) return;
+
+    const parentBounds =
+      this.getLiveElementCanvasBounds(parent) ??
+      this.element.getAbsoluteBounds(parent, elements, this.editorState.currentPage());
+    const layout = this.page.activePageLayout();
+    const currentPreview = this.flowDragPlaceholder();
+    const previewWidth =
+      currentPreview?.elementId === dragged.id
+        ? currentPreview.bounds.width
+        : this.element.getRenderedWidth(dragged, elements, this.editorState.currentPage());
+    const previewHeight =
+      currentPreview?.elementId === dragged.id
+        ? currentPreview.bounds.height
+        : this.element.getRenderedHeight(dragged, elements, this.editorState.currentPage());
+    this.flowDragPlaceholder.set({
+      elementId: dragged.id,
+      bounds: {
+        x: roundToTwoDecimals(absoluteX + (layout?.x ?? 0)),
+        y: roundToTwoDecimals(absoluteY + (layout?.y ?? 0)),
+        width: roundToTwoDecimals(previewWidth),
+        height: roundToTwoDecimals(previewHeight),
+      },
+    });
+
+    const centerX = absoluteX + previewWidth / 2;
+    const centerY = absoluteY + previewHeight / 2;
+    const insideParent =
+      centerX >= parentBounds.x &&
+      centerX <= parentBounds.x + parentBounds.width &&
+      centerY >= parentBounds.y &&
+      centerY <= parentBounds.y + parentBounds.height;
+
+    this.isFlowDragInsideContainer = insideParent;
+
+    if (insideParent) {
+      const dropIndex = this.computeLayoutDropIndex(parent, centerX, centerY, elements);
+      this.layoutDropTarget.set({ containerId: parent.id, index: dropIndex });
+    }
+
+    this.snapLines.set([]);
+  }
+
+  private computeLayoutDropIndex(
+    container: CanvasElement,
+    absoluteX: number,
+    absoluteY: number,
+    elements: CanvasElement[],
+  ): number {
+    const isRow =
+      container.display === 'flex' &&
+      (!container.flexDirection ||
+        container.flexDirection === 'row' ||
+        container.flexDirection === 'row-reverse');
+
+    const draggedId = this.draggingFlowChildId();
+    const siblings = elements.filter(
+      (el) => el.parentId === container.id && el.id !== draggedId && this.isChildInFlow(el),
+    );
+
+    for (let i = 0; i < siblings.length; i++) {
+      const siblingBounds =
+        this.getLiveElementCanvasBounds(siblings[i]) ??
+        this.getFlowAwareBounds(siblings[i], elements);
+      if (isRow) {
+        if (absoluteX < siblingBounds.x + siblingBounds.width / 2) return i;
+      } else {
+        if (absoluteY < siblingBounds.y + siblingBounds.height / 2) return i;
+      }
+    }
+
+    return siblings.length;
+  }
+
+  getFlowChildIndex(containerId: string, childId: string, elements: CanvasElement[]): number {
+    const flowChildren = elements.filter(
+      (el) => el.parentId === containerId && this.isChildInFlow(el),
+    );
+    const index = flowChildren.findIndex((el) => el.id === childId);
+    return index < 0 ? flowChildren.length : index;
+  }
+
+  private commitFlowChildDrop(): void {
+    const draggedId = this.draggingFlowChildId();
+    if (!draggedId) return;
+
+    const target = this.layoutDropTarget();
+    if (target && this.isFlowDragInsideContainer) {
+      this.commitFlowChildReorder(draggedId, target.containerId, target.index);
+    } else {
+      const dragged = this.element.findElementById(draggedId, this.editorState.elements());
+      const parent = dragged
+        ? this.element.findElementById(dragged.parentId ?? null, this.editorState.elements())
+        : null;
+
+      if (parent?.type === 'frame') {
+        this.detachFlowChild(draggedId);
+      } else {
+        this.restoreFlowChildToContainer(draggedId);
+      }
+    }
+  }
+
+  private commitFlowChildReorder(draggedId: string, containerId: string, dropIndex: number): void {
+    this.editorState.updateCurrentPageElements((els) => {
+      const dragged = els.find((el) => el.id === draggedId);
+      if (!dragged) return els;
+
+      const container = this.element.findElementById(containerId, els);
+      if (!container) return els;
+
+      const flowSiblings = els.filter(
+        (el) => el.parentId === containerId && el.id !== draggedId && this.isChildInFlow(el),
+      );
+
+      const rest = els.filter((el) => el.id !== draggedId);
+      const updatedDragged = {
+        ...dragged,
+        parentId: container.id,
+        x: 0,
+        y: 0,
+        position: this.element.getDefaultPositionForPlacement(dragged.type, container),
+      };
+
+      const insertBeforeId = dropIndex < flowSiblings.length ? flowSiblings[dropIndex].id : null;
+
+      if (insertBeforeId) {
+        const idx = rest.findIndex((el) => el.id === insertBeforeId);
+        return [...rest.slice(0, idx), updatedDragged, ...rest.slice(idx)];
+      }
+
+      let lastChildIdx = -1;
+      for (let i = rest.length - 1; i >= 0; i--) {
+        if (rest[i].parentId === containerId) {
+          lastChildIdx = i;
+          break;
+        }
+      }
+      if (lastChildIdx === -1) {
+        const containerIdx = rest.findIndex((el) => el.id === containerId);
+        return [
+          ...rest.slice(0, containerIdx + 1),
+          updatedDragged,
+          ...rest.slice(containerIdx + 1),
+        ];
+      }
+      return [...rest.slice(0, lastChildIdx + 1), updatedDragged, ...rest.slice(lastChildIdx + 1)];
+    });
+  }
+
+  private detachFlowChild(draggedId: string): void {
+    this.editorState.updateCurrentPageElements((els) => {
+      const dragged = els.find((el) => el.id === draggedId);
+      if (!dragged) return els;
+
+      const preview = this.flowDragPlaceholder();
+      const layout = this.page.activePageLayout();
+      const absBounds =
+        preview && preview.elementId === draggedId
+          ? {
+              x: roundToTwoDecimals(preview.bounds.x - (layout?.x ?? 0)),
+              y: roundToTwoDecimals(preview.bounds.y - (layout?.y ?? 0)),
+              width: preview.bounds.width,
+              height: preview.bounds.height,
+            }
+          : this.element.getAbsoluteBounds(dragged, els, this.editorState.currentPage());
+      return els.map((el) =>
+        el.id === draggedId
+          ? {
+              ...el,
+              parentId: null,
+              x: roundToTwoDecimals(absBounds.x),
+              y: roundToTwoDecimals(absBounds.y),
+              width: roundToTwoDecimals(absBounds.width),
+              height: roundToTwoDecimals(absBounds.height),
+              position: this.element.getDefaultPositionForPlacement(el.type, null),
+            }
+          : el,
+      );
+    });
+  }
+
+  private restoreFlowChildToContainer(draggedId: string): void {
+    this.editorState.updateCurrentPageElements((els) => {
+      const dragged = els.find((el) => el.id === draggedId);
+      if (!dragged) return els;
+
+      const parent = this.element.findElementById(dragged.parentId ?? null, els);
+      return els.map((el) =>
+        el.id === draggedId
+          ? {
+              ...el,
+              x: 0,
+              y: 0,
+              position: this.element.getDefaultPositionForPlacement(el.type, parent),
+            }
+          : el,
+      );
+    });
+  }
+
+  private alignRootFramesOnDrop(): void {
+    this.editorState.updateCurrentPageElements((els) => this.reflowRootFrames(els));
+  }
+
+  // ── Live bounds ───────────────────────────────────────────
+
+  getLiveOverlaySceneBounds(el: CanvasElement): Bounds | null {
+    void this._flowCacheVersion(); // track for overlay reactivity
+
+    const sceneEl = this.getCanvasElement()?.querySelector<HTMLElement>('.canvas-scene') ?? null;
+    if (sceneEl) {
+      const domEl = sceneEl.querySelector<HTMLElement>(`[data-element-id="${el.id}"]`);
+      if (domEl) {
+        const zoom = this.viewport.zoomLevel();
+        const sceneRect = sceneEl.getBoundingClientRect();
+        const rect = domEl.getBoundingClientRect();
+        return {
+          x: roundToTwoDecimals((rect.left - sceneRect.left) / zoom),
+          y: roundToTwoDecimals((rect.top - sceneRect.top) / zoom),
+          width: roundToTwoDecimals(rect.width / zoom),
+          height: roundToTwoDecimals(rect.height / zoom),
+        };
+      }
+    }
+
+    return this.getLivePixiSceneBounds(el);
+  }
+
+  private getLivePixiSceneBounds(el: CanvasElement): Bounds | null {
+    if (!this._pixiSceneReady) return null;
+
+    const renderedBounds = this.pixiRenderer.getRenderedNodeSceneBounds(el.id);
+    if (renderedBounds) return renderedBounds;
+
+    const container = this.pixiRenderer.getContainerForElement(el.id);
+    if (!container || container.destroyed) return null;
+
+    const globalPos = container.toGlobal({ x: 0, y: 0 });
+    const scenePos = this.pixiApp.sceneContainer.toLocal(globalPos);
+    const renderedSize = this.pixiRenderer.getRenderedNodeSize(el.id);
+    const absoluteBounds = this.element.getAbsoluteBounds(
+      el,
+      this.editorState.elements(),
+      this.editorState.currentPage(),
+    );
+
+    return {
+      x: roundToTwoDecimals(scenePos.x),
+      y: roundToTwoDecimals(scenePos.y),
+      width: roundToTwoDecimals(
+        renderedSize && renderedSize.width > 0 ? renderedSize.width : absoluteBounds.width,
+      ),
+      height: roundToTwoDecimals(
+        renderedSize && renderedSize.height > 0 ? renderedSize.height : absoluteBounds.height,
+      ),
+    };
+  }
+
+  getCachedOverlaySceneBounds(el: CanvasElement): Bounds {
+    void this._flowCacheVersion(); // track for overlay reactivity
+
+    const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(el.id);
+    if (cached) return cached;
+
+    const livePixiBounds = this.getLivePixiSceneBounds(el);
+    if (livePixiBounds) return livePixiBounds;
+
+    const layout = this.page.activePageLayout();
+    const absolute = this.element.getAbsoluteBounds(
+      el,
+      this.editorState.elements(),
+      this.editorState.currentPage(),
+    );
+    return {
+      x: roundToTwoDecimals(absolute.x + (layout?.x ?? 0)),
+      y: roundToTwoDecimals(absolute.y + (layout?.y ?? 0)),
+      width: absolute.width,
+      height: absolute.height,
+    };
+  }
+
+  getLiveElementCanvasBounds(el: CanvasElement): Bounds | null {
+    const sceneBounds = this.getLiveOverlaySceneBounds(el);
+    if (!sceneBounds) return null;
+
+    const layout = this.page.activePageLayout();
+    return {
+      x: roundToTwoDecimals(sceneBounds.x - (layout?.x ?? 0)),
+      y: roundToTwoDecimals(sceneBounds.y - (layout?.y ?? 0)),
+      width: sceneBounds.width,
+      height: sceneBounds.height,
+    };
+  }
+
+  // ── Text editor screen coordinates ───────────────────────
+
+  getTextEditorElement(): CanvasElement | null {
+    const id = this.editorState.editingTextElementId();
+    if (!id) return null;
+    return this.element.findElementById(id, this.editorState.elements()) ?? null;
+  }
+
+  private getTextEditorDisplayBounds(): Bounds | null {
+    const el = this.getTextEditorElement();
+    if (!el) return null;
+
+    const bounds =
+      this.getLiveElementCanvasBounds(el) ??
+      this.element.getAbsoluteBounds(el, this.editorState.elements());
+    const draft = this.editingTextDraft();
+    if (!draft || draft === (el.text ?? '')) return bounds;
+
+    const widthConstraint = this.canAutoSizeTextAxis(el, 'width') ? undefined : bounds.width;
+    const size = this.measureTextSize({ ...el, text: draft }, widthConstraint);
+    const nextBounds: Bounds = { ...bounds };
+
+    if (this.canAutoSizeTextAxis(el, 'width')) {
+      const centerX = bounds.x + bounds.width / 2;
+      nextBounds.x = roundToTwoDecimals(centerX - size.width / 2);
+      nextBounds.width = size.width;
+    }
+
+    if (this.canAutoSizeTextAxis(el, 'height')) {
+      nextBounds.height = size.height;
+    }
+
+    return nextBounds;
+  }
+
+  getTextEditorScreenLeft(): number {
+    const bounds = this.getTextEditorDisplayBounds();
+    if (!bounds) return 0;
+    const layout = this.page.activePageLayout();
+    const offset = this.viewport.viewportOffset();
+    return (layout!.x + bounds.x) * this.viewport.zoomLevel() + offset.x;
+  }
+
+  getTextEditorScreenTop(): number {
+    const bounds = this.getTextEditorDisplayBounds();
+    if (!bounds) return 0;
+    const layout = this.page.activePageLayout();
+    const offset = this.viewport.viewportOffset();
+    return (layout!.y + bounds.y) * this.viewport.zoomLevel() + offset.y;
+  }
+
+  getTextEditorScreenWidth(): number {
+    return this.getTextEditorDisplayBounds()?.width ?? 0;
+  }
+
+  getTextEditorScreenHeight(): number {
+    return this.getTextEditorDisplayBounds()?.height ?? 0;
+  }
+
+  // ── Text editing ──────────────────────────────────────────
+
+  beginTextEdit(elementId: string): void {
+    const el = this.element.findElementById(elementId, this.editorState.elements());
+    if (el?.type !== 'text') return;
+
+    this.editingTextDraft.set(el.text ?? '');
+    this.editorState.editingTextElementId.set(elementId);
+    this.focusInlineTextEditor(elementId);
+  }
+
+  private stopTextEditing(): void {
+    this.editorState.editingTextElementId.set(null);
+    this.editingTextDraft.set('');
+  }
+
+  commitActiveTextEdit(): void {
+    const editingId = this.editorState.editingTextElementId();
+    if (!editingId) return;
+    this.finalizeTextEditing(editingId);
+  }
+
+  finalizeTextEditing(id: string | null): boolean {
+    if (!id || this.editorState.editingTextElementId() !== id) return false;
+
+    this.applyTextEditorDraft(id);
+    this.history.commitTextEditHistory(() => this.editorState.createHistorySnapshot());
+    const removed = this.discardEmptyTextElement(id);
+    this.stopTextEditing();
+    return removed;
+  }
+
+  applyTextEditorDraftFromInput(id: string, rawValue: string): void {
+    this.history.beginTextEditHistory(() => this.editorState.createHistorySnapshot());
+    this.editingTextDraft.set(this.normalizeInlineEditorValue(rawValue));
+  }
+
+  private normalizeInlineEditorValue(raw: string): string {
+    const value = raw.replace(/\r\n/g, '\n');
+    return value === '\n' ? '' : value;
+  }
+
+  private applyTextEditorDraft(id: string): void {
+    const el = this.element.findElementById(id, this.editorState.elements());
+    if (el?.type !== 'text') return;
+
+    const value = this.editingTextDraft();
+    if (value === (el.text ?? '')) return;
+
+    this.editorState.updateCurrentPageElements((els) => {
+      let effectivePatch: Partial<CanvasElement> = { text: value };
+      const withText = els.map((currentEl) => {
+        if (currentEl.id !== id) return currentEl;
+        const updated = { ...currentEl, text: value };
+        if (value) {
+          const textLayoutPatch = this.buildAutoSizedTextPatch(currentEl, updated);
+          if (textLayoutPatch) {
+            effectivePatch = { text: value, ...textLayoutPatch };
+            return { ...updated, ...textLayoutPatch };
+          }
+        }
+        return updated;
+      });
+      const editedEl = withText.find((e) => e.id === id);
+      if (editedEl?.primarySyncId) {
+        return withText.map((e) => (e.id === id ? { ...e, primarySyncId: undefined } : e));
+      }
+      return this.syncElementPatchToPrimary(id, effectivePatch, withText);
+    });
+  }
+
+  private focusInlineTextEditor(elementId: string): void {
+    setTimeout(() => {
+      const editor = document.querySelector(
+        `[data-text-editor-id="${elementId}"]`,
+      ) as HTMLElement | null;
+      if (!editor) return;
+
+      if (editor.textContent !== this.editingTextDraft()) {
+        editor.textContent = this.editingTextDraft();
+      }
+      editor.focus();
+      this.placeInlineTextEditorCaretAtEnd(editor);
+    }, 0);
+  }
+
+  private placeInlineTextEditorCaretAtEnd(editor: HTMLElement): void {
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    const range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+
+  readInlineTextEditorValue(editor: HTMLElement | null): string {
+    if (!editor) return '';
+    const value = (editor.innerText || editor.textContent || '').replace(/\r\n/g, '\n');
+    return value === '\n' ? '' : value;
+  }
+
+  private discardEmptyTextElement(id: string | null): boolean {
+    if (!id) return false;
+
+    const el = this.element.findElementById(id, this.editorState.elements());
+    if (el?.type !== 'text' || el.text?.trim()) return false;
+
+    this.editorState.updateCurrentPageElements((els) => {
+      const withoutEl = removeWithChildren(els, id);
+      return this.removeSyncedCopiesForSourceSubtree(id, withoutEl, els);
+    });
+
+    if (this.editorState.selectedElementId() === id) {
+      this.editorState.selectedElementId.set(null);
+    }
+
+    return true;
+  }
+
+  private canAutoSizeTextAxis(el: CanvasElement, axis: 'width' | 'height'): boolean {
+    if (el.type !== 'text') return false;
+    const mode = axis === 'width' ? (el.widthMode ?? 'fixed') : (el.heightMode ?? 'fixed');
+    return mode === 'fixed' || mode === 'fit-content';
+  }
+
+  buildAutoSizedTextPatch(
+    previousElement: CanvasElement,
+    nextElement: CanvasElement,
+  ): Partial<CanvasElement> | null {
+    const previousRenderedWidth = this.element.getRenderedWidth(
+      previousElement,
+      this.editorState.elements(),
+      this.editorState.currentPage(),
+    );
+    const widthConstraint = this.canAutoSizeTextAxis(previousElement, 'width')
+      ? undefined
+      : previousRenderedWidth;
+    const size = this.measureTextSize(nextElement, widthConstraint);
+    const patch: Partial<CanvasElement> = {};
+
+    if (this.canAutoSizeTextAxis(previousElement, 'width')) {
+      const centerX = previousElement.x + previousRenderedWidth / 2;
+      patch.x = roundToTwoDecimals(centerX - size.width / 2);
+      patch.width = size.width;
+    }
+
+    if (this.canAutoSizeTextAxis(previousElement, 'height')) {
+      patch.height = size.height;
+    }
+
+    return Object.keys(patch).length > 0 ? patch : null;
+  }
+
+  measureTextSize(el: CanvasElement, widthConstraint?: number): { width: number; height: number } {
+    const mirror = document.createElement('div');
+    mirror.style.cssText = [
+      'position:fixed',
+      'top:-9999px',
+      'left:-9999px',
+      'visibility:hidden',
+      'box-sizing:content-box',
+      'padding:0',
+      'margin:0',
+      widthConstraint == null ? 'white-space:pre' : 'white-space:pre-wrap',
+      widthConstraint == null ? 'display:inline-block' : 'display:block',
+      'overflow-wrap:break-word',
+      `font-size:${getTextFontSize(el)}`,
+      `font-family:${getTextFontFamily(el)}`,
+      `font-weight:${getTextFontWeight(el)}`,
+      `font-style:${getTextFontStyle(el)}`,
+      `line-height:${getTextLineHeight(el)}`,
+      `letter-spacing:${getTextLetterSpacing(el)}`,
+    ].join(';');
+    if (widthConstraint != null) {
+      mirror.style.width = `${widthConstraint}px`;
+    }
+    const textForMeasure = (el.text || ' ').replace(/\n+$/, (m) => m + '\u200b');
+    mirror.textContent = textForMeasure;
+    document.body.appendChild(mirror);
+    const w = widthConstraint ?? mirror.offsetWidth;
+    const h = mirror.offsetHeight;
+    document.body.removeChild(mirror);
+    return { width: Math.max(w, 24), height: Math.max(h, 4) };
+  }
+
+  getAutoSizedTextLayoutPatch(
+    previousElement: CanvasElement,
+    nextElement: CanvasElement,
+    patch: Partial<CanvasElement>,
+  ): Partial<CanvasElement> | null {
+    if (!this.shouldAutoSizeTextFromPatch(previousElement, patch) || !nextElement.text) return null;
+    return this.buildAutoSizedTextPatch(previousElement, nextElement);
+  }
+
+  shouldAutoSizeTextFromPatch(el: CanvasElement, patch: Partial<CanvasElement>): boolean {
+    if (el.type !== 'text') return false;
+
+    return (
+      patch.text !== undefined ||
+      patch.fontFamily !== undefined ||
+      patch.fontWeight !== undefined ||
+      patch.fontStyle !== undefined ||
+      patch.widthMode !== undefined ||
+      patch.heightMode !== undefined ||
+      patch.fontSize !== undefined ||
+      patch.fontSizeUnit !== undefined ||
+      patch.lineHeight !== undefined ||
+      patch.lineHeightUnit !== undefined ||
+      patch.letterSpacing !== undefined ||
+      patch.letterSpacingUnit !== undefined
+    );
+  }
+
+  // ── Element creation & drop ───────────────────────────────
+
+  createElementAtCanvasPoint(
+    tool: CanvasElementType,
+    pointer: Point,
+    targetContainer?: CanvasElement | null,
+    containerBounds?: Bounds | null,
+  ): CanvasElement | null {
+    const requiredSize = this.element.getDefaultElementDimensions(
+      tool,
+      this.viewport.frameTemplate(),
+    );
+    const preferredContainer =
+      tool === 'frame' ||
+      !targetContainer ||
+      !this.canContainerFitSize(targetContainer, requiredSize)
+        ? null
+        : targetContainer;
+    const resolvedContainer =
+      tool === 'frame'
+        ? null
+        : (preferredContainer ?? this.resolveInsertionContainer(pointer, requiredSize));
+    const resolvedContainerBounds = resolvedContainer
+      ? targetContainer && resolvedContainer.id === targetContainer.id
+        ? (containerBounds ??
+          this.element.getAbsoluteBounds(
+            resolvedContainer,
+            this.editorState.elements(),
+            this.editorState.currentPage(),
+          ))
+        : this.element.getAbsoluteBounds(
+            resolvedContainer,
+            this.editorState.elements(),
+            this.editorState.currentPage(),
+          )
+      : null;
+
+    const result = this.element.createElementAtPoint(
+      tool,
+      pointer,
+      this.editorState.elements(),
+      resolvedContainer,
+      resolvedContainerBounds,
+      this.viewport.frameTemplate(),
+    );
+
+    const newElement = this.commitElementCreationResult(result);
+    this.autoOpenFillPopupElementId.set(tool === 'image' && newElement ? newElement.id : null);
+    return newElement;
+  }
+
+  commitElementCreationResult(result: {
+    element: CanvasElement | null;
+    error: string | null;
+  }): CanvasElement | null {
+    if (result.error) {
+      this.page.apiError.set(result.error);
+      return null;
+    }
+
+    if (!result.element) return null;
+
+    const newElement = result.element;
+    this.runWithHistory(() => {
+      this.editorState.updateCurrentPageElements((els) => {
+        const withNewElement = [...els, newElement];
+        return this.syncPrimarySubtreeAcrossFrames(newElement.id, withNewElement);
+      });
+      this.editorState.selectedElementId.set(newElement.id);
+      this.editorState.currentTool.set('select');
+    });
+
+    if (newElement.type === 'text') {
+      this.beginTextEdit(newElement.id);
+    }
+
+    return newElement;
+  }
+
+  private autoGroupOnDrop(): void {
+    const id = this.editorState.selectedElementId();
+    if (!id) return;
+
+    const elements = this.editorState.elements();
+    const el = this.element.findElementById(id, elements);
+    if (!el || el.type === 'frame') return;
+
+    const elementBounds = this.element.getAbsoluteBounds(
+      el,
+      elements,
+      this.editorState.currentPage(),
+    );
+    const currentParent = el.parentId ? this.element.findElementById(el.parentId, elements) : null;
+
+    if (currentParent) {
+      const currentParentBounds = this.element.getAbsoluteBounds(
+        currentParent,
+        elements,
+        this.editorState.currentPage(),
+      );
+      const isStillInsideCurrentParent = this.isBoundsInsideBoundsWithTolerance(
+        elementBounds,
+        currentParentBounds,
+        CONTAINER_DROP_TOLERANCE,
+      );
+
+      if (isStillInsideCurrentParent) {
+        this.editorState.updateCurrentPageElements((els) =>
+          els.map((e) =>
+            e.id === id
+              ? {
+                  ...e,
+                  x: roundToTwoDecimals(
+                    clamp(
+                      elementBounds.x - currentParentBounds.x,
+                      0,
+                      this.element.getRenderedWidth(
+                        currentParent,
+                        els,
+                        this.editorState.currentPage(),
+                      ) - this.element.getRenderedWidth(e, els, this.editorState.currentPage()),
+                    ),
+                  ),
+                  y: roundToTwoDecimals(
+                    clamp(
+                      elementBounds.y - currentParentBounds.y,
+                      0,
+                      this.element.getRenderedHeight(
+                        currentParent,
+                        els,
+                        this.editorState.currentPage(),
+                      ) - this.element.getRenderedHeight(e, els, this.editorState.currentPage()),
+                    ),
+                  ),
+                }
+              : e,
+          ),
+        );
+        return;
+      }
+    }
+
+    const target = this.resolveInsertionContainerForBounds(elementBounds, id);
+
+    if (!target) {
+      if (currentParent) {
+        this.editorState.updateCurrentPageElements((els) =>
+          els.map((e) =>
+            e.id === id
+              ? {
+                  ...e,
+                  parentId: null,
+                  position: this.element.getDefaultPositionForPlacement(e.type, null),
+                  x: roundToTwoDecimals(elementBounds.x),
+                  y: roundToTwoDecimals(elementBounds.y),
+                }
+              : e,
+          ),
+        );
+      }
+      return;
+    }
+
+    if (target.id === el.parentId) return;
+
+    const fb = this.element.getAbsoluteBounds(target, elements, this.editorState.currentPage());
+    const isTargetLayout = this.isLayoutContainer(target);
+    this.editorState.updateCurrentPageElements((els) =>
+      els.map((e) =>
+        e.id === id
+          ? {
+              ...e,
+              parentId: target.id,
+              position: this.element.getDefaultPositionForPlacement(e.type, target),
+              x: isTargetLayout
+                ? 0
+                : clamp(
+                    elementBounds.x - fb.x,
+                    0,
+                    this.element.getRenderedWidth(target, els, this.editorState.currentPage()) -
+                      this.element.getRenderedWidth(e, els, this.editorState.currentPage()),
+                  ),
+              y: isTargetLayout
+                ? 0
+                : clamp(
+                    elementBounds.y - fb.y,
+                    0,
+                    this.element.getRenderedHeight(target, els, this.editorState.currentPage()) -
+                      this.element.getRenderedHeight(e, els, this.editorState.currentPage()),
+                  ),
+            }
+          : e,
+      ),
+    );
+  }
+
+  // ── Helpers needed by component panel handlers (public) ───
+
+  syncElementPatchToPrimary(
+    elementId: string,
+    _patch: Partial<CanvasElement>,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    return this.syncPrimarySubtreeAcrossFrames(elementId, elements);
+  }
+
+  applyLayoutTransitionsForContainers(
+    previousElements: CanvasElement[],
+    nextElements: CanvasElement[],
+    containerIds: readonly string[],
+  ): CanvasElement[] {
+    let updatedElements = nextElements;
+    const seenContainerIds = new Set<string>();
+
+    for (const containerId of containerIds) {
+      if (!containerId || seenContainerIds.has(containerId)) continue;
+      seenContainerIds.add(containerId);
+      updatedElements = this.applyLayoutTransitionForContainer(
+        previousElements,
+        updatedElements,
+        containerId,
+      );
+    }
+
+    return updatedElements;
+  }
+
+  private applyLayoutTransitionForContainer(
+    previousElements: CanvasElement[],
+    nextElements: CanvasElement[],
+    containerId: string,
+  ): CanvasElement[] {
+    const previousContainer = previousElements.find((el) => el.id === containerId);
+    const nextContainer = nextElements.find((el) => el.id === containerId);
+    if (!previousContainer || !nextContainer) return nextElements;
+
+    const hadLayout = this.isLayoutContainer(previousContainer);
+    const hasLayout = this.isLayoutContainer(nextContainer);
+    if (hadLayout === hasLayout) return nextElements;
+
+    const previousContainerBounds = this.getFlowAwareBounds(previousContainer, previousElements);
+
+    return nextElements.map((el) => {
+      if (el.parentId !== containerId) return el;
+
+      if (hasLayout) {
+        return {
+          ...el,
+          x: 0,
+          y: 0,
+          position: this.element.getDefaultPositionForPlacement(el.type, nextContainer),
+        };
+      }
+
+      const previousChild = previousElements.find((c) => c.id === el.id) ?? el;
+      const childBounds = this.getFlowAwareBounds(previousChild, previousElements);
+      const nextContainerWidth = this.element.getRenderedWidth(
+        nextContainer,
+        nextElements,
+        this.editorState.currentPage(),
+      );
+      const nextContainerHeight = this.element.getRenderedHeight(
+        nextContainer,
+        nextElements,
+        this.editorState.currentPage(),
+      );
+      const childWidth = this.element.getRenderedWidth(
+        el,
+        nextElements,
+        this.editorState.currentPage(),
+      );
+      const childHeight = this.element.getRenderedHeight(
+        el,
+        nextElements,
+        this.editorState.currentPage(),
+      );
+
+      return {
+        ...el,
+        x: roundToTwoDecimals(
+          clamp(childBounds.x - previousContainerBounds.x, 0, nextContainerWidth - childWidth),
+        ),
+        y: roundToTwoDecimals(
+          clamp(childBounds.y - previousContainerBounds.y, 0, nextContainerHeight - childHeight),
+        ),
+        position: this.element.getDefaultPositionForPlacement(el.type, nextContainer),
+      };
+    });
+  }
+
+  didContainerLayoutStateChange(
+    previousElement: CanvasElement,
+    nextElement: CanvasElement,
+  ): boolean {
+    return this.isLayoutContainer(previousElement) !== this.isLayoutContainer(nextElement);
+  }
+
+  normalizeDraggedElementAfterLayerMove(
+    previousElements: CanvasElement[],
+    nextElements: CanvasElement[],
+    draggedId: string,
+    previousBounds: Bounds,
+  ): CanvasElement[] {
+    const dragged = this.element.findElementById(draggedId, nextElements);
+    if (!dragged) return nextElements;
+
+    const nextParent = this.element.findElementById(dragged.parentId ?? null, nextElements);
+    const nextPosition = this.element.getDefaultPositionForPlacement(dragged.type, nextParent);
+
+    if (!nextParent) {
+      return nextElements.map((el) =>
+        el.id === draggedId
+          ? {
+              ...el,
+              x: roundToTwoDecimals(previousBounds.x),
+              y: roundToTwoDecimals(previousBounds.y),
+              position: nextPosition,
+            }
+          : el,
+      );
+    }
+
+    if (this.isLayoutContainer(nextParent)) {
+      return nextElements.map((el) =>
+        el.id === draggedId ? { ...el, x: 0, y: 0, position: nextPosition } : el,
+      );
+    }
+
+    const previousParent =
+      this.element.findElementById(nextParent.id, previousElements) ?? nextParent;
+    const parentBounds =
+      this.getLiveElementCanvasBounds(previousParent) ??
+      this.getFlowAwareBounds(previousParent, previousElements);
+    const nextParentWidth = this.element.getRenderedWidth(
+      nextParent,
+      nextElements,
+      this.editorState.currentPage(),
+    );
+    const nextParentHeight = this.element.getRenderedHeight(
+      nextParent,
+      nextElements,
+      this.editorState.currentPage(),
+    );
+    const draggedWidth = this.element.getRenderedWidth(
+      dragged,
+      nextElements,
+      this.editorState.currentPage(),
+    );
+    const draggedHeight = this.element.getRenderedHeight(
+      dragged,
+      nextElements,
+      this.editorState.currentPage(),
+    );
+    const maxX = Math.max(0, nextParentWidth - draggedWidth);
+    const maxY = Math.max(0, nextParentHeight - draggedHeight);
+
+    return nextElements.map((el) =>
+      el.id === draggedId
+        ? {
+            ...el,
+            x: roundToTwoDecimals(clamp(previousBounds.x - parentBounds.x, 0, maxX)),
+            y: roundToTwoDecimals(clamp(previousBounds.y - parentBounds.y, 0, maxY)),
+            position: nextPosition,
+          }
+        : el,
+    );
+  }
+
+  // ── Layout predicates (public, used by component handlers) ──
+
+  isRootFrame(el: CanvasElement): boolean {
+    return el.type === 'frame' && !el.parentId;
+  }
+
+  isLayoutContainer(el: CanvasElement | null | undefined): boolean {
+    return this.element.isLayoutContainerElement(el);
+  }
+
+  isChildInFlow(el: CanvasElement): boolean {
+    const pos = el.position;
+    return !pos || pos === 'static' || pos === 'relative' || pos === 'sticky';
+  }
+
+  // ── Selection helpers (public, used by clipboard/context menu) ──
+
+  getSelectionRootIds(
+    ids: string[] = this.editorState.selectedElementIds(),
+    elements: CanvasElement[] = this.editorState.elements(),
+  ): string[] {
+    const selectedIdSet = new Set(ids);
+
+    return ids.filter((id) => {
+      let parentId = elements.find((el) => el.id === id)?.parentId ?? null;
+      while (parentId) {
+        if (selectedIdSet.has(parentId)) return false;
+        parentId = elements.find((el) => el.id === parentId)?.parentId ?? null;
+      }
+      return true;
+    });
+  }
+
+  // ── Property number gesture (panel interaction) ───────────
+
+  beginPropertyNumberGesture(): void {
+    if (this.isPropertyNumberGestureActive) return;
+    this.isPropertyNumberGestureActive = true;
+    this.beginGestureHistory();
+  }
+
+  commitPropertyNumberGesture(): void {
+    if (!this.isPropertyNumberGestureActive) return;
+    this.isPropertyNumberGestureActive = false;
+    this.history.commitGestureHistory(() => this.editorState.createHistorySnapshot());
+  }
+
+  isInPropertyNumberGesture(): boolean {
+    return this.isPropertyNumberGestureActive;
+  }
+
+  // ── History helpers ───────────────────────────────────────
+
+  runWithHistory(action: () => void): void {
+    this.history.runWithHistory(() => this.editorState.createHistorySnapshot(), action);
+  }
+
+  beginGestureHistory(): void {
+    this.history.beginGestureHistory(() => this.editorState.createHistorySnapshot());
+  }
+
+  commitGestureHistory(): void {
+    this.history.commitGestureHistory(() => this.editorState.createHistorySnapshot());
+  }
+
+  // ── Primary frame sync ────────────────────────────────────
+
+  getPrimaryFrameFromElements(elements: CanvasElement[]): CanvasElement | null {
+    return this.getPrimaryFrame(elements);
+  }
+
+  private getPrimaryFrame(elements: CanvasElement[]): CanvasElement | null {
+    const rootFrames = elements.filter((el) => el.type === 'frame' && !el.parentId);
+    return (
+      rootFrames.find((el) => el.isPrimary) ??
+      rootFrames.find((el) => el.name?.toLowerCase() === 'desktop') ??
+      rootFrames[0] ??
+      null
+    );
+  }
+
+  setPrimaryFrame(elementId: string): void {
+    this.runWithHistory(() => {
+      this.editorState.updateCurrentPageElements((els) =>
+        els.map((el) =>
+          el.type === 'frame' && !el.parentId ? { ...el, isPrimary: el.id === elementId } : el,
+        ),
+      );
+    });
+  }
+
+  private syncElementMoveToPrimary(
+    movedElement: CanvasElement | null,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    if (!movedElement) return elements;
+    return this.syncPrimarySubtreeAcrossFrames(movedElement.id, elements);
+  }
+
+  private syncPrimaryFrameResize(
+    resizedFrame: CanvasElement,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    const primaryFrame = this.getPrimaryFrame(elements);
+    if (!primaryFrame || resizedFrame.id !== primaryFrame.id) return elements;
+    return this.syncPrimarySubtreeAcrossFrames(primaryFrame.id, elements);
+  }
+
+  syncPrimarySubtreeAcrossFrames(sourceRootId: string, elements: CanvasElement[]): CanvasElement[] {
+    const primaryFrame = this.getPrimaryFrame(elements);
+    if (!primaryFrame) return elements;
+
+    if (sourceRootId !== primaryFrame.id) {
+      const sourceRoot = elements.find((el) => el.id === sourceRootId);
+      if (
+        !sourceRoot ||
+        sourceRoot.primarySyncId ||
+        !this.isElementWithinPrimaryFrame(sourceRoot, elements, primaryFrame.id)
+      ) {
+        return elements;
+      }
+    }
+
+    const otherRootFrames = elements.filter(
+      (el) => this.isRootFrame(el) && el.id !== primaryFrame.id,
+    );
+    if (otherRootFrames.length === 0) return elements;
+
+    let nextElements =
+      sourceRootId === primaryFrame.id
+        ? this.syncRootFramesFromPrimary(primaryFrame, elements)
+        : elements;
+    for (const frame of otherRootFrames) {
+      const targetFrame = nextElements.find((el) => el.id === frame.id) ?? frame;
+      nextElements = this.syncPrimarySubtreeToFrame(
+        sourceRootId,
+        primaryFrame,
+        targetFrame,
+        nextElements,
+      );
+    }
+
+    return nextElements;
+  }
+
+  private syncRootFramesFromPrimary(
+    primaryFrame: CanvasElement,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    return elements.map((el) => {
+      if (!this.isRootFrame(el) || el.id === primaryFrame.id) return el;
+
+      return {
+        ...primaryFrame,
+        id: el.id,
+        name: el.name,
+        x: el.x,
+        y: el.y,
+        width: el.width,
+        height: el.height,
+        parentId: null,
+        isPrimary: false,
+        primarySyncId: undefined,
+      };
+    });
+  }
+
+  private syncPrimarySubtreeToFrame(
+    sourceRootId: string,
+    primaryFrame: CanvasElement,
+    targetFrame: CanvasElement,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    const sourceRoot =
+      sourceRootId === primaryFrame.id
+        ? primaryFrame
+        : (elements.find((el) => el.id === sourceRootId) ?? null);
+    if (!sourceRoot) return elements;
+
+    const sourceNodes = [
+      ...this.getPrimarySourceAncestors(sourceRoot, elements, primaryFrame.id),
+      ...this.getPrimarySourceSubtree(sourceRootId, primaryFrame, elements),
+    ];
+    if (sourceNodes.length === 0) return elements;
+
+    let nextElements = [...elements];
+    const syncedBySourceId = new Map<string, CanvasElement>();
+    const syncedParentIds = new Map<string, string>();
+
+    for (const sourceElement of sourceNodes) {
+      if (!sourceElement.parentId) continue;
+
+      const sourceParent = elements.find((el) => el.id === sourceElement.parentId) ?? null;
+      if (!sourceParent) continue;
+
+      const targetParent =
+        sourceElement.parentId === primaryFrame.id
+          ? targetFrame
+          : (syncedBySourceId.get(sourceElement.parentId) ??
+            this.findSyncedElementInRootFrame(
+              sourceElement.parentId,
+              targetFrame.id,
+              nextElements,
+            ));
+      if (!targetParent) continue;
+
+      syncedParentIds.set(sourceParent.id, targetParent.id);
+
+      const existingCopy = this.findSyncedElementInRootFrame(
+        sourceElement.id,
+        targetFrame.id,
+        nextElements,
+      );
+      const syncedElement = this.buildSyncedElementFromSource(
+        sourceElement,
+        sourceParent,
+        targetParent,
+        nextElements,
+        existingCopy,
+      );
+
+      nextElements = this.upsertElement(nextElements, syncedElement);
+      syncedBySourceId.set(sourceElement.id, syncedElement);
+    }
+
+    for (const [sourceParentId, targetParentId] of syncedParentIds) {
+      nextElements = this.syncFlowChildOrderAcrossFrames(
+        sourceParentId,
+        targetParentId,
+        elements,
+        nextElements,
+      );
+    }
+
+    return nextElements;
+  }
+
+  private buildSyncedElementFromSource(
+    sourceElement: CanvasElement,
+    sourceParent: CanvasElement,
+    targetParent: CanvasElement,
+    elements: CanvasElement[],
+    existingCopy: CanvasElement | null,
+  ): CanvasElement {
+    const sourceParentWidth = this.element.getRenderedWidth(
+      sourceParent,
+      elements,
+      this.editorState.currentPage(),
+    );
+    const sourceParentHeight = this.element.getRenderedHeight(
+      sourceParent,
+      elements,
+      this.editorState.currentPage(),
+    );
+    const targetParentWidth = this.element.getRenderedWidth(
+      targetParent,
+      elements,
+      this.editorState.currentPage(),
+    );
+    const targetParentHeight = this.element.getRenderedHeight(
+      targetParent,
+      elements,
+      this.editorState.currentPage(),
+    );
+    const scaleX = sourceParentWidth > 0 ? targetParentWidth / sourceParentWidth : 1;
+    const scaleY = sourceParentHeight > 0 ? targetParentHeight / sourceParentHeight : 1;
+    const shouldScalePosition =
+      !this.isLayoutContainer(targetParent) || !this.isChildInFlow(sourceElement);
+    const syncedSize = this.getSyncedElementSize(sourceElement, scaleX, scaleY);
+    const syncedElement: CanvasElement = {
+      ...sourceElement,
+      id: existingCopy?.id ?? crypto.randomUUID(),
+      parentId: targetParent.id,
+      primarySyncId: sourceElement.id,
+      isPrimary: false,
+      x: shouldScalePosition ? roundToTwoDecimals(sourceElement.x * scaleX) : 0,
+      y: shouldScalePosition ? roundToTwoDecimals(sourceElement.y * scaleY) : 0,
+      width: syncedSize.width,
+      height: syncedSize.height,
+    };
+
+    mutateNormalizeElement(syncedElement, elements);
+    return syncedElement;
+  }
+
+  private getSyncedElementSize(
+    sourceElement: CanvasElement,
+    scaleX: number,
+    scaleY: number,
+  ): { width: number; height: number } {
+    let width = this.getSyncedAxisSize(sourceElement.width, sourceElement.widthMode, scaleX);
+    let height = this.getSyncedAxisSize(sourceElement.height, sourceElement.heightMode, scaleY);
+    const sourceAspectRatio =
+      sourceElement.width > 0 && sourceElement.height > 0
+        ? sourceElement.width / sourceElement.height
+        : null;
+
+    if (sourceAspectRatio && sourceAspectRatio > 0) {
+      if (sourceElement.widthMode === 'fit-image') {
+        width = roundToTwoDecimals(height * sourceAspectRatio);
+      }
+
+      if (sourceElement.heightMode === 'fit-image') {
+        height = roundToTwoDecimals(width / sourceAspectRatio);
+      }
+    }
+
+    return { width: Math.max(1, width), height: Math.max(1, height) };
+  }
+
+  private getSyncedAxisSize(
+    value: number,
+    mode: CanvasElement['widthMode'] | CanvasElement['heightMode'] | undefined,
+    scale: number,
+  ): number {
+    if ((mode ?? 'fixed') === 'fixed') return roundToTwoDecimals(value);
+    return roundToTwoDecimals(value * scale);
+  }
+
+  private getPrimarySourceSubtree(
+    sourceRootId: string,
+    primaryFrame: CanvasElement,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    const subtreeIds =
+      sourceRootId === primaryFrame.id ? null : new Set(collectSubtreeIds(elements, sourceRootId));
+    const sourceElements =
+      sourceRootId === primaryFrame.id
+        ? elements.filter(
+            (el) =>
+              !el.primarySyncId && this.isElementWithinPrimaryFrame(el, elements, primaryFrame.id),
+          )
+        : elements.filter((el) => !el.primarySyncId && !!subtreeIds?.has(el.id));
+
+    return sourceElements.sort(
+      (l, r) => this.getElementNestingDepth(l, elements) - this.getElementNestingDepth(r, elements),
+    );
+  }
+
+  private getPrimarySourceAncestors(
+    sourceElement: CanvasElement,
+    elements: CanvasElement[],
+    primaryFrameId: string,
+  ): CanvasElement[] {
+    const ancestors: CanvasElement[] = [];
+    let parentId = sourceElement.parentId ?? null;
+
+    while (parentId && parentId !== primaryFrameId) {
+      const parent = elements.find((el) => el.id === parentId && !el.primarySyncId);
+      if (!parent) break;
+
+      ancestors.push(parent);
+      parentId = parent.parentId ?? null;
+    }
+
+    return ancestors.reverse();
+  }
+
+  removeSyncedCopiesForSourceSubtree(
+    sourceRootId: string,
+    elements: CanvasElement[],
+    sourceElements: CanvasElement[] = elements,
+  ): CanvasElement[] {
+    const sourceRoot = sourceElements.find((el) => el.id === sourceRootId);
+    if (!sourceRoot || sourceRoot.primarySyncId) return elements;
+
+    const sourceSubtreeIds = new Set(collectSubtreeIds(sourceElements, sourceRootId));
+    return elements.filter((el) => !el.primarySyncId || !sourceSubtreeIds.has(el.primarySyncId));
+  }
+
+  breakSyncOnParentChange(
+    elementId: string,
+    prevParentId: string | null,
+    elements: CanvasElement[],
+  ): CanvasElement[] {
+    if (!elementId) return elements;
+
+    const current = elements.find((e) => e.id === elementId);
+    if (!current) return elements;
+
+    const currentParentId = current.parentId ?? null;
+    if (currentParentId === prevParentId) return elements;
+
+    const primaryFrame = this.getPrimaryFrame(elements);
+    const currentSubtreeIds = new Set(collectSubtreeIds(elements, elementId));
+
+    if (current.primarySyncId) {
+      return elements.map((el) =>
+        currentSubtreeIds.has(el.id) ? { ...el, primarySyncId: undefined } : el,
+      );
+    }
+
+    const wasInPrimaryScope =
+      !!primaryFrame && this.isParentWithinPrimaryScope(prevParentId, elements, primaryFrame.id);
+    const isInPrimaryScope =
+      !!primaryFrame && this.isParentWithinPrimaryScope(currentParentId, elements, primaryFrame.id);
+
+    if (wasInPrimaryScope && !isInPrimaryScope) {
+      return elements.map((el) =>
+        el.primarySyncId && currentSubtreeIds.has(el.primarySyncId)
+          ? { ...el, primarySyncId: undefined }
+          : el,
+      );
+    }
+
+    return elements;
+  }
+
+  private isParentWithinPrimaryScope(
+    parentId: string | null,
+    elements: CanvasElement[],
+    primaryFrameId: string,
+  ): boolean {
+    if (!parentId) return false;
+    if (parentId === primaryFrameId) return true;
+
+    const parent = this.element.findElementById(parentId, elements);
+    return !!parent && this.isElementWithinPrimaryFrame(parent, elements, primaryFrameId);
+  }
+
+  private isElementWithinPrimaryFrame(
+    el: CanvasElement,
+    elements: CanvasElement[],
+    primaryFrameId: string,
+  ): boolean {
+    let parentId = el.parentId ?? null;
+
+    while (parentId) {
+      if (parentId === primaryFrameId) return true;
+      parentId = this.element.findElementById(parentId, elements)?.parentId ?? null;
+    }
+
+    return false;
+  }
+
+  private findSyncedElementInRootFrame(
+    sourceId: string,
+    rootFrameId: string,
+    elements: CanvasElement[],
+  ): CanvasElement | null {
+    return (
+      elements.find(
+        (el) => el.primarySyncId === sourceId && this.findRootFrameId(el, elements) === rootFrameId,
+      ) ?? null
+    );
+  }
+
+  private findRootFrameId(el: CanvasElement, elements: CanvasElement[]): string | null {
+    let current: CanvasElement | null = el;
+
+    while (current) {
+      if (this.isRootFrame(current)) return current.id;
+      current = current.parentId ? this.element.findElementById(current.parentId, elements) : null;
+    }
+
+    return null;
+  }
+
+  private upsertElement(elements: CanvasElement[], nextElement: CanvasElement): CanvasElement[] {
+    const index = elements.findIndex((el) => el.id === nextElement.id);
+    if (index === -1) return [...elements, nextElement];
+
+    const nextElements = [...elements];
+    nextElements[index] = nextElement;
+    return nextElements;
+  }
+
+  private syncFlowChildOrderAcrossFrames(
+    sourceParentId: string,
+    targetParentId: string,
+    sourceElements: CanvasElement[],
+    targetElements: CanvasElement[],
+  ): CanvasElement[] {
+    const sourceParent = this.element.findElementById(sourceParentId, sourceElements);
+    const targetParent = this.element.findElementById(targetParentId, targetElements);
+    if (!sourceParent || !targetParent || !this.isLayoutContainer(sourceParent)) {
+      return targetElements;
+    }
+
+    const sourceFlowChildren = sourceElements.filter(
+      (el) => el.parentId === sourceParentId && !el.primarySyncId && this.isChildInFlow(el),
+    );
+    if (sourceFlowChildren.length <= 1) return targetElements;
+
+    const sourceOrder = new Map(sourceFlowChildren.map((el, index) => [el.id, index] as const));
+    const targetIndices: number[] = [];
+    const targetFlowChildren: CanvasElement[] = [];
+
+    targetElements.forEach((el, index) => {
+      if (
+        el.parentId === targetParentId &&
+        !!el.primarySyncId &&
+        sourceOrder.has(el.primarySyncId) &&
+        this.isChildInFlow(el)
+      ) {
+        targetIndices.push(index);
+        targetFlowChildren.push(el);
+      }
+    });
+
+    if (targetFlowChildren.length <= 1) return targetElements;
+
+    const sortedChildren = [...targetFlowChildren].sort(
+      (l, r) =>
+        (sourceOrder.get(l.primarySyncId ?? '') ?? Number.MAX_SAFE_INTEGER) -
+        (sourceOrder.get(r.primarySyncId ?? '') ?? Number.MAX_SAFE_INTEGER),
+    );
+
+    const changed = sortedChildren.some((el, index) => el.id !== targetFlowChildren[index].id);
+    if (!changed) return targetElements;
+
+    const nextElements = [...targetElements];
+    targetIndices.forEach((elementIndex, index) => {
+      nextElements[elementIndex] = sortedChildren[index];
+    });
+
+    return nextElements;
+  }
+
+  // ── Private helpers ───────────────────────────────────────
+
+  getActivePageCanvasPoint(event: MouseEvent): Point | null {
+    const canvas = this.getCanvasElement();
+    const offset = this.page.activePageLayout();
+    if (!offset) return null;
+
+    const point = this.viewport.getCanvasPoint(event, canvas);
+    if (!point) return null;
+
+    return {
+      x: point.x - offset.x,
+      y: point.y - offset.y,
+    };
+  }
+
+  private resolveDraggedElementPatch(
+    el: CanvasElement,
+    elements: CanvasElement[],
+    nextAbsoluteX: number,
+    nextAbsoluteY: number,
+    preserveParentDuringDrag = false,
+  ): Partial<CanvasElement> {
+    const parent = this.element.findElementById(el.parentId ?? null, elements);
+    if (!parent) {
+      return {
+        x: roundToTwoDecimals(nextAbsoluteX),
+        y: roundToTwoDecimals(nextAbsoluteY),
+      };
+    }
+
+    const parentBounds = this.element.getAbsoluteBounds(
+      parent,
+      elements,
+      this.editorState.currentPage(),
+    );
+    const elementRenderedWidth = this.element.getRenderedWidth(
+      el,
+      elements,
+      this.editorState.currentPage(),
+    );
+    const elementRenderedHeight = this.element.getRenderedHeight(
+      el,
+      elements,
+      this.editorState.currentPage(),
+    );
+    const parentRenderedWidth = this.element.getRenderedWidth(
+      parent,
+      elements,
+      this.editorState.currentPage(),
+    );
+    const parentRenderedHeight = this.element.getRenderedHeight(
+      parent,
+      elements,
+      this.editorState.currentPage(),
+    );
+    const nextBounds: Bounds = {
+      x: nextAbsoluteX,
+      y: nextAbsoluteY,
+      width: elementRenderedWidth,
+      height: elementRenderedHeight,
+    };
+
+    if (
+      preserveParentDuringDrag &&
+      this.element.isContainerElement(parent) &&
+      !this.isLayoutContainer(parent) &&
+      el.position === 'absolute'
+    ) {
+      return {
+        x: roundToTwoDecimals(nextAbsoluteX - parentBounds.x),
+        y: roundToTwoDecimals(nextAbsoluteY - parentBounds.y),
+      };
+    }
+
+    if (
+      this.element.isContainerElement(parent) &&
+      !this.isLayoutContainer(parent) &&
+      !this.isBoundsFullyInsideBounds(nextBounds, parentBounds)
+    ) {
+      return {
+        parentId: null,
+        position: this.element.getDefaultPositionForPlacement(el.type, null),
+        x: roundToTwoDecimals(nextAbsoluteX),
+        y: roundToTwoDecimals(nextAbsoluteY),
+      };
+    }
+
+    return {
+      x: clamp(nextAbsoluteX - parentBounds.x, 0, parentRenderedWidth - elementRenderedWidth),
+      y: clamp(nextAbsoluteY - parentBounds.y, 0, parentRenderedHeight - elementRenderedHeight),
+    };
+  }
+
+  private setFlowDragPlaceholder(el: CanvasElement, cachedBounds: Bounds | null): void {
+    if (cachedBounds) {
+      this.flowDragPlaceholder.set({
+        elementId: el.id,
+        bounds: {
+          x: cachedBounds.x,
+          y: cachedBounds.y,
+          width: cachedBounds.width,
+          height: cachedBounds.height,
+        },
+      });
+      return;
+    }
+
+    const absoluteBounds = this.element.getAbsoluteBounds(
+      el,
+      this.editorState.elements(),
+      this.editorState.currentPage(),
+    );
+    const layout = this.page.activePageLayout();
+    this.flowDragPlaceholder.set({
+      elementId: el.id,
+      bounds: {
+        x: absoluteBounds.x + (layout?.x ?? 0),
+        y: absoluteBounds.y + (layout?.y ?? 0),
+        width: absoluteBounds.width,
+        height: absoluteBounds.height,
+      },
+    });
+  }
+
+  private resolveInsertionContainer(
+    pointer: Point,
+    requiredSize?: { width: number; height: number },
+  ): CanvasElement | null {
+    const elements = this.editorState.elements();
+    const hoveredContainers = elements.filter((el) => {
+      if (
+        !this.element.isContainerElement(el) ||
+        !this.element.isElementEffectivelyVisible(el.id, elements)
+      ) {
+        return false;
+      }
+
+      const bounds = this.element.getAbsoluteBounds(el, elements, this.editorState.currentPage());
+      return (
+        pointer.x >= bounds.x &&
+        pointer.x <= bounds.x + bounds.width &&
+        pointer.y >= bounds.y &&
+        pointer.y <= bounds.y + bounds.height &&
+        this.canContainerFitSize(el, requiredSize)
+      );
+    });
+
+    if (hoveredContainers.length > 0) {
+      return this.getSmallestContainer(hoveredContainers);
+    }
+
+    const selectedContainer = this.element.getSelectedContainer(this.editorState.selectedElement());
+    return selectedContainer && this.canContainerFitSize(selectedContainer, requiredSize)
+      ? selectedContainer
+      : null;
+  }
+
+  resolveInsertionContainerForBounds(
+    bounds: Bounds,
+    excludedRootId?: string | null,
+  ): CanvasElement | null {
+    const elements = this.editorState.elements();
+    const excludedIds = excludedRootId
+      ? new Set(collectSubtreeIds(elements, excludedRootId))
+      : null;
+    const hoveredContainers = elements.filter((el) => {
+      if (
+        !this.element.isContainerElement(el) ||
+        !this.element.isElementEffectivelyVisible(el.id, elements) ||
+        excludedIds?.has(el.id)
+      ) {
+        return false;
+      }
+
+      const containerBounds = this.element.getAbsoluteBounds(
+        el,
+        elements,
+        this.editorState.currentPage(),
+      );
+      return this.isBoundsFullyInsideBounds(bounds, containerBounds);
+    });
+
+    return this.getSmallestContainer(hoveredContainers);
+  }
+
+  resolveInsertionContext(
+    pointer: Point,
+    requiredSize?: { width: number; height: number },
+  ): { container: CanvasElement | null; containerBounds: Bounds | null } {
+    const container = this.resolveInsertionContainer(pointer, requiredSize);
+    return {
+      container,
+      containerBounds: container
+        ? this.element.getAbsoluteBounds(
+            container,
+            this.editorState.elements(),
+            this.editorState.currentPage(),
+          )
+        : null,
+    };
+  }
+
+  private getSmallestContainer(containers: CanvasElement[]): CanvasElement | null {
+    if (containers.length === 0) return null;
+
+    return containers.reduce((best, candidate) => {
+      const bestArea =
+        this.element.getRenderedWidth(
+          best,
+          this.editorState.elements(),
+          this.editorState.currentPage(),
+        ) *
+        this.element.getRenderedHeight(
+          best,
+          this.editorState.elements(),
+          this.editorState.currentPage(),
+        );
+      const candidateArea =
+        this.element.getRenderedWidth(
+          candidate,
+          this.editorState.elements(),
+          this.editorState.currentPage(),
+        ) *
+        this.element.getRenderedHeight(
+          candidate,
+          this.editorState.elements(),
+          this.editorState.currentPage(),
+        );
+      return candidateArea < bestArea ? candidate : best;
+    });
+  }
+
+  private canContainerFitSize(
+    container: CanvasElement,
+    requiredSize?: { width: number; height: number },
+  ): boolean {
+    if (!requiredSize) return true;
+
+    return (
+      this.element.getRenderedWidth(
+        container,
+        this.editorState.elements(),
+        this.editorState.currentPage(),
+      ) >= requiredSize.width &&
+      this.element.getRenderedHeight(
+        container,
+        this.editorState.elements(),
+        this.editorState.currentPage(),
+      ) >= requiredSize.height
+    );
+  }
+
+  private canUseGroupDrag(ids: string[], elements: CanvasElement[]): boolean {
+    if (ids.length <= 1) return false;
+
+    return ids.every((id) => {
+      const el = this.element.findElementById(id, elements);
+      if (!el) return false;
+
+      const parent = this.element.findElementById(el.parentId ?? null, elements);
+      return !(parent && this.isLayoutContainer(parent) && this.isChildInFlow(el));
+    });
+  }
+
+  private getFlowAwareBounds(el: CanvasElement, elements: CanvasElement[]): Bounds {
+    const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(el.id);
+    if (cached) {
+      const layout = this.page.activePageLayout();
+      return {
+        x: roundToTwoDecimals(cached.x - (layout?.x ?? 0)),
+        y: roundToTwoDecimals(cached.y - (layout?.y ?? 0)),
+        width: cached.width,
+        height: cached.height,
+      };
+    }
+
+    return this.element.getAbsoluteBounds(el, elements, this.editorState.currentPage());
+  }
+
+  getDragSelectionCount(): number {
+    return this.dragSelectionIds.length;
+  }
+
+  getRootFrameCount(elements: CanvasElement[]): number {
+    return elements.filter((el) => this.isRootFrame(el)).length;
+  }
+
+  private reflowRootFrames(
+    elements: CanvasElement[],
+    draggedId?: string,
+    draggedX?: number,
+  ): CanvasElement[] {
+    const rootFrames = elements.filter((el) => this.isRootFrame(el));
+    if (rootFrames.length <= 1) return elements;
+
+    const ordered = [...rootFrames].sort((a, b) => {
+      const ax = a.id === draggedId && typeof draggedX === 'number' ? draggedX : a.x;
+      const bx = b.id === draggedId && typeof draggedX === 'number' ? draggedX : b.x;
+      return ax - bx;
+    });
+
+    const startX = Math.min(...rootFrames.map((f) => f.x));
+    const baselineY = rootFrames[0]?.y ?? 0;
+    let cursorX = startX;
+    const nextById = new Map<string, { x: number; y: number }>();
+
+    for (const frame of ordered) {
+      nextById.set(frame.id, {
+        x: roundToTwoDecimals(cursorX),
+        y: roundToTwoDecimals(baselineY),
+      });
+      cursorX +=
+        this.element.getRenderedWidth(frame, elements, this.editorState.currentPage()) +
+        ROOT_FRAME_INSERT_GAP;
+    }
+
+    return elements.map((el) => {
+      const next = nextById.get(el.id);
+      if (!next) return el;
+      return { ...el, x: next.x, y: next.y };
+    });
+  }
+
+  private getElementNestingDepth(el: CanvasElement, elements: CanvasElement[]): number {
+    let depth = 0;
+    let currentParentId = el.parentId ?? null;
+
+    while (currentParentId) {
+      const parent = this.element.findElementById(currentParentId, elements);
+      if (!parent) break;
+      depth += 1;
+      currentParentId = parent.parentId ?? null;
+    }
+
+    return depth;
+  }
+
+  private getStoredAxisSizeFromRendered(
+    el: CanvasElement,
+    axis: 'width' | 'height',
+    renderedSize: number,
+  ): number {
+    const paddingTotal = el.padding
+      ? axis === 'width'
+        ? el.padding.left + el.padding.right
+        : el.padding.top + el.padding.bottom
+      : 0;
+    return Math.max(24, roundToTwoDecimals(renderedSize - paddingTotal));
+  }
+
+  private isBoundsFullyInsideBounds(inner: Bounds, outer: Bounds): boolean {
+    return (
+      inner.x >= outer.x &&
+      inner.y >= outer.y &&
+      inner.x + inner.width <= outer.x + outer.width &&
+      inner.y + inner.height <= outer.y + outer.height
+    );
+  }
+
+  private isBoundsInsideBoundsWithTolerance(
+    inner: Bounds,
+    outer: Bounds,
+    tolerance: number,
+  ): boolean {
+    return (
+      inner.x >= outer.x - tolerance &&
+      inner.y >= outer.y - tolerance &&
+      inner.x + inner.width <= outer.x + outer.width + tolerance &&
+      inner.y + inner.height <= outer.y + outer.height + tolerance
+    );
+  }
+}

@@ -15,7 +15,7 @@ import { CanvasElement, CanvasElementType, CanvasPageModel } from '@app/core';
 import { ContextMenuComponent, ToggleGroupComponent } from '@app/shared';
 import type { ContextMenuItem, ToggleGroupOption } from '@app/shared';
 import { DeviceFramePreset, VIEWPORT_PRESET_OPTIONS } from '../../canvas.types';
-import { formatCanvasElementTypeLabel } from '../../utils/canvas-interaction.util';
+import { formatCanvasElementTypeLabel } from '../../utils/element/canvas-element-normalization.util';
 
 interface LayerEntry {
   pageId: string;

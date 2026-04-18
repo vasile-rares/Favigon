@@ -96,6 +96,8 @@ export type {
   ProjectImageUploadResponse,
 } from './project.models';
 
+export { FALLBACK_AVATAR_URL } from './user.models';
+
 export type {
   UserProfile,
   UserSearchResult,

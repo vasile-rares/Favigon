@@ -3,14 +3,14 @@ import { map, Observable } from 'rxjs';
 import {
   buildCanvasProjectDocumentFromUnknown,
   buildPersistedCanvasDesign,
-} from '../mappers/canvas-ir.mapper';
+} from '../mappers/canvas-persistence.mapper';
 import {
   CanvasPageModel,
   CanvasProjectDocument,
   ProjectDesignResponse,
   ProjectService,
 } from '@app/core';
-import { withRoundedPrecision } from '../utils/canvas-interaction.util';
+import { withRoundedPrecision } from '../utils/element/canvas-element-normalization.util';
 
 @Injectable()
 export class CanvasPersistenceService {

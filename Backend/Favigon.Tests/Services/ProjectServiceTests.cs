@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Favigon.Application.DTOs.Requests;
 using Favigon.Application.Interfaces;
@@ -20,8 +21,9 @@ public class ProjectServiceTests
 
   public ProjectServiceTests()
   {
-    var config = new MapperConfiguration(cfg => cfg.AddProfile<MappingProfile>());
-    _mapper = config.CreateMapper();
+    var configExpr = new MapperConfigurationExpression();
+    configExpr.AddProfile<MappingProfile>();
+    _mapper = new MapperConfiguration(configExpr, NullLoggerFactory.Instance).CreateMapper();
     _sut = new ProjectService(
       _projectRepo.Object,
       _mapper,

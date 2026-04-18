@@ -1,3 +1,5 @@
+export const FALLBACK_AVATAR_URL = '/assets/default-avatar.svg';
+
 export interface UserProfile {
   userId: number;
   displayName: string;

@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, ElementRef, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   CanvasPageModel,
@@ -9,13 +9,13 @@ import {
   ProjectService,
   extractApiErrorMessage,
 } from '@app/core';
-import { DropdownSelectComponent } from '../../../shared/components/dropdown-select/dropdown-select.component';
-import type { DropdownSelectOption } from '../../../shared/components/dropdown-select/dropdown-select.component';
-import { HeaderBarComponent } from '../../../shared/components/header-bar/header-bar.component';
-import { CanvasPersistenceService } from '../services/canvas-api.service';
-import { buildCanvasIRPages } from '../mappers/canvas-ir.mapper';
-import { VIEWPORT_PRESET_OPTIONS } from '../canvas.types';
-import { NumberInputComponent } from '../components/properties-panel/number-input/number-input.component';
+import { DropdownSelectComponent } from '../../../../shared/components/dropdown-select/dropdown-select.component';
+import type { DropdownSelectOption } from '../../../../shared/components/dropdown-select/dropdown-select.component';
+import { HeaderBarComponent } from '../../../../shared/components/header-bar/header-bar.component';
+import { CanvasPersistenceService } from '../../services/canvas-persistence.service';
+import { buildCanvasIRPages } from '../../mappers/canvas-to-ir.mapper';
+import { VIEWPORT_PRESET_OPTIONS } from '../../canvas.types';
+import { NumberInputComponent } from '../../components/properties-panel/number-input/number-input.component';
 
 interface FrameSizeOption {
   label: string;
@@ -45,7 +45,7 @@ export class CanvasPreviewPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly sanitizer = inject(DomSanitizer);
+
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
   private readonly converterService = inject(ConverterService);
   private readonly projectApiService = inject(ProjectService);
@@ -169,15 +169,23 @@ export class CanvasPreviewPage {
     return frame ? frame.height : 720;
   });
 
-  readonly iframeSrcdoc = computed<SafeHtml>(() => {
+  /**
+   * Build a self-contained HTML document string for the preview iframe.
+   *
+   * Security: the HTML/CSS is generated server-side by the Converter from the
+   * project's IR tree — it is NOT raw user input.  The iframe uses
+   * `sandbox=""` (most restrictive: no scripts, no same-origin, no popups),
+   * so even if malicious content were injected it cannot execute.
+   */
+  readonly iframeSrcdoc = computed<string>(() => {
     const html = this.generatedHtml();
     const css = this.generatedCss();
 
     if (!html && !css) {
-      return this.sanitizer.bypassSecurityTrustHtml('');
+      return '';
     }
 
-    const doc = `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -195,8 +203,6 @@ ${css}
 ${html}
 </body>
 </html>`;
-
-    return this.sanitizer.bypassSecurityTrustHtml(doc);
   });
 
   readonly filteredPages = computed<CanvasPageModel[]>(() => {

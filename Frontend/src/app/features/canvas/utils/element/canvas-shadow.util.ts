@@ -1,5 +1,5 @@
 import { CanvasShadowPreset } from '@app/core';
-import { roundToTwoDecimals } from './canvas-math.util';
+import { roundToTwoDecimals } from '../canvas-math.util';
 
 export type CanvasShadowPosition = 'outside' | 'inside';
 

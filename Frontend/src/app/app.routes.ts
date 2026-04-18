@@ -28,7 +28,7 @@ export const routes: Routes = [
   {
     path: 'project/:slug/preview',
     loadComponent: () =>
-      import('./features/canvas/pages/canvas-preview-page.component').then(
+      import('./features/canvas/pages/canvas-preview-page/canvas-preview-page.component').then(
         (m) => m.CanvasPreviewPage,
       ),
     canActivate: [authGuard],
@@ -36,7 +36,7 @@ export const routes: Routes = [
   {
     path: 'project/:slug',
     loadComponent: () =>
-      import('./features/canvas/pages/canvas-page.component').then((m) => m.CanvasPage),
+      import('./features/canvas/pages/canvas-page/canvas-page.component').then((m) => m.CanvasPage),
     canActivate: [authGuard],
     canDeactivate: [canvasPageCanDeactivateGuard],
   },

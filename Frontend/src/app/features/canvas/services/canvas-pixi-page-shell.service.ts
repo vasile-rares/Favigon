@@ -3,8 +3,8 @@ import { Container, Graphics, Rectangle, Text, TextStyle, FederatedPointerEvent 
 import { CanvasPixiApplicationService } from './canvas-pixi-application.service';
 import { CanvasPageGeometryService } from './canvas-page-geometry.service';
 import { CanvasEditorStateService } from './canvas-editor-state.service';
-import { PageCanvasLayout } from '../canvas.types';
-import { getFrameTitle } from '../utils/canvas-text.util';
+import { CanvasPageLayout } from '../canvas.types';
+import { getFrameTitle } from '../utils/element/canvas-text.util';
 
 const FRAME_TITLE_FONT_SIZE = 13;
 const FRAME_TITLE_COLOR_ACTIVE = 0xffffff;
@@ -99,7 +99,7 @@ export class CanvasPixiPageShellService {
   }
 
   syncPageShells(
-    pageLayouts: PageCanvasLayout[],
+    pageLayouts: CanvasPageLayout[],
     activePageId: string | null,
     zoom: number,
     pageNames: Map<string, string>,
@@ -145,7 +145,7 @@ export class CanvasPixiPageShellService {
   }
 
   private syncFrameTitles(
-    pageLayouts: PageCanvasLayout[],
+    pageLayouts: CanvasPageLayout[],
     activePageId: string | null,
     zoom: number,
   ): void {
@@ -210,7 +210,7 @@ export class CanvasPixiPageShellService {
   }
 
   private syncPageHeaders(
-    pageLayouts: PageCanvasLayout[],
+    pageLayouts: CanvasPageLayout[],
     activePageId: string | null,
     zoom: number,
     pageNames: Map<string, string>,

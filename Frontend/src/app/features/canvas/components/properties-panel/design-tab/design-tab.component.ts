@@ -2,6 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output, ViewEncapsulation } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DropdownSelectComponent, ToggleGroupComponent, ContextMenuComponent } from '@app/shared';
+import { NumberInputComponent } from '../number-input/number-input.component';
+import { FieldInputComponent } from '../field-input/field-input.component';
 import type { DropdownSelectOption, ToggleGroupOption, ContextMenuItem } from '@app/shared';
 import {
   CanvasAlignItems,
@@ -37,13 +39,12 @@ import {
   CanvasTextAlign,
   CanvasTextVerticalAlign,
 } from '@app/core';
-import { NumberInputComponent } from '../number-input/number-input.component';
-import { FieldInputComponent } from '../field-input/field-input.component';
+
 import {
   getDefaultCornerRadius,
   getResolvedCornerRadii,
   hasPerCornerRadius,
-} from '../../../utils/canvas-interaction.util';
+} from '../../../utils/element/canvas-element-normalization.util';
 import { roundToTwoDecimals } from '../../../utils/canvas-math.util';
 import {
   getAllowedCustomAccessibilityTags,
@@ -53,7 +54,7 @@ import {
   normalizeCanvasAccessibilityLabel,
   normalizeStoredCanvasTag,
   supportsCustomAccessibilityTag,
-} from '../../../utils/canvas-accessibility.util';
+} from '../../../utils/element/canvas-accessibility.util';
 import {
   CanvasConstraintField,
   CanvasSizeAxis,
@@ -80,7 +81,7 @@ import {
   shouldDisableCanvasSizeInput,
   supportsCanvasConstraintSizeMode,
   supportsCanvasSizeMode,
-} from '../../../utils/canvas-sizing.util';
+} from '../../../utils/element/canvas-sizing.util';
 import {
   buildCanvasShadowCss,
   DEFAULT_EDITABLE_CANVAS_SHADOW,
@@ -88,9 +89,18 @@ import {
   hasCanvasShadow,
   normalizeCanvasShadowValue,
   resolveEditableCanvasShadow,
-} from '../../../utils/canvas-shadow.util';
-import { createDefaultCanvasEffect, resolveCanvasEffect } from '../../../utils/canvas-effect.util';
+} from '../../../utils/element/canvas-shadow.util';
+import {
+  createDefaultCanvasEffect,
+  resolveCanvasEffect,
+} from '../../../utils/element/canvas-effect.util';
 import { FrameTemplateSelection } from '../../../canvas.types';
+import { ExtrasSectionComponent } from './sections/extras-section.component';
+import { DimensionsSectionComponent } from './sections/dimensions-section.component';
+import { LayoutSectionComponent } from './sections/layout-section.component';
+import { AppearanceSectionComponent } from './sections/appearance-section.component';
+import { TypographySectionComponent } from './sections/typography-section.component';
+import { TransformsEffectsSectionComponent } from './sections/transforms-effects-section.component';
 
 type CornerRadiusMode = 'full' | 'per-corner';
 type PaddingMode = 'full' | 'per-side';
@@ -225,12 +235,12 @@ const EFFECT_PREVIEW_CLICK_IDLE_MS = 1080;
   standalone: true,
   imports: [
     CommonModule,
-    FormsModule,
-    DropdownSelectComponent,
-    NumberInputComponent,
-    FieldInputComponent,
-    ToggleGroupComponent,
-    ContextMenuComponent,
+    ExtrasSectionComponent,
+    DimensionsSectionComponent,
+    LayoutSectionComponent,
+    AppearanceSectionComponent,
+    TypographySectionComponent,
+    TransformsEffectsSectionComponent,
   ],
   templateUrl: './design-tab.component.html',
   styleUrl: './design-tab.component.css',

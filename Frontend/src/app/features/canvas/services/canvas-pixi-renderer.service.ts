@@ -11,10 +11,10 @@ import {
   hasPerCornerRadius,
   hasPerSideStrokeWidths,
   getStrokeWidth,
-} from '../utils/canvas-interaction.util';
+} from '../utils/element/canvas-element-normalization.util';
 import { roundToTwoDecimals } from '../utils/canvas-math.util';
-import { Bounds, FlowDragRenderState, PageCanvasLayout } from '../canvas.types';
-import { parsePixiCssColor, parseShadowParams } from './canvas-pixi-shadow.util';
+import { Bounds, FlowDragRenderState, CanvasPageLayout } from '../canvas.types';
+import { parsePixiCssColor, parseShadowParams } from '../utils/pixi/canvas-pixi-shadow.util';
 
 const MAX_TEXT_RENDER_RESOLUTION = 4;
 const MAX_SHADOW_FILTER_RESOLUTION = 4;
@@ -62,7 +62,7 @@ export class CanvasPixiRendererService {
   // ── Full Sync ─────────────────────────────────────────────
 
   syncPages(
-    pages: { pageId: string; elements: CanvasElement[]; layout: PageCanvasLayout }[],
+    pages: { pageId: string; elements: CanvasElement[]; layout: CanvasPageLayout }[],
     activePageId: string | null,
     flowDragState?: FlowDragRenderState | null,
     zoom = 1,
@@ -106,7 +106,7 @@ export class CanvasPixiRendererService {
   private syncElements(
     elements: CanvasElement[],
     pageContainer: Container,
-    layout: PageCanvasLayout,
+    layout: CanvasPageLayout,
     flowDragState: FlowDragRenderState | null,
     zoom: number,
   ): void {
@@ -150,7 +150,7 @@ export class CanvasPixiRendererService {
     element: CanvasElement,
     allElements: CanvasElement[],
     childrenMap: Map<string | null, CanvasElement[]>,
-    layout: PageCanvasLayout,
+    layout: CanvasPageLayout,
     layoutOverride?: LayoutResult,
     flowDragState?: FlowDragRenderState | null,
     zoom = 1,
@@ -219,7 +219,7 @@ export class CanvasPixiRendererService {
   private createElementNode(
     element: CanvasElement,
     allElements: CanvasElement[],
-    layout: PageCanvasLayout,
+    layout: CanvasPageLayout,
     layoutOverride?: LayoutResult,
     zoom = 1,
   ): PixiElementNode {
@@ -437,7 +437,7 @@ export class CanvasPixiRendererService {
     node: PixiElementNode,
     element: CanvasElement,
     allElements: CanvasElement[],
-    layout: PageCanvasLayout,
+    layout: CanvasPageLayout,
     layoutOverride?: LayoutResult,
   ): void {
     let x: number;
@@ -487,7 +487,7 @@ export class CanvasPixiRendererService {
     element: CanvasElement,
     allElements: CanvasElement[],
     childrenMap: Map<string | null, CanvasElement[]>,
-    layout: PageCanvasLayout,
+    layout: CanvasPageLayout,
     containerSize: { width: number; height: number },
     flowDragState?: FlowDragRenderState | null,
     zoom = 1,
@@ -560,7 +560,7 @@ export class CanvasPixiRendererService {
     flowDragState: FlowDragRenderState,
     elements: CanvasElement[],
     childrenMap: Map<string | null, CanvasElement[]>,
-    layout: PageCanvasLayout,
+    layout: CanvasPageLayout,
     pageContainer: Container,
     zoom: number,
   ): void {
@@ -599,7 +599,7 @@ export class CanvasPixiRendererService {
     element: CanvasElement,
     allElements: CanvasElement[],
     childrenMap: Map<string | null, CanvasElement[]>,
-    layout: PageCanvasLayout,
+    layout: CanvasPageLayout,
     layoutOverride: LayoutResult,
     zoom: number,
   ): PixiElementNode | null {

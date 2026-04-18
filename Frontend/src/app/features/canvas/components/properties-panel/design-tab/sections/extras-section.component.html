@@ -1,0 +1,184 @@
+<!-- Link -->
+<section
+  class="properties-section properties-section--collapsible"
+  [class.properties-section--compact]="!hasLink(element)"
+  [class.properties-section--actionable]="!hasLink(element)"
+  (click)="!hasLink(element) && onLinkSectionHeaderClick()">
+  <div class="properties-section-header properties-section-header--actionable" (click)="onLinkSectionHeaderClick()">
+    <p class="properties-section-title">Link</p>
+    <button
+      type="button"
+      class="pp-section-toggle"
+      [class.pp-section-toggle--minus]="hasLink(element)"
+      [class.pp-section-toggle--plus]="!hasLink(element)"
+      [attr.aria-label]="hasLink(element) ? 'Remove link' : 'Add link'"
+      [title]="hasLink(element) ? 'Remove link' : 'Add link'"
+      (click)="onLinkSectionToggleClick($event)">
+      <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+        <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+        <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+      </svg>
+    </button>
+  </div>
+
+  <ng-container *ngIf="hasLink(element)">
+    <div class="pp-style-row">
+      <span class="pp-row-label">Type</span>
+      <div class="pp-style-control">
+        <app-toggle-group
+          [ariaLabel]="'Link type'"
+          [options]="linkTypeOptions"
+          [value]="linkTypeValue(element)"
+          [stretch]="true"
+          [minWidth]="null"
+          (valueChange)="onLinkTypeChange($event)"></app-toggle-group>
+      </div>
+    </div>
+
+    <ng-container [ngSwitch]="linkTypeValue(element)">
+      <ng-container *ngSwitchCase="'page'">
+        <div class="pp-style-row" *ngIf="linkPageOptions(element).length > 0; else noLinkPages">
+          <span class="pp-row-label">Page</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <app-dropdown-select
+              [enableSearch]="false"
+              [placeholder]="'Select page'"
+              [options]="linkPageOptions(element)"
+              [ngModel]="linkPageValue(element)"
+              (ngModelChange)="onLinkPageChange($event)"></app-dropdown-select>
+          </div>
+        </div>
+      </ng-container>
+
+      <div class="pp-style-row" *ngSwitchCase="'url'">
+        <span class="pp-row-label">URL</span>
+        <div class="pp-style-control pp-style-control--dropdown">
+          <input
+            type="url"
+            class="pp-text-input pp-text-input--boxed"
+            [value]="linkUrlValue(element)"
+            (input)="onLinkUrlChange($event)"
+            placeholder="https://example.com" />
+        </div>
+      </div>
+    </ng-container>
+
+    <ng-template #noLinkPages>
+      <p class="properties-section-hint">Add another page to create an internal navigation target.</p>
+    </ng-template>
+  </ng-container>
+</section>
+
+<!-- Position -->
+<section class="properties-section" *ngIf="supportsPosition(element.type)">
+  <p class="properties-section-title">Position</p>
+  <div class="pp-style-row">
+    <span class="pp-row-label">Type</span>
+    <div class="pp-style-control pp-style-control--dropdown">
+      <app-dropdown-select
+        [enableSearch]="false"
+        [placeholder]="'Select position type'"
+        [options]="positionOptions"
+        [ngModel]="positionValue(element)"
+        (ngModelChange)="onPositionChange($event)"></app-dropdown-select>
+    </div>
+  </div>
+</section>
+
+<!-- Cursor -->
+<section
+  class="properties-section properties-section--collapsible"
+  [class.properties-section--compact]="!hasCursor(element)"
+  [class.properties-section--actionable]="!hasCursor(element)"
+  (click)="!hasCursor(element) && onCursorSectionHeaderClick()">
+  <div class="properties-section-header properties-section-header--actionable" (click)="onCursorSectionHeaderClick()">
+    <p class="properties-section-title">Cursor</p>
+    <button
+      type="button"
+      class="pp-section-toggle"
+      [class.pp-section-toggle--minus]="hasCursor(element)"
+      [class.pp-section-toggle--plus]="!hasCursor(element)"
+      [attr.aria-label]="hasCursor(element) ? 'Remove cursor override' : 'Add cursor override'"
+      [title]="hasCursor(element) ? 'Remove cursor override' : 'Add cursor override'"
+      (click)="onCursorSectionToggleClick($event)">
+      <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+        <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+        <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+      </svg>
+    </button>
+  </div>
+
+  <ng-container *ngIf="hasCursor(element)">
+    <div class="pp-style-row">
+      <span class="pp-row-label">Type</span>
+      <div class="pp-style-control pp-style-control--dropdown">
+        <app-dropdown-select
+          [enableSearch]="false"
+          [placeholder]="'Select cursor'"
+          [options]="cursorOptions"
+          [ngModel]="cursorValue(element)"
+          (ngModelChange)="onCursorChange($event)"></app-dropdown-select>
+      </div>
+    </div>
+  </ng-container>
+</section>
+
+<!-- Accessibility -->
+<section
+  class="properties-section properties-section--collapsible"
+  [class.properties-section--compact]="!hasAccessibilityFields(element)"
+  [class.properties-section--actionable]="!hasAccessibilityFields(element)"
+  (click)="!hasAccessibilityFields(element) && onAccessibilitySectionHeaderClick($event)">
+  <div
+    class="properties-section-header properties-section-header--menu properties-section-header--actionable"
+    (click)="onAccessibilitySectionHeaderClick($event)">
+    <p class="properties-section-title">Accessibility</p>
+    <button
+      type="button"
+      class="pp-section-toggle pp-section-toggle--plus"
+      aria-label="Accessibility options"
+      title="Accessibility options"
+      (click)="onAccessibilitySectionToggleClick($event)">
+      <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+        <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+        <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+      </svg>
+    </button>
+  </div>
+
+  <div class="pp-style-row" *ngIf="hasAccessibilityField(element, 'tag') && supportsAccessibilityTag(element)">
+    <span class="pp-row-label">Tag</span>
+    <div class="pp-style-control pp-style-control--dropdown">
+      <app-dropdown-select
+        [disabled]="isAccessibilityTagLocked(element)"
+        [enableSearch]="false"
+        [placeholder]="accessibilityTagPlaceholder(element)"
+        [options]="accessibilityTagOptions(element)"
+        [ngModel]="accessibilityTagValue(element)"
+        (ngModelChange)="onAccessibilityTagChange($event)"></app-dropdown-select>
+    </div>
+  </div>
+
+  <div class="pp-style-row" *ngIf="hasAccessibilityField(element, 'ariaLabel')">
+    <span class="pp-row-label">Aria Label</span>
+    <div class="pp-style-control pp-style-control--dropdown">
+      <input
+        type="text"
+        class="pp-text-input pp-text-input--boxed"
+        [value]="accessibilityLabelValue(element)"
+        (input)="onAccessibilityLabelChange($event)"
+        [placeholder]="accessibilityLabelPlaceholder(element)" />
+    </div>
+  </div>
+  <p class="properties-section-hint" *ngIf="element.type === 'image'">
+    Image labels are exported as alt text.
+  </p>
+</section>
+
+<app-context-menu
+  *ngIf="accessibilityMenuItems.length > 0"
+  [x]="accessibilityMenuX"
+  [y]="accessibilityMenuY"
+  [verticalDirection]="'below'"
+  [items]="accessibilityMenuItems"
+  (closed)="closeAccessibilityMenu()"></app-context-menu>

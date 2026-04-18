@@ -5,6 +5,7 @@ using Favigon.Application.Mappings;
 using Favigon.Application.Services;
 using Favigon.Domain.Entities;
 using Favigon.Tests.Helpers;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 
 namespace Favigon.Tests.Services;
@@ -20,7 +21,9 @@ public class AuthServicePasswordManagementTests
 
   public AuthServicePasswordManagementTests()
   {
-    var config = new MapperConfiguration(cfg => cfg.AddProfile<MappingProfile>());
+    var configExpr = new MapperConfigurationExpression();
+    configExpr.AddProfile<MappingProfile>();
+    var config = new MapperConfiguration(configExpr, NullLoggerFactory.Instance);
     var mapper = config.CreateMapper();
 
     _sut = new AuthService(

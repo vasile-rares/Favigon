@@ -14,7 +14,13 @@ import {
 } from '@angular/core';
 import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { AuthService, ProjectService, CurrentUserService, extractApiErrorMessage } from '@app/core';
+import {
+  AuthService,
+  ProjectService,
+  CurrentUserService,
+  extractApiErrorMessage,
+  FALLBACK_AVATAR_URL,
+} from '@app/core';
 import { UserMenuDropdownComponent } from '../user-menu-dropdown/user-menu-dropdown.component';
 import { DIALOG_BOX_IMPORTS } from '../dialog-box/dialog-box.component';
 import { TextInputComponent } from '../text-input/text-input.component';
@@ -62,7 +68,7 @@ export class HeaderBarComponent implements OnInit {
   private readonly projectService = inject(ProjectService);
   private readonly currentUser = inject(CurrentUserService);
   private readonly fb = inject(FormBuilder);
-  private readonly fallbackAvatarUrl = 'https://github.com/shadcn.png';
+  private readonly fallbackAvatarUrl = FALLBACK_AVATAR_URL;
 
   profilePictureUrl: string | null = null;
   displayName = '';

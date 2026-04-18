@@ -44,7 +44,7 @@ export class CanvasEditorStateService {
           return;
         }
 
-        if (!sameStringArray(currentSelectedIds, normalizedSelectedIds)) {
+        if (!areStringArraysEqual(currentSelectedIds, normalizedSelectedIds)) {
           this.selectedElementIds.set(normalizedSelectedIds);
         }
       },
@@ -120,7 +120,7 @@ export class CanvasEditorStateService {
   }
 }
 
-function sameStringArray(left: string[], right: string[]): boolean {
+function areStringArraysEqual(left: string[], right: string[]): boolean {
   if (left.length !== right.length) {
     return false;
   }

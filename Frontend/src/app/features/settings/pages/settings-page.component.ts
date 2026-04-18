@@ -3,7 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
-import { AuthService, UserService, CurrentUserService, extractApiErrorMessage } from '@app/core';
+import {
+  AuthService,
+  UserService,
+  CurrentUserService,
+  extractApiErrorMessage,
+  FALLBACK_AVATAR_URL,
+} from '@app/core';
 import type { UserMe } from '@app/core';
 import { environment } from '../../../../environments/environment';
 import {
@@ -43,7 +49,7 @@ export class SettingsPage implements OnInit {
   private readonly userService = inject(UserService);
   private readonly currentUser = inject(CurrentUserService);
   private readonly router = inject(Router);
-  private readonly fallbackAvatarUrl = 'https://github.com/shadcn.png';
+  private readonly fallbackAvatarUrl = FALLBACK_AVATAR_URL;
 
   activeTab: 'account' | 'password' | 'linked-accounts' = 'account';
 

@@ -2,7 +2,9 @@ import { Injectable, signal } from '@angular/core';
 import { CanvasElement } from '@app/core';
 import { roundToTwoDecimals, clamp } from '../utils/canvas-math.util';
 import { Bounds, Point } from '../canvas.types';
-import { CANVAS_DEFAULT_ZOOM, CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from './canvas-viewport.constants';
+export const CANVAS_MIN_ZOOM = 0.02;
+export const CANVAS_DEFAULT_ZOOM = 0.5;
+export const CANVAS_MAX_ZOOM = 3;
 
 const ZOOM_FACTOR = 1.1;
 const GRID_SIZE = 20;

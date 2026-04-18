@@ -4,7 +4,7 @@ import {
   CanvasPageModel,
   CanvasSizeMode,
 } from '@app/core';
-import { roundToTwoDecimals } from './canvas-math.util';
+import { roundToTwoDecimals } from '../canvas-math.util';
 
 export type CanvasSizeAxis = 'width' | 'height';
 export type CanvasConstraintField = 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight';

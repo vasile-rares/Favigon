@@ -24,7 +24,7 @@ import {
   CanvasFlexWrap,
   CanvasPositionMode,
 } from '@app/core';
-import { CanvasElementService } from './canvas-element.service';
+import { CanvasElementService } from '../canvas-element.service';
 
 export interface LayoutResult {
   x: number;

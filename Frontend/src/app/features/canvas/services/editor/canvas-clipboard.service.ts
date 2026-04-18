@@ -1,9 +1,9 @@
 import { inject, Injectable } from '@angular/core';
 import { CanvasElement, CanvasElementType } from '@app/core';
-import { clamp, roundToTwoDecimals } from '../utils/canvas-math.util';
-import { collectSubtreeIds } from '../utils/canvas-interaction.util';
-import { CanvasClipboardPasteResult, CanvasClipboardSnapshot, Bounds } from '../canvas.types';
-import { CanvasElementService } from './canvas-element.service';
+import { clamp, roundToTwoDecimals } from '../../utils/canvas-math.util';
+import { collectSubtreeIds } from '../../utils/canvas-tree.util';
+import { CanvasClipboardPasteResult, CanvasClipboardSnapshot, Bounds } from '../../canvas.types';
+import { CanvasElementService } from '../canvas-element.service';
 
 const PASTE_OFFSET = 24;
 

@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HistorySnapshot } from '../canvas.types';
+import { HistorySnapshot } from '../../canvas.types';
 
 const MAX_HISTORY_STEPS = 50;
 

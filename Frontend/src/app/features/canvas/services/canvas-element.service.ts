@@ -6,16 +6,10 @@ import {
   CanvasPageModel,
   CanvasPositionMode,
 } from '@app/core';
-import {
-  getDefaultCornerRadius,
-  getElementBorderRadiusCss,
-  getStrokeWidths,
-  getStrokeWidth,
-  hasPerSideStrokeWidths,
-  hasPerCornerRadius,
-} from '../utils/canvas-interaction.util';
+import { hasPerCornerRadius } from '../utils/element/canvas-element-normalization.util';
 import { clamp, roundToTwoDecimals } from '../utils/canvas-math.util';
-import { collectSubtreeIds, formatCanvasElementTypeLabel } from '../utils/canvas-interaction.util';
+import { collectSubtreeIds } from '../utils/canvas-tree.util';
+import { formatCanvasElementTypeLabel } from '../utils/element/canvas-element-normalization.util';
 import {
   getTextFontFamily,
   getTextFontSize,
@@ -23,13 +17,7 @@ import {
   getTextFontWeight,
   getTextLetterSpacing,
   getTextLineHeight,
-} from '../utils/canvas-text.util';
-import {
-  buildCanvasElementBackfaceVisibility,
-  buildCanvasElementTransform,
-  buildCanvasElementTransformOrigin,
-  buildCanvasElementTransformStyle,
-} from '../utils/canvas-transform.util';
+} from '../utils/element/canvas-text.util';
 import {
   CanvasConstraintField,
   CanvasSizeAxis,
@@ -41,11 +29,9 @@ import {
   getCanvasSizingValue,
   resolveCanvasConstraintPixels,
   resolveCanvasPixelsFromMode,
-} from '../utils/canvas-sizing.util';
-import { getCanvasShadowCss } from '../utils/canvas-shadow.util';
+} from '../utils/element/canvas-sizing.util';
 import { Bounds, Point } from '../canvas.types';
 
-const IMAGE_PLACEHOLDER_URL = 'https://placehold.co/300x200?text=Image';
 const DEFAULT_FRAME_FILL = '#ffffff';
 const DEFAULT_ELEMENT_FILL = '#e0e0e0';
 const MIN_ELEMENT_SIZE = 24;
@@ -804,77 +790,13 @@ export class CanvasElementService {
 
   // G��G�� Template Rendering Helpers G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
-  getElementStrokeStyle(element: CanvasElement): string {
-    if (!element.stroke || element.type === 'text') {
-      return 'none';
-    }
-
-    if (hasPerSideStrokeWidths(element)) {
-      return 'none';
-    }
-
-    const strokeWidth = getStrokeWidth(element);
-    if (strokeWidth <= 0) {
-      return 'none';
-    }
-
-    const cssStyle = (element.strokeStyle ?? 'Solid').toLowerCase();
-    return `${strokeWidth}px ${cssStyle} ${element.stroke}`;
-  }
-
-  getElementStrokeSideStyle(
-    element: CanvasElement,
-    side: keyof ReturnType<typeof getStrokeWidths>,
-  ): string | null {
-    if (!element.stroke || element.type === 'text') {
-      return null;
-    }
-
-    if (!hasPerSideStrokeWidths(element)) {
-      return null;
-    }
-
-    const widths = getStrokeWidths(element);
-    const width = widths[side];
-    if (width <= 0) {
-      return 'none';
-    }
-
-    const cssStyle = (element.strokeStyle ?? 'Solid').toLowerCase();
-    return `${width}px ${cssStyle} ${element.stroke}`;
-  }
-
-  getElementTransform(element: CanvasElement): string | null {
-    return buildCanvasElementTransform(element);
-  }
-
-  getElementTransformOrigin(element: CanvasElement): string | null {
-    return buildCanvasElementTransformOrigin(element);
-  }
-
-  getElementBackfaceVisibility(element: CanvasElement): string | null {
-    return buildCanvasElementBackfaceVisibility(element);
-  }
-
-  getElementTransformStyle(element: CanvasElement): string | null {
-    return buildCanvasElementTransformStyle(element);
-  }
-
-  getElementBoxShadow(element: CanvasElement): string {
-    return getCanvasShadowCss(element.shadow);
-  }
-
-  getElementOverflowMode(element: CanvasElement): CanvasOverflowMode {
-    return element.overflow ?? 'clip';
-  }
-
   getElementClipPath(element: CanvasElement, elements: CanvasElement[]): string {
     const parent = this.findElementById(element.parentId ?? null, elements);
     if (!parent) {
       return 'none';
     }
 
-    if (!isOverflowClippingMode(this.getElementOverflowMode(parent))) {
+    if (!isOverflowClippingMode(parent.overflow ?? 'clip')) {
       return 'none';
     }
 
@@ -901,7 +823,7 @@ export class CanvasElementService {
       return false;
     }
 
-    if (!isOverflowClippingMode(this.getElementOverflowMode(parent))) {
+    if (!isOverflowClippingMode(parent.overflow ?? 'clip')) {
       return false;
     }
 
@@ -919,20 +841,6 @@ export class CanvasElementService {
 
   supportsCornerRadius(element: CanvasElement): boolean {
     return element.type !== 'text' && element.type !== 'frame' && !hasPerCornerRadius(element);
-  }
-
-  getElementBorderRadius(element: CanvasElement): string {
-    return getElementBorderRadiusCss(element);
-  }
-
-  getCornerRadiusHandleInset(element: CanvasElement): number {
-    const radius = getDefaultCornerRadius(element);
-
-    const handleRadius = 6; // half of 12px handle size
-    const maxInset = Math.max(0, Math.min(element.width / 2, element.height / 2) - handleRadius);
-    // Handle center sits at (radius, radius) from the element corner,
-    // so CSS top/right = radius - handleRadius. Clamped for small elements.
-    return roundToTwoDecimals(clamp(radius - handleRadius, 0, maxInset));
   }
 }
 

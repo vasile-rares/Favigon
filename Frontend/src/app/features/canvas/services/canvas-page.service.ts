@@ -3,16 +3,16 @@ import { Router } from '@angular/router';
 import { CanvasElement, CanvasPageModel, CanvasPageViewportPreset } from '@app/core';
 import type { ContextMenuItem, DialogBoxField } from '@app/shared';
 import { roundToTwoDecimals, clamp } from '../utils/canvas-math.util';
-import { mutateNormalizeElement } from '../utils/canvas-interaction.util';
-import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from './canvas-viewport.constants';
-import { getFrameTitle } from '../utils/canvas-text.util';
-import { DeviceFramePreset, PageCanvasLayout, VIEWPORT_PRESET_OPTIONS } from '../canvas.types';
+import { mutateNormalizeElement } from '../utils/element/canvas-element-normalization.util';
+import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from './canvas-viewport.service';
+import { getFrameTitle } from '../utils/element/canvas-text.util';
+import { DeviceFramePreset, CanvasPageLayout, VIEWPORT_PRESET_OPTIONS } from '../canvas.types';
 import type { Point } from '../canvas.types';
 import { CanvasEditorStateService } from './canvas-editor-state.service';
 import { CanvasElementService } from './canvas-element.service';
 import { CanvasPageGeometryService } from './canvas-page-geometry.service';
 import { CanvasViewportService } from './canvas-viewport.service';
-import { CanvasHistoryService } from './canvas-history.service';
+import { CanvasHistoryService } from './editor/canvas-history.service';
 
 const DEVICE_FRAME_OPTIONS = VIEWPORT_PRESET_OPTIONS;
 
@@ -69,7 +69,7 @@ export class CanvasPageService {
     },
   ]);
 
-  readonly pageLayouts = computed<PageCanvasLayout[]>(() => {
+  readonly pageLayouts = computed<CanvasPageLayout[]>(() => {
     const pages = this.editorState.pages();
     let cursorX = 0;
     return pages.map((page) => {
@@ -79,7 +79,7 @@ export class CanvasPageService {
         typeof page.canvasX === 'number' && Number.isFinite(page.canvasX) ? page.canvasX : cursorX;
       const pageY =
         typeof page.canvasY === 'number' && Number.isFinite(page.canvasY) ? page.canvasY : 0;
-      const layout: PageCanvasLayout = {
+      const layout: CanvasPageLayout = {
         pageId: page.id,
         x: pageX,
         y: pageY,
@@ -91,7 +91,7 @@ export class CanvasPageService {
     });
   });
 
-  readonly activePageLayout = computed<PageCanvasLayout | null>(() => {
+  readonly activePageLayout = computed<CanvasPageLayout | null>(() => {
     const activeId = this.editorState.currentPageId();
     if (!activeId) {
       return null;
@@ -99,7 +99,7 @@ export class CanvasPageService {
     return this.pageLayouts().find((layout) => layout.pageId === activeId) ?? null;
   });
 
-  readonly inactivePageLayouts = computed<PageCanvasLayout[]>(() => {
+  readonly inactivePageLayouts = computed<CanvasPageLayout[]>(() => {
     const activeId = this.editorState.currentPageId();
     return this.pageLayouts().filter((layout) => layout.pageId !== activeId);
   });
@@ -634,7 +634,7 @@ export class CanvasPageService {
     return this.editorState.pages().find((page) => page.id === pageId) ?? null;
   }
 
-  getPageLayoutById(pageId: string): PageCanvasLayout | null {
+  getPageLayoutById(pageId: string): CanvasPageLayout | null {
     return this.pageLayouts().find((layout) => layout.pageId === pageId) ?? null;
   }
 

@@ -1,5 +1,5 @@
 import { CanvasBackfaceVisibility, CanvasElement, CanvasTransformOption } from '@app/core';
-import { roundToTwoDecimals } from './canvas-math.util';
+import { roundToTwoDecimals } from '../canvas-math.util';
 
 export interface CanvasTransformStyleProperties {
   transform?: string | null;

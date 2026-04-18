@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Favigon.Application.DTOs.Requests;
 using Favigon.Application.Interfaces;
@@ -21,7 +22,9 @@ public class AuthServiceLoginTests
 
   public AuthServiceLoginTests()
   {
-    var config = new MapperConfiguration(cfg => cfg.AddProfile<MappingProfile>());
+    var configExpr = new MapperConfigurationExpression();
+    configExpr.AddProfile<MappingProfile>();
+    var config = new MapperConfiguration(configExpr, NullLoggerFactory.Instance);
     _mapper = config.CreateMapper();
     _sut = new AuthService(
         _userRepo.Object, _linkedRepo.Object,

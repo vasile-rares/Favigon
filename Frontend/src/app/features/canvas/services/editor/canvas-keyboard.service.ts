@@ -1,18 +1,18 @@
 import { Injectable, inject } from '@angular/core';
 import { CanvasElementType } from '@app/core';
-import { CanvasEditorStateService } from './canvas-editor-state.service';
+import { CanvasEditorStateService } from '../canvas-editor-state.service';
 
 export interface KeyboardActionCallbacks {
-  onCopy: () => void;
-  onPaste: () => void;
-  onUndo: () => void;
-  onRedo: () => void;
-  onDelete: () => void;
-  onSelectTool: (tool: CanvasElementType | 'select') => void;
-  onSpaceDown: () => void;
-  onSpaceUp: () => void;
-  onZoomIn: () => void;
-  onZoomOut: () => void;
+  copy: () => void;
+  paste: () => void;
+  undo: () => void;
+  redo: () => void;
+  delete: () => void;
+  selectTool: (tool: CanvasElementType | 'select') => void;
+  spaceDown: () => void;
+  spaceUp: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
 }
 
 const TOOL_HOTKEYS: Record<string, CanvasElementType | 'select'> = {
@@ -38,12 +38,12 @@ export class CanvasKeyboardService {
       const key = event.key;
       if (key === '+' || key === '=') {
         event.preventDefault();
-        callbacks.onZoomIn();
+        callbacks.zoomIn();
         return;
       }
       if (key === '-') {
         event.preventDefault();
-        callbacks.onZoomOut();
+        callbacks.zoomOut();
         return;
       }
     }
@@ -53,25 +53,25 @@ export class CanvasKeyboardService {
 
       if (key === 'c') {
         event.preventDefault();
-        callbacks.onCopy();
+        callbacks.copy();
         return;
       }
 
       if (key === 'v') {
         event.preventDefault();
-        callbacks.onPaste();
+        callbacks.paste();
         return;
       }
 
       if (key === 'z' && !event.shiftKey) {
         event.preventDefault();
-        callbacks.onUndo();
+        callbacks.undo();
         return;
       }
 
       if (key === 'y' || (key === 'z' && event.shiftKey)) {
         event.preventDefault();
-        callbacks.onRedo();
+        callbacks.redo();
         return;
       }
     }
@@ -81,7 +81,7 @@ export class CanvasKeyboardService {
     }
 
     if (event.code === 'Space' && !isTypingContext) {
-      callbacks.onSpaceDown();
+      callbacks.spaceDown();
       event.preventDefault();
       return;
     }
@@ -93,14 +93,14 @@ export class CanvasKeyboardService {
     const toolKey = event.key.toLowerCase();
     const tool = TOOL_HOTKEYS[toolKey];
     if (tool) {
-      callbacks.onSelectTool(tool);
+      callbacks.selectTool(tool);
     }
 
     if (event.key === 'Delete' || event.key === 'Backspace') {
       if (this.editorState.selectedElementIds().length === 0) {
         return;
       }
-      callbacks.onDelete();
+      callbacks.delete();
     }
   }
 

@@ -9,6 +9,7 @@ import {
   ProjectService,
   UserService,
   extractApiErrorMessage,
+  FALLBACK_AVATAR_URL,
 } from '@app/core';
 import type { UserProfile } from '@app/core';
 import {
@@ -161,7 +162,7 @@ export class ProfilePage implements OnInit {
   readonly profileBio = computed(() => this.profile()?.bio?.trim() ?? '');
 
   get fallbackAvatarUrl(): string {
-    return 'https://github.com/shadcn.png';
+    return FALLBACK_AVATAR_URL;
   }
 
   get avatarUrl(): string {

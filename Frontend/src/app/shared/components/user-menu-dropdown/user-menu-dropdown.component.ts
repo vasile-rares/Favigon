@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { FALLBACK_AVATAR_URL } from '@app/core';
 
 const CLOSE_ANIMATION_MS = 120;
 
@@ -14,7 +15,7 @@ const CLOSE_ANIMATION_MS = 120;
 export class UserMenuDropdownComponent implements OnChanges {
   @Input() displayName = '';
   @Input() email = '';
-  @Input() avatarUrl = 'https://github.com/shadcn.png';
+  @Input() avatarUrl = FALLBACK_AVATAR_URL;
   @Input() username = '';
   @Input() isOpen = false;
 

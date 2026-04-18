@@ -1,5 +1,5 @@
 import { CanvasElement } from '@app/core';
-import { Bounds, SnapLine } from '../canvas.types';
+import { Bounds, SnapLine } from '../../canvas.types';
 
 export const SNAP_THRESHOLD = 6; // canvas-space pixels
 

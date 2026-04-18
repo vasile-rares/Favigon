@@ -1,20 +1,20 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { CanvasElement, CanvasPageModel } from '@app/core';
 import type { ContextMenuItem } from '@app/shared';
-import { CanvasEditorStateService } from './canvas-editor-state.service';
+import { CanvasEditorStateService } from '../canvas-editor-state.service';
 
 export interface ContextMenuActionCallbacks {
-  onCopy: () => void;
-  onPaste: () => void;
-  onDelete: (elementId: string) => void;
-  onBringToFront: (elementId: string) => void;
-  onSendToBack: (elementId: string) => void;
-  onMoveToPage: (elementId: string, targetPageId: string) => void;
-  onFlipHorizontal: (elementId: string) => void;
-  onFlipVertical: (elementId: string) => void;
-  onRename: (elementId: string) => void;
-  onToggleVisibility: (elementId: string) => void;
-  onSetAsPrimary: (elementId: string) => void;
+  copy: () => void;
+  paste: () => void;
+  delete: (elementId: string) => void;
+  bringToFront: (elementId: string) => void;
+  sendToBack: (elementId: string) => void;
+  moveToPage: (elementId: string, targetPageId: string) => void;
+  flipHorizontal: (elementId: string) => void;
+  flipVertical: (elementId: string) => void;
+  rename: (elementId: string) => void;
+  toggleVisibility: (elementId: string) => void;
+  setAsPrimary: (elementId: string) => void;
 }
 
 @Injectable()
@@ -65,13 +65,13 @@ export class CanvasContextMenuService {
         label: 'Copy',
         shortcut: 'Ctrl+C',
         disabled: !hasElement,
-        action: () => callbacks.onCopy(),
+        action: () => callbacks.copy(),
       },
       {
         id: 'paste',
         label: 'Paste',
         shortcut: 'Ctrl+V',
-        action: () => callbacks.onPaste(),
+        action: () => callbacks.paste(),
       },
       {
         id: 'delete',
@@ -79,7 +79,7 @@ export class CanvasContextMenuService {
         shortcut: 'Del',
         variant: 'danger' as const,
         disabled: !hasElement,
-        action: guardAction((id) => callbacks.onDelete(id)),
+        action: guardAction((id) => callbacks.delete(id)),
       },
 
       // Order group
@@ -89,14 +89,14 @@ export class CanvasContextMenuService {
         shortcut: 'Ctrl+]',
         disabled: !hasElement,
         separator: true,
-        action: guardAction((id) => callbacks.onBringToFront(id)),
+        action: guardAction((id) => callbacks.bringToFront(id)),
       },
       {
         id: 'send-back',
         label: 'Send to Back',
         shortcut: 'Ctrl+[',
         disabled: !hasElement,
-        action: guardAction((id) => callbacks.onSendToBack(id)),
+        action: guardAction((id) => callbacks.sendToBack(id)),
       },
       {
         id: 'move-to-page',
@@ -105,7 +105,7 @@ export class CanvasContextMenuService {
         children: otherPages.map((page) => ({
           id: `move-page-${page.id}`,
           label: page.name,
-          action: guardAction((id) => callbacks.onMoveToPage(id, page.id)),
+          action: guardAction((id) => callbacks.moveToPage(id, page.id)),
         })),
       },
 
@@ -115,13 +115,13 @@ export class CanvasContextMenuService {
         label: 'Flip Horizontal',
         disabled: !hasElement,
         separator: true,
-        action: guardAction((id) => callbacks.onFlipHorizontal(id)),
+        action: guardAction((id) => callbacks.flipHorizontal(id)),
       },
       {
         id: 'flip-v',
         label: 'Flip Vertical',
         disabled: !hasElement,
-        action: guardAction((id) => callbacks.onFlipVertical(id)),
+        action: guardAction((id) => callbacks.flipVertical(id)),
       },
 
       // Element group
@@ -131,14 +131,14 @@ export class CanvasContextMenuService {
         shortcut: 'F2',
         disabled: !hasElement,
         separator: true,
-        action: guardAction((id) => callbacks.onRename(id)),
+        action: guardAction((id) => callbacks.rename(id)),
       },
       {
         id: 'visibility',
         label: isVisible ? 'Hide' : 'Show',
         shortcut: 'Ctrl+Shift+H',
         disabled: !hasElement,
-        action: guardAction((id) => callbacks.onToggleVisibility(id)),
+        action: guardAction((id) => callbacks.toggleVisibility(id)),
       },
 
       // Primary frame group
@@ -147,7 +147,7 @@ export class CanvasContextMenuService {
         label: element?.isPrimary ? 'Primary Frame ✓' : 'Set as Primary Frame',
         disabled: !isRootFrame || !!element?.isPrimary,
         separator: true,
-        action: guardAction((id) => callbacks.onSetAsPrimary(id)),
+        action: guardAction((id) => callbacks.setAsPrimary(id)),
       },
     ];
   }
