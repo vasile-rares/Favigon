@@ -58,6 +58,8 @@ const DEVICE_FRAME_PRESET_OPTIONS = VIEWPORT_PRESET_OPTIONS.filter(
   styleUrl: './project-panel.component.css',
 })
 export class ProjectPanelComponent implements OnInit, OnDestroy {
+  // ── Inputs ────────────────────────────────────────────────
+
   @HostBinding('style.width.px') panelWidth = DEFAULT_PANEL_WIDTH;
   @HostBinding('class.is-resizing') isResizingPanel = false;
 
@@ -69,6 +71,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   readonly elements = input<CanvasElement[]>([]);
   readonly selectedElementId = input<string | null>(null);
   readonly selectedElementIds = input<string[]>([]);
+
+  // ── Outputs ───────────────────────────────────────────────
 
   readonly panelWidthChanged = output<number>();
   readonly pageSelected = output<string>();
@@ -95,6 +99,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     y: number;
   }>();
 
+  // ── Private State ─────────────────────────────────────────
+
   private cachedLayerEntriesByPage = new Map<string, LayerEntry[]>();
   private draggedLayerId: string | null = null;
   private draggedLayerPageId: string | null = null;
@@ -103,6 +109,9 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   private dragOverPosition: LayerDropPosition = 'before';
   private collapsedLayers = new Set<string>();
   private collapsedPageLayers = new Set<string>();
+
+  // ── Public State ──────────────────────────────────────────
+
   editingLayerId: string | null = null;
   editingLayerName = '';
   editingPageId: string | null = null;
@@ -140,6 +149,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     this.startRename(layerId);
   };
 
+  // ── Getters ───────────────────────────────────────────────
+
   get layerEntries(): LayerEntry[] {
     const focusedPageId = this.focusedPageId();
     return focusedPageId ? this.getLayerEntriesForPage(focusedPageId) : [];
@@ -151,6 +162,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     }
     return this.pages();
   }
+
+  // ── Lifecycle ─────────────────────────────────────────────
 
   constructor() {
     effect(() => {
@@ -168,6 +181,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     window.removeEventListener('canvas:rename-request', this.renameRequestListener);
     this.stopPanelResize();
   }
+
+  // ── Panel ───────────────────────────────────────────────────
 
   onTabValueChange(value: string | number | boolean): void {
     if (value === 'navigator' || value === 'ai-chat') {
@@ -218,6 +233,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     document.body.style.cursor = 'ew-resize';
     document.body.style.userSelect = 'none';
   }
+
+  // ── Page Operations ──────────────────────────────────────
 
   startPageRename(pageId: string, event?: MouseEvent, source: PageRenameSource = 'pages'): void {
     event?.stopPropagation();
@@ -386,6 +403,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     this.pageDeleteRequested.emit(pageId);
   }
 
+  // ── Layer Operations ─────────────────────────────────────
+
   onLayerSelected(pageId: string, id: string, event?: MouseEvent): void {
     this.closePageMenu();
     this.layerSelected.emit({ pageId, id, additive: !!event?.shiftKey });
@@ -487,6 +506,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
 
     return null;
   }
+
+  // ── Layer Drag ───────────────────────────────────────────────
 
   onLayerDragStart(pageId: string, id: string, event: DragEvent): void {
     this.draggedLayerId = id;
@@ -600,6 +621,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     this.clearDragState();
   }
 
+  // ── Layer View ───────────────────────────────────────────────
+
   isLayerCollapsed(id: string): boolean {
     return this.collapsedLayers.has(id);
   }
@@ -665,6 +688,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     return this.cachedLayerEntriesByPage.get(pageId) ?? [];
   }
 
+  // ── Type Checks & Utils ───────────────────────────────────
+
   isFrame(type: CanvasElementType): boolean {
     return type === 'frame';
   }
@@ -719,6 +744,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   canDeletePage(): boolean {
     return this.pages().length > 1;
   }
+
+  // ── Private Helpers ───────────────────────────────────────
 
   private rebuildLayerEntriesByPage(): void {
     this.cachedLayerEntriesByPage = new Map(

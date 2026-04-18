@@ -53,6 +53,8 @@ export class CanvasPixiRendererService {
   private placeholderGraphics: Graphics | null = null;
   private placeholderParentContainer: Container | null = null;
 
+  // ── Public API ────────────────────────────────────────────
+
   init(): void {
     if (this.initialized) return;
     this.pixiApp.sceneContainer.addChild(this.pagesRoot);

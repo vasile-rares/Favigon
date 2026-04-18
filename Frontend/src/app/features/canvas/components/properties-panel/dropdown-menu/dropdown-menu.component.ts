@@ -51,6 +51,8 @@ type EyeDropperConstructor = new () => EyeDropperInstance;
   encapsulation: ViewEncapsulation.None,
 })
 export class DropdownMenuComponent implements OnDestroy {
+  // ── Inputs ────────────────────────────────────────────────
+
   readonly projectId = input<number | null>(null);
   readonly kind = input<StylePopupFieldKind>('fill');
   readonly colorValue = input('#000000');
@@ -71,9 +73,13 @@ export class DropdownMenuComponent implements OnDestroy {
   readonly imageAltText = input('');
   readonly initialColorMode = input<ColorPickerMode>('solid');
 
+  // ── Outputs ───────────────────────────────────────────────
+
   readonly patchRequested = output<Partial<CanvasElement>>();
   readonly numberGestureStarted = output<void>();
   readonly numberGestureCommitted = output<void>();
+
+  // ── Public State ──────────────────────────────────────────
 
   pickerHue = 0;
   pickerSaturation = 0;
@@ -91,6 +97,8 @@ export class DropdownMenuComponent implements OnDestroy {
   isScreenPickerActive = false;
   isUploadingImage = false;
   imageUploadError = '';
+
+  // ── Options ───────────────────────────────────────────────
 
   readonly colorFormatOptions: DropdownSelectOption[] = [
     { label: 'HEX', value: 'hex' },
@@ -152,9 +160,13 @@ export class DropdownMenuComponent implements OnDestroy {
   ];
   imagePreviewUrl: string | null = null;
 
+  // ── Private State ─────────────────────────────────────────
+
   private readonly projectService = inject(ProjectService);
   private colorPickerDragTarget: ColorPickerDragTarget = null;
   private isColorGestureActive = false;
+
+  // ── Lifecycle ─────────────────────────────────────────────
 
   constructor(private readonly hostRef: ElementRef<HTMLElement>) {
     effect(() => {
@@ -211,6 +223,8 @@ export class DropdownMenuComponent implements OnDestroy {
       this.numberGestureCommitted.emit();
     }
   }
+
+  // ── Event Handlers ────────────────────────────────────────
 
   @HostListener('document:pointermove', ['$event'])
   onDocumentPointerMove(event: PointerEvent): void {
@@ -583,6 +597,8 @@ export class DropdownMenuComponent implements OnDestroy {
     this.numberGestureCommitted.emit();
   }
 
+  // ── Color Picker Computed ──────────────────────────────────
+
   pickerHueColor(): string {
     const { r, g, b } = hsvToRgb(this.pickerHue, 1, 1);
     return rgbToHex(r, g, b);
@@ -624,6 +640,8 @@ export class DropdownMenuComponent implements OnDestroy {
     return `linear-gradient(90deg, rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 0) 0%, rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)}, 1) 100%)`;
   }
 
+  // ── Getters ───────────────────────────────────────────────
+
   get strokeStyleDropdownOptions(): DropdownSelectOption[] {
     return this.borderStyleOptions().map((option) => ({ label: option, value: option }));
   }
@@ -639,6 +657,8 @@ export class DropdownMenuComponent implements OnDestroy {
 
     return this.isScreenPickerSupported ? 'Pick From Screen' : 'Screen Picker Unavailable';
   }
+
+  // ── Private Helpers ───────────────────────────────────────
 
   private isColorKind(): boolean {
     return this.kind() === 'fill' || this.kind() === 'stroke' || this.kind() === 'shadow';

@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   CanvasPageModel,
@@ -48,6 +48,7 @@ export class CanvasPreviewPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly sanitizer = inject(DomSanitizer);
 
   private readonly destroyRef = inject(DestroyRef);
 
@@ -182,15 +183,15 @@ export class CanvasPreviewPage {
    * `sandbox=""` (most restrictive: no scripts, no same-origin, no popups),
    * so even if malicious content were injected it cannot execute.
    */
-  readonly iframeSrcdoc = computed<string>(() => {
+  readonly iframeSrcdoc = computed<SafeHtml>(() => {
     const html = this.generatedHtml();
     const css = this.generatedCss();
 
     if (!html && !css) {
-      return '';
+      return this.sanitizer.bypassSecurityTrustHtml('');
     }
 
-    return `<!DOCTYPE html>
+    return this.sanitizer.bypassSecurityTrustHtml(`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -207,7 +208,7 @@ ${css}
 <body>
 ${html}
 </body>
-</html>`;
+</html>`);
   });
 
   readonly filteredPages = computed<CanvasPageModel[]>(() => {
