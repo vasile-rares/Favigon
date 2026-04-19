@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Favigon.Application.DTOs.Requests;
 using Favigon.Application.DTOs.Responses;
+using Favigon.Application.Helpers;
 using Favigon.Application.Interfaces;
 using Favigon.Domain.Entities;
 
@@ -251,31 +252,15 @@ public class UserService : IUserService
 
   private static void ValidateProfileImageUploadRequest(UserProfileImageUploadRequest request)
   {
-    if (request.Length <= 0)
-    {
-      throw new ArgumentException("Image file is empty.");
-    }
-
-    if (request.Length > MaxProfileImageSizeBytes)
-    {
-      throw new ArgumentException("Image file exceeds the 10 MB limit.");
-    }
-
-    if (string.IsNullOrWhiteSpace(request.FileName))
-    {
-      throw new ArgumentException("Image file name is required.");
-    }
-
-    if (request.Content == Stream.Null || !request.Content.CanRead)
-    {
-      throw new ArgumentException("Image file content is not readable.");
-    }
-
-    if (string.IsNullOrWhiteSpace(request.ContentType)
-      || !AllowedProfileImageContentTypes.Contains(request.ContentType))
-    {
-      throw new ArgumentException("Only PNG, JPEG, WebP, GIF, and AVIF images are supported.");
-    }
+    ImageUploadValidator.Validate(
+      request.Content,
+      request.FileName,
+      request.ContentType,
+      request.Length,
+      MaxProfileImageSizeBytes,
+      AllowedProfileImageContentTypes,
+      "Image file",
+      "Only PNG, JPEG, WebP, GIF, and AVIF images are supported.");
   }
 
   private static string BuildAbsoluteAssetUrl(string publicBaseUrl, string assetPath)

@@ -5,7 +5,6 @@ namespace Favigon.Application.Interfaces;
 
 public interface IProjectService
 {
-  Task<IReadOnlyList<ProjectResponse>> GetAllAsync();
   Task<IReadOnlyList<ProjectResponse>> GetByUserIdAsync(int userId, bool? isPublic = null);
   Task<ProjectResponse?> GetByIdAsync(int id, int userId);
   Task<ProjectResponse?> GetBySlugAsync(string slug, int userId);

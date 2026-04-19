@@ -1,10 +1,10 @@
-﻿using Favigon.Application.DTOs.Requests;
+﻿using Favigon.API.Extensions;
+using Favigon.Application.DTOs.Requests;
 using Favigon.Application.DTOs.Responses;
 using Favigon.Application.Interfaces;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace Favigon.API.Controllers;
 
@@ -27,8 +27,7 @@ public class ProjectsController : ControllerBase
   [HttpGet]
   public async Task<IActionResult> GetAll()
   {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
+    if (!User.TryGetUserId(out var userId))
     {
       return Unauthorized();
     }
@@ -40,8 +39,7 @@ public class ProjectsController : ControllerBase
   [HttpGet("{id:int}")]
   public async Task<IActionResult> GetById(int id)
   {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
+    if (!User.TryGetUserId(out var userId))
     {
       return Unauthorized();
     }
@@ -58,8 +56,7 @@ public class ProjectsController : ControllerBase
   [HttpGet("by-slug/{slug}")]
   public async Task<IActionResult> GetBySlug(string slug)
   {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
+    if (!User.TryGetUserId(out var userId))
     {
       return Unauthorized();
     }
@@ -76,8 +73,7 @@ public class ProjectsController : ControllerBase
   [HttpPost]
   public async Task<IActionResult> Create([FromBody] ProjectCreateRequest request)
   {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
+    if (!User.TryGetUserId(out var userId))
     {
       return Unauthorized();
     }
@@ -89,8 +85,7 @@ public class ProjectsController : ControllerBase
   [HttpPut("{id:int}")]
   public async Task<IActionResult> Update(int id, [FromBody] ProjectUpdateRequest request)
   {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
+    if (!User.TryGetUserId(out var userId))
     {
       return Unauthorized();
     }
@@ -107,8 +102,7 @@ public class ProjectsController : ControllerBase
   [HttpDelete("{id:int}")]
   public async Task<IActionResult> Delete(int id)
   {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
+    if (!User.TryGetUserId(out var userId))
     {
       return Unauthorized();
     }
@@ -120,8 +114,7 @@ public class ProjectsController : ControllerBase
   [HttpPost("{id:int}/assets/images")]
   public async Task<IActionResult> UploadImage(int id, IFormFile? file)
   {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
+    if (!User.TryGetUserId(out var userId))
     {
       return Unauthorized();
     }
@@ -164,8 +157,7 @@ public class ProjectsController : ControllerBase
   [HttpGet("{id:int}/design")]
   public async Task<IActionResult> GetDesign(int id)
   {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
+    if (!User.TryGetUserId(out var userId))
     {
       return Unauthorized();
     }
@@ -182,8 +174,7 @@ public class ProjectsController : ControllerBase
   [HttpPut("{id:int}/design")]
   public async Task<IActionResult> SaveDesign(int id, [FromBody] ProjectDesignSaveRequest request)
   {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
+    if (!User.TryGetUserId(out var userId))
     {
       return Unauthorized();
     }
@@ -204,8 +195,7 @@ public class ProjectsController : ControllerBase
     [FromForm] string? designJson,
     IFormFile? thumbnailFile)
   {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
+    if (!User.TryGetUserId(out var userId))
     {
       return Unauthorized();
     }
@@ -259,8 +249,7 @@ public class ProjectsController : ControllerBase
   [Consumes("multipart/form-data")]
   public async Task<IActionResult> SaveThumbnail(int id, IFormFile? file)
   {
-    var userIdValue = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdValue, out var userId))
+    if (!User.TryGetUserId(out var userId))
     {
       return Unauthorized();
     }

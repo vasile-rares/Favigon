@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using Favigon.Application.DTOs.Requests;
 using Favigon.Application.DTOs.Responses;
+using Favigon.Application.Helpers;
 using Favigon.Application.Interfaces;
 using Favigon.Converter.Abstractions;
 using Favigon.Converter.Models;
@@ -42,12 +43,6 @@ public class ProjectService : IProjectService
     _mapper = mapper;
     _converterEngine = converterEngine;
     _projectAssetStorage = projectAssetStorage;
-  }
-
-  public async Task<IReadOnlyList<ProjectResponse>> GetAllAsync()
-  {
-    var projects = await _projectRepository.GetAllAsync();
-    return projects.Select(MapProjectResponse).ToList();
   }
 
   public async Task<IReadOnlyList<ProjectResponse>> GetByUserIdAsync(int userId, bool? isPublic = null)
@@ -212,31 +207,15 @@ public class ProjectService : IProjectService
 
   private static void ValidateThumbnailUploadRequest(ProjectImageUploadRequest request)
   {
-    if (request.Length <= 0)
-    {
-      throw new ArgumentException("Thumbnail file is empty.");
-    }
-
-    if (request.Length > MaxThumbnailSizeBytes)
-    {
-      throw new ArgumentException("Thumbnail file exceeds the 5 MB limit.");
-    }
-
-    if (string.IsNullOrWhiteSpace(request.FileName))
-    {
-      throw new ArgumentException("Thumbnail file name is required.");
-    }
-
-    if (request.Content == Stream.Null || !request.Content.CanRead)
-    {
-      throw new ArgumentException("Thumbnail file content is not readable.");
-    }
-
-    if (string.IsNullOrWhiteSpace(request.ContentType)
-      || !AllowedThumbnailContentTypes.Contains(request.ContentType))
-    {
-      throw new ArgumentException("Only JPEG, PNG, and WebP thumbnails are supported.");
-    }
+    ImageUploadValidator.Validate(
+      request.Content,
+      request.FileName,
+      request.ContentType,
+      request.Length,
+      MaxThumbnailSizeBytes,
+      AllowedThumbnailContentTypes,
+      "Thumbnail file",
+      "Only JPEG, PNG, and WebP thumbnails are supported.");
   }
 
   private string NormalizeAndValidateDesignJson(string? designJson)

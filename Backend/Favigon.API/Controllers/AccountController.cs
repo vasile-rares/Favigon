@@ -1,10 +1,10 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Favigon.API.Extensions;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Favigon.Application.DTOs.Requests;
 using Favigon.Application.DTOs.Responses;
 using Favigon.Application.Interfaces;
-using System.Security.Claims;
 
 namespace Favigon.API.Controllers;
 
@@ -78,9 +78,7 @@ public class AccountController : ControllerBase
   [DisableRateLimiting]
   public async Task<IActionResult> LinkWithGithub([FromBody] GithubAuthRequest request)
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     await _authService.LinkWithGithubAsync(userId, request);
     return Ok(new { message = "GitHub account linked successfully." });
@@ -91,9 +89,7 @@ public class AccountController : ControllerBase
   [DisableRateLimiting]
   public async Task<IActionResult> LinkWithGoogle([FromBody] GoogleAuthRequest request)
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     await _authService.LinkWithGoogleAsync(userId, request);
     return Ok(new { message = "Google account linked successfully." });
@@ -120,9 +116,7 @@ public class AccountController : ControllerBase
   [Authorize]
   public async Task<IActionResult> SetPassword([FromBody] SetPasswordRequest request)
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     await _authService.SetPasswordAsync(userId, request);
     return Ok(new
@@ -135,9 +129,7 @@ public class AccountController : ControllerBase
   [Authorize]
   public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     await _authService.ChangePasswordAsync(userId, request);
     return Ok(new { message = "Password changed successfully." });
@@ -147,9 +139,7 @@ public class AccountController : ControllerBase
   [Authorize]
   public async Task<IActionResult> RequestEnableTwoFactor()
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     await _authService.SendEnableTwoFactorCodeAsync(userId);
     return Ok(new { message = "We sent a verification code to your email." });
@@ -159,9 +149,7 @@ public class AccountController : ControllerBase
   [Authorize]
   public async Task<IActionResult> ConfirmEnableTwoFactor([FromBody] TwoFactorCodeRequest request)
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     await _authService.EnableTwoFactorAsync(userId, request);
     return Ok(new { message = "Two-factor authentication is now on." });
@@ -171,9 +159,7 @@ public class AccountController : ControllerBase
   [Authorize]
   public async Task<IActionResult> RequestDisableTwoFactor()
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     await _authService.SendDisableTwoFactorCodeAsync(userId);
     return Ok(new { message = "We sent a verification code to your email." });
@@ -183,9 +169,7 @@ public class AccountController : ControllerBase
   [Authorize]
   public async Task<IActionResult> ConfirmDisableTwoFactor([FromBody] TwoFactorCodeRequest request)
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     await _authService.DisableTwoFactorAsync(userId, request);
     return Ok(new { message = "Two-factor authentication is now off." });
@@ -205,7 +189,7 @@ public class AccountController : ControllerBase
       SetRefreshTokenCookie(response.RefreshToken);
       return Ok(new { message = "Token refreshed." });
     }
-    catch
+    catch (Exception)
     {
       DeleteRefreshTokenCookie();
       Response.Cookies.Delete("jwt");

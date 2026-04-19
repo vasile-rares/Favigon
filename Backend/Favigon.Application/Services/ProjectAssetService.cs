@@ -1,4 +1,5 @@
 using Favigon.Application.DTOs.Requests;
+using Favigon.Application.Helpers;
 using Favigon.Application.Interfaces;
 
 namespace Favigon.Application.Services;
@@ -39,31 +40,15 @@ public class ProjectAssetService : IProjectAssetService
       return null;
     }
 
-    if (request.Length <= 0)
-    {
-      throw new ArgumentException("Image file is empty.");
-    }
-
-    if (request.Length > MaxImageSizeBytes)
-    {
-      throw new ArgumentException("Image file exceeds the 10 MB limit.");
-    }
-
-    if (string.IsNullOrWhiteSpace(request.FileName))
-    {
-      throw new ArgumentException("Image file name is required.");
-    }
-
-    if (request.Content == Stream.Null || !request.Content.CanRead)
-    {
-      throw new ArgumentException("Image file content is not readable.");
-    }
-
-    if (string.IsNullOrWhiteSpace(request.ContentType)
-      || !AllowedContentTypes.Contains(request.ContentType))
-    {
-      throw new ArgumentException("Only PNG, JPEG, WebP, GIF, and AVIF images are supported.");
-    }
+    ImageUploadValidator.Validate(
+      request.Content,
+      request.FileName,
+      request.ContentType,
+      request.Length,
+      MaxImageSizeBytes,
+      AllowedContentTypes,
+      "Image file",
+      "Only PNG, JPEG, WebP, GIF, and AVIF images are supported.");
 
     return await _projectAssetStorage.SaveImageAsync(
       userId,

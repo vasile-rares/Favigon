@@ -14,11 +14,6 @@ public class ProjectRepository : IProjectRepository
     _context = context;
   }
 
-  public async Task<IReadOnlyList<Project>> GetAllAsync()
-  {
-    return await _context.Projects.AsNoTracking().ToListAsync();
-  }
-
   public async Task<IReadOnlyList<Project>> GetByUserIdAsync(int userId, bool? isPublic = null)
   {
     return await _context.Projects

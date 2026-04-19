@@ -1,10 +1,9 @@
-﻿using Favigon.Application.DTOs.Requests;
+﻿using Favigon.API.Extensions;
+using Favigon.Application.DTOs.Requests;
 using Favigon.Application.Interfaces;
-using Favigon.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
 namespace Favigon.API.Controllers;
 
@@ -21,6 +20,7 @@ public class UsersController : ControllerBase
   }
 
   [HttpGet]
+  [Authorize(Roles = "Admin")]
   public async Task<IActionResult> GetAll()
   {
     var users = await _userService.GetAllAsync();
@@ -30,9 +30,7 @@ public class UsersController : ControllerBase
   [HttpGet("me")]
   public async Task<IActionResult> GetMe()
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     var profile = await _userService.GetMyProfileAsync(userId);
     if (profile == null) return NotFound();
@@ -43,9 +41,7 @@ public class UsersController : ControllerBase
   [HttpPut("me")]
   public async Task<IActionResult> UpdateMe([FromBody] UserProfileUpdateRequest request)
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     var updated = await _userService.UpdateMyProfileAsync(userId, request);
     if (updated == null) return NotFound();
@@ -56,9 +52,7 @@ public class UsersController : ControllerBase
   [HttpPost("me/profile-image")]
   public async Task<IActionResult> UploadMyProfileImage(IFormFile? file)
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     if (file == null)
     {
@@ -90,9 +84,7 @@ public class UsersController : ControllerBase
   [HttpDelete("me")]
   public async Task<IActionResult> DeleteMe()
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     var deleted = await _userService.DeleteMyAccountAsync(userId);
     if (!deleted) return NotFound();
@@ -105,15 +97,14 @@ public class UsersController : ControllerBase
   [HttpDelete("me/linked-accounts/{provider}")]
   public async Task<IActionResult> UnlinkProvider(string provider)
   {
-    var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (!int.TryParse(userIdClaim, out var userId))
-      return Unauthorized();
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
     var unlinked = await _userService.UnlinkProviderAsync(userId, provider.ToLowerInvariant());
     return unlinked ? NoContent() : NotFound();
   }
 
   [HttpGet("{id:int}")]
+  [Authorize(Roles = "Admin")]
   public async Task<IActionResult> GetById(int id)
   {
     var user = await _userService.GetByIdAsync(id);
@@ -126,6 +117,7 @@ public class UsersController : ControllerBase
   }
 
   [HttpPost]
+  [Authorize(Roles = "Admin")]
   public async Task<IActionResult> Create([FromBody] UserCreateRequest request)
   {
     var created = await _userService.CreateAsync(request);
@@ -133,6 +125,7 @@ public class UsersController : ControllerBase
   }
 
   [HttpPut("{id:int}")]
+  [Authorize(Roles = "Admin")]
   public async Task<IActionResult> Update(int id, [FromBody] UserUpdateRequest request)
   {
     var updated = await _userService.UpdateAsync(id, request);
