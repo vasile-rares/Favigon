@@ -116,16 +116,6 @@ export function buildCanvasShadowCss(shadow: EditableCanvasShadow): string {
   return `${prefix}${formatShadowNumber(shadow.x)}px ${formatShadowNumber(shadow.y)}px ${formatShadowNumber(Math.max(0, shadow.blur))}px ${formatShadowNumber(shadow.spread)}px ${color}`;
 }
 
-export function formatCanvasShadowSummary(value: unknown): string {
-  if (!hasCanvasShadow(value)) {
-    return 'None';
-  }
-
-  const shadow = resolveEditableCanvasShadow(value);
-  const label = shadow.position === 'inside' ? 'Inside' : 'Outside';
-  return `${label} (${formatShadowNumber(shadow.x)}, ${formatShadowNumber(shadow.y)}, ${formatShadowNumber(shadow.blur)}, ${formatShadowNumber(shadow.spread)})`;
-}
-
 function copyEditableCanvasShadow(shadow: EditableCanvasShadow): EditableCanvasShadow {
   return { ...shadow };
 }

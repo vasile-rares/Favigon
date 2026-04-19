@@ -38,8 +38,8 @@ const PROFILE_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/av
     FormsModule,
     TextInputComponent,
     ActionButtonComponent,
-    ...DIALOG_BOX_IMPORTS
-],
+    ...DIALOG_BOX_IMPORTS,
+  ],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
 })

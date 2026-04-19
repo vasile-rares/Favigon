@@ -18,6 +18,7 @@ import {
   CanvasPageModel,
   IRNode,
   ConverterPageRequest,
+  dataUrlToBlob,
   extractApiErrorMessage,
   PendingProjectFlushService,
   ProjectService,
@@ -33,13 +34,13 @@ import { ToolbarComponent } from '../../components/toolbar/toolbar.component';
 import { ProjectPanelComponent } from '../../components/project-panel/project-panel.component';
 import { PropertiesPanelComponent } from '../../components/properties-panel/properties-panel.component';
 import { mutateNormalizeElement } from '../../utils/element/canvas-element-normalization.util';
-import { clamp, roundToTwoDecimals } from '../../utils/canvas-math.util';
+import { roundToTwoDecimals } from '../../utils/canvas-math.util';
 import { collectSubtreeIds, removeWithChildren } from '../../utils/canvas-tree.util';
 import {
   generateThumbnail,
   generateThumbnailFromCanvas,
 } from '../../utils/pixi/canvas-thumbnail.util';
-import { calculateResizedBounds } from '../../utils/interaction/canvas-resize.util';
+
 import {
   getTextFontFamily,
   getTextFontWeight,
@@ -58,11 +59,7 @@ import {
   FrameTemplateSelection,
   Point,
   Bounds,
-  ResizeState,
-  RotateState,
-  CornerRadiusState,
   HistorySnapshot,
-  SnapLine,
   CanvasPageLayout,
   FlowDragRenderState,
 } from '../../canvas.types';
@@ -1615,7 +1612,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    const thumbnailFile = this.createThumbnailBlob(thumbnail);
+    const thumbnailFile = dataUrlToBlob(thumbnail);
     if (!thumbnailFile) {
       return;
     }
@@ -1659,27 +1656,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   private buildCurrentPersistedDesignJson(): string {
     return JSON.stringify(buildPersistedCanvasDesign(this.buildCurrentProjectDocument()));
-  }
-
-  private createThumbnailBlob(thumbnailDataUrl: string): Blob | null {
-    const match = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/i.exec(thumbnailDataUrl.trim());
-    if (!match) {
-      return null;
-    }
-
-    try {
-      const contentType = match[1].toLowerCase();
-      const base64Data = match[2];
-      const binary = atob(base64Data);
-      const bytes = new Uint8Array(binary.length);
-      for (let index = 0; index < binary.length; index += 1) {
-        bytes[index] = binary.charCodeAt(index);
-      }
-
-      return new Blob([bytes], { type: contentType });
-    } catch {
-      return null;
-    }
   }
 
   private captureRenderedThumbnail(): string | null {

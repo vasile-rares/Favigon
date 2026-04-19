@@ -23,15 +23,6 @@ import { normalizeCanvasShadowValue } from './canvas-shadow.util';
 const MIN_SIZE = 1;
 const DEFAULT_STROKE_WIDTH = 1;
 
-export function isPointInsideElement(x: number, y: number, element: CanvasElement): boolean {
-  return (
-    x >= element.x &&
-    x <= element.x + element.width &&
-    y >= element.y &&
-    y <= element.y + element.height
-  );
-}
-
 export function withRoundedPrecision(element: CanvasElement): CanvasElement {
   return {
     ...element,

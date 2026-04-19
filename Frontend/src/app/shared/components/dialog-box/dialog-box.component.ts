@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   Component,
@@ -30,7 +30,7 @@ const CLOSE_ANIMATION_DURATION_MS = 120;
 @Component({
   selector: 'app-dialog-box',
   standalone: true,
-  imports: [CommonModule, FormsModule, ActionButtonComponent],
+  imports: [FormsModule, NgTemplateOutlet, ActionButtonComponent],
   templateUrl: './dialog-box.component.html',
   styleUrl: './dialog-box.component.css',
 })

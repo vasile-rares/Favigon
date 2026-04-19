@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { NgClass } from '@angular/common';
 import {
   Component,
   effect,
@@ -23,7 +23,7 @@ const DRAG_PIXELS_PER_STEP = 4;
 @Component({
   selector: 'app-number-input',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgClass],
   templateUrl: './number-input.component.html',
   styleUrl: './number-input.component.css',
 })

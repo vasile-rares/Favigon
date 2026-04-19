@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { dataUrlToBlob } from '../utils/data-url.util';
 import { ProjectService } from './project.service';
 
 const STORAGE_KEY_PREFIX = 'favigon.pending-project-flush.';
@@ -31,11 +32,7 @@ export class PendingProjectFlushService {
     };
 
     this.writePendingPayload(payload);
-    this.projectService.dispatchExitFlush(
-      projectId,
-      designJson,
-      this.dataUrlToBlob(thumbnailDataUrl),
-    );
+    this.projectService.dispatchExitFlush(projectId, designJson, dataUrlToBlob(thumbnailDataUrl));
   }
 
   clearPendingFlush(projectId: number): void {
@@ -61,7 +58,7 @@ export class PendingProjectFlushService {
         .flushProjectOnExit(
           payload.projectId,
           payload.designJson,
-          this.dataUrlToBlob(payload.thumbnailDataUrl),
+          dataUrlToBlob(payload.thumbnailDataUrl),
         )
         .subscribe({
           next: () => {
@@ -124,31 +121,6 @@ export class PendingProjectFlushService {
       window.localStorage.setItem(this.getStorageKey(payload.projectId), JSON.stringify(payload));
     } catch {
       // Ignore storage failures.
-    }
-  }
-
-  private dataUrlToBlob(dataUrl: string | null): Blob | null {
-    if (!dataUrl) {
-      return null;
-    }
-
-    const match = /^data:(image\/(?:jpeg|png|webp));base64,(.+)$/i.exec(dataUrl.trim());
-    if (!match) {
-      return null;
-    }
-
-    try {
-      const contentType = match[1].toLowerCase();
-      const base64Data = match[2];
-      const binary = atob(base64Data);
-      const bytes = new Uint8Array(binary.length);
-      for (let index = 0; index < binary.length; index += 1) {
-        bytes[index] = binary.charCodeAt(index);
-      }
-
-      return new Blob([bytes], { type: contentType });
-    } catch {
-      return null;
     }
   }
 

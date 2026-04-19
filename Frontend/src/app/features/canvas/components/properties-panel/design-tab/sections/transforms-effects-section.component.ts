@@ -1,5 +1,5 @@
 ﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { NgStyle } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DropdownSelectComponent, ToggleGroupComponent, ContextMenuComponent } from '@app/shared';
 import { NumberInputComponent } from '../../number-input/number-input.component';
@@ -63,7 +63,7 @@ const EFFECT_PREVIEW_CLICK_IDLE_MS = 1080;
   selector: 'app-dt-transforms-effects-section',
   standalone: true,
   imports: [
-    CommonModule,
+    NgStyle,
     FormsModule,
     DropdownSelectComponent,
     ToggleGroupComponent,

@@ -3,7 +3,6 @@ import { CanvasElement, CanvasPageModel, CanvasPageViewportPreset } from '@app/c
 export type SupportedFramework = 'html' | 'react' | 'angular';
 export type HandlePosition = 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w';
 export type CornerHandle = 'nw' | 'ne' | 'sw' | 'se';
-export type EdgeHandle = 'n' | 's' | 'e' | 'w';
 export type DeviceFramePreset = 'desktop' | 'tablet' | 'mobile' | 'custom';
 
 export interface ViewportPresetOption {

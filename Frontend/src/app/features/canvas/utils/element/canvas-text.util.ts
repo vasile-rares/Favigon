@@ -31,36 +31,6 @@ export function getTextLetterSpacing(element: CanvasElement): string {
   return formatTextMetricValue(element.letterSpacing, element.letterSpacingUnit ?? 'px', 0);
 }
 
-export function getTextFontSizeInPixels(element: CanvasElement): number {
-  const fontSize = Number.isFinite(element.fontSize ?? Number.NaN)
-    ? (element.fontSize as number)
-    : DEFAULT_TEXT_FONT_SIZE;
-
-  return (element.fontSizeUnit ?? 'px') === 'rem' ? fontSize * ROOT_FONT_SIZE_PX : fontSize;
-}
-
-export function getTextJustifyContent(element: CanvasElement): string {
-  switch (element.textAlign) {
-    case 'left':
-      return 'flex-start';
-    case 'right':
-      return 'flex-end';
-    default:
-      return 'center';
-  }
-}
-
-export function getTextAlignItems(element: CanvasElement): string {
-  switch (element.textVerticalAlign) {
-    case 'top':
-      return 'flex-start';
-    case 'bottom':
-      return 'flex-end';
-    default:
-      return 'center';
-  }
-}
-
 export function getTextAlignValue(element: CanvasElement): string {
   return element.textAlign ?? 'center';
 }

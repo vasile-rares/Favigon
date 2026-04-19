@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, ElementRef, HostListener, inject, input, output, signal } from '@angular/core';
 import { Router } from '@angular/router';
 
@@ -15,7 +15,7 @@ export interface ProjectCardViewModel {
 @Component({
   selector: 'app-project-card',
   standalone: true,
-  imports: [CommonModule],
+  imports: [DatePipe],
   host: {
     '[class.project-card-host--menu-active]': 'isMenuOpen() || isMenuClosing()',
   },

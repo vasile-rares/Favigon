@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
   Component,
@@ -40,8 +40,8 @@ type EyeDropperConstructor = new () => EyeDropperInstance;
   selector: 'app-dropdown-menu',
   standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
+    NgTemplateOutlet,
     NumberInputComponent,
     DropdownSelectComponent,
     ToggleGroupComponent,

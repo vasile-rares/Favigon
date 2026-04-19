@@ -1,4 +1,4 @@
-import { CommonModule } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -33,7 +33,7 @@ type ProjectSortOption = 'updated' | 'created';
   selector: 'app-profile-page',
   standalone: true,
   imports: [
-    CommonModule,
+    DatePipe,
     FormsModule,
     ReactiveFormsModule,
     HeaderBarComponent,
