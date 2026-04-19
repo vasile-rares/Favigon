@@ -95,27 +95,27 @@ public sealed class ConverterEngine : IConverterEngine
       var primary = sorted[0];
 
       var primaryArtifacts = GeneratePageArtifacts(primary.Ir, framework);
-      var htmlFragment = primaryArtifacts.Html;
-      var baseCss = primaryArtifacts.Css;
+      string htmlFragment;
+      string pageCss;
 
-      var cssSb = new StringBuilder(baseCss);
-
-      foreach (var breakpoint in sorted.Skip(1))
+      if (sorted.Count == 1)
       {
-        var breakpointArtifacts = GeneratePageArtifacts(breakpoint.Ir, framework);
-        var diffCss = BuildBreakpointDiffCss(
-          primaryArtifacts.Styles,
-          breakpointArtifacts.Styles,
-          breakpoint.ViewportWidth,
-          $"{breakpoint.PageName} – {breakpoint.ViewportWidth}px");
-        if (!string.IsNullOrWhiteSpace(diffCss))
-          cssSb.Append(diffCss);
+        htmlFragment = primaryArtifacts.Html;
+        pageCss = primaryArtifacts.Css;
+      }
+      else
+      {
+        var breakpoints = sorted.Skip(1).Select(bp => (
+          GeneratePageArtifacts(bp.Ir, framework),
+          bp.ViewportWidth,
+          $"{bp.PageName} – {bp.ViewportWidth}px"));
+        (htmlFragment, pageCss) = BuildResponsiveArtifacts(primaryArtifacts, breakpoints, framework);
       }
 
       var slug = ToKebabCase(group.Key);
       var pascal = ToPascalCase(group.Key);
       var debugMap = ExportDebugMapBuilder.Build(group.Key, framework, primaryArtifacts.ExportRoot, primaryArtifacts.CssClassMap);
-      pageEntries.Add((slug, pascal, htmlFragment, cssSb.ToString(), debugMap));
+      pageEntries.Add((slug, pascal, htmlFragment, pageCss, debugMap));
     }
 
     var fw = framework.ToLowerInvariant();
@@ -472,30 +472,109 @@ public sealed class ConverterEngine : IConverterEngine
   {
     var primaryArtifacts = GeneratePageArtifacts(primary, framework);
     var breakpointArtifacts = GeneratePageArtifacts(breakpoint, framework);
-    return BuildBreakpointDiffCss(primaryArtifacts.Styles, breakpointArtifacts.Styles, maxWidth, label);
+    var orderDiffs = BuildNodeOrderDiffs(primaryArtifacts.ExportRoot, breakpointArtifacts.ExportRoot, primaryArtifacts.CssClassMap);
+    return BuildBreakpointDiffCss(primaryArtifacts.Styles, breakpointArtifacts.Styles, orderDiffs, maxWidth, label);
+  }
+
+  public (string Html, string Css) GenerateResponsiveOutput(
+    IReadOnlyList<(IRNode Ir, int ViewportWidth, string Label)> sortedDescending,
+    string framework)
+  {
+    if (sortedDescending.Count == 0)
+      throw new ArgumentException("At least one page is required.");
+
+    var primaryArtifacts = GeneratePageArtifacts(sortedDescending[0].Ir, framework);
+
+    if (sortedDescending.Count == 1)
+      return (primaryArtifacts.Html, primaryArtifacts.Css);
+
+    var breakpoints = sortedDescending.Skip(1).Select(p => (
+      GeneratePageArtifacts(p.Ir, framework),
+      p.ViewportWidth,
+      p.Label));
+
+    return BuildResponsiveArtifacts(primaryArtifacts, breakpoints, framework);
   }
 
   // ── Responsive diff helpers ───────────────────────────────
 
   /// <summary>
-  /// Compares the CSS rules of a breakpoint against the primary and returns a
-  /// @media block containing only the properties that differ. Returns empty string
-  /// when there are no differences.
+  /// Generates HTML + CSS for a primary page with responsive overrides from the given
+  /// breakpoints. Exclusive breakpoint nodes (not in primary) are appended to the HTML
+  /// hidden by default and revealed in their respective @media block. Primary-only nodes
+  /// (not in a given breakpoint) receive <c>display: none</c> in that breakpoint's @media
+  /// block.
+  /// </summary>
+  private (string Html, string Css) BuildResponsiveArtifacts(
+    GeneratedPageArtifacts primaryArtifacts,
+    IEnumerable<(GeneratedPageArtifacts Artifacts, int ViewportWidth, string Label)> breakpoints,
+    string framework)
+  {
+    var primaryIds = CollectNodeIds(primaryArtifacts.ExportRoot);
+
+    var htmlSb = new StringBuilder(primaryArtifacts.Html);
+    var baseCssSb = new StringBuilder(primaryArtifacts.Css);
+    var diffCssSb = new StringBuilder();
+    var alreadyProcessedIds = new HashSet<string>(StringComparer.Ordinal);
+
+    foreach (var (bpArtifacts, viewportWidth, label) in breakpoints)
+    {
+      // Append exclusive breakpoint nodes to the HTML (hidden by default).
+      var exclusiveRoots = CollectExclusiveRoots(bpArtifacts.ExportRoot, primaryIds, alreadyProcessedIds);
+      foreach (var exclusiveRoot in exclusiveRoots)
+      {
+        var exclusiveStyles = new StyleBuilder();
+        var exclusiveHtml = EmitSubtree(exclusiveRoot, bpArtifacts.CssClassMap, framework, exclusiveStyles);
+        htmlSb.Append(exclusiveHtml);
+
+        // Hide the entire exclusive subtree in the base CSS.
+        foreach (var (cssClass, _) in exclusiveStyles.GetBaseRulesSnapshot())
+          baseCssSb.Append($"\n.{cssClass} {{ display: none; }}\n");
+
+        alreadyProcessedIds.UnionWith(CollectNodeIds(exclusiveRoot));
+      }
+
+      var orderDiffs = BuildNodeOrderDiffs(primaryArtifacts.ExportRoot, bpArtifacts.ExportRoot, primaryArtifacts.CssClassMap);
+      var diffCss = BuildBreakpointDiffCss(primaryArtifacts.Styles, bpArtifacts.Styles, orderDiffs, viewportWidth, label);
+      if (!string.IsNullOrWhiteSpace(diffCss))
+        diffCssSb.Append(diffCss);
+    }
+
+    baseCssSb.Append(diffCssSb);
+    return (htmlSb.ToString(), baseCssSb.ToString());
+  }
+
+  /// <summary>
+  /// Compares primary and breakpoint styles and returns a CSS string with:
+  /// <list type="bullet">
+  /// <item>Any new <c>@keyframes</c> (in breakpoint but not in primary), placed before the @media block.</item>
+  /// <item>A <c>@media (max-width: Npx)</c> block containing:
+  ///   <list type="bullet">
+  ///   <item>Changed base-class properties (or <c>display: block</c> for exclusive BP nodes).</item>
+  ///   <item><c>display: none</c> for primary-only classes absent from the breakpoint.</item>
+  ///   <item><c>order: N</c> for reordered flex/grid children.</item>
+  ///   <item>Changed pseudo-class (hover/focus/etc.) rules.</item>
+  ///   </list>
+  /// </item>
+  /// </list>
+  /// Returns empty string when there are no differences.
   /// </summary>
   private static string BuildBreakpointDiffCss(
     StyleBuilder primaryStyles,
-    StyleBuilder breakpointStyles,
+    StyleBuilder bpStyles,
+    IReadOnlyList<(string CssClass, int Order)> orderDiffs,
     int maxWidth,
     string label)
   {
-    var primaryRules = primaryStyles.GetBaseRulesSnapshot();
-    var bpRules = breakpointStyles.GetBaseRulesSnapshot();
+    var primaryBaseRules = primaryStyles.GetBaseRulesSnapshot();
+    var bpBaseRules = bpStyles.GetBaseRulesSnapshot();
 
-    var diffSelectors = new List<(string CssClass, List<KeyValuePair<string, string>> Props)>();
+    // ── Base class diffs ──────────────────────────────────────
+    var diffByClass = new Dictionary<string, List<KeyValuePair<string, string>>>(StringComparer.Ordinal);
 
-    foreach (var (cssClass, bpProps) in bpRules)
+    foreach (var (cssClass, bpProps) in bpBaseRules)
     {
-      primaryRules.TryGetValue(cssClass, out var primProps);
+      primaryBaseRules.TryGetValue(cssClass, out var primProps);
 
       var diffProps = bpProps
         .Where(kv => primProps is null
@@ -503,27 +582,212 @@ public sealed class ConverterEngine : IConverterEngine
           || primVal != kv.Value)
         .ToList();
 
+      // Exclusive-BP class: ensure display is present so the node is un-hidden.
+      if (primProps is null && !diffProps.Exists(kv => kv.Key == "display"))
+        diffProps.Insert(0, new KeyValuePair<string, string>("display", "block"));
+
       if (diffProps.Count > 0)
-        diffSelectors.Add((cssClass, diffProps));
+        diffByClass[cssClass] = diffProps;
     }
 
-    if (diffSelectors.Count == 0)
+    // Primary-only classes: hide them at this breakpoint.
+    foreach (var cssClass in primaryBaseRules.Keys)
+    {
+      if (!bpBaseRules.ContainsKey(cssClass))
+        diffByClass[cssClass] = [new KeyValuePair<string, string>("display", "none")];
+    }
+
+    // ── Order diffs ───────────────────────────────────────────
+    foreach (var (cssClass, order) in orderDiffs)
+    {
+      if (!diffByClass.TryGetValue(cssClass, out var existing))
+        diffByClass[cssClass] = existing = [];
+      existing.Add(new KeyValuePair<string, string>("order", order.ToString()));
+    }
+
+    // ── Pseudo-class diffs ────────────────────────────────────
+    var primaryPseudoBySelector = primaryStyles.GetPseudoRulesSnapshot()
+      .ToDictionary(r => r.Selector, r => r.Props, StringComparer.Ordinal);
+
+    var pseudoDiffs = new List<(string Selector, List<KeyValuePair<string, string>> Props)>();
+    foreach (var (selector, bpProps) in bpStyles.GetPseudoRulesSnapshot())
+    {
+      primaryPseudoBySelector.TryGetValue(selector, out var primProps);
+      var diffProps = bpProps
+        .Where(kv => primProps is null
+          || !primProps.TryGetValue(kv.Key, out var primVal)
+          || primVal != kv.Value)
+        .ToList();
+      if (diffProps.Count > 0)
+        pseudoDiffs.Add((selector, diffProps));
+    }
+
+    // ── New keyframes (in breakpoint but not primary) ─────────
+    var primaryKfNames = new HashSet<string>(
+      primaryStyles.GetKeyframesSnapshot().Select(k => k.Name), StringComparer.Ordinal);
+    var newKeyframes = bpStyles.GetKeyframesSnapshot()
+      .Where(k => !primaryKfNames.Contains(k.Name))
+      .ToList();
+
+    if (diffByClass.Count == 0 && pseudoDiffs.Count == 0 && newKeyframes.Count == 0)
       return string.Empty;
 
     var sb = new StringBuilder();
     sb.Append($"\n/* {label} */\n");
-    sb.Append($"@media (max-width: {maxWidth}px) {{\n");
 
-    foreach (var (cssClass, diffProps) in diffSelectors)
+    // New keyframes go BEFORE the @media block (they can't be inside it in all browsers).
+    foreach (var (name, body) in newKeyframes)
+      sb.Append($"@keyframes {name} {{\n{body}}}\n");
+
+    var mediaBody = new StringBuilder();
+
+    foreach (var (cssClass, props) in diffByClass)
     {
-      sb.Append($"  .{cssClass} {{\n");
-      foreach (var (k, v) in diffProps)
-        sb.Append($"    {k}: {v};\n");
-      sb.Append("  }\n");
+      mediaBody.Append($"  .{cssClass} {{\n");
+      foreach (var (k, v) in props)
+        mediaBody.Append($"    {k}: {v};\n");
+      mediaBody.Append("  }\n");
     }
 
-    sb.Append("}\n");
+    foreach (var (selector, props) in pseudoDiffs)
+    {
+      mediaBody.Append($"  {selector} {{\n");
+      foreach (var (k, v) in props)
+        mediaBody.Append($"    {k}: {v};\n");
+      mediaBody.Append("  }\n");
+    }
+
+    if (mediaBody.Length > 0)
+    {
+      sb.Append($"@media (max-width: {maxWidth}px) {{\n");
+      sb.Append(mediaBody);
+      sb.Append("}\n");
+    }
+
     return sb.ToString();
+  }
+
+  // ── Responsive node helpers ───────────────────────────────
+
+  private static HashSet<string> CollectNodeIds(IRNode root)
+  {
+    var ids = new HashSet<string>(StringComparer.Ordinal);
+    var queue = new Queue<IRNode>();
+    queue.Enqueue(root);
+    while (queue.Count > 0)
+    {
+      var node = queue.Dequeue();
+      ids.Add(node.Id);
+      foreach (var child in node.Children)
+        queue.Enqueue(child);
+    }
+    return ids;
+  }
+
+  /// <summary>
+  /// Returns top-level nodes in <paramref name="bpRoot"/>'s tree whose IDs are not in
+  /// <paramref name="primaryIds"/> and have not yet been processed (<paramref name="alreadyProcessed"/>).
+  /// Does not recurse into found nodes — their entire subtree is emitted together.
+  /// </summary>
+  private static List<IRNode> CollectExclusiveRoots(
+    IRNode bpRoot,
+    HashSet<string> primaryIds,
+    HashSet<string> alreadyProcessed)
+  {
+    var result = new List<IRNode>();
+
+    void Walk(IRNode node)
+    {
+      foreach (var child in node.Children)
+      {
+        if (!primaryIds.Contains(child.Id) && !alreadyProcessed.Contains(child.Id))
+          result.Add(child);
+        else
+          Walk(child);
+      }
+    }
+
+    Walk(bpRoot);
+    return result;
+  }
+
+  /// <summary>
+  /// Emits HTML for <paramref name="node"/> and its subtree using the provided CSS class map,
+  /// accumulating generated styles into <paramref name="styles"/>.
+  /// </summary>
+  private string EmitSubtree(
+    IRNode node,
+    IReadOnlyDictionary<string, NodeCssClasses> cssClassMap,
+    string framework,
+    StyleBuilder styles)
+  {
+    var frameworkMappers = ResolveFrameworkMappers(framework);
+    var context = new EmitContext
+    {
+      Framework = framework,
+      Depth = 0,
+      Styles = styles,
+      CssClassMap = cssClassMap,
+      EmitChild = (n, ctx) => EmitNode(n, ctx, framework, frameworkMappers)
+    };
+    return EmitNode(node, context, framework, frameworkMappers);
+  }
+
+  // ── Responsive order helpers ──────────────────────────────
+
+  /// <summary>
+  /// Detects flex/grid children whose order differs between primary and breakpoint trees.
+  /// For each such parent, emits an explicit <c>order: N</c> value for every child.
+  /// Uses the primary CSS class map so class names resolve to the HTML already emitted.
+  /// </summary>
+  private static List<(string CssClass, int Order)> BuildNodeOrderDiffs(
+    IRNode primaryRoot,
+    IRNode bpRoot,
+    IReadOnlyDictionary<string, NodeCssClasses> primaryCssClassMap)
+  {
+    var primaryParentChildren = BuildFlexGridParentChildrenMap(primaryRoot);
+    var bpParentChildren = BuildFlexGridParentChildrenMap(bpRoot);
+
+    var result = new List<(string CssClass, int Order)>();
+
+    foreach (var (parentId, bpChildren) in bpParentChildren)
+    {
+      if (!primaryParentChildren.TryGetValue(parentId, out var primChildren))
+        continue;
+
+      // Compare order of only the shared children (ignoring exclusive nodes on either side).
+      var primShared = primChildren.Where(id => bpChildren.Contains(id)).ToList();
+      var bpShared = bpChildren.Where(id => primChildren.Contains(id)).ToList();
+
+      if (primShared.SequenceEqual(bpShared))
+        continue;
+
+      // Order differs — emit explicit `order` for every BP child so the reorder is applied.
+      for (var i = 0; i < bpChildren.Count; i++)
+      {
+        if (primaryCssClassMap.TryGetValue(bpChildren[i], out var cssClasses))
+          result.Add((cssClasses.TargetClass, i));
+      }
+    }
+
+    return result;
+  }
+
+  private static Dictionary<string, List<string>> BuildFlexGridParentChildrenMap(IRNode root)
+  {
+    var map = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+
+    void Walk(IRNode node)
+    {
+      if (node.Layout is { Mode: LayoutMode.Flex or LayoutMode.Grid } && node.Children.Count > 1)
+        map[node.Id] = node.Children.Select(c => c.Id).ToList();
+
+      foreach (var child in node.Children)
+        Walk(child);
+    }
+
+    Walk(root);
+    return map;
   }
 
 }

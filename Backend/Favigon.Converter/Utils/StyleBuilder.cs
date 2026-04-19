@@ -38,6 +38,14 @@ public sealed class StyleBuilder
     return map;
   }
 
+  /// <summary>Returns a snapshot of all pseudo-class rules as (selector, props) pairs.</summary>
+  public IReadOnlyList<(string Selector, IReadOnlyDictionary<string, string> Props)> GetPseudoRulesSnapshot() =>
+    _pseudoRules.Select(r => (r.Selector, (IReadOnlyDictionary<string, string>)r.Props)).ToList();
+
+  /// <summary>Returns a snapshot of all keyframe rules as (name, body) pairs.</summary>
+  public IReadOnlyList<(string Name, string Body)> GetKeyframesSnapshot() =>
+    [.. _keyframeRules];
+
   public string Build()
   {
     if (IsEmpty) return string.Empty;

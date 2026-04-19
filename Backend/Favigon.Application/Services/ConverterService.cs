@@ -1,5 +1,4 @@
-﻿using System.Text;
-using Favigon.Application.DTOs.Requests;
+﻿using Favigon.Application.DTOs.Requests;
 using Favigon.Application.Interfaces;
 using Favigon.Application.DTOs.Responses;
 using Favigon.Converter.Abstractions;
@@ -35,22 +34,13 @@ public class ConverterService(IConverterEngine converterEngine) : IConverterServ
       if (!converterEngine.Validate(page.Ir))
         throw new InvalidOperationException($"IR validation failed for page '{page.PageName}'.");
 
-    var (html, baseCss) = converterEngine.Generate(sorted[0].Ir, framework);
+    var sortedInput = sorted
+      .Select(p => (p.Ir, p.ViewportWidth, string.IsNullOrWhiteSpace(p.PageName) ? $"{p.ViewportWidth}px" : $"{p.PageName} \u2013 {p.ViewportWidth}px"))
+      .ToList();
 
-    if (sorted.Count == 1)
-      return new ConverterResponse { Framework = framework, IsValid = true, Html = html, Css = baseCss };
+    var (html, css) = converterEngine.GenerateResponsiveOutput(sortedInput, framework);
 
-    var sb = new StringBuilder(baseCss);
-
-    foreach (var page in sorted.Skip(1))
-    {
-      var label = string.IsNullOrWhiteSpace(page.PageName) ? $"{page.ViewportWidth}px" : $"{page.PageName} – {page.ViewportWidth}px";
-      var diffCss = converterEngine.GenerateDiffCss(sorted[0].Ir, page.Ir, framework, page.ViewportWidth, label);
-      if (!string.IsNullOrWhiteSpace(diffCss))
-        sb.Append(diffCss);
-    }
-
-    return new ConverterResponse { Framework = framework, IsValid = true, Html = html, Css = sb.ToString() };
+    return new ConverterResponse { Framework = framework, IsValid = true, Html = html, Css = css };
   }
 
   public bool Validate(IRNode root) => converterEngine.Validate(root);

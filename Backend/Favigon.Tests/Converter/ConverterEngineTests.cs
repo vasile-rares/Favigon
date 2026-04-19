@@ -296,4 +296,393 @@ public class ConverterEngineTests
     var css = Assert.Single(files, file => file.Path == "scrollable.css");
     Assert.Contains("overflow: scroll;", css.Content);
   }
+
+  // ── Responsive output ────────────────────────────────────
+
+  [Fact]
+  public void GenerateResponsiveOutput_ExclusiveBpNode_AppearsInHtmlHiddenByDefaultAndVisibleInMedia()
+  {
+    var sut = new ConverterEngine();
+
+    // Primary (Desktop): one child element
+    var desktopRoot = new IRNode
+    {
+      Id = "canvas-project-resp",
+      Type = "Container",
+      Props = new Dictionary<string, object?> { ["role"] = "canvas-root" },
+      Children =
+      [
+        new IRNode
+        {
+          Id = "frame-desktop",
+          Type = "Frame",
+          Meta = new IRMeta { Name = "Desktop" },
+          Style = new IRStyle
+          {
+            Width = new IRLength { Value = 1280, Unit = "px" },
+            Height = new IRLength { Value = 800, Unit = "px" }
+          },
+          Children =
+          [
+            new IRNode
+            {
+              Id = "hero-shared",
+              Type = "Container",
+              Meta = new IRMeta { Name = "Hero" },
+              Style = new IRStyle
+              {
+                Width = new IRLength { Value = 1200, Unit = "px" },
+                Height = new IRLength { Value = 400, Unit = "px" },
+                Background = "#ffffff"
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    // Mobile (375px): shared Hero (remapped to same ID) + exclusive MobileMenu node
+    var mobileRoot = new IRNode
+    {
+      Id = "canvas-project-resp",
+      Type = "Container",
+      Props = new Dictionary<string, object?> { ["role"] = "canvas-root" },
+      Children =
+      [
+        new IRNode
+        {
+          Id = "frame-desktop",            // same as primary — this is the synced root
+          Type = "Frame",
+          Meta = new IRMeta { Name = "Desktop" },
+          Style = new IRStyle
+          {
+            Width = new IRLength { Value = 375, Unit = "px" },
+            Height = new IRLength { Value = 800, Unit = "px" }
+          },
+          Children =
+          [
+            new IRNode
+            {
+              Id = "hero-shared",           // shared — same ID as in primary
+              Type = "Container",
+              Meta = new IRMeta { Name = "Hero" },
+              Style = new IRStyle
+              {
+                Width = new IRLength { Value = 375, Unit = "px" },
+                Height = new IRLength { Value = 200, Unit = "px" },
+                Background = "#ffffff"
+              }
+            },
+            new IRNode
+            {
+              Id = "mobile-menu",           // exclusive to Mobile — not in primary
+              Type = "Container",
+              Meta = new IRMeta { Name = "Mobile Menu" },  // slugifies to "mobile-menu"
+              Style = new IRStyle
+              {
+                Width = new IRLength { Value = 375, Unit = "px" },
+                Height = new IRLength { Value = 60, Unit = "px" },
+                Background = "#000000"
+              }
+            }
+          ]
+        }
+      ]
+    };
+
+    var (html, css) = sut.GenerateResponsiveOutput(
+      [(desktopRoot, 1280, "Desktop – 1280px"), (mobileRoot, 375, "Mobile – 375px")],
+      "html");
+
+    // 1. The exclusive mobile node must appear in the HTML
+    Assert.Contains("mobile-menu", html);
+
+    // 2. The exclusive node's CSS class must be hidden in the base CSS
+    Assert.Matches(@"\.mobile-menu\s*\{\s*display:\s*none", css);
+
+    // 3. The @media block must un-hide it (display: block or explicit display value)
+    Assert.Matches(@"@media\s*\(max-width:\s*375px\)", css);
+    var mediaIndex = css.IndexOf("@media", StringComparison.Ordinal);
+    var mediaBlock = css[mediaIndex..];
+    Assert.Contains("mobile-menu", mediaBlock);
+    Assert.Contains("display:", mediaBlock);
+
+    // 4. The Hero shared node must NOT get display:none in the base CSS
+    var baseRegion = css[..mediaIndex];
+    Assert.DoesNotMatch(@"\.hero\s*\{\s*display:\s*none", baseRegion);
+  }
+
+  [Fact]
+  public void GenerateResponsiveOutput_PrimaryOnlyNode_GetsDisplayNoneAtBreakpoint()
+  {
+    var sut = new ConverterEngine();
+
+    var desktopRoot = new IRNode
+    {
+      Id = "canvas-resp2",
+      Type = "Container",
+      Props = new Dictionary<string, object?> { ["role"] = "canvas-root" },
+      Children =
+      [
+        new IRNode
+        {
+          Id = "frame-d",
+          Type = "Frame",
+          Meta = new IRMeta { Name = "Desktop" },
+          Style = new IRStyle { Width = new IRLength { Value = 1280, Unit = "px" }, Height = new IRLength { Value = 800, Unit = "px" } },
+          Children =
+          [
+            new IRNode
+            {
+              Id = "sidebar",
+              Type = "Container",
+              Meta = new IRMeta { Name = "Sidebar" },
+              Style = new IRStyle { Width = new IRLength { Value = 300, Unit = "px" }, Height = new IRLength { Value = 800, Unit = "px" } }
+            }
+          ]
+        }
+      ]
+    };
+
+    // Mobile: no Sidebar (it's desktop-only)
+    var mobileRoot = new IRNode
+    {
+      Id = "canvas-resp2",
+      Type = "Container",
+      Props = new Dictionary<string, object?> { ["role"] = "canvas-root" },
+      Children =
+      [
+        new IRNode
+        {
+          Id = "frame-d",
+          Type = "Frame",
+          Meta = new IRMeta { Name = "Desktop" },
+          Style = new IRStyle { Width = new IRLength { Value = 375, Unit = "px" }, Height = new IRLength { Value = 800, Unit = "px" } }
+        }
+      ]
+    };
+
+    var (_, css) = sut.GenerateResponsiveOutput(
+      [(desktopRoot, 1280, "Desktop – 1280px"), (mobileRoot, 375, "Mobile – 375px")],
+      "html");
+
+    var mediaIndex = css.IndexOf("@media", StringComparison.Ordinal);
+    Assert.True(mediaIndex >= 0, "Expected a @media block in the CSS");
+    var mediaBlock = css[mediaIndex..];
+
+    // Sidebar is primary-only → must be hidden at mobile
+    Assert.Contains("sidebar", mediaBlock);
+    Assert.Contains("display: none", mediaBlock);
+  }
+
+  [Fact]
+  public void GenerateResponsiveOutput_HoverEffectDiff_EmittedInMediaQuery()
+  {
+    var sut = new ConverterEngine();
+
+    static IRNode MakeRoot(string frameId, int frameWidth, float hoverOpacity) => new IRNode
+    {
+      Id = "canvas-hover",
+      Type = "Container",
+      Props = new Dictionary<string, object?> { ["role"] = "canvas-root" },
+      Children =
+      [
+        new IRNode
+        {
+          Id = frameId,
+          Type = "Frame",
+          Meta = new IRMeta { Name = "Desktop" },
+          Style = new IRStyle
+          {
+            Width = new IRLength { Value = frameWidth, Unit = "px" },
+            Height = new IRLength { Value = 800, Unit = "px" }
+          },
+          Children =
+          [
+            new IRNode
+            {
+              Id = "hover-btn",
+              Type = "Container",
+              Meta = new IRMeta { Name = "Button" },
+              Style = new IRStyle { Width = new IRLength { Value = 200, Unit = "px" }, Height = new IRLength { Value = 50, Unit = "px" } },
+              Effects = [new IREffect { Trigger = "hover", Opacity = hoverOpacity }]
+            }
+          ]
+        }
+      ]
+    };
+
+    var (_, css) = sut.GenerateResponsiveOutput(
+      [(MakeRoot("frame-d", 1280, 0.8f), 1280, "Desktop – 1280px"),
+       (MakeRoot("frame-d", 375, 0.3f), 375, "Mobile – 375px")],
+      "html");
+
+    var mediaIndex = css.IndexOf("@media", StringComparison.Ordinal);
+    Assert.True(mediaIndex >= 0, "Expected @media block");
+    var mediaBlock = css[mediaIndex..];
+
+    // Hover pseudo-class diff must appear inside the @media block
+    Assert.Contains(":hover", mediaBlock);
+    Assert.Contains("opacity:", mediaBlock);
+  }
+
+  [Fact]
+  public void GenerateResponsiveOutput_NewKeyframeAtBreakpoint_EmittedBeforeMedia()
+  {
+    var sut = new ConverterEngine();
+
+    var primaryRoot = new IRNode
+    {
+      Id = "canvas-kf",
+      Type = "Container",
+      Props = new Dictionary<string, object?> { ["role"] = "canvas-root" },
+      Children =
+      [
+        new IRNode
+        {
+          Id = "frame-d",
+          Type = "Frame",
+          Meta = new IRMeta { Name = "Desktop" },
+          Style = new IRStyle { Width = new IRLength { Value = 1280, Unit = "px" }, Height = new IRLength { Value = 800, Unit = "px" } },
+          Children =
+          [
+            new IRNode
+            {
+              Id = "banner",
+              Type = "Container",
+              Meta = new IRMeta { Name = "Banner" },
+              Style = new IRStyle { Width = new IRLength { Value = 1200, Unit = "px" }, Height = new IRLength { Value = 300, Unit = "px" } }
+              // No animation on desktop
+            }
+          ]
+        }
+      ]
+    };
+
+    var mobileRoot = new IRNode
+    {
+      Id = "canvas-kf",
+      Type = "Container",
+      Props = new Dictionary<string, object?> { ["role"] = "canvas-root" },
+      Children =
+      [
+        new IRNode
+        {
+          Id = "frame-d",
+          Type = "Frame",
+          Meta = new IRMeta { Name = "Desktop" },
+          Style = new IRStyle { Width = new IRLength { Value = 375, Unit = "px" }, Height = new IRLength { Value = 800, Unit = "px" } },
+          Children =
+          [
+            new IRNode
+            {
+              Id = "banner",
+              Type = "Container",
+              Meta = new IRMeta { Name = "Banner" },
+              Style = new IRStyle { Width = new IRLength { Value = 375, Unit = "px" }, Height = new IRLength { Value = 200, Unit = "px" } },
+              Effects = [new IREffect { Preset = "slide", Trigger = "onLoad", Opacity = 0.0, Duration = 400 }]
+            }
+          ]
+        }
+      ]
+    };
+
+    var (_, css) = sut.GenerateResponsiveOutput(
+      [(primaryRoot, 1280, "Desktop – 1280px"), (mobileRoot, 375, "Mobile – 375px")],
+      "html");
+
+    // New keyframe must appear in the CSS
+    Assert.Contains("@keyframes", css);
+
+    // Keyframe must appear BEFORE the @media block
+    var kfIndex = css.IndexOf("@keyframes", StringComparison.Ordinal);
+    var mediaIndex = css.IndexOf("@media", StringComparison.Ordinal);
+    Assert.True(kfIndex >= 0 && mediaIndex >= 0 && kfIndex < mediaIndex,
+      "Expected @keyframes to appear before the @media block");
+  }
+
+  [Fact]
+  public void GenerateResponsiveOutput_ReorderedFlexChildren_EmitsOrderInMedia()
+  {
+    var sut = new ConverterEngine();
+
+    var primaryRoot = new IRNode
+    {
+      Id = "canvas-order",
+      Type = "Container",
+      Props = new Dictionary<string, object?> { ["role"] = "canvas-root" },
+      Children =
+      [
+        new IRNode
+        {
+          Id = "frame-d",
+          Type = "Frame",
+          Meta = new IRMeta { Name = "Desktop" },
+          Style = new IRStyle { Width = new IRLength { Value = 1280, Unit = "px" }, Height = new IRLength { Value = 800, Unit = "px" } },
+          Children =
+          [
+            new IRNode
+            {
+              Id = "row",
+              Type = "Container",
+              Meta = new IRMeta { Name = "Row" },
+              Layout = new IRLayout { Mode = LayoutMode.Flex, Direction = FlexDirection.Row },
+              Style = new IRStyle { Width = new IRLength { Value = 1280, Unit = "px" }, Height = new IRLength { Value = 400, Unit = "px" } },
+              Children =
+              [
+                new IRNode { Id = "alpha", Type = "Container", Meta = new IRMeta { Name = "Alpha" }, Style = new IRStyle { Width = new IRLength { Value = 300, Unit = "px" }, Height = new IRLength { Value = 400, Unit = "px" } } },
+                new IRNode { Id = "beta",  Type = "Container", Meta = new IRMeta { Name = "Beta"  }, Style = new IRStyle { Width = new IRLength { Value = 980, Unit = "px" }, Height = new IRLength { Value = 400, Unit = "px" } } }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    // Mobile: same structure but children reversed [beta, alpha]
+    var mobileRoot = new IRNode
+    {
+      Id = "canvas-order",
+      Type = "Container",
+      Props = new Dictionary<string, object?> { ["role"] = "canvas-root" },
+      Children =
+      [
+        new IRNode
+        {
+          Id = "frame-d",
+          Type = "Frame",
+          Meta = new IRMeta { Name = "Desktop" },
+          Style = new IRStyle { Width = new IRLength { Value = 375, Unit = "px" }, Height = new IRLength { Value = 800, Unit = "px" } },
+          Children =
+          [
+            new IRNode
+            {
+              Id = "row",
+              Type = "Container",
+              Meta = new IRMeta { Name = "Row" },
+              Layout = new IRLayout { Mode = LayoutMode.Flex, Direction = FlexDirection.Column },
+              Style = new IRStyle { Width = new IRLength { Value = 375, Unit = "px" }, Height = new IRLength { Value = 800, Unit = "px" } },
+              Children =
+              [
+                new IRNode { Id = "beta",  Type = "Container", Meta = new IRMeta { Name = "Beta"  }, Style = new IRStyle { Width = new IRLength { Value = 375, Unit = "px" }, Height = new IRLength { Value = 300, Unit = "px" } } },
+                new IRNode { Id = "alpha", Type = "Container", Meta = new IRMeta { Name = "Alpha" }, Style = new IRStyle { Width = new IRLength { Value = 375, Unit = "px" }, Height = new IRLength { Value = 300, Unit = "px" } } }
+              ]
+            }
+          ]
+        }
+      ]
+    };
+
+    var (_, css) = sut.GenerateResponsiveOutput(
+      [(primaryRoot, 1280, "Desktop – 1280px"), (mobileRoot, 375, "Mobile – 375px")],
+      "html");
+
+    var mediaIndex = css.IndexOf("@media", StringComparison.Ordinal);
+    Assert.True(mediaIndex >= 0, "Expected @media block");
+    var mediaBlock = css[mediaIndex..];
+
+    // Both alpha and beta must have explicit order values in the @media block
+    Assert.Matches(@"\.alpha\s*\{[^}]*order:\s*1", mediaBlock);
+    Assert.Matches(@"\.beta\s*\{[^}]*order:\s*0", mediaBlock);
+  }
 }
