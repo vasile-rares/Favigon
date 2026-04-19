@@ -112,6 +112,7 @@ public class ProjectsController : ControllerBase
   }
 
   [HttpPost("{id:int}/assets/images")]
+  [RequestSizeLimit(10 * 1024 * 1024)]
   public async Task<IActionResult> UploadImage(int id, IFormFile? file)
   {
     if (!User.TryGetUserId(out var userId))
@@ -172,6 +173,7 @@ public class ProjectsController : ControllerBase
   }
 
   [HttpPut("{id:int}/design")]
+  [RequestSizeLimit(5 * 1024 * 1024)]
   public async Task<IActionResult> SaveDesign(int id, [FromBody] ProjectDesignSaveRequest request)
   {
     if (!User.TryGetUserId(out var userId))
@@ -190,6 +192,7 @@ public class ProjectsController : ControllerBase
 
   [HttpPost("{id:int}/flush")]
   [Consumes("multipart/form-data")]
+  [RequestSizeLimit(15 * 1024 * 1024)]
   public async Task<IActionResult> FlushProjectState(
     int id,
     [FromForm] string? designJson,
@@ -247,6 +250,7 @@ public class ProjectsController : ControllerBase
 
   [HttpPut("{id:int}/thumbnail")]
   [Consumes("multipart/form-data")]
+  [RequestSizeLimit(5 * 1024 * 1024)]
   public async Task<IActionResult> SaveThumbnail(int id, IFormFile? file)
   {
     if (!User.TryGetUserId(out var userId))

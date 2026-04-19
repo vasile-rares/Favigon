@@ -24,17 +24,20 @@ public class UserService : IUserService
   private readonly ILinkedAccountRepository _linkedAccountRepository;
   private readonly IUserProfileImageStorage _userProfileImageStorage;
   private readonly IMapper _mapper;
+  private readonly IAuditLogger _audit;
 
   public UserService(
     IUserRepository userRepository,
     ILinkedAccountRepository linkedAccountRepository,
     IUserProfileImageStorage userProfileImageStorage,
-    IMapper mapper)
+    IMapper mapper,
+    IAuditLogger audit)
   {
     _userRepository = userRepository;
     _linkedAccountRepository = linkedAccountRepository;
     _userProfileImageStorage = userProfileImageStorage;
     _mapper = mapper;
+    _audit = audit;
   }
 
   public Task<IReadOnlyList<User>> GetAllAsync()
@@ -230,6 +233,7 @@ public class UserService : IUserService
 
     await _userRepository.DeleteAsync(user);
     await _userProfileImageStorage.DeleteUserAssetsAsync(userId, CancellationToken.None);
+    _audit.AccountDeleted(userId);
     return true;
   }
 
@@ -239,6 +243,7 @@ public class UserService : IUserService
     if (link == null) return false;
 
     await _linkedAccountRepository.RemoveAsync(link);
+    _audit.OAuthProviderUnlinked(userId, provider);
     return true;
   }
 

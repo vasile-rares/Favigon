@@ -21,6 +21,7 @@ public class AuthServiceRefreshTests
   private readonly Mock<IGithubOAuthClient> _github = new();
   private readonly Mock<IGoogleOAuthClient> _google = new();
   private readonly Mock<IEmailSender> _email = new();
+  private readonly Mock<IAuditLogger> _audit = new();
   private readonly IMapper _mapper;
   private readonly AuthService _sut;
 
@@ -34,7 +35,7 @@ public class AuthServiceRefreshTests
         _userRepo.Object, _linkedRepo.Object,
         _github.Object, _google.Object,
         _email.Object, _mapper,
-        TestConfiguration.Build());
+        TestConfiguration.Build(), _audit.Object);
   }
 
   private User MakeUser() => new()

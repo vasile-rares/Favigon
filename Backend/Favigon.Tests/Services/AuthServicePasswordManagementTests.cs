@@ -17,6 +17,7 @@ public class AuthServicePasswordManagementTests
   private readonly Mock<IGithubOAuthClient> _github = new();
   private readonly Mock<IGoogleOAuthClient> _google = new();
   private readonly Mock<IEmailSender> _email = new();
+  private readonly Mock<IAuditLogger> _audit = new();
   private readonly AuthService _sut;
 
   public AuthServicePasswordManagementTests()
@@ -33,7 +34,8 @@ public class AuthServicePasswordManagementTests
       _google.Object,
       _email.Object,
       mapper,
-      TestConfiguration.Build());
+      TestConfiguration.Build(),
+      _audit.Object);
   }
 
   [Fact]

@@ -50,6 +50,7 @@ public class UsersController : ControllerBase
   }
 
   [HttpPost("me/profile-image")]
+  [RequestSizeLimit(10 * 1024 * 1024)]
   public async Task<IActionResult> UploadMyProfileImage(IFormFile? file)
   {
     if (!User.TryGetUserId(out var userId)) return Unauthorized();

@@ -14,6 +14,7 @@ public class UserServiceTests
   private readonly Mock<ILinkedAccountRepository> _linkedAccountRepo = new();
   private readonly Mock<IUserProfileImageStorage> _profileImageStorage = new();
   private readonly Mock<IMapper> _mapper = new();
+  private readonly Mock<IAuditLogger> _audit = new();
   private readonly UserService _sut;
 
   public UserServiceTests()
@@ -22,7 +23,8 @@ public class UserServiceTests
       _userRepo.Object,
       _linkedAccountRepo.Object,
       _profileImageStorage.Object,
-      _mapper.Object);
+      _mapper.Object,
+      _audit.Object);
   }
 
   [Fact]

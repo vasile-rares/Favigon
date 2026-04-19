@@ -27,6 +27,13 @@ try
 
     builder.Host.UseSerilog();
 
+    // Global request body limit: 1 MB for JSON endpoints.
+    // File upload endpoints override this individually via [RequestSizeLimit].
+    builder.WebHost.ConfigureKestrel(kestrel =>
+    {
+        kestrel.Limits.MaxRequestBodySize = 1 * 1024 * 1024; // 1 MB
+    });
+
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -69,7 +76,9 @@ try
         options.RejectionStatusCode = 429;
     });
 
-    var jwtKey = builder.Configuration["JwtSettings:Key"] ?? "";
+    var jwtKey = builder.Configuration["JwtSettings:Key"];
+    if (string.IsNullOrWhiteSpace(jwtKey))
+        throw new InvalidOperationException("JwtSettings:Key is not configured.");
     var jwtIssuer = builder.Configuration["JwtSettings:Issuer"];
     var jwtAudience = builder.Configuration["JwtSettings:Audience"];
     var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
@@ -160,9 +169,7 @@ try
 
     app.UseForwardedHeaders(new ForwardedHeadersOptions
     {
-        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
-        KnownNetworks = { },
-        KnownProxies = { }
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
     });
 
     app.UseMiddleware<ExceptionHandlerMiddleware>();

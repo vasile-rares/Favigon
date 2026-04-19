@@ -26,6 +26,7 @@ public class AuthService : IAuthService
   private readonly IEmailSender _emailSender;
   private readonly IMapper _mapper;
   private readonly IConfiguration _configuration;
+  private readonly IAuditLogger _audit;
 
   public AuthService(
       IUserRepository userRepository,
@@ -34,7 +35,8 @@ public class AuthService : IAuthService
       IGoogleOAuthClient googleOAuthClient,
       IEmailSender emailSender,
       IMapper mapper,
-      IConfiguration configuration)
+      IConfiguration configuration,
+      IAuditLogger audit)
   {
     _userRepository = userRepository;
     _linkedAccountRepository = linkedAccountRepository;
@@ -43,6 +45,7 @@ public class AuthService : IAuthService
     _emailSender = emailSender;
     _mapper = mapper;
     _configuration = configuration;
+    _audit = audit;
   }
 
   public async Task<AuthResponse> RegisterAsync(RegisterRequest request)
@@ -76,6 +79,7 @@ public class AuthService : IAuthService
 
     await _userRepository.AddAsync(user);
 
+    _audit.Registered(user.Email);
     return CreateAuthenticatedResponse(user);
   }
 
@@ -86,16 +90,19 @@ public class AuthService : IAuthService
 
     if (user is null)
     {
+      _audit.LoginFailed(email);
       return null;
     }
 
     if (!user.HasPassword || string.IsNullOrWhiteSpace(user.PasswordHash))
     {
+      _audit.LoginFailed(email);
       return null;
     }
 
     if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
     {
+      _audit.LoginFailed(email);
       return null;
     }
 
@@ -165,6 +172,7 @@ public class AuthService : IAuthService
     ClearTwoFactorChallenge(user);
 
     await _userRepository.UpdateAsync(user);
+    _audit.TwoFactorVerified(user.Id);
     return CreateAuthenticatedResponse(user);
   }
 
@@ -212,6 +220,7 @@ public class AuthService : IAuthService
     user.PasswordResetExpiresAt = null;
     ClearTwoFactorChallenge(user);
     await _userRepository.UpdateAsync(user);
+    _audit.PasswordReset(user.Email);
   }
 
   public async Task SetPasswordAsync(int userId, SetPasswordRequest request)
@@ -260,6 +269,7 @@ public class AuthService : IAuthService
     ClearTwoFactorChallenge(user);
 
     await _userRepository.UpdateAsync(user);
+    _audit.PasswordChanged(userId);
   }
 
   public async Task SendEnableTwoFactorCodeAsync(int userId)
@@ -290,6 +300,7 @@ public class AuthService : IAuthService
     ClearTwoFactorChallenge(user);
 
     await _userRepository.UpdateAsync(user);
+    _audit.TwoFactorEnabled(userId);
   }
 
   public async Task SendDisableTwoFactorCodeAsync(int userId)
@@ -320,6 +331,7 @@ public class AuthService : IAuthService
     ClearTwoFactorChallenge(user);
 
     await _userRepository.UpdateAsync(user);
+    _audit.TwoFactorDisabled(userId);
   }
 
   public async Task LinkWithGithubAsync(int userId, GithubAuthRequest request)
@@ -371,6 +383,7 @@ public class AuthService : IAuthService
       ProviderUserId = providerUserId,
       ProviderEmail = normalizedEmail,
     });
+    _audit.OAuthProviderLinked(userId, provider);
   }
 
 
@@ -485,6 +498,7 @@ public class AuthService : IAuthService
     var user = await _userRepository.GetByIdAsync(userId)
       ?? throw new ArgumentException("User not found.");
 
+    _audit.RefreshTokenRotated(userId);
     return CreateAuthenticatedResponse(user);
   }
 
@@ -492,9 +506,11 @@ public class AuthService : IAuthService
   {
     if (!user.IsTwoFactorEnabled)
     {
+      _audit.LoginSucceeded(user.Email);
       return CreateAuthenticatedResponse(user);
     }
 
+    _audit.LoginRequiresTwoFactor(user.Email);
     return await CreateTwoFactorChallengeAsync(user, TwoFactorLoginPurpose);
   }
 
@@ -665,7 +681,8 @@ public class AuthService : IAuthService
 
   private (string Token, DateTime ExpiresAt) GenerateJwtToken(User user)
   {
-    var key = _configuration["JwtSettings:Key"] ?? "";
+    var key = _configuration["JwtSettings:Key"]
+      ?? throw new InvalidOperationException("JwtSettings:Key is not configured.");
     var issuer = _configuration["JwtSettings:Issuer"];
     var audience = _configuration["JwtSettings:Audience"];
     var expirationMinutes = _configuration.GetValue<int>("JwtSettings:AccessTokenMinutes");

@@ -3,6 +3,7 @@ using Favigon.Infrastructure.Context;
 using Favigon.Infrastructure.External.Assets;
 using Favigon.Infrastructure.External.Email;
 using Favigon.Infrastructure.External.OAuth;
+using Favigon.Infrastructure.Logging;
 using Favigon.Infrastructure.Repositories;
 using Favigon.Infrastructure.Seeding;
 using Microsoft.EntityFrameworkCore;
@@ -25,6 +26,7 @@ public static class ServiceCollectionExtensions
     services.AddScoped<ProjectAssetStorage>();
     services.AddScoped<IProjectAssetStorage>(sp => sp.GetRequiredService<ProjectAssetStorage>());
     services.AddScoped<IUserProfileImageStorage>(sp => sp.GetRequiredService<ProjectAssetStorage>());
+    services.AddScoped<IAuditLogger, AuditLogger>();
 
     services.AddHttpClient<IGithubOAuthClient, GithubOAuthClient>(client =>
     {

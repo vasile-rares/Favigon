@@ -19,6 +19,7 @@ public class AuthServiceTwoFactorTests
   private readonly Mock<IGithubOAuthClient> _github = new();
   private readonly Mock<IGoogleOAuthClient> _google = new();
   private readonly Mock<IEmailSender> _email = new();
+  private readonly Mock<IAuditLogger> _audit = new();
   private readonly AuthService _sut;
 
   public AuthServiceTwoFactorTests()
@@ -35,7 +36,8 @@ public class AuthServiceTwoFactorTests
       _google.Object,
       _email.Object,
       mapper,
-      TestConfiguration.Build());
+      TestConfiguration.Build(),
+      _audit.Object);
   }
 
   [Fact]
