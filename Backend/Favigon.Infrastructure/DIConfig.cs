@@ -1,5 +1,6 @@
 ﻿using Favigon.Application.Interfaces;
 using Favigon.Infrastructure.Context;
+using Favigon.Infrastructure.External.AI;
 using Favigon.Infrastructure.External.Assets;
 using Favigon.Infrastructure.External.Email;
 using Favigon.Infrastructure.External.OAuth;
@@ -36,6 +37,8 @@ public static class ServiceCollectionExtensions
 
     services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
     services.AddScoped<IEmailSender, SmtpEmailSender>();
+
+    services.AddHttpClient<IAiClient, GeminiClient>();
 
     return services;
   }

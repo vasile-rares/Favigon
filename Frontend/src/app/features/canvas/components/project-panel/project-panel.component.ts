@@ -1,14 +1,26 @@
 import {
   Component,
+  ElementRef,
   HostBinding,
   HostListener,
   OnDestroy,
   OnInit,
   effect,
+  inject,
   input,
   output,
+  signal,
+  viewChild,
 } from '@angular/core';
-import { CanvasElement, CanvasElementType, CanvasPageModel } from '@app/core';
+import { FormsModule } from '@angular/forms';
+import {
+  AiChatMessage,
+  AiDesignService,
+  CanvasElement,
+  CanvasElementType,
+  CanvasPageModel,
+  IRNode,
+} from '@app/core';
 import { ContextMenuComponent, ToggleGroupComponent } from '@app/shared';
 import type { ContextMenuItem, ToggleGroupOption } from '@app/shared';
 import { DeviceFramePreset, VIEWPORT_PRESET_OPTIONS } from '../../canvas.types';
@@ -53,7 +65,7 @@ const DEVICE_FRAME_PRESET_OPTIONS = VIEWPORT_PRESET_OPTIONS.filter(
 @Component({
   selector: 'app-project-panel',
   standalone: true,
-  imports: [ContextMenuComponent, ToggleGroupComponent],
+  imports: [ContextMenuComponent, ToggleGroupComponent, FormsModule],
   templateUrl: './project-panel.component.html',
   styleUrl: './project-panel.component.css',
 })
@@ -71,10 +83,13 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   readonly elements = input<CanvasElement[]>([]);
   readonly selectedElementId = input<string | null>(null);
   readonly selectedElementIds = input<string[]>([]);
+  readonly currentIr = input<IRNode | null>(null);
+  readonly viewportWidth = input(1280);
 
   // ── Outputs ───────────────────────────────────────────────
 
   readonly panelWidthChanged = output<number>();
+  readonly designApplied = output<IRNode>();
   readonly pageSelected = output<string>();
   readonly pageLayerSelected = output<string>();
   readonly pageCreateRequested = output<void>();
@@ -98,6 +113,15 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     x: number;
     y: number;
   }>();
+
+  // ── AI Chat State ─────────────────────────────────────────
+
+  private readonly aiDesignService = inject(AiDesignService);
+  private readonly aiMessagesContainer = viewChild<ElementRef<HTMLElement>>('aiMessagesContainer');
+
+  readonly aiMessages = signal<AiChatMessage[]>([]);
+  readonly aiUserInput = signal('');
+  readonly aiIsLoading = signal(false);
 
   // ── Private State ─────────────────────────────────────────
 
@@ -170,6 +194,15 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
       this.elements(); // track elements changes
       this.rebuildLayerEntriesByPage();
     });
+
+    effect(() => {
+      this.aiMessagesContainer();
+      this.aiMessages();
+      queueMicrotask(() => {
+        const el = this.aiMessagesContainer()?.nativeElement;
+        if (el) el.scrollTop = el.scrollHeight;
+      });
+    });
   }
 
   ngOnInit(): void {
@@ -189,6 +222,100 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
       this.activeTab = value;
       this.closePageMenu();
     }
+  }
+
+  // ── AI Chat ───────────────────────────────────────────────
+
+  private aiStreamAbort: AbortController | null = null;
+
+  sendAiMessage(): void {
+    const prompt = this.aiUserInput().trim();
+    if (!prompt || this.aiIsLoading()) return;
+
+    const existingIr = this.currentIr() ?? undefined;
+
+    this.aiMessages.update((msgs) => [
+      ...msgs,
+      { role: 'user', content: prompt, timestamp: Date.now() },
+    ]);
+    this.aiUserInput.set('');
+    this.aiIsLoading.set(true);
+
+    // Add a streaming assistant message
+    const streamingMsg: AiChatMessage = {
+      role: 'assistant',
+      content: '',
+      isStreaming: true,
+      timestamp: Date.now(),
+    };
+    this.aiMessages.update((msgs) => [...msgs, streamingMsg]);
+
+    this.aiStreamAbort = new AbortController();
+    const request = { prompt, existingIr, viewportWidth: this.viewportWidth() };
+
+    this.aiDesignService.generateDesignStream(
+      request,
+      {
+        onChunk: (text) => {
+          this.aiMessages.update((msgs) => {
+            const updated = [...msgs];
+            const last = updated[updated.length - 1];
+            if (last?.isStreaming) {
+              updated[updated.length - 1] = { ...last, content: last.content + text };
+            }
+            return updated;
+          });
+        },
+        onResult: (response) => {
+          if (response.success && response.ir) {
+            this.aiMessages.update((msgs) => {
+              const updated = [...msgs];
+              const last = updated[updated.length - 1];
+              if (last?.isStreaming) {
+                updated[updated.length - 1] = {
+                  ...last,
+                  content: 'Design ready. Click Apply to load it on the canvas.',
+                  ir: response.ir,
+                  isStreaming: false,
+                };
+              }
+              return updated;
+            });
+          }
+        },
+        onError: (message) => {
+          this.aiMessages.update((msgs) => {
+            const updated = [...msgs];
+            const last = updated[updated.length - 1];
+            if (last?.isStreaming) {
+              updated[updated.length - 1] = {
+                ...last,
+                content: message,
+                error: true,
+                isStreaming: false,
+              };
+            }
+            return updated;
+          });
+        },
+        onDone: () => {
+          this.aiIsLoading.set(false);
+          this.aiStreamAbort = null;
+        },
+      },
+      this.aiStreamAbort.signal,
+    );
+  }
+
+  onAiKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      this.sendAiMessage();
+    }
+  }
+
+  clearAiChat(): void {
+    this.aiMessages.set([]);
   }
 
   @HostListener('window:pointermove', ['$event'])

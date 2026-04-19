@@ -12,6 +12,7 @@ import {
   hasPerSideStrokeWidths,
   getStrokeWidth,
 } from '../../utils/element/canvas-element-normalization.util';
+import { getTextFontSizeInPx } from '../../utils/element/canvas-text.util';
 import { roundToTwoDecimals } from '../../utils/canvas-math.util';
 import { Bounds, FlowDragRenderState, CanvasPageLayout } from '../../canvas.types';
 import { parsePixiCssColor, parseShadowParams } from '../../utils/pixi/canvas-pixi-shadow.util';
@@ -348,7 +349,7 @@ export class CanvasPixiRendererService {
 
       const style = new TextStyle({
         fontFamily: element.fontFamily || 'Inter',
-        fontSize: element.fontSize || 16,
+        fontSize: getTextFontSizeInPx(element),
         fontWeight: (element.fontWeight?.toString() as any) || '400',
         fontStyle: element.fontStyle || 'normal',
         fill: element.fill || '#000000',
@@ -409,10 +410,11 @@ export class CanvasPixiRendererService {
     container.alpha = element.opacity ?? 1;
 
     // Overflow (clip children for containers)
-    // Containers clip children for clipping overflow modes and allow spill for visible.
+    // Default overflow is 'clip' (matches the UI default of element.overflow ?? 'clip').
     const shouldClip =
       this.elService.isContainerElement(element) &&
-      (element.overflow === 'clip' ||
+      (element.overflow == null ||
+        element.overflow === 'clip' ||
         element.overflow === 'hidden' ||
         element.overflow === 'scroll');
     if (shouldClip) {
@@ -1166,7 +1168,7 @@ export class CanvasPixiRendererService {
   // ── Line Height Resolution ────────────────────────────────
 
   private resolveLineHeight(element: CanvasElement): number {
-    const fontSize = element.fontSize || 16;
+    const fontSize = getTextFontSizeInPx(element);
     const lh = element.lineHeight ?? 1.2;
     const unit = element.lineHeightUnit || 'em';
     return unit === 'em' ? lh * fontSize : lh;
@@ -1200,6 +1202,7 @@ export class CanvasPixiRendererService {
       skewY: el.skewY,
       text: el.text,
       fontSize: el.fontSize,
+      fontSizeUnit: el.fontSizeUnit,
       fontFamily: el.fontFamily,
       fontWeight: el.fontWeight,
       fontStyle: el.fontStyle,

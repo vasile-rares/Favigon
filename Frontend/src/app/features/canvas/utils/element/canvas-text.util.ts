@@ -35,6 +35,14 @@ export function getTextAlignValue(element: CanvasElement): string {
   return element.textAlign ?? 'center';
 }
 
+/** Returns font size always in px (converts rem → px using the 16px root). */
+export function getTextFontSizeInPx(element: CanvasElement): number {
+  const value = Number.isFinite(element.fontSize ?? Number.NaN)
+    ? (element.fontSize as number)
+    : DEFAULT_TEXT_FONT_SIZE;
+  return element.fontSizeUnit === 'rem' ? value * ROOT_FONT_SIZE_PX : value;
+}
+
 export function getFrameTitle(element: CanvasElement): string {
   const name = element.name?.trim() || 'Frame';
   const primary = element.isPrimary ? ' · Primary' : '';

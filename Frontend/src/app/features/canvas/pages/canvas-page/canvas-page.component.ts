@@ -24,6 +24,7 @@ import {
   ProjectService,
 } from '@app/core';
 import { buildCanvasIR, buildCanvasIRPages } from '../../mappers/canvas-to-ir.mapper';
+import { buildCanvasElementsFromIR } from '../../mappers/ir-to-canvas.mapper';
 import {
   buildCanvasProjectDocument,
   buildPersistedCanvasDesign,
@@ -1223,6 +1224,23 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   // ── Zoom Toolbar Delegates ────────────────────────────────
+
+  onAiDesignApplied(ir: IRNode): void {
+    const newElements = buildCanvasElementsFromIR(ir);
+    if (newElements.length === 0) return;
+
+    // Remap IDs to guarantee uniqueness
+    const idMap = new Map(newElements.map((el) => [el.id, crypto.randomUUID()]));
+    const remapped = newElements.map((el) => ({
+      ...el,
+      id: idMap.get(el.id) ?? crypto.randomUUID(),
+      parentId: el.parentId ? (idMap.get(el.parentId) ?? el.parentId) : el.parentId,
+    }));
+
+    this.runWithHistory(() => {
+      this.editorState.updateCurrentPageElements(() => remapped);
+    });
+  }
 
   zoomIn(): void {
     this.viewport.zoomIn(this.getCanvasElement());

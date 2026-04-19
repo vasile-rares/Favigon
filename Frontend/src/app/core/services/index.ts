@@ -1,3 +1,4 @@
+export { AiDesignService } from './ai-design.service';
 export { AuthService } from './auth.service';
 export { ConverterService } from './converter.service';
 export { CurrentUserService } from './current-user.service';

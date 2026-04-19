@@ -412,6 +412,20 @@ export class CanvasElementService {
       const widthConstraint = this.getTextMeasurementWidthConstraint(element, elements, page);
       const measured = this.measureTextContentSize(element, widthConstraint);
       resolvedPixels = axis === 'width' ? measured.width : measured.height;
+    } else if (
+      (element.type === 'rectangle' || element.type === 'frame') &&
+      mode === 'fit-content'
+    ) {
+      const children = elements.filter((c) => c.parentId === element.id);
+      if (children.length > 0) {
+        let maxExtent = 0;
+        for (const child of children) {
+          const childPos = axis === 'width' ? child.x : child.y;
+          const childSize = axis === 'width' ? child.width : child.height;
+          maxExtent = Math.max(maxExtent, childPos + childSize);
+        }
+        resolvedPixels = Math.max(maxExtent, 1);
+      }
     } else if (mode !== 'fixed' && mode !== 'fit-content') {
       if (mode === 'viewport' && !page) {
         resolvedPixels = fallbackPixels;

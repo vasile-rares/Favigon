@@ -73,7 +73,12 @@ export function supportsCanvasSizeMode(
         element.position !== 'fixed'
       );
     case 'fit-content':
-      return element.type === 'text' || element.type === 'image';
+      return (
+        element.type === 'text' ||
+        element.type === 'image' ||
+        element.type === 'rectangle' ||
+        element.type === 'frame'
+      );
     case 'viewport':
       return !parent;
     case 'fit-image':

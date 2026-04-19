@@ -45,6 +45,8 @@
 
       <app-dt-dimensions-section
         [element]="element"
+        [pages]="pages()"
+        [currentPageId]="currentPageId()"
         (elementPatch)="elementPatch.emit($event)"
         (numberInputGestureStarted)="numberInputGestureStarted.emit()"
         (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-dimensions-section>

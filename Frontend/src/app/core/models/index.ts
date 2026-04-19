@@ -64,6 +64,8 @@ export type {
   MultiPageConverterResponse,
 } from './converter.models';
 
+export type { AiDesignRequest, AiDesignResponse, AiChatMessage } from './ai-design.models';
+
 export type {
   IRNode,
   IRLayout,

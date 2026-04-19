@@ -753,7 +753,8 @@ export class CanvasGestureService {
       ? this.element.findElementById(state.containerId, elements)
       : null;
     const containerBounds = targetContainer
-      ? this.element.getAbsoluteBounds(targetContainer, elements, this.editorState.currentPage())
+      ? (this.getLiveElementCanvasBounds(targetContainer) ??
+        this.element.getAbsoluteBounds(targetContainer, elements, this.editorState.currentPage()))
       : null;
 
     this.runWithHistory(() => {
@@ -1670,18 +1671,12 @@ export class CanvasGestureService {
         ? null
         : (preferredContainer ?? this.resolveInsertionContainer(pointer, requiredSize));
     const resolvedContainerBounds = resolvedContainer
-      ? targetContainer && resolvedContainer.id === targetContainer.id
-        ? (containerBounds ??
-          this.element.getAbsoluteBounds(
-            resolvedContainer,
-            this.editorState.elements(),
-            this.editorState.currentPage(),
-          ))
-        : this.element.getAbsoluteBounds(
-            resolvedContainer,
-            this.editorState.elements(),
-            this.editorState.currentPage(),
-          )
+      ? (this.getLiveElementCanvasBounds(resolvedContainer) ??
+        this.element.getAbsoluteBounds(
+          resolvedContainer,
+          this.editorState.elements(),
+          this.editorState.currentPage(),
+        ))
       : null;
 
     const result = this.element.createElementAtPoint(
@@ -2672,7 +2667,11 @@ export class CanvasGestureService {
         return false;
       }
 
-      const bounds = this.element.getAbsoluteBounds(el, elements, this.editorState.currentPage());
+      // Use live (Yoga-computed) bounds so that flow children of layout containers
+      // are hit-tested at their actual rendered position, not their stale stored x/y.
+      const bounds =
+        this.getLiveElementCanvasBounds(el) ??
+        this.element.getAbsoluteBounds(el, elements, this.editorState.currentPage());
       return (
         pointer.x >= bounds.x &&
         pointer.x <= bounds.x + bounds.width &&
@@ -2683,13 +2682,46 @@ export class CanvasGestureService {
     });
 
     if (hoveredContainers.length > 0) {
-      return this.getSmallestContainer(hoveredContainers);
+      // Prefer the deepest container in the tree (most specific descendant).
+      // This handles fill-sized children where area == parent area.
+      return this.getDeepestSmallestContainer(hoveredContainers, elements);
     }
 
     const selectedContainer = this.element.getSelectedContainer(this.editorState.selectedElement());
     return selectedContainer && this.canContainerFitSize(selectedContainer, requiredSize)
       ? selectedContainer
       : null;
+  }
+
+  private getContainerDepth(el: CanvasElement, elements: CanvasElement[]): number {
+    let depth = 0;
+    let parentId = el.parentId;
+    while (parentId) {
+      depth++;
+      parentId = elements.find((e) => e.id === parentId)?.parentId ?? null;
+    }
+    return depth;
+  }
+
+  private getDeepestSmallestContainer(
+    containers: CanvasElement[],
+    elements: CanvasElement[],
+  ): CanvasElement | null {
+    if (containers.length === 0) return null;
+    return containers.reduce((best, candidate) => {
+      const bestDepth = this.getContainerDepth(best, elements);
+      const candidateDepth = this.getContainerDepth(candidate, elements);
+      if (candidateDepth !== bestDepth) {
+        return candidateDepth > bestDepth ? candidate : best;
+      }
+      const bestArea =
+        this.element.getRenderedWidth(best, elements, this.editorState.currentPage()) *
+        this.element.getRenderedHeight(best, elements, this.editorState.currentPage());
+      const candidateArea =
+        this.element.getRenderedWidth(candidate, elements, this.editorState.currentPage()) *
+        this.element.getRenderedHeight(candidate, elements, this.editorState.currentPage());
+      return candidateArea < bestArea ? candidate : best;
+    });
   }
 
   resolveInsertionContainerForBounds(

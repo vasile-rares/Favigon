@@ -136,8 +136,9 @@ export class CanvasPixiLayoutService {
       rootNode.setPadding(Edge.Left, container.padding.left);
     }
 
-    // Overflow
+    // Overflow — default is 'clip' (matches UI default)
     if (
+      container.overflow == null ||
       container.overflow === 'clip' ||
       container.overflow === 'hidden' ||
       container.overflow === 'scroll'

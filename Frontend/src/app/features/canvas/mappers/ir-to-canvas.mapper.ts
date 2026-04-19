@@ -1,19 +1,27 @@
 import {
+  CanvasAlignItems,
   CanvasBorderSides,
   CanvasBorderWidths,
   CanvasCornerRadii,
+  CanvasDisplayMode,
   CanvasEffect,
   CanvasEffectTrigger,
   CanvasElement,
+  CanvasFlexDirection,
+  CanvasFlexWrap,
   CanvasFontSizeUnit,
+  CanvasJustifyContent,
   CanvasLinkType,
+  CanvasPositionMode,
   CanvasSizeMode,
+  CanvasSpacing,
   CanvasTextSpacingUnit,
   IRBorder,
   IRLayout,
   IRLength,
   IRNode,
   IRShadow,
+  IRSpacing,
   IRStyle,
 } from '@app/core';
 import {
@@ -62,6 +70,12 @@ export function buildCanvasElementsFromIR(root: IRNode | null | undefined): Canv
   }
 
   const flattened: CanvasElement[] = [];
+
+  // Include the root Frame as a canvas element with no parent (it IS the artboard)
+  const rootElement = mapIRNodeToCanvasElement(root);
+  rootElement.parentId = null;
+  flattened.push(rootElement);
+
   for (const child of root.children) {
     flattenIRNode(child, root.id, flattened);
   }
@@ -74,8 +88,8 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
   const defaults = mappedType === 'text' ? DEFAULT_ELEMENT_SIZE.text : DEFAULT_ELEMENT_SIZE.generic;
   const linkType = readLinkTypeFromProps(node.props);
   const importedTag = readOptionalStringProp(node.props, 'tag');
-  const importedWidthMode = readSizeModeFromProps(node.props, 'widthMode');
-  const importedHeightMode = readSizeModeFromProps(node.props, 'heightMode');
+  const importedWidthMode = readSizeModeFromProps(node.props, 'widthMode', node.style?.width);
+  const importedHeightMode = readSizeModeFromProps(node.props, 'heightMode', node.style?.height);
   const importedAriaLabel =
     mappedType === 'image'
       ? (readOptionalStringProp(node.props, 'alt') ??
@@ -114,7 +128,13 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     maxWidthSizingValue: readImportedConstraintValue(node.style?.maxWidth),
     height:
       importedHeightMode === 'fixed'
-        ? readLength(node.style?.height, defaults.height)
+        ? readLength(
+            node.style?.height,
+            readLength(
+              node.style?.minHeight?.unit === 'px' ? node.style?.minHeight : undefined,
+              defaults.height,
+            ),
+          )
         : defaults.height,
     heightMode: importedHeightMode === 'fixed' ? undefined : importedHeightMode,
     heightSizingValue: readImportedSizeValue(node.style?.height, importedHeightMode),
@@ -154,7 +174,10 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
       ? normalizeCanvasAccessibilityLabel(importedAriaLabel)
       : undefined,
     shadow: readShadow(node.style?.shadows),
-    text: mappedType === 'text' ? readStringProp(node.props, 'content', 'New text') : undefined,
+    text:
+      mappedType === 'text'
+        ? readStringPropAny(node.props, ['content', 'text'], 'New text')
+        : undefined,
     fontSize: mappedType === 'text' ? readLength(node.style?.fontSize, 16) : undefined,
     fontSizeUnit:
       mappedType === 'text'
@@ -186,6 +209,19 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     tag: normalizeStoredCanvasTag(mappedType, importedTag, linkType !== undefined),
     ariaLabel: normalizeCanvasAccessibilityLabel(importedAriaLabel),
     cursor: (readOptionalStringStyle(node.style, 'cursor') as CanvasElement['cursor']) ?? undefined,
+    display: mappedType !== 'text' ? readDisplayMode(node.layout) : undefined,
+    flexDirection: mappedType !== 'text' ? readFlexDirection(node.layout?.direction) : undefined,
+    flexWrap: mappedType !== 'text' ? readFlexWrap(node.layout?.wrap) : undefined,
+    justifyContent: mappedType !== 'text' ? readJustifyContent(node.layout?.justify) : undefined,
+    alignItems: mappedType !== 'text' ? readAlignItems(node.layout?.align) : undefined,
+    gap: mappedType !== 'text' ? readLength(node.layout?.gap, 0) || undefined : undefined,
+    gapX: mappedType !== 'text' ? readLength(node.layout?.columnGap, 0) || undefined : undefined,
+    gapY: mappedType !== 'text' ? readLength(node.layout?.rowGap, 0) || undefined : undefined,
+    gridTemplateColumns: mappedType !== 'text' ? node.layout?.gridTemplateColumns : undefined,
+    gridTemplateRows: mappedType !== 'text' ? node.layout?.gridTemplateRows : undefined,
+    padding: readSpacing(node.style?.padding),
+    margin: readSpacing(node.style?.margin),
+    position: readPositionMode(node.position?.mode),
     effects: readNodeEffects(node),
     ...transformFields,
     irMeta: {
@@ -297,6 +333,7 @@ function readImportedConstraintValue(len: IRLength | undefined): number | undefi
 function readSizeModeFromProps(
   props: Record<string, unknown> | undefined,
   key: 'widthMode' | 'heightMode',
+  styleLength?: IRLength,
 ): CanvasSizeMode {
   const value = props?.[key];
   if (
@@ -307,6 +344,16 @@ function readSizeModeFromProps(
     value === 'fit-image'
   ) {
     return value;
+  }
+
+  // Auto-derive from style unit when not explicitly set in props (e.g. AI-generated IR)
+  if (!value && styleLength) {
+    if (styleLength.unit === '%') {
+      return styleLength.value === 100 ? 'fill' : 'relative';
+    }
+    if (styleLength.unit === 'vw' || styleLength.unit === 'vh') {
+      return 'viewport';
+    }
   }
 
   return 'fixed';
@@ -479,20 +526,82 @@ function readTextAlign(
     : fallback;
 }
 
+function normEnum(value: unknown): string {
+  return typeof value === 'string' ? value.toLowerCase() : '';
+}
+
+function readDisplayMode(layout: IRLayout | undefined): CanvasDisplayMode | undefined {
+  const v = normEnum(layout?.mode);
+  if (v === 'flex') return 'flex';
+  if (v === 'grid') return 'grid';
+  if (v === 'block') return 'block';
+  return undefined;
+}
+
+function readFlexDirection(dir: unknown): CanvasFlexDirection | undefined {
+  const v = normEnum(dir);
+  if (v === 'row') return 'row';
+  if (v === 'column') return 'column';
+  if (v === 'rowreverse') return 'row-reverse';
+  if (v === 'columnreverse') return 'column-reverse';
+  return undefined;
+}
+
+function readFlexWrap(wrap: boolean | undefined): CanvasFlexWrap | undefined {
+  if (wrap === undefined) return undefined;
+  return wrap ? 'wrap' : 'nowrap';
+}
+
+function readJustifyContent(jc: unknown): CanvasJustifyContent | undefined {
+  const v = normEnum(jc);
+  if (v === 'start') return 'flex-start';
+  if (v === 'end') return 'flex-end';
+  if (v === 'center') return 'center';
+  if (v === 'spacebetween') return 'space-between';
+  if (v === 'spacearound') return 'space-around';
+  if (v === 'spaceevenly') return 'space-evenly';
+  return undefined;
+}
+
+function readAlignItems(ai: unknown): CanvasAlignItems | undefined {
+  const v = normEnum(ai);
+  if (v === 'start') return 'flex-start';
+  if (v === 'end') return 'flex-end';
+  if (v === 'center') return 'center';
+  if (v === 'stretch') return 'stretch';
+  if (v === 'baseline') return 'baseline';
+  return undefined;
+}
+
+function readPositionMode(mode: unknown): CanvasPositionMode | undefined {
+  const v = normEnum(mode);
+  if (v === 'relative' || v === 'flow') return 'relative'; // 'flow' = normal flow = relative in canvas
+  if (v === 'absolute') return 'absolute';
+  if (v === 'fixed') return 'fixed';
+  if (v === 'sticky') return 'sticky';
+  if (v === 'static') return 'static';
+  return undefined;
+}
+
+function readSpacing(spacing: IRSpacing | undefined): CanvasSpacing | undefined {
+  if (!spacing) return undefined;
+  const top = readLength(spacing.top, 0);
+  const right = readLength(spacing.right, 0);
+  const bottom = readLength(spacing.bottom, 0);
+  const left = readLength(spacing.left, 0);
+  if (top === 0 && right === 0 && bottom === 0 && left === 0) return undefined;
+  return { top, right, bottom, left };
+}
+
 function readTextVerticalAlignFromLayout(
   layout: IRLayout | undefined,
   fallback: 'top' | 'middle' | 'bottom',
 ): 'top' | 'middle' | 'bottom' {
-  switch (layout?.align) {
-    case 'Start':
-      return 'top';
-    case 'Center':
-      return 'middle';
-    case 'End':
-      return 'bottom';
-    default:
-      return fallback;
-  }
+  const v = normEnum(layout?.align);
+  if (v === 'start') return 'top';
+  if (v === 'center') return 'middle';
+  if (v === 'end') return 'bottom';
+  return fallback;
 }
 
 function readTextVerticalAlignFromProps(
@@ -537,6 +646,18 @@ function readStringProp(
 ): string {
   const value = props?.[key];
   return typeof value === 'string' ? value : fallback;
+}
+
+function readStringPropAny(
+  props: Record<string, unknown> | undefined,
+  keys: string[],
+  fallback: string,
+): string {
+  for (const key of keys) {
+    const value = props?.[key];
+    if (typeof value === 'string') return value;
+  }
+  return fallback;
 }
 
 function readOptionalStringProp(

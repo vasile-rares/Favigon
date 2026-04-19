@@ -261,11 +261,77 @@
 
 } @else {
 
-      <section class="project-section project-section--placeholder">
-        <p class="project-section-title">AI Chat</p>
-        <p class="project-placeholder-text">This tab is reserved for the future AI-assisted UI generation chat.</p>
-        <p class="project-placeholder-text project-placeholder-text--muted">When the integration is ready, you will be able to prompt the assistant here and generate UI directly from the canvas workflow.</p>
-      </section>
+      <div class="ai-chat">
+
+        <div class="ai-chat__messages" #aiMessagesContainer>
+          @if (aiMessages().length === 0) {
+            <div class="ai-chat__empty">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="ai-chat__empty-icon">
+                <path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4Z"/>
+                <path d="M9 12h6"/>
+                <path d="M12 12v9"/>
+                <path d="m7.5 17.5 1-1"/>
+                <path d="m15.5 17.5 1-1"/>
+                <path d="M6 21h12"/>
+              </svg>
+              <p>Describe what you want to design or modify.</p>
+              <span class="ai-chat__hint">e.g. "Hero section with a title, subtitle and CTA button"</span>
+            </div>
+          }
+
+          @for (msg of aiMessages(); track msg.timestamp) {
+            <div class="ai-chat__message"
+              [class.ai-chat__message--user]="msg.role === 'user'"
+              [class.ai-chat__message--assistant]="msg.role === 'assistant'"
+              [class.ai-chat__message--error]="msg.error"
+              [class.ai-chat__message--streaming]="msg.isStreaming">
+              @if (msg.isStreaming && !msg.content) {
+                <span class="ai-chat__loading-dots">
+                  <span></span><span></span><span></span>
+                </span>
+              } @else {
+                <span class="ai-chat__message-text">{{ msg.content }}</span>
+              }
+              @if (msg.ir) {
+                <button class="ai-chat__apply-btn" (click)="designApplied.emit(msg.ir)" title="Apply this design to canvas">
+                  Apply to canvas
+                </button>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="ai-chat__footer">
+          <div class="ai-chat__input-row">
+            <textarea
+              class="ai-chat__input"
+              rows="2"
+              placeholder="Describe your design..."
+              [ngModel]="aiUserInput()"
+              (ngModelChange)="aiUserInput.set($event)"
+              (keydown)="onAiKeyDown($event)"
+              [disabled]="aiIsLoading()"></textarea>
+            <button
+              class="ai-chat__send-btn"
+              [disabled]="!aiUserInput().trim() || aiIsLoading()"
+              (click)="sendAiMessage()"
+              title="Send">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m22 2-7 20-4-9-9-4Z"/>
+                <path d="M22 2 11 13"/>
+              </svg>
+            </button>
+          </div>
+          <button class="ai-chat__clear-btn" (click)="clearAiChat()" title="Clear chat">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18"/>
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+            </svg>
+            Clear chat
+          </button>
+        </div>
+      </div>
 
 }
 
