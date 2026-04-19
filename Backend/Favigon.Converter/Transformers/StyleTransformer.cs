@@ -16,11 +16,11 @@ public static class StyleTransformer
     if (style.BackgroundPosition is not null) css["background-position"] = style.BackgroundPosition;
     if (style.BackgroundRepeat is not null) css["background-repeat"] = style.BackgroundRepeat;
     if (style.ObjectFit is not null) css["object-fit"] = style.ObjectFit;
-    if (style.Transform is not null) css["transform"] = style.Transform;
-    if (style.TransformOrigin is not null) css["transform-origin"] = style.TransformOrigin;
+    if (style.Transform is not null) { css["-webkit-transform"] = style.Transform; css["transform"] = style.Transform; }
+    if (style.TransformOrigin is not null) { css["-webkit-transform-origin"] = style.TransformOrigin; css["transform-origin"] = style.TransformOrigin; }
     if (style.BackfaceVisibility is not null)
-      css["backface-visibility"] = style.BackfaceVisibility;
-    if (style.TransformStyle is not null) css["transform-style"] = style.TransformStyle;
+    { css["-webkit-backface-visibility"] = style.BackfaceVisibility; css["backface-visibility"] = style.BackfaceVisibility; }
+    if (style.TransformStyle is not null) { css["-webkit-transform-style"] = style.TransformStyle; css["transform-style"] = style.TransformStyle; }
     if (style.Border is not null) ApplyBorder(css, style.Border);
 
     if (style.BorderRadius is { Value: not 0 }) css["border-radius"] = style.BorderRadius.ToString();

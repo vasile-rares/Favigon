@@ -440,8 +440,11 @@ public sealed class ConverterEngine : IConverterEngine
     IReadOnlyDictionary<string, IComponentMapper> frameworkMappers)
   {
     if (!frameworkMappers.TryGetValue(node.Type, out var mapper))
-      throw new InvalidOperationException(
-          $"No mapper registered for component type '{node.Type}' in framework '{framework}'.");
+    {
+      // Unknown type: fall back to Container mapper to avoid crashing on future node types
+      if (!frameworkMappers.TryGetValue("Container", out mapper))
+        return $"{ctx.Indent}<!-- unknown type: {node.Type} -->\n";
+    }
 
     return mapper.Emit(node, ctx);
   }

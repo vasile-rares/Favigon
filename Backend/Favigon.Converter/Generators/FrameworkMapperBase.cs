@@ -82,9 +82,11 @@ public abstract class FrameworkMapperBase : IComponentMapper
         if (stateTransforms.TryGetValue(pseudoClass, out var transforms) && transforms.Count > 0)
         {
           var stateTransform = string.Join(' ', transforms);
-          pseudoProps["transform"] = cssProps.TryGetValue("transform", out var baseTransform) && !string.IsNullOrWhiteSpace(baseTransform)
+          var combinedTransform = cssProps.TryGetValue("transform", out var baseTransform) && !string.IsNullOrWhiteSpace(baseTransform)
             ? $"{baseTransform} {stateTransform}".Trim()
             : stateTransform;
+          pseudoProps["-webkit-transform"] = combinedTransform;
+          pseudoProps["transform"] = combinedTransform;
         }
 
         if (pseudoProps.Count == 0)
@@ -96,6 +98,7 @@ public abstract class FrameworkMapperBase : IComponentMapper
         {
           var transitionDelay = transitionSource.Delay > 0 ? $" {transitionSource.Delay}ms" : string.Empty;
           cssProps["transition"] = $"all {transitionSource.Duration}ms {transitionSource.Easing}{transitionDelay}";
+          cssProps["-webkit-transition"] = cssProps["transition"];
         }
       }
 
@@ -111,13 +114,15 @@ public abstract class FrameworkMapperBase : IComponentMapper
         };
 
         if (pseudoClass is not null)
-          ctx.Styles.AddPseudo(cssClasses.TargetClass, pseudoClass, new Dictionary<string, string> { ["animation"] = combined });
+          ctx.Styles.AddPseudo(cssClasses.TargetClass, pseudoClass, new Dictionary<string, string> { ["-webkit-animation"] = combined, ["animation"] = combined });
         else
+        {
+          cssProps["-webkit-animation"] = combined;
           cssProps["animation"] = combined;
+        }
       }
     }
     ctx.Styles.AddBase(cssClasses.TargetClass, cssProps);
-    ctx.Styles.AddVariants(cssClasses.TargetClass, node.Variants);
 
     var sb = new StringBuilder();
     var previousContext = CurrentContext.Value;
@@ -209,42 +214,14 @@ public abstract class FrameworkMapperBase : IComponentMapper
     return sb.ToString();
   }
 
-  protected static string GetProp(IRNode node, string key, string defaultValue = "")
-  {
-    if (!node.Props.TryGetValue(key, out var val)) return defaultValue;
-    return val switch
-    {
-      null => defaultValue,
-      JsonElement je => je.ValueKind == JsonValueKind.String
-        ? je.GetString() ?? defaultValue
-        : je.ToString(),
-      _ => val.ToString() ?? defaultValue
-    };
-  }
+  protected static string GetProp(IRNode node, string key, string defaultValue = "") =>
+    IrProps.GetString(node, key, defaultValue);
 
-  protected static bool GetBoolProp(IRNode node, string key, bool defaultValue = false)
-  {
-    if (!node.Props.TryGetValue(key, out var val)) return defaultValue;
-    return val switch
-    {
-      null => defaultValue,
-      JsonElement je => je.ValueKind == JsonValueKind.True,
-      bool b => b,
-      _ => bool.TryParse(val?.ToString(), out var parsed) ? parsed : defaultValue
-    };
-  }
+  protected static bool GetBoolProp(IRNode node, string key, bool defaultValue = false) =>
+    IrProps.GetBool(node, key, defaultValue);
 
-  protected static int GetIntProp(IRNode node, string key, int defaultValue = 0)
-  {
-    if (!node.Props.TryGetValue(key, out var val)) return defaultValue;
-    return val switch
-    {
-      null => defaultValue,
-      JsonElement je => je.TryGetInt32(out var i) ? i : defaultValue,
-      int i => i,
-      _ => int.TryParse(val?.ToString(), out var parsed) ? parsed : defaultValue
-    };
-  }
+  protected static int GetIntProp(IRNode node, string key, int defaultValue = 0) =>
+    IrProps.GetInt(node, key, defaultValue);
 
   protected static string AppendAriaLabel(IRNode node, string attrs)
   {
@@ -254,23 +231,31 @@ public abstract class FrameworkMapperBase : IComponentMapper
       : $"{attrs} aria-label=\"{ariaLabel}\"";
   }
 
-  protected static string ResolveTag(IRNode node, string defaultTag, params string[] allowedTags)
+  protected static string ResolveTag(IRNode node, string defaultTag, params string[] allowedTags) =>
+    IrProps.ResolveTag(node, defaultTag, allowedTags);
+
+  protected static string FocusAttr(IRNode node)
   {
-    var requestedTag = GetProp(node, "tag");
-    if (string.IsNullOrWhiteSpace(requestedTag))
+    if (node.Effects is null or { Count: 0 }) return string.Empty;
+    foreach (var effect in node.Effects)
     {
-      return defaultTag;
+      if (string.Equals(effect.Trigger, "focus", StringComparison.OrdinalIgnoreCase))
+        return " tabindex=\"0\"";
     }
+    return string.Empty;
+  }
 
-    foreach (var allowedTag in allowedTags)
+  protected string BuildLinkAttrs(IRNode node, string href)
+  {
+    var attrs = NodeClass(node) + $" href=\"{href}\"";
+    var target = GetProp(node, "target");
+    if (!string.IsNullOrEmpty(target))
     {
-      if (string.Equals(allowedTag, requestedTag, StringComparison.OrdinalIgnoreCase))
-      {
-        return allowedTag;
-      }
+      attrs += $" target=\"{target}\"";
+      if (target == "_blank")
+        attrs += " rel=\"noopener noreferrer\"";
     }
-
-    return defaultTag;
+    return AppendAriaLabel(node, attrs);
   }
 
   protected static string SelfClosing(string tag, string attrs, string indent) =>

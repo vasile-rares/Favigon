@@ -63,18 +63,18 @@ public static class ExportDebugMapBuilder
   {
     return node.Type switch
     {
-      "Text" => !string.IsNullOrWhiteSpace(ReadStringProp(node, "href"))
+      "Text" => !string.IsNullOrWhiteSpace(IrProps.GetString(node, "href"))
         ? "a"
-        : ResolveTag(node, ReadBoolProp(node, "inline") ? "span" : "p", "div", "p", "span", "label"),
-      "Heading" => $"h{Math.Clamp(ReadIntProp(node, "level", 2), 1, 6)}",
+        : IrProps.ResolveTag(node, IrProps.GetBool(node, "inline") ? "span" : "p", "div", "p", "span", "label"),
+      "Heading" => $"h{Math.Clamp(IrProps.GetInt(node, "level", 2), 1, 6)}",
       "Link" => "a",
       "Card" => "div",
-      "Image" => !string.IsNullOrWhiteSpace(ReadStringProp(node, "href")) ? "a" : "img",
+      "Image" => !string.IsNullOrWhiteSpace(IrProps.GetString(node, "href")) ? "a" : "img",
       "Icon" => "span",
       "Badge" => "span",
-      "Avatar" => !string.IsNullOrWhiteSpace(ReadStringProp(node, "src")) ? "img" : "span",
+      "Avatar" => !string.IsNullOrWhiteSpace(IrProps.GetString(node, "src")) ? "img" : "span",
       "Table" => "table",
-      "List" => ReadBoolProp(node, "ordered") ? "ol" : "ul",
+      "List" => IrProps.GetBool(node, "ordered") ? "ol" : "ul",
       "Button" => "button",
       "Input" => "input",
       "Textarea" => "textarea",
@@ -87,13 +87,13 @@ public static class ExportDebugMapBuilder
       "Row" => "div",
       "Column" => "div",
       "Grid" => "div",
-      "Container" => !string.IsNullOrWhiteSpace(ReadStringProp(node, "href"))
+      "Container" => !string.IsNullOrWhiteSpace(IrProps.GetString(node, "href"))
         ? "a"
-        : ResolveTag(node, "div", "div", "section", "article", "aside", "main", "header", "footer", "nav"),
-      "Frame" => !string.IsNullOrWhiteSpace(ReadStringProp(node, "href"))
+        : IrProps.ResolveTag(node, "div", "div", "section", "article", "aside", "main", "header", "footer", "nav"),
+      "Frame" => !string.IsNullOrWhiteSpace(IrProps.GetString(node, "href"))
         ? "a"
-        : ResolveTag(node, "div", "div", "section", "article", "aside", "main", "header", "footer", "nav"),
-      "Divider" => string.Equals(ReadStringProp(node, "orientation", "horizontal"), "vertical", StringComparison.OrdinalIgnoreCase)
+        : IrProps.ResolveTag(node, "div", "div", "section", "article", "aside", "main", "header", "footer", "nav"),
+      "Divider" => string.Equals(IrProps.GetString(node, "orientation", "horizontal"), "vertical", StringComparison.OrdinalIgnoreCase)
         ? "div"
         : "hr",
       "Navbar" => "nav",
@@ -106,64 +106,6 @@ public static class ExportDebugMapBuilder
       "Breadcrumb" => "nav",
       "Pagination" => "nav",
       _ => "div"
-    };
-  }
-
-  private static string ResolveTag(IRNode node, string defaultTag, params string[] allowedTags)
-  {
-    var requestedTag = ReadStringProp(node, "tag");
-    if (string.IsNullOrWhiteSpace(requestedTag))
-      return defaultTag;
-
-    foreach (var allowedTag in allowedTags)
-    {
-      if (string.Equals(allowedTag, requestedTag, StringComparison.OrdinalIgnoreCase))
-        return allowedTag;
-    }
-
-    return defaultTag;
-  }
-
-  private static string ReadStringProp(IRNode node, string key, string defaultValue = "")
-  {
-    if (!node.Props.TryGetValue(key, out var value))
-      return defaultValue;
-
-    return value switch
-    {
-      null => defaultValue,
-      JsonElement jsonElement => jsonElement.ValueKind == JsonValueKind.String
-        ? jsonElement.GetString() ?? defaultValue
-        : jsonElement.ToString(),
-      _ => value.ToString() ?? defaultValue
-    };
-  }
-
-  private static bool ReadBoolProp(IRNode node, string key, bool defaultValue = false)
-  {
-    if (!node.Props.TryGetValue(key, out var value))
-      return defaultValue;
-
-    return value switch
-    {
-      null => defaultValue,
-      JsonElement jsonElement => jsonElement.ValueKind == JsonValueKind.True,
-      bool boolValue => boolValue,
-      _ => bool.TryParse(value.ToString(), out var parsed) ? parsed : defaultValue
-    };
-  }
-
-  private static int ReadIntProp(IRNode node, string key, int defaultValue = 0)
-  {
-    if (!node.Props.TryGetValue(key, out var value))
-      return defaultValue;
-
-    return value switch
-    {
-      null => defaultValue,
-      JsonElement jsonElement => jsonElement.TryGetInt32(out var intValue) ? intValue : defaultValue,
-      int intValue => intValue,
-      _ => int.TryParse(value.ToString(), out var parsed) ? parsed : defaultValue
     };
   }
 }

@@ -8,7 +8,7 @@ public abstract class AngularMapperBase : FrameworkMapperBase
 {
     protected override string ClassAttributeName => "class";
 
-    protected string BuildLinkAttrs(IRNode node, string href)
+    protected new string BuildLinkAttrs(IRNode node, string href)
     {
         var attrs = NodeClass(node);
         attrs += href.StartsWith('/') || href.StartsWith('#')
