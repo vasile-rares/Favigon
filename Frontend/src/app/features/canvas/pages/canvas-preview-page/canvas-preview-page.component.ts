@@ -125,12 +125,9 @@ export class CanvasPreviewPage {
     const elements = page?.elements ?? [];
     const rootFrames = elements.filter((el) => el.type === 'frame' && !el.parentId);
     for (const frame of rootFrames) {
-      const w = Math.round(
-        frame.width + (frame.padding ? frame.padding.left + frame.padding.right : 0),
-      );
-      const h = Math.round(
-        frame.height + (frame.padding ? frame.padding.top + frame.padding.bottom : 0),
-      );
+      // frame.width is already border-box (content + padding)
+      const w = Math.round(frame.width);
+      const h = Math.round(frame.height);
       options.push({ label: frame.name || `Frame ${w}×${h}`, width: w, height: h });
     }
 

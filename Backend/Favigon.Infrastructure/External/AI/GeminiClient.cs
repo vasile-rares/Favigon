@@ -40,9 +40,11 @@ public class GeminiClient : IAiClient
   public async Task<string> ChatCompletionAsync(
       string systemPrompt,
       string userMessage,
+      string? modelOverride = null,
       CancellationToken ct = default)
   {
-    var url = $"v1beta/models/{_model}:generateContent?key={_apiKey}";
+    var model = ResolveModel(modelOverride);
+    var url = $"v1beta/models/{model}:generateContent?key={_apiKey}";
     var payload = BuildRequest(systemPrompt, userMessage);
 
     for (var attempt = 0; attempt <= MaxRetries; attempt++)
@@ -80,9 +82,11 @@ public class GeminiClient : IAiClient
   public async IAsyncEnumerable<string> StreamChatCompletionAsync(
       string systemPrompt,
       string userMessage,
+      string? modelOverride = null,
       [EnumeratorCancellation] CancellationToken ct = default)
   {
-    var url = $"v1beta/models/{_model}:streamGenerateContent?alt=sse&key={_apiKey}";
+    var model = ResolveModel(modelOverride);
+    var url = $"v1beta/models/{model}:streamGenerateContent?alt=sse&key={_apiKey}";
     var payload = BuildRequest(systemPrompt, userMessage);
 
     var json = JsonSerializer.Serialize(payload, JsonOptions);
@@ -148,6 +152,9 @@ public class GeminiClient : IAiClient
         yield return delta;
     }
   }
+
+  private string ResolveModel(string? modelOverride) =>
+      string.IsNullOrWhiteSpace(modelOverride) ? _model : modelOverride;
 
   private static GeminiRequest BuildRequest(string systemPrompt, string userMessage) =>
       new()

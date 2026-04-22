@@ -5,10 +5,40 @@ namespace Favigon.Converter.Utils;
 
 public static class ExportDebugMapBuilder
 {
-  private static readonly JsonSerializerOptions JsonOptions = new()
-  {
-    WriteIndented = true
-  };
+  private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+  // Lookup table for simple type → tag mappings (types with no conditional logic)
+  private static readonly IReadOnlyDictionary<string, string> SimpleTagMap =
+    new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+      ["Heading"]    = "h2",   // level-specific: handled in ResolveHtmlTag
+      ["Link"]       = "a",
+      ["Card"]       = "div",
+      ["Icon"]       = "span",
+      ["Badge"]      = "span",
+      ["Table"]      = "table",
+      ["Button"]     = "button",
+      ["Input"]      = "input",
+      ["Textarea"]   = "textarea",
+      ["Select"]     = "select",
+      ["Checkbox"]   = "label",
+      ["Radio"]      = "label",
+      ["Toggle"]     = "label",
+      ["Form"]       = "form",
+      ["Stack"]      = "div",
+      ["Row"]        = "div",
+      ["Column"]     = "div",
+      ["Grid"]       = "div",
+      ["Navbar"]     = "nav",
+      ["Sidebar"]    = "aside",
+      ["Modal"]      = "dialog",
+      ["Drawer"]     = "div",
+      ["Tooltip"]    = "div",
+      ["Tabs"]       = "div",
+      ["Accordion"]  = "details",
+      ["Breadcrumb"] = "nav",
+      ["Pagination"] = "nav",
+    };
 
   public static string Build(
     string pageName,
@@ -35,7 +65,7 @@ public static class ExportDebugMapBuilder
   {
     var cssClasses = cssClassMap.TryGetValue(node.Id, out var resolvedClasses)
       ? resolvedClasses
-      : new NodeCssClasses(CssClassNameResolver.GetSemanticSeed(node), CssClassNameResolver.GetSemanticSeed(node));
+      : new NodeCssClasses(CssClassNameResolver.GetBaseClassName(node), CssClassNameResolver.GetBaseClassName(node));
 
     return new
     {
@@ -61,51 +91,39 @@ public static class ExportDebugMapBuilder
 
   private static string ResolveHtmlTag(IRNode node)
   {
-    return node.Type switch
+    // Types with conditional logic
+    switch (node.Type)
     {
-      "Text" => !string.IsNullOrWhiteSpace(IrProps.GetString(node, "href"))
-        ? "a"
-        : IrProps.ResolveTag(node, IrProps.GetBool(node, "inline") ? "span" : "p", "div", "p", "span", "label"),
-      "Heading" => $"h{Math.Clamp(IrProps.GetInt(node, "level", 2), 1, 6)}",
-      "Link" => "a",
-      "Card" => "div",
-      "Image" => !string.IsNullOrWhiteSpace(IrProps.GetString(node, "href")) ? "a" : "img",
-      "Icon" => "span",
-      "Badge" => "span",
-      "Avatar" => !string.IsNullOrWhiteSpace(IrProps.GetString(node, "src")) ? "img" : "span",
-      "Table" => "table",
-      "List" => IrProps.GetBool(node, "ordered") ? "ol" : "ul",
-      "Button" => "button",
-      "Input" => "input",
-      "Textarea" => "textarea",
-      "Select" => "select",
-      "Checkbox" => "label",
-      "Radio" => "label",
-      "Toggle" => "label",
-      "Form" => "form",
-      "Stack" => "div",
-      "Row" => "div",
-      "Column" => "div",
-      "Grid" => "div",
-      "Container" => !string.IsNullOrWhiteSpace(IrProps.GetString(node, "href"))
-        ? "a"
-        : IrProps.ResolveTag(node, "div", "div", "section", "article", "aside", "main", "header", "footer", "nav"),
-      "Frame" => !string.IsNullOrWhiteSpace(IrProps.GetString(node, "href"))
-        ? "a"
-        : IrProps.ResolveTag(node, "div", "div", "section", "article", "aside", "main", "header", "footer", "nav"),
-      "Divider" => string.Equals(IrProps.GetString(node, "orientation", "horizontal"), "vertical", StringComparison.OrdinalIgnoreCase)
-        ? "div"
-        : "hr",
-      "Navbar" => "nav",
-      "Sidebar" => "aside",
-      "Modal" => "dialog",
-      "Drawer" => "div",
-      "Tooltip" => "div",
-      "Tabs" => "div",
-      "Accordion" => "details",
-      "Breadcrumb" => "nav",
-      "Pagination" => "nav",
-      _ => "div"
-    };
+      case "Text":
+        return !string.IsNullOrWhiteSpace(IrProps.GetString(node, "href"))
+          ? "a"
+          : IrProps.ResolveTag(node, IrProps.GetBool(node, "inline") ? "span" : "p", "div", "p", "span", "label");
+
+      case "Heading":
+        return $"h{Math.Clamp(IrProps.GetInt(node, "level", 2), 1, 6)}";
+
+      case "Image":
+        return !string.IsNullOrWhiteSpace(IrProps.GetString(node, "href")) ? "a" : "img";
+
+      case "Avatar":
+        return !string.IsNullOrWhiteSpace(IrProps.GetString(node, "src")) ? "img" : "span";
+
+      case "List":
+        return IrProps.GetBool(node, "ordered") ? "ol" : "ul";
+
+      case "Divider":
+        return string.Equals(IrProps.GetString(node, "orientation", "horizontal"), "vertical", StringComparison.OrdinalIgnoreCase)
+          ? "div"
+          : "hr";
+
+      case "Container":
+      case "Frame":
+        return !string.IsNullOrWhiteSpace(IrProps.GetString(node, "href"))
+          ? "a"
+          : IrProps.ResolveTag(node, "div", "div", "section", "article", "aside", "main", "header", "footer", "nav");
+    }
+
+    // Simple lookup for all other types
+    return SimpleTagMap.TryGetValue(node.Type, out var tag) ? tag : "div";
   }
 }

@@ -46,6 +46,7 @@ export type {
   CanvasFlexWrap,
   CanvasJustifyContent,
   CanvasAlignItems,
+  CanvasBlendMode,
   CanvasSpacing,
   CanvasCornerRadii,
   CanvasBorderSides,

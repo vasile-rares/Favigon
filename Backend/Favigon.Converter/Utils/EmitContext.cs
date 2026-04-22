@@ -16,7 +16,7 @@ public sealed class EmitContext
         if (CssClassMap.TryGetValue(node.Id, out var classes))
             return classes;
 
-        var fallback = CssClassNameResolver.GetSemanticSeed(node);
+        var fallback = CssClassNameResolver.GetBaseClassName(node);
         return new NodeCssClasses(fallback, fallback);
     }
 

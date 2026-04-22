@@ -38,7 +38,7 @@ public static class ServiceCollectionExtensions
     services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
     services.AddScoped<IEmailSender, SmtpEmailSender>();
 
-    services.AddHttpClient<IAiClient, GeminiClient>();
+    services.AddHttpClient<IAiClient, GitHubModelsClient>();
 
     return services;
   }
@@ -49,6 +49,7 @@ public static class ServiceCollectionExtensions
     var dbContext = scope.ServiceProvider.GetRequiredService<FavigonDbContext>();
     await dbContext.Database.MigrateAsync();
     await UserSeeder.SeedAsync(dbContext);
+    await ProjectSeeder.SeedAsync(dbContext);
   }
 
 }

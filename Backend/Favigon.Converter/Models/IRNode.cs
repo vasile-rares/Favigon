@@ -1,4 +1,6 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace Favigon.Converter.Models;
 
@@ -129,6 +131,8 @@ public class IRStyle
 
   public double? Opacity { get; set; }
 
+  public string? MixBlendMode { get; set; }
+
   public string? Cursor { get; set; }
 
   public IRSpacing? Padding { get; set; }
@@ -176,12 +180,114 @@ public class IRBorder
   public bool? Left { get; set; }
 }
 
+[JsonConverter(typeof(IRLengthConverter))]
 public class IRLength
 {
   public double Value { get; set; }
   public string Unit { get; set; } = "px";
 
-  public override string ToString() => $"{Value}{Unit}";
+  // CSS keyword values that have no numeric component.
+  internal static readonly HashSet<string> CssKeywordUnits =
+    new(StringComparer.OrdinalIgnoreCase) { "fit-content", "auto", "max-content", "min-content" };
+
+  public override string ToString() =>
+    CssKeywordUnits.Contains(Unit) ? Unit : $"{Value}{Unit}";
+}
+
+/// <summary>
+/// Tolerant deserializer for IRLength.
+/// Handles three AI-generated formats:
+///   1. { "value": 16, "unit": "px" }   — correct
+///   2. { "value": "16px", "unit": "px" } — value is a string
+///   3. "16px"  — entire length is a plain CSS string
+/// </summary>
+internal sealed class IRLengthConverter : JsonConverter<IRLength>
+{
+  private static readonly Regex CssLengthRegex = new(
+      @"^(-?\d*\.?\d+)(px|%|rem|em|vw|vh)$",
+      RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+  public override IRLength Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+  {
+    // Format 3: plain CSS string e.g. "16px"
+    if (reader.TokenType == JsonTokenType.String)
+    {
+      return ParseCssString(reader.GetString() ?? "0px");
+    }
+
+    if (reader.TokenType != JsonTokenType.StartObject)
+      throw new JsonException($"Expected object or string for IRLength, got {reader.TokenType}.");
+
+    double value = 0;
+    string unit = "px";
+
+    while (reader.Read() && reader.TokenType != JsonTokenType.EndObject)
+    {
+      if (reader.TokenType != JsonTokenType.PropertyName) continue;
+      var propName = reader.GetString();
+      reader.Read();
+
+      if (string.Equals(propName, "value", StringComparison.OrdinalIgnoreCase))
+      {
+        if (reader.TokenType == JsonTokenType.Number)
+        {
+          value = reader.GetDouble();
+        }
+        else if (reader.TokenType == JsonTokenType.String)
+        {
+          // Format 2: "value" is a string — parse as CSS or bare number
+          var raw = reader.GetString() ?? "0";
+          var parsed = ParseCssString(raw);
+          value = parsed.Value;
+          unit = parsed.Unit;
+        }
+      }
+      else if (string.Equals(propName, "unit", StringComparison.OrdinalIgnoreCase))
+      {
+        if (reader.TokenType == JsonTokenType.String)
+          unit = reader.GetString() ?? "px";
+      }
+      else
+      {
+        reader.Skip();
+      }
+    }
+
+    return new IRLength { Value = value, Unit = unit };
+  }
+
+  public override void Write(Utf8JsonWriter writer, IRLength value, JsonSerializerOptions options)
+  {
+    writer.WriteStartObject();
+    writer.WriteNumber("value", value.Value);
+    writer.WriteString("unit", value.Unit);
+    writer.WriteEndObject();
+  }
+
+  private static IRLength ParseCssString(string raw)
+  {
+    raw = raw.Trim();
+
+    // CSS keyword with no numeric component (e.g. "fit-content", "auto")
+    if (IRLength.CssKeywordUnits.Contains(raw))
+      return new IRLength { Value = 0, Unit = raw.ToLowerInvariant() };
+
+    var match = CssLengthRegex.Match(raw);
+    if (match.Success && double.TryParse(match.Groups[1].Value, System.Globalization.NumberStyles.Any,
+        System.Globalization.CultureInfo.InvariantCulture, out var num))
+    {
+      return new IRLength { Value = num, Unit = match.Groups[2].Value.ToLowerInvariant() };
+    }
+
+    // Bare number string e.g. "16"
+    if (double.TryParse(raw, System.Globalization.NumberStyles.Any,
+        System.Globalization.CultureInfo.InvariantCulture, out var bare))
+    {
+      return new IRLength { Value = bare, Unit = "px" };
+    }
+
+    return new IRLength { Value = 0, Unit = "px" };
+  }
 }
 
 public class IRVariant

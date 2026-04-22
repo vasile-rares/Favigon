@@ -122,6 +122,16 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   readonly aiMessages = signal<AiChatMessage[]>([]);
   readonly aiUserInput = signal('');
   readonly aiIsLoading = signal(false);
+  readonly aiSelectedModel = signal('gpt-4o');
+  readonly aiModelDropdownOpen = signal(false);
+
+  readonly AI_MODELS: readonly { id: string; label: string }[] = [
+    { id: 'gpt-4o',                       label: 'GPT-4o' },
+    { id: 'gpt-4o-mini',                  label: 'GPT-4o mini' },
+    { id: 'o4-mini',                      label: 'o4-mini' },
+    { id: 'claude-3.7-sonnet',            label: 'Claude 3.7 Sonnet' },
+    { id: 'meta-llama-3.1-405b-instruct', label: 'Llama 3.1 405B' },
+  ];
 
   // ── Private State ─────────────────────────────────────────
 
@@ -251,7 +261,7 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     this.aiMessages.update((msgs) => [...msgs, streamingMsg]);
 
     this.aiStreamAbort = new AbortController();
-    const request = { prompt, existingIr, viewportWidth: this.viewportWidth() };
+    const request = { prompt, existingIr, viewportWidth: this.viewportWidth(), model: this.aiSelectedModel() };
 
     this.aiDesignService.generateDesignStream(
       request,
@@ -268,14 +278,14 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
         },
         onResult: (response) => {
           if (response.success && response.ir) {
+            this.designApplied.emit(response.ir);
             this.aiMessages.update((msgs) => {
               const updated = [...msgs];
               const last = updated[updated.length - 1];
               if (last?.isStreaming) {
                 updated[updated.length - 1] = {
                   ...last,
-                  content: 'Design ready. Click Apply to load it on the canvas.',
-                  ir: response.ir,
+                  content: 'Design applied to canvas.',
                   isStreaming: false,
                 };
               }
@@ -316,6 +326,17 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
 
   clearAiChat(): void {
     this.aiMessages.set([]);
+  }
+
+  getModelLabel(modelId: string): string {
+    return this.AI_MODELS.find((m) => m.id === modelId)?.label ?? modelId;
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.aiModelDropdownOpen()) {
+      this.aiModelDropdownOpen.set(false);
+    }
   }
 
   @HostListener('window:pointermove', ['$event'])

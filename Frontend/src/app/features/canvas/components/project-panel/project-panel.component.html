@@ -266,15 +266,11 @@
         <div class="ai-chat__messages" #aiMessagesContainer>
           @if (aiMessages().length === 0) {
             <div class="ai-chat__empty">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="ai-chat__empty-icon">
-                <path d="M12 2a4 4 0 0 1 4 4v1a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4Z"/>
-                <path d="M9 12h6"/>
-                <path d="M12 12v9"/>
-                <path d="m7.5 17.5 1-1"/>
-                <path d="m15.5 17.5 1-1"/>
-                <path d="M6 21h12"/>
+              <div class="ai-chat__empty-glow" aria-hidden="true"></div>
+              <svg class="ai-chat__empty-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
               </svg>
-              <p>Describe what you want to design or modify.</p>
+              <p class="ai-chat__empty-title">What do you want to design?</p>
               <span class="ai-chat__hint">e.g. "Hero section with a title, subtitle and CTA button"</span>
             </div>
           }
@@ -286,50 +282,77 @@
               [class.ai-chat__message--error]="msg.error"
               [class.ai-chat__message--streaming]="msg.isStreaming">
               @if (msg.isStreaming && !msg.content) {
-                <span class="ai-chat__loading-dots">
+                <span class="ai-chat__loading-dots" aria-label="Thinking">
                   <span></span><span></span><span></span>
                 </span>
               } @else {
                 <span class="ai-chat__message-text">{{ msg.content }}</span>
               }
-              @if (msg.ir) {
-                <button class="ai-chat__apply-btn" (click)="designApplied.emit(msg.ir)" title="Apply this design to canvas">
-                  Apply to canvas
-                </button>
-              }
+
             </div>
           }
         </div>
 
         <div class="ai-chat__footer">
-          <div class="ai-chat__input-row">
+          <div class="ai-chat__input-wrap" [class.is-disabled]="aiIsLoading()">
             <textarea
               class="ai-chat__input"
               rows="2"
-              placeholder="Describe your design..."
+              placeholder="Describe your design…"
               [ngModel]="aiUserInput()"
               (ngModelChange)="aiUserInput.set($event)"
               (keydown)="onAiKeyDown($event)"
               [disabled]="aiIsLoading()"></textarea>
-            <button
-              class="ai-chat__send-btn"
-              [disabled]="!aiUserInput().trim() || aiIsLoading()"
-              (click)="sendAiMessage()"
-              title="Send">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m22 2-7 20-4-9-9-4Z"/>
-                <path d="M22 2 11 13"/>
-              </svg>
-            </button>
+            <div class="ai-chat__input-toolbar">
+              <div class="ai-chat__model-picker">
+                <button
+                  class="ai-chat__model-trigger"
+                  [disabled]="aiIsLoading()"
+                  (click)="$event.stopPropagation(); aiModelDropdownOpen.set(!aiModelDropdownOpen())"
+                  [class.is-open]="aiModelDropdownOpen()">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/>
+                  </svg>
+                  {{ getModelLabel(aiSelectedModel()) }}
+                  <svg class="ai-chat__model-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+                @if (aiModelDropdownOpen()) {
+                  <div class="ai-chat__model-dropdown">
+                    @for (m of AI_MODELS; track m.id) {
+                      <button
+                        class="ai-chat__model-option"
+                        [class.is-active]="aiSelectedModel() === m.id"
+                        (click)="aiSelectedModel.set(m.id); aiModelDropdownOpen.set(false)">
+                        {{ m.label }}
+                        @if (aiSelectedModel() === m.id) {
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                        }
+                      </button>
+                    }
+                  </div>
+                }
+              </div>
+              <button
+                class="ai-chat__send-btn"
+                [disabled]="!aiUserInput().trim() || aiIsLoading()"
+                (click)="sendAiMessage()"
+                title="Send (Enter)">
+                @if (aiIsLoading()) {
+                  <svg class="ai-chat__send-spinner" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true">
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                  </svg>
+                } @else {
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z"/>
+                  </svg>
+                }
+              </button>
+            </div>
           </div>
-          <button class="ai-chat__clear-btn" (click)="clearAiChat()" title="Clear chat">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 6h18"/>
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
-            </svg>
-            Clear chat
-          </button>
         </div>
       </div>
 

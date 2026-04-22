@@ -59,11 +59,12 @@
 }
 
 .properties-panel-content {
+  --properties-panel-content-gap: 0.6rem;
   min-height: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: var(--properties-panel-content-gap);
   overflow-y: auto;
 
   scrollbar-width: none;

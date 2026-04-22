@@ -19,6 +19,7 @@ import {
   IRNode,
   IRNodeType,
   IRPosition,
+  IRShadow,
   IRSpacing,
   IRStyle,
   JustifyContent,
@@ -48,7 +49,6 @@ import {
 } from '../utils/element/canvas-sizing.util';
 import {
   normalizeCanvasShadowValue,
-  resolveEditableCanvasShadow,
 } from '../utils/element/canvas-shadow.util';
 import { resolveCanvasEffect } from '../utils/element/canvas-effect.util';
 import { collectFrameSubtree, syncBreakpointElements } from './canvas-breakpoint.mapper';
@@ -281,6 +281,11 @@ function buildNodePosition(element: CanvasElement, parent?: CanvasElement): IRPo
   const parentBorderTopWidth = resolveCanvasBorderSideWidth(parent, 'top');
 
   if (!element.position) {
+    // If the parent is a layout container (flex/block/grid), this child is in-flow —
+    // use Flow mode (no position/left/top) so the converter emits proper CSS flow layout.
+    if (parent?.display) {
+      return { mode: 'Flow' };
+    }
     return {
       mode: 'Absolute',
       left: px(element.x - parentBorderLeftWidth),
@@ -407,23 +412,17 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     style.opacity = element.opacity;
   }
 
+  if (element.blendMode && element.blendMode !== 'normal') {
+    style.mixBlendMode = element.blendMode;
+  }
+
   if (element.type === 'frame' || element.type === 'rectangle') {
     style.overflow = mapCanvasOverflowToIr(element.overflow ?? 'clip');
   }
 
   const shadowStr = normalizeCanvasShadowValue(element.shadow);
   if (shadowStr) {
-    const parsed = resolveEditableCanvasShadow(shadowStr);
-    style.shadows = [
-      {
-        inset: parsed.position === 'inside',
-        x: parsed.x,
-        y: parsed.y,
-        blur: parsed.blur,
-        spread: parsed.spread,
-        color: parsed.color,
-      },
-    ];
+    style.shadows = parseAllCanvasShadowLayers(shadowStr);
   }
 
   if (typeof element.cornerRadius === 'number') {
@@ -504,11 +503,15 @@ function applyNodeDimensionStyle(
   const sizingValue = getCanvasSizingValue(element, axis);
 
   if (mode === 'fit-content') {
+    style[axis] = { value: 0, unit: 'fit-content' };
     return;
   }
 
   if (mode === 'fixed' || mode === 'fit-image') {
-    style[axis] = px(axis === 'width' ? element.width : element.height);
+    // Canvas stores border-box (content + padding); CSS border-box also includes stroke.
+    // Add only the stroke/border width for the CSS value.
+    const base = axis === 'width' ? element.width : element.height;
+    style[axis] = px(base + getBorderBoxAdjustment(element, axis));
     return;
   }
 
@@ -541,7 +544,9 @@ function applyNodeConstraintStyle(
     return;
   }
 
-  style[field] = px(pixels as number);
+  // Fixed constraints are border-box (content + padding) on canvas; add stroke for CSS.
+  const axis: 'width' | 'height' = field.toLowerCase().includes('width') ? 'width' : 'height';
+  style[field] = px((pixels as number) + getBorderBoxAdjustment(element, axis));
 }
 
 function buildNodeProps(element: CanvasElement, primitiveType: string): Record<string, unknown> {
@@ -557,7 +562,6 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
 
   if (element.type === 'text') {
     props['content'] = element.text ?? '';
-    props['textVerticalAlign'] = element.textVerticalAlign ?? 'middle';
   }
 
   if (element.type === 'image') {
@@ -570,14 +574,6 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
 
   if (typeof element.name === 'string') {
     props['name'] = element.name;
-  }
-
-  if (element.widthMode && element.widthMode !== 'fixed') {
-    props['widthMode'] = element.widthMode;
-  }
-
-  if (element.heightMode && element.heightMode !== 'fixed') {
-    props['heightMode'] = element.heightMode;
   }
 
   if (tag) {
@@ -789,6 +785,22 @@ function resolveCanvasBorderSideWidth(
     : DEFAULT_STROKE_WIDTH;
 }
 
+/**
+ * Returns the stroke/border width total for an axis.
+ * Canvas stores border-box (content + padding); CSS border-box also includes stroke.
+ * Only the stroke portion needs to be added for IR output.
+ */
+function getBorderBoxAdjustment(
+  element: CanvasElement,
+  axis: 'width' | 'height',
+): number {
+  return axis === 'width'
+    ? resolveCanvasBorderSideWidth(element, 'left') +
+      resolveCanvasBorderSideWidth(element, 'right')
+    : resolveCanvasBorderSideWidth(element, 'top') +
+      resolveCanvasBorderSideWidth(element, 'bottom');
+}
+
 function normalizeExternalLinkUrl(value: string | undefined): string | undefined {
   if (typeof value !== 'string') {
     return undefined;
@@ -809,4 +821,29 @@ function normalizeExternalLinkUrl(value: string | undefined): string | undefined
   }
 
   return `https://${normalized}`;
+}
+
+const SHADOW_LAYER_PATTERN =
+  /^(inset\s+)?(-?(?:\d+|\d*\.\d+))px\s+(-?(?:\d+|\d*\.\d+))px\s+((?:\d+|\d*\.\d+))px\s+(-?(?:\d+|\d*\.\d+))px\s+(.+)$/i;
+
+function parseAllCanvasShadowLayers(shadowStr: string): IRShadow[] {
+  const layers = shadowStr.split(/,(?![^(]*\))/).map((s) => s.trim());
+  const results: IRShadow[] = [];
+
+  for (const layer of layers) {
+    if (!layer) continue;
+    const match = SHADOW_LAYER_PATTERN.exec(layer);
+    if (!match) continue;
+
+    results.push({
+      inset: !!match[1],
+      x: parseFloat(match[2]),
+      y: parseFloat(match[3]),
+      blur: Math.max(0, parseFloat(match[4])),
+      spread: parseFloat(match[5]),
+      color: match[6].trim(),
+    });
+  }
+
+  return results;
 }

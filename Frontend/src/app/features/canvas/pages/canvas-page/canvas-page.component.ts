@@ -1237,6 +1237,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       parentId: el.parentId ? (idMap.get(el.parentId) ?? el.parentId) : el.parentId,
     }));
 
+    // Normalize every element so fill/relative sizes are resolved to pixels,
+    // sizing modes are validated, and text properties are sanitized.
+    // Must iterate in document order (parents before children) so parent sizes
+    // are already resolved when children run.
+    for (const el of remapped) {
+      mutateNormalizeElement(el, remapped);
+    }
+
     this.runWithHistory(() => {
       this.editorState.updateCurrentPageElements(() => remapped);
     });

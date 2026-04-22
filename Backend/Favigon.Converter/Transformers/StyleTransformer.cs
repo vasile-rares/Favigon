@@ -46,6 +46,8 @@ public static class StyleTransformer
 
     if (style.Opacity is not null && style.Opacity.Value != 1.0) css["opacity"] = style.Opacity.Value.ToString("G");
 
+    if (style.MixBlendMode is not null) css["mix-blend-mode"] = style.MixBlendMode;
+
     if (style.Cursor is not null) css["cursor"] = style.Cursor;
 
     if (style.Width is not null) css["width"] = style.Width.ToString();

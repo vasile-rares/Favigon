@@ -1,13 +1,15 @@
 /**
- * Parses a CSS box-shadow string into parameters suitable for PixiJS DropShadowFilter.
- * Handles single shadow values only (first layer of multi-shadow).
+ * Parses a CSS box-shadow string into parameters suitable for PixiJS rendering.
+ * Supports multiple shadow layers, inset, and spread.
  */
 export interface PixiShadowParams {
   x: number;
   y: number;
   blur: number;
+  spread: number;
   color: number;
   alpha: number;
+  inset: boolean;
 }
 
 export interface PixiColorParams {
@@ -21,26 +23,37 @@ const SHADOW_PATTERN =
 const RGBA_PATTERN = /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+))?\s*\)/i;
 
 export function parseShadowParams(shadow: string | undefined | null): PixiShadowParams | null {
-  if (!shadow || shadow === 'none') return null;
+  const all = parseAllShadowParams(shadow);
+  return all.length > 0 ? all[0] : null;
+}
 
-  // Take first shadow layer if multi-shadow
-  const firstLayer = shadow.split(/,(?![^(]*\))/).map((s) => s.trim())[0];
-  if (!firstLayer) return null;
+/**
+ * Parses ALL shadow layers from a CSS box-shadow string.
+ * Supports multi-shadow, inset, and spread.
+ */
+export function parseAllShadowParams(shadow: string | undefined | null): PixiShadowParams[] {
+  if (!shadow || shadow === 'none') return [];
 
-  const match = SHADOW_PATTERN.exec(firstLayer);
-  if (!match) return null;
+  const layers = shadow.split(/,(?![^(]*\))/).map((s) => s.trim());
+  const results: PixiShadowParams[] = [];
 
-  // Skip inset shadows (PixiJS DropShadowFilter is outer-only)
-  if (match[1]) return null;
+  for (const layer of layers) {
+    if (!layer) continue;
+    const match = SHADOW_PATTERN.exec(layer);
+    if (!match) continue;
 
-  const x = parseFloat(match[2]);
-  const y = parseFloat(match[3]);
-  const blur = parseFloat(match[4]);
-  const colorStr = match[6].trim();
+    const isInset = !!match[1];
+    const x = parseFloat(match[2]);
+    const y = parseFloat(match[3]);
+    const blur = parseFloat(match[4]);
+    const spread = parseFloat(match[5]);
+    const colorStr = match[6].trim();
+    const { color, alpha } = parsePixiCssColor(colorStr);
 
-  const { color, alpha } = parsePixiCssColor(colorStr);
+    results.push({ x, y, blur, spread, color, alpha, inset: isInset });
+  }
 
-  return { x, y, blur, color, alpha };
+  return results;
 }
 
 export function parsePixiCssColor(colorStr: string): PixiColorParams {

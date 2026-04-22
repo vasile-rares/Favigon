@@ -25,7 +25,7 @@ public static class CssClassNameResolver
 
     foreach (var node in nodes)
     {
-      var semanticSeed = GetSemanticSeed(node);
+      var semanticSeed = GetBaseClassName(node);
       counts[semanticSeed] = counts.GetValueOrDefault(semanticSeed) + 1;
     }
 
@@ -34,7 +34,7 @@ public static class CssClassNameResolver
 
     foreach (var node in nodes)
     {
-      var semanticSeed = GetSemanticSeed(node);
+      var semanticSeed = GetBaseClassName(node);
       if (counts[semanticSeed] <= 1)
       {
         map[node.Id] = new NodeCssClasses(semanticSeed, semanticSeed);
@@ -50,7 +50,7 @@ public static class CssClassNameResolver
     return map;
   }
 
-  public static string GetSemanticSeed(IRNode node)
+  public static string GetBaseClassName(IRNode node)
   {
     if (!string.IsNullOrWhiteSpace(node.Meta.Name))
       return SlugifyValue(node.Meta.Name);

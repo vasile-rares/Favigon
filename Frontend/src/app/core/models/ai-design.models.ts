@@ -4,6 +4,7 @@ export interface AiDesignRequest {
   prompt: string;
   existingIr?: IRNode;
   viewportWidth?: number;
+  model?: string;
 }
 
 export interface AiDesignResponse {

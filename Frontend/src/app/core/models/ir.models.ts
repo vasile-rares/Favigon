@@ -78,6 +78,8 @@ export interface IRStyle {
 
   opacity?: number;
 
+  mixBlendMode?: string;
+
   cursor?: string;
 
   padding?: IRSpacing;

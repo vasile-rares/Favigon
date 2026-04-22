@@ -224,9 +224,29 @@ function drawRect(
   }
 
   if (el.stroke && el.strokeWidth) {
+    const sw = el.strokeWidth * scale;
+    const style = el.strokeStyle?.toLowerCase() ?? 'solid';
     ctx.strokeStyle = el.stroke;
-    ctx.lineWidth = el.strokeWidth * scale;
+    ctx.lineWidth = sw;
+
+    if (style === 'dashed') {
+      ctx.setLineDash([Math.max(6, sw * 3), Math.max(4, sw * 2)]);
+    } else if (style === 'dotted') {
+      ctx.setLineDash([sw, sw * 1.5]);
+    } else if (style === 'double' && sw >= 3) {
+      const lineW = Math.max(1, sw / 3);
+      ctx.lineWidth = lineW;
+      ctx.stroke();
+      ctx.beginPath();
+      const inset = sw - lineW;
+      buildRoundedRectPath(ctx, x + inset, y + inset, w - inset * 2, h - inset * 2, getScaledCornerRadii(el, scale, w - inset * 2, h - inset * 2));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      return;
+    }
+
     ctx.stroke();
+    ctx.setLineDash([]);
   }
 }
 

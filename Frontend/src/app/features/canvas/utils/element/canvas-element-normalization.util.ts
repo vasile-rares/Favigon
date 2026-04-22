@@ -495,14 +495,12 @@ function getParentSizeReference(
     return null;
   }
 
-  const width = parent.width + ((parent.padding?.left ?? 0) + (parent.padding?.right ?? 0));
-  const height = parent.height + ((parent.padding?.top ?? 0) + (parent.padding?.bottom ?? 0));
-
+  // parent.width is already border-box (content + padding); no addition needed.
   if (isFlowLayoutChild(element, parent)) {
-    return { width, height, padding: parent.padding };
+    return { width: parent.width, height: parent.height, padding: parent.padding };
   }
 
-  return { width, height };
+  return { width: parent.width, height: parent.height };
 }
 
 function isFlowLayoutChild(

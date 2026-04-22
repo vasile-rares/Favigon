@@ -1,6 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { Container, Graphics, Text, TextStyle, Sprite, Assets, Texture } from 'pixi.js';
-import { DropShadowFilter } from 'pixi-filters';
+import { Container, Graphics, Text, TextStyle, Sprite, Assets, Texture, BlurFilter } from 'pixi.js';
 import { CanvasElement, CanvasCornerRadii, CanvasBorderWidths } from '@app/core';
 import { CanvasPixiApplicationService } from './canvas-pixi-application.service';
 import { CanvasPixiLayoutService, LayoutResult } from './canvas-pixi-layout.service';
@@ -15,11 +14,10 @@ import {
 import { getTextFontSizeInPx } from '../../utils/element/canvas-text.util';
 import { roundToTwoDecimals } from '../../utils/canvas-math.util';
 import { Bounds, FlowDragRenderState, CanvasPageLayout } from '../../canvas.types';
-import { parsePixiCssColor, parseShadowParams } from '../../utils/pixi/canvas-pixi-shadow.util';
+import { parsePixiCssColor, parseAllShadowParams, PixiShadowParams } from '../../utils/pixi/canvas-pixi-shadow.util';
 
 const MAX_TEXT_RENDER_RESOLUTION = 4;
-const MAX_SHADOW_FILTER_RESOLUTION = 4;
-const SHADOW_FILTER_QUALITY = 5;
+const MAX_SHADOW_BLUR_QUALITY = 4;
 
 interface PixiElementNode {
   container: Container;
@@ -29,7 +27,8 @@ interface PixiElementNode {
   textObj: Text | null;
   sprite: Sprite | null;
   maskGraphics: Graphics | null;
-  shadowFilter: DropShadowFilter | null;
+  /** Wrapper container that holds shadow layers + the element container */
+  shadowWrapper: Container | null;
   lastHash: string;
 }
 
@@ -140,7 +139,7 @@ export class CanvasPixiRendererService {
         flowDragState,
         zoom,
       );
-      if (node) pageContainer.addChild(node.container);
+      if (node) pageContainer.addChild(node.shadowWrapper ?? node.container);
     }
 
     // Render the dragged element floating at mouse position (on top of everything)
@@ -172,7 +171,6 @@ export class CanvasPixiRendererService {
 
     if (node && node.lastHash === hash && !node.container.destroyed) {
       this.syncTextNodePresentation(node, element, renderedWidth, renderedHeight, zoom);
-      this.syncShadowFilterPresentation(node, zoom);
       // Position may have changed — update position
       this.applyPosition(node, element, allElements, layout, layoutOverride);
       // Re-add children
@@ -191,12 +189,21 @@ export class CanvasPixiRendererService {
 
     // Create or recreate
     if (node && !node.container.destroyed) {
-      node.container.destroy({ children: true });
+      if (node.shadowWrapper && !node.shadowWrapper.destroyed) {
+        node.shadowWrapper.destroy({ children: true });
+      } else {
+        node.container.destroy({ children: true });
+      }
     }
 
     node = this.createElementNode(element, allElements, layout, layoutOverride, zoom);
     node.lastHash = hash;
     this.elementNodes.set(element.id, node);
+
+    // If the node has a shadow wrapper, wrap the container inside it
+    if (node.shadowWrapper) {
+      node.shadowWrapper.addChild(node.container);
+    }
 
     // Apply transforms (sets pivot for rotated/scaled elements)
     this.applyTransforms(node, element);
@@ -244,7 +251,7 @@ export class CanvasPixiRendererService {
     let sprite: Sprite | null = null;
     let strokeMaskGraphics: Graphics | null = null;
     let maskGraphics: Graphics | null = null;
-    let shadowFilter: DropShadowFilter | null = null;
+    let shadowWrapper: Container | null = null;
 
     // Fill
     if (element.type !== 'text' && element.type !== 'image') {
@@ -317,26 +324,32 @@ export class CanvasPixiRendererService {
             cornerRadii,
             element.stroke,
             sw,
+            element.strokeStyle,
           );
           container.addChild(strokeGraphics);
         }
       }
     }
 
-    // Shadow
+    // Shadows (outer layers rendered behind the element, inset layers inside)
     if (element.shadow) {
-      const shadowParams = parseShadowParams(element.shadow);
-      if (shadowParams) {
-        shadowFilter = new DropShadowFilter({
-          offset: { x: shadowParams.x, y: shadowParams.y },
-          blur: shadowParams.blur,
-          color: shadowParams.color,
-          alpha: shadowParams.alpha,
-          quality: SHADOW_FILTER_QUALITY,
-          resolution: this.getShadowFilterResolution(zoom),
-        });
-        this.configureShadowFilter(shadowFilter, shadowParams, zoom);
-        container.filters = [shadowFilter];
+      const allShadows = parseAllShadowParams(element.shadow);
+      const outerShadows = allShadows.filter((s) => !s.inset);
+      const insetShadows = allShadows.filter((s) => s.inset);
+
+      if (outerShadows.length > 0) {
+        // Wrap the element in a shadow container: outer shadows first, then element on top
+        shadowWrapper = new Container({ label: `shadow-wrap-${element.id}` });
+        for (const sp of outerShadows.reverse()) {
+          const shadowContainer = this.createOuterShadowLayer(sp, width, height, cornerRadii, zoom);
+          shadowWrapper.addChild(shadowContainer);
+        }
+      }
+
+      // Inset shadows are rendered inside the element (after fill, before text/content)
+      for (const sp of insetShadows) {
+        const insetLayer = this.createInsetShadowLayer(sp, width, height, cornerRadii, zoom);
+        container.addChild(insetLayer);
       }
     }
 
@@ -375,7 +388,7 @@ export class CanvasPixiRendererService {
           textObj,
           sprite,
           maskGraphics,
-          shadowFilter,
+          shadowWrapper,
           lastHash: '',
         },
         element,
@@ -424,6 +437,12 @@ export class CanvasPixiRendererService {
       container.mask = clipMask;
     }
 
+    // Blend mode
+    const blendMode = element.blendMode;
+    if (blendMode && blendMode !== 'normal') {
+      container.blendMode = blendMode as any;
+    }
+
     return {
       container,
       fillGraphics,
@@ -432,7 +451,7 @@ export class CanvasPixiRendererService {
       textObj,
       sprite,
       maskGraphics,
-      shadowFilter,
+      shadowWrapper,
       lastHash: '',
     };
   }
@@ -454,23 +473,25 @@ export class CanvasPixiRendererService {
       y = element.y;
     }
     // Compensate for pivot so the element renders at its intended (x, y)
-    node.container.position.set(x + node.container.pivot.x, y + node.container.pivot.y);
+    const target = node.shadowWrapper ?? node.container;
+    target.position.set(x + target.pivot.x, y + target.pivot.y);
   }
 
   private applyTransforms(node: PixiElementNode, element: CanvasElement): void {
+    const target = node.shadowWrapper ?? node.container;
     const rotation = element.rotation ?? 0;
-    node.container.rotation = (rotation * Math.PI) / 180;
+    target.rotation = (rotation * Math.PI) / 180;
 
     const scaleX = element.scaleX ?? 1;
     const scaleY = element.scaleY ?? 1;
     if (scaleX !== 1 || scaleY !== 1) {
-      node.container.scale.set(scaleX, scaleY);
+      target.scale.set(scaleX, scaleY);
     }
 
     const skewX = element.skewX ?? 0;
     const skewY = element.skewY ?? 0;
     if (skewX !== 0 || skewY !== 0) {
-      node.container.skew.set((skewX * Math.PI) / 180, (skewY * Math.PI) / 180);
+      target.skew.set((skewX * Math.PI) / 180, (skewY * Math.PI) / 180);
     }
 
     // Only set pivot (transform origin) when there's an actual transform
@@ -481,7 +502,7 @@ export class CanvasPixiRendererService {
       const originY = (element.transformOriginY ?? 50) / 100;
       const width = node.fillGraphics.width || element.width;
       const height = node.fillGraphics.height || element.height;
-      node.container.pivot.set(width * originX, height * originY);
+      target.pivot.set(width * originX, height * originY);
       // Position compensation is handled by applyPosition
     }
   }
@@ -543,7 +564,7 @@ export class CanvasPixiRendererService {
         zoom,
       );
       if (childNode) {
-        node.container.addChild(childNode.container);
+        node.container.addChild(childNode.shadowWrapper ?? childNode.container);
       }
     }
 
@@ -592,7 +613,7 @@ export class CanvasPixiRendererService {
       zoom,
     );
     if (node) {
-      pageContainer.addChild(node.container);
+      pageContainer.addChild(node.shadowWrapper ?? node.container);
     }
   }
 
@@ -618,7 +639,6 @@ export class CanvasPixiRendererService {
         layoutOverride.height,
         zoom,
       );
-      this.syncShadowFilterPresentation(node, zoom);
       this.applyPosition(node, element, allElements, layout, layoutOverride);
       this.addChildElements(
         node,
@@ -634,12 +654,20 @@ export class CanvasPixiRendererService {
     }
 
     if (node && !node.container.destroyed) {
-      node.container.destroy({ children: true });
+      if (node.shadowWrapper && !node.shadowWrapper.destroyed) {
+        node.shadowWrapper.destroy({ children: true });
+      } else {
+        node.container.destroy({ children: true });
+      }
     }
 
     node = this.createElementNode(element, allElements, layout, layoutOverride, zoom);
     node.lastHash = hash;
     this.elementNodes.set(element.id, node);
+
+    if (node.shadowWrapper) {
+      node.shadowWrapper.addChild(node.container);
+    }
 
     this.applyTransforms(node, element);
     this.applyPosition(node, element, allElements, layout, layoutOverride);
@@ -696,32 +724,145 @@ export class CanvasPixiRendererService {
     );
   }
 
-  private syncShadowFilterPresentation(node: PixiElementNode, zoom: number): void {
-    const shadowFilter = node.shadowFilter;
-    if (!shadowFilter) {
-      return;
+  // ── Shadow Layer Creation ──────────────────────────────────
+
+  /**
+   * Creates a single outer shadow layer: a filled shape (expanded by spread)
+   * at the shadow offset, with a blur filter applied.
+   */
+  private createOuterShadowLayer(
+    sp: PixiShadowParams,
+    w: number,
+    h: number,
+    radii: CanvasCornerRadii,
+    zoom: number,
+  ): Container {
+    const spread = sp.spread;
+    const sx = -spread;
+    const sy = -spread;
+    const sw = w + spread * 2;
+    const sh = h + spread * 2;
+
+    // Scale corner radii proportionally with spread
+    const scale = spread !== 0 && w > 0 && h > 0 ? Math.max(0, (w + spread * 2) / w) : 1;
+    const adjustedRadii: CanvasCornerRadii = {
+      topLeft: Math.max(0, radii.topLeft * scale),
+      topRight: Math.max(0, radii.topRight * scale),
+      bottomRight: Math.max(0, radii.bottomRight * scale),
+      bottomLeft: Math.max(0, radii.bottomLeft * scale),
+    };
+
+    const g = new Graphics();
+    this.drawRoundedRect(g, 0, 0, Math.max(0, sw), Math.max(0, sh), adjustedRadii, '#ffffff');
+    g.tint = sp.color;
+    g.alpha = sp.alpha;
+
+    const layer = new Container({ label: 'shadow-outer' });
+    layer.addChild(g);
+    layer.position.set(sp.x + sx, sp.y + sy);
+
+    if (sp.blur > 0) {
+      const strength = sp.blur * 0.5;
+      layer.filters = [new BlurFilter({ strength, quality: MAX_SHADOW_BLUR_QUALITY })];
     }
 
-    shadowFilter.resolution = this.getShadowFilterResolution(zoom);
-    shadowFilter.quality = SHADOW_FILTER_QUALITY;
-    shadowFilter.antialias = 'on';
+    return layer;
   }
 
-  private configureShadowFilter(
-    shadowFilter: DropShadowFilter,
-    shadowParams: { x: number; y: number; blur: number; color: number; alpha: number },
+  /**
+   * Creates a single inset shadow layer: a frame (large exterior minus interior)
+   * drawn inside the element, blurred, and masked to the element bounds.
+   */
+  private createInsetShadowLayer(
+    sp: PixiShadowParams,
+    w: number,
+    h: number,
+    radii: CanvasCornerRadii,
     zoom: number,
+  ): Container {
+    const spread = sp.spread;
+    // The "hole" shrinks by spread (positive spread = smaller hole = more shadow visible)
+    const pad = Math.max(sp.blur * 2, 40);
+    const holeX = spread;
+    const holeY = spread;
+    const holeW = Math.max(0, w - spread * 2);
+    const holeH = Math.max(0, h - spread * 2);
+
+    // Scale corner radii for the hole
+    const scale = w > 0 ? Math.max(0, holeW / w) : 1;
+    const holeRadii: CanvasCornerRadii = {
+      topLeft: Math.max(0, radii.topLeft * scale),
+      topRight: Math.max(0, radii.topRight * scale),
+      bottomRight: Math.max(0, radii.bottomRight * scale),
+      bottomLeft: Math.max(0, radii.bottomLeft * scale),
+    };
+
+    // Draw a large filled rect and cut out the inner shape to create a "frame"
+    const g = new Graphics();
+    // Outer rect (extends beyond element for blur padding)
+    g.rect(-pad, -pad, w + pad * 2, h + pad * 2);
+    // Cut out the inner shape
+    this.drawRoundedRectPath(g, holeX, holeY, holeW, holeH, holeRadii);
+    g.fill({ color: sp.color, alpha: sp.alpha });
+
+    const layer = new Container({ label: 'shadow-inset' });
+    layer.addChild(g);
+    layer.position.set(sp.x, sp.y);
+
+    if (sp.blur > 0) {
+      const strength = sp.blur * 0.5;
+      layer.filters = [new BlurFilter({ strength, quality: MAX_SHADOW_BLUR_QUALITY })];
+    }
+
+    // Mask to element bounds so the outer padding is hidden
+    const mask = new Graphics();
+    this.drawRoundedRect(mask, 0, 0, w, h, radii, '#ffffff');
+    layer.addChild(mask);
+    layer.mask = mask;
+    // The mask coords are relative to the layer, offset by the inset offset
+    mask.position.set(-sp.x, -sp.y);
+
+    return layer;
+  }
+
+  /**
+   * Draws a rounded rect path as a cutout hole (for inset shadow).
+   * Uses PixiJS winding rules: the hole is drawn after the outer rect.
+   */
+  private drawRoundedRectPath(
+    g: Graphics,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    radii: CanvasCornerRadii,
   ): void {
-    shadowFilter.offset = { x: shadowParams.x, y: shadowParams.y };
-    shadowFilter.blur = shadowParams.blur;
-    shadowFilter.color = shadowParams.color;
-    shadowFilter.alpha = shadowParams.alpha;
-    shadowFilter.quality = SHADOW_FILTER_QUALITY;
-    shadowFilter.resolution = this.getShadowFilterResolution(zoom);
-    shadowFilter.antialias = 'on';
-    shadowFilter.padding = Math.ceil(
-      shadowParams.blur * 2 + Math.max(Math.abs(shadowParams.x), Math.abs(shadowParams.y)),
-    );
+    const maxR = Math.min(w / 2, h / 2);
+    const tl = Math.min(radii.topLeft, maxR);
+    const tr = Math.min(radii.topRight, maxR);
+    const br = Math.min(radii.bottomRight, maxR);
+    const bl = Math.min(radii.bottomLeft, maxR);
+
+    if (tl === 0 && tr === 0 && br === 0 && bl === 0) {
+      g.rect(x, y, w, h);
+    } else if (tl === tr && tr === br && br === bl) {
+      g.roundRect(x, y, w, h, tl);
+    } else {
+      g.moveTo(x + tl, y);
+      g.lineTo(x + w - tr, y);
+      if (tr > 0) g.arcTo(x + w, y, x + w, y + tr, tr);
+      else g.lineTo(x + w, y);
+      g.lineTo(x + w, y + h - br);
+      if (br > 0) g.arcTo(x + w, y + h, x + w - br, y + h, br);
+      else g.lineTo(x + w, y + h);
+      g.lineTo(x + bl, y + h);
+      if (bl > 0) g.arcTo(x, y + h, x, y + h - bl, bl);
+      else g.lineTo(x, y + h);
+      g.lineTo(x, y + tl);
+      if (tl > 0) g.arcTo(x, y, x + tl, y, tl);
+      else g.lineTo(x, y);
+      g.closePath();
+    }
   }
 
   private getTextRenderResolution(zoom: number): number {
@@ -730,15 +871,6 @@ export class CanvasPixiRendererService {
     return Math.max(
       rendererResolution,
       Math.min(MAX_TEXT_RENDER_RESOLUTION, rendererResolution * Math.max(1, zoom)),
-    );
-  }
-
-  private getShadowFilterResolution(zoom: number): number {
-    const rendererResolution =
-      this.pixiApp.pixiApp?.renderer.resolution ?? window.devicePixelRatio ?? 1;
-    return Math.max(
-      rendererResolution,
-      Math.min(MAX_SHADOW_FILTER_RESOLUTION, rendererResolution * Math.max(1, zoom)),
     );
   }
 
@@ -973,6 +1105,7 @@ export class CanvasPixiRendererService {
     radii: CanvasCornerRadii,
     strokeColor: string,
     strokeWidth: number,
+    strokeStyle: string = 'solid',
   ): void {
     const { topLeft, topRight, bottomRight, bottomLeft } = radii;
     const maxR = Math.min(w / 2, h / 2);
@@ -980,6 +1113,7 @@ export class CanvasPixiRendererService {
     const tr = Math.min(topRight, maxR);
     const br = Math.min(bottomRight, maxR);
     const bl = Math.min(bottomLeft, maxR);
+    const normalizedStyle = strokeStyle?.toLowerCase() ?? 'solid';
 
     g.clear();
 
@@ -988,6 +1122,16 @@ export class CanvasPixiRendererService {
       stroke = parsePixiCssColor(strokeColor);
     } catch {
       stroke = { color: 0x000000, alpha: 1 };
+    }
+
+    if (normalizedStyle === 'dashed' || normalizedStyle === 'dotted') {
+      this.drawDashedRectStroke(g, x, y, w, h, tl, tr, br, bl, stroke, strokeWidth, normalizedStyle);
+      return;
+    }
+
+    if (normalizedStyle === 'double') {
+      this.drawDoubleRectStroke(g, x, y, w, h, tl, tr, br, bl, stroke, strokeWidth);
+      return;
     }
 
     if (tl === 0 && tr === 0 && br === 0 && bl === 0) {
@@ -1012,6 +1156,193 @@ export class CanvasPixiRendererService {
     }
 
     g.stroke({ width: strokeWidth, color: stroke.color, alpha: stroke.alpha, alignment: 1 });
+  }
+
+  /**
+   * Draws a dashed or dotted stroke along each side of a (possibly rounded) rect.
+   * - Dotted: evenly spaced filled circles (diameter = strokeWidth)
+   * - Dashed: CSS-accurate balanced distribution (n dashes, n-1 gaps, 3:1 ratio)
+   * - Corner overlap fix: vertical sides cede the corner zone to horizontal sides when r=0
+   * - All geometry inside bounds (overflow:clip safe)
+   */
+  private drawDashedRectStroke(
+    g: Graphics,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    tl: number,
+    tr: number,
+    br: number,
+    bl: number,
+    stroke: { color: number; alpha: number },
+    strokeWidth: number,
+    style: string,
+  ): void {
+    const sw = strokeWidth;
+    const fillOpts = { color: stroke.color, alpha: stroke.alpha };
+
+    if (style === 'dotted') {
+      const r = sw / 2;
+      const cornerOff = (rad: number): number => (rad > 0 ? rad : r);
+
+      const placeDots = (from: number, to: number, fixedCoord: number, isH: boolean): void => {
+        const span = to - from;
+        if (span < 0) return;
+        const n = Math.max(1, Math.round(span / (sw * 2)) + 1);
+        for (let i = 0; i < n; i++) {
+          const pos = n <= 1 ? from + span / 2 : from + (span * i) / (n - 1);
+          if (isH) g.circle(pos, fixedCoord, r);
+          else g.circle(fixedCoord, pos, r);
+        }
+      };
+
+      placeDots(x + cornerOff(tl), x + w - cornerOff(tr), y + r,     true);
+      placeDots(x + cornerOff(bl), x + w - cornerOff(br), y + h - r, true);
+      placeDots(y + cornerOff(tl), y + h - cornerOff(bl), x + r,     false);
+      placeDots(y + cornerOff(tr), y + h - cornerOff(br), x + w - r, false);
+
+      g.fill(fillOpts);
+    } else {
+      /**
+       * CSS `border-style: dashed` uses a 1:1 dash:gap ratio (equal dash and gap)
+       * with period ≈ 6 × border-width. Balanced so each side starts AND ends with a dash.
+       * V sides run the full height (same as CSS) — at sharp corners, same-color fill
+       * overlap between H and V is invisible, just like CSS border rendering.
+       */
+      const balanced = (total: number): number => {
+        // target period = 6*sw (3sw dash + 3sw gap), balanced so n*d + (n-1)*d = total
+        // → d*(2n-1) = total → n = round(total/(6*sw) + 0.5)
+        const n = Math.max(1, Math.round(total / (6 * sw) + 0.5));
+        return total / (2 * n - 1); // equal dash and gap
+      };
+
+      const fillDashH = (fromX: number, toX: number, rectY: number): void => {
+        const total = toX - fromX;
+        if (total < 0.5) return;
+        const d = balanced(total);
+        let cur = fromX;
+        let on = true;
+        while (cur < toX - 0.01) {
+          const len = Math.min(d, toX - cur);
+          if (on && len > 0.01) g.rect(cur, rectY, len, sw);
+          cur += d;
+          on = !on;
+        }
+      };
+
+      const fillDashV = (fromY: number, toY: number, rectX: number): void => {
+        const total = toY - fromY;
+        if (total < 0.5) return;
+        const d = balanced(total);
+        let cur = fromY;
+        let on = true;
+        while (cur < toY - 0.01) {
+          const len = Math.min(d, toY - cur);
+          if (on && len > 0.01) g.rect(rectX, cur, sw, len);
+          cur += d;
+          on = !on;
+        }
+      };
+
+      // H sides: full width (corner to corner)
+      fillDashH(x + tl, x + w - tr, y);
+      fillDashH(x + bl, x + w - br, y + h - sw);
+      // V sides: full height — for sharp corners (r=0) they overlap with H at corners
+      // (same color fill, overlap is invisible, matches CSS border rendering)
+      fillDashV(y + tl, y + h - bl, x);
+      fillDashV(y + tr, y + h - br, x + w - sw);
+
+      g.fill(fillOpts);
+    }
+
+    // Corner arc-annulus sectors (rounded corners only — solid fill)
+    const drawFilledArc = (cx: number, cy: number, outerR: number, sa: number): void => {
+      if (outerR <= 0) return;
+      const innerR = Math.max(0, outerR - sw);
+      const ea = sa + Math.PI / 2;
+      const steps = Math.max(8, Math.ceil(outerR * 2));
+      g.moveTo(cx + Math.cos(sa) * outerR, cy + Math.sin(sa) * outerR);
+      for (let i = 1; i <= steps; i++) {
+        const a = sa + (ea - sa) * (i / steps);
+        g.lineTo(cx + Math.cos(a) * outerR, cy + Math.sin(a) * outerR);
+      }
+      g.lineTo(cx + Math.cos(ea) * innerR, cy + Math.sin(ea) * innerR);
+      for (let i = steps - 1; i >= 0; i--) {
+        const a = sa + (ea - sa) * (i / steps);
+        g.lineTo(cx + Math.cos(a) * innerR, cy + Math.sin(a) * innerR);
+      }
+      g.closePath();
+      g.fill(fillOpts);
+    };
+
+    drawFilledArc(x + tl,     y + tl,     tl, Math.PI);
+    drawFilledArc(x + w - tr, y + tr,     tr, -Math.PI / 2);
+    drawFilledArc(x + w - br, y + h - br, br, 0);
+    drawFilledArc(x + bl,     y + h - bl, bl, Math.PI / 2);
+  }
+
+  /**
+   * Draws a double-line stroke: two parallel strokes each 1/3 of the total width,
+   * separated by a 1/3 gap. Outer ring uses alignment=1 (outside), inner ring uses alignment=0 (inside).
+   */
+  private drawDoubleRectStroke(
+    g: Graphics,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    tl: number,
+    tr: number,
+    br: number,
+    bl: number,
+    stroke: { color: number; alpha: number },
+    strokeWidth: number,
+  ): void {
+    const lineW = Math.max(1, strokeWidth / 3);
+
+    const drawRR = (
+      gfx: Graphics,
+      rx: number,
+      ry: number,
+      rw: number,
+      rh: number,
+      rtl: number,
+      rtr: number,
+      rbr: number,
+      rbl: number,
+    ): void => {
+      if (rtl === 0 && rtr === 0 && rbr === 0 && rbl === 0) {
+        gfx.rect(rx, ry, rw, rh);
+      } else if (rtl === rtr && rtr === rbr && rbr === rbl) {
+        gfx.roundRect(rx, ry, rw, rh, rtl);
+      } else {
+        gfx.moveTo(rx + rtl, ry);
+        gfx.lineTo(rx + rw - rtr, ry);
+        if (rtr > 0) gfx.arcTo(rx + rw, ry, rx + rw, ry + rtr, rtr);
+        else gfx.lineTo(rx + rw, ry);
+        gfx.lineTo(rx + rw, ry + rh - rbr);
+        if (rbr > 0) gfx.arcTo(rx + rw, ry + rh, rx + rw - rbr, ry + rh, rbr);
+        else gfx.lineTo(rx + rw, ry + rh);
+        gfx.lineTo(rx + rbl, ry + rh);
+        if (rbl > 0) gfx.arcTo(rx, ry + rh, rx, ry + rh - rbl, rbl);
+        else gfx.lineTo(rx, ry + rh);
+        gfx.lineTo(rx, ry + rtl);
+        if (rtl > 0) gfx.arcTo(rx, ry, rx + rtl, ry, rtl);
+        else gfx.lineTo(rx, ry);
+        gfx.closePath();
+      }
+    };
+
+    // Outer ring (alignment=1 → drawn outward)
+    drawRR(g, x, y, w, h, tl, tr, br, bl);
+    g.stroke({ width: lineW, color: stroke.color, alpha: stroke.alpha, alignment: 1 });
+
+    // Inner ring: inset by (strokeWidth - lineW) so the gap sits in between
+    const inset = strokeWidth - lineW;
+    const clamp = (v: number): number => Math.max(0, v - inset);
+    drawRR(g, x + inset, y + inset, w - inset * 2, h - inset * 2, clamp(tl), clamp(tr), clamp(br), clamp(bl));
+    g.stroke({ width: lineW, color: stroke.color, alpha: stroke.alpha, alignment: 0 });
   }
 
   private drawPerSideRectStroke(
@@ -1181,9 +1512,10 @@ export class CanvasPixiRendererService {
     renderedWidth: number,
     renderedHeight: number,
   ): string {
+    // NOTE: x/y/parentId/position are intentionally excluded — they only affect
+    // placement, which is handled by applyPosition() on every frame without
+    // triggering a full node rebuild.
     return JSON.stringify({
-      x: el.x,
-      y: el.y,
       w: renderedWidth,
       h: renderedHeight,
       fill: el.fill,
@@ -1193,6 +1525,7 @@ export class CanvasPixiRendererService {
       strokeWidths: el.strokeWidths,
       strokeStyle: el.strokeStyle,
       opacity: el.opacity,
+      blendMode: el.blendMode,
       cornerRadius: el.cornerRadius,
       cornerRadii: el.cornerRadii,
       rotation: el.rotation,
@@ -1219,8 +1552,6 @@ export class CanvasPixiRendererService {
       heightMode: el.heightMode,
       transformOriginX: el.transformOriginX,
       transformOriginY: el.transformOriginY,
-      parentId: el.parentId,
-      position: el.position,
       flexDirection: el.flexDirection,
       flexWrap: el.flexWrap,
       justifyContent: el.justifyContent,
@@ -1246,7 +1577,11 @@ export class CanvasPixiRendererService {
     const activeIds = new Set(allElements.map((el) => el.id));
     for (const [id, node] of this.elementNodes) {
       if (!activeIds.has(id)) {
-        node.container.destroy({ children: true });
+        if (node.shadowWrapper && !node.shadowWrapper.destroyed) {
+          node.shadowWrapper.destroy({ children: true });
+        } else {
+          node.container.destroy({ children: true });
+        }
         this.elementNodes.delete(id);
       }
     }

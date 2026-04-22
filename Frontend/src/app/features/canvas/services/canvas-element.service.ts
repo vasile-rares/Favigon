@@ -391,8 +391,8 @@ export class CanvasElementService {
     axis: CanvasSizeAxis,
     page?: CanvasPageModel | null,
   ): number {
-    const contentSize = this.getResolvedContentSizePx(element, elements, axis, page);
-    return roundToTwoDecimals(contentSize + this.getPaddingAxisTotal(element, axis));
+    // element.width stores border-box (content + padding); no padding addition needed.
+    return roundToTwoDecimals(this.getResolvedContentSizePx(element, elements, axis, page));
   }
 
   private getResolvedContentSizePx(
@@ -411,20 +411,24 @@ export class CanvasElementService {
     if (element.type === 'text' && mode === 'fit-content') {
       const widthConstraint = this.getTextMeasurementWidthConstraint(element, elements, page);
       const measured = this.measureTextContentSize(element, widthConstraint);
-      resolvedPixels = axis === 'width' ? measured.width : measured.height;
+      // Text measurement returns content-only size; add padding for border-box storage.
+      resolvedPixels = (axis === 'width' ? measured.width : measured.height)
+        + this.getPaddingAxisTotal(element, axis);
     } else if (
       (element.type === 'rectangle' || element.type === 'frame') &&
       mode === 'fit-content'
     ) {
       const children = elements.filter((c) => c.parentId === element.id);
       if (children.length > 0) {
-        let maxExtent = 0;
-        for (const child of children) {
-          const childPos = axis === 'width' ? child.x : child.y;
-          const childSize = axis === 'width' ? child.width : child.height;
-          maxExtent = Math.max(maxExtent, childPos + childSize);
-        }
-        resolvedPixels = Math.max(maxExtent, 1);
+        // computeContainerFitContentSize returns children's extent (content-only);
+        // add own padding for border-box storage.
+        resolvedPixels = this.computeContainerFitContentSize(
+          element,
+          children,
+          elements,
+          axis,
+          page,
+        ) + this.getPaddingAxisTotal(element, axis);
       }
     } else if (mode !== 'fixed' && mode !== 'fit-content') {
       if (mode === 'viewport' && !page) {
@@ -481,8 +485,11 @@ export class CanvasElementService {
     page?: CanvasPageModel | null,
   ): number | undefined {
     const widthMode = getCanvasSizeMode(element, 'width');
+    const padding = this.getPaddingAxisTotal(element, 'width');
+
     if (widthMode !== 'fit-content') {
-      return this.getResolvedContentSizePx(element, elements, 'width', page);
+      // Resolved size is border-box; text measurement needs content area.
+      return this.getResolvedContentSizePx(element, elements, 'width', page) - padding;
     }
 
     let minWidth = this.getRenderedConstraintPx(element, elements, 'minWidth', page);
@@ -492,12 +499,13 @@ export class CanvasElementService {
     }
     let constrainedWidth = this.measureTextContentSize(element).width;
 
+    // Constraints are border-box; subtract padding for content-area comparison.
     if (minWidth !== undefined) {
-      constrainedWidth = Math.max(constrainedWidth, minWidth);
+      constrainedWidth = Math.max(constrainedWidth, minWidth - padding);
     }
 
     if (maxWidth !== undefined) {
-      constrainedWidth = Math.min(constrainedWidth, maxWidth);
+      constrainedWidth = Math.min(constrainedWidth, maxWidth - padding);
     }
 
     return constrainedWidth;
@@ -624,6 +632,196 @@ export class CanvasElementService {
     return axis === 'width'
       ? (padding.left ?? 0) + (padding.right ?? 0)
       : (padding.top ?? 0) + (padding.bottom ?? 0);
+  }
+
+  // ── Fit-Content Container Sizing ──────────────────────────
+
+  /**
+   * Computes the intrinsic content size for a container (rectangle/frame)
+   * with fit-content sizing, matching CSS intrinsic sizing semantics.
+   */
+  private computeContainerFitContentSize(
+    container: CanvasElement,
+    children: CanvasElement[],
+    elements: CanvasElement[],
+    axis: CanvasSizeAxis,
+    page?: CanvasPageModel | null,
+  ): number {
+    if (this.isLayoutContainerElement(container)) {
+      return this.computeLayoutContainerFitContent(
+        container,
+        children,
+        elements,
+        axis,
+        page,
+      );
+    }
+    return this.computeFreeContainerFitContent(children, elements, axis, page);
+  }
+
+  /**
+   * For layout containers (display: flex/grid/block), computes intrinsic
+   * content size based on flex direction, gaps, and margins.
+   * Fill children contribute 0 intrinsic size on the main axis (like CSS).
+   */
+  private computeLayoutContainerFitContent(
+    container: CanvasElement,
+    children: CanvasElement[],
+    elements: CanvasElement[],
+    axis: CanvasSizeAxis,
+    page?: CanvasPageModel | null,
+  ): number {
+    const flowChildren = children.filter((c) => isFlowLayoutChild(c));
+    const absChildren = children.filter((c) => !isFlowLayoutChild(c));
+
+    const mainIsWidth = isContainerMainAxisWidth(container);
+    const isMainAxis = (axis === 'width' && mainIsWidth) || (axis === 'height' && !mainIsWidth);
+
+    let contentSize = 0;
+
+    if (flowChildren.length > 0) {
+      if (isMainAxis) {
+        // Main axis: sum of children intrinsic sizes + margins + gaps
+        let total = 0;
+        let count = 0;
+        for (const child of flowChildren) {
+          const childMode = getCanvasSizeMode(child, axis);
+          // Fill children don't contribute intrinsic size on the main axis
+          const childBoxSize =
+            childMode === 'fill'
+              ? 0
+              : this.getChildIntrinsicBoxSize(child, elements, axis, page);
+          total += childBoxSize + this.getMarginAxisTotal(child, axis);
+          count++;
+        }
+        const gap = getContainerGapForAxis(container, axis);
+        total += Math.max(0, count - 1) * gap;
+        contentSize = total;
+      } else {
+        // Cross axis: max of children intrinsic sizes + margins
+        for (const child of flowChildren) {
+          const childMode = getCanvasSizeMode(child, axis);
+          // Fill children on the cross axis stretch — they don't contribute intrinsic size
+          const childBoxSize =
+            childMode === 'fill'
+              ? 0
+              : this.getChildIntrinsicBoxSize(child, elements, axis, page);
+          contentSize = Math.max(
+            contentSize,
+            childBoxSize + this.getMarginAxisTotal(child, axis),
+          );
+        }
+      }
+    }
+
+    // Absolute-positioned children contribute via their position + size
+    for (const child of absChildren) {
+      const childPos = axis === 'width' ? child.x : child.y;
+      const childSize = this.getChildIntrinsicBoxSize(child, elements, axis, page);
+      contentSize = Math.max(contentSize, childPos + childSize);
+    }
+
+    return Math.max(contentSize, 1);
+  }
+
+  /**
+   * For non-layout containers (no display mode), computes fit-content
+   * from absolute child positions + resolved sizes.
+   */
+  private computeFreeContainerFitContent(
+    children: CanvasElement[],
+    elements: CanvasElement[],
+    axis: CanvasSizeAxis,
+    page?: CanvasPageModel | null,
+  ): number {
+    let maxExtent = 0;
+    for (const child of children) {
+      const childPos = axis === 'width' ? child.x : child.y;
+      const childSize = this.getChildIntrinsicBoxSize(child, elements, axis, page);
+      maxExtent = Math.max(maxExtent, childPos + childSize);
+    }
+    return Math.max(maxExtent, 1);
+  }
+
+  /**
+   * Computes a child's box size without referencing the parent's size,
+   * avoiding circular dependencies when the parent has fit-content sizing.
+   * For fill/relative children (parent-dependent), uses the raw stored value.
+   */
+  private getChildIntrinsicBoxSize(
+    child: CanvasElement,
+    elements: CanvasElement[],
+    axis: CanvasSizeAxis,
+    page?: CanvasPageModel | null,
+  ): number {
+    const mode = getCanvasSizeMode(child, axis);
+    const raw = axis === 'width' ? child.width : child.height;
+    const padding = this.getPaddingAxisTotal(child, axis);
+
+    switch (mode) {
+      case 'fit-content': {
+        if (child.type === 'text') {
+          let widthConstraint: number | undefined;
+          if (axis === 'height') {
+            const widthMode = getCanvasSizeMode(child, 'width');
+            if (widthMode !== 'fit-content') {
+              // child.width is border-box; text measurement needs content area
+              widthConstraint = child.width - this.getPaddingAxisTotal(child, 'width');
+            }
+          }
+          const measured = this.measureTextContentSize(child, widthConstraint);
+          // Text measurement returns content-only; add padding for border-box
+          return (axis === 'width' ? measured.width : measured.height) + padding;
+        }
+        if (child.type === 'rectangle' || child.type === 'frame') {
+          const grandchildren = elements.filter((gc) => gc.parentId === child.id);
+          if (grandchildren.length > 0) {
+            // Children extent is content-only; add own padding for border-box
+            return (
+              this.computeContainerFitContentSize(child, grandchildren, elements, axis, page) +
+              padding
+            );
+          }
+        }
+        // No children or unsupported type — raw is already border-box
+        return Math.max(raw, 1);
+      }
+      case 'viewport':
+        if (page) {
+          // Viewport mode resolves to border-box directly
+          return resolveCanvasPixelsFromMode(
+            mode,
+            raw,
+            axis,
+            getCanvasSizingValue(child, axis),
+            null,
+            page,
+          );
+        }
+        // raw is already border-box
+        return raw;
+      case 'fill':
+      case 'relative':
+        // Parent-dependent modes — raw is already border-box
+        return raw;
+      default:
+        // fixed, fit-image — raw is already border-box
+        return raw;
+    }
+  }
+
+  private getMarginAxisTotal(
+    element: Pick<CanvasElement, 'margin'>,
+    axis: CanvasSizeAxis,
+  ): number {
+    const margin = element.margin;
+    if (!margin) {
+      return 0;
+    }
+
+    return axis === 'width'
+      ? (margin.left ?? 0) + (margin.right ?? 0)
+      : (margin.top ?? 0) + (margin.bottom ?? 0);
   }
 
   private getRenderedConstraintStyle(
@@ -861,6 +1059,31 @@ export class CanvasElementService {
 function isFlowLayoutChild(element: Pick<CanvasElement, 'position'>): boolean {
   const position = element.position;
   return !position || position === 'static' || position === 'relative' || position === 'sticky';
+}
+
+function isContainerMainAxisWidth(
+  container: Pick<CanvasElement, 'display' | 'flexDirection'>,
+): boolean {
+  if (container.display === 'grid') {
+    return true;
+  }
+  if (container.display === 'block') {
+    return false;
+  }
+  return container.flexDirection !== 'column' && container.flexDirection !== 'column-reverse';
+}
+
+function getContainerGapForAxis(
+  container: Pick<CanvasElement, 'display' | 'gap' | 'gapX' | 'gapY'>,
+  axis: CanvasSizeAxis,
+): number {
+  if (container.display === 'grid') {
+    const specificGap = axis === 'width' ? container.gapX : container.gapY;
+    if (typeof specificGap === 'number' && specificGap > 0) {
+      return specificGap;
+    }
+  }
+  return typeof container.gap === 'number' && container.gap > 0 ? container.gap : 0;
 }
 
 function isOverflowClippingMode(mode: CanvasOverflowMode): boolean {

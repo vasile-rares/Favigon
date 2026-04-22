@@ -1,8 +1,9 @@
-import { CanvasPageModel, CanvasProjectDocument, IRNode } from '@app/core';
+import { CanvasElement, CanvasPageModel, CanvasProjectDocument, IRNode } from '@app/core';
 import { buildCanvasIR } from './canvas-to-ir.mapper';
 import { buildCanvasElementsFromIR } from './ir-to-canvas.mapper';
 
 const CANVAS_DOCUMENT_PROP = 'favigonCanvasDocument';
+const CURRENT_DOCUMENT_VERSION = '3.0';
 const DEFAULT_PAGE_VIEWPORT_WIDTH = 1280;
 const DEFAULT_PAGE_VIEWPORT_HEIGHT = 720;
 
@@ -14,7 +15,7 @@ export function buildCanvasProjectDocument(
   const normalizedPages = pages;
 
   return {
-    version: '2.0',
+    version: CURRENT_DOCUMENT_VERSION,
     projectId,
     activePageId: activePageId ?? normalizedPages[0]?.id ?? null,
     pages: normalizedPages.map((page) => ({
@@ -58,7 +59,7 @@ export function buildCanvasProjectDocumentFromUnknown(
 ): CanvasProjectDocument {
   const persistedDocument = readPersistedCanvasProjectDocument(rawDesign, projectId);
   if (persistedDocument) {
-    return persistedDocument;
+    return migrateDocumentIfNeeded(persistedDocument);
   }
 
   if (isCanvasProjectDocument(rawDesign)) {
@@ -66,8 +67,8 @@ export function buildCanvasProjectDocumentFromUnknown(
     const pages = rawPages;
     const fallbackActivePageId = pages[0]?.id ?? null;
 
-    return {
-      version: typeof rawDesign.version === 'string' ? rawDesign.version : '2.0',
+    const doc: CanvasProjectDocument = {
+      version: typeof rawDesign.version === 'string' ? rawDesign.version : CURRENT_DOCUMENT_VERSION,
       projectId:
         typeof rawDesign.projectId === 'string' && rawDesign.projectId.trim().length > 0
           ? rawDesign.projectId
@@ -79,6 +80,7 @@ export function buildCanvasProjectDocumentFromUnknown(
           : fallbackActivePageId,
       pages: pages.map((page, index) => normalizeCanvasPage(page, index + 1)),
     };
+    return migrateDocumentIfNeeded(doc);
   }
 
   const legacyElements = buildCanvasElementsFromIR(rawDesign as IRNode | null | undefined);
@@ -163,4 +165,61 @@ function normalizeCanvasCoordinate(value: unknown, fallback: number): number {
   }
 
   return Math.round(value);
+}
+
+// ── Data Migration: v2 (content-box) → v3 (border-box) ─────────────────
+
+/**
+ * Migrates a document to the current version if needed.
+ * v2 → v3: element.width/height stored as content-box → border-box (content + padding).
+ */
+function migrateDocumentIfNeeded(doc: CanvasProjectDocument): CanvasProjectDocument {
+  const version = parseFloat(doc.version) || 2.0;
+  if (version >= 3.0) {
+    return doc;
+  }
+
+  // v2 → v3: add padding to stored dimensions and constraints
+  return {
+    ...doc,
+    version: CURRENT_DOCUMENT_VERSION,
+    pages: doc.pages.map((page) => ({
+      ...page,
+      elements: page.elements.map(migrateElementContentBoxToBorderBox),
+    })),
+  };
+}
+
+/**
+ * Converts a v2 element (content-box) to v3 (border-box) by adding padding
+ * to width, height, and fixed constraints.
+ */
+function migrateElementContentBoxToBorderBox(element: CanvasElement): CanvasElement {
+  const paddingH = (element.padding?.left ?? 0) + (element.padding?.right ?? 0);
+  const paddingV = (element.padding?.top ?? 0) + (element.padding?.bottom ?? 0);
+
+  if (paddingH === 0 && paddingV === 0) {
+    return element;
+  }
+
+  const migrated = { ...element };
+
+  migrated.width = element.width + paddingH;
+  migrated.height = element.height + paddingV;
+
+  // Migrate fixed constraints (only px-based; relative constraints are percentages)
+  if (typeof element.minWidth === 'number' && element.minWidthMode !== 'relative') {
+    migrated.minWidth = element.minWidth + paddingH;
+  }
+  if (typeof element.maxWidth === 'number' && element.maxWidthMode !== 'relative') {
+    migrated.maxWidth = element.maxWidth + paddingH;
+  }
+  if (typeof element.minHeight === 'number' && element.minHeightMode !== 'relative') {
+    migrated.minHeight = element.minHeight + paddingV;
+  }
+  if (typeof element.maxHeight === 'number' && element.maxHeightMode !== 'relative') {
+    migrated.maxHeight = element.maxHeight + paddingV;
+  }
+
+  return migrated;
 }

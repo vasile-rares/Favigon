@@ -528,9 +528,7 @@ export class DimensionsSectionComponent {
     if (!element.parentId) return null;
     const parent = this.currentPageModel()?.elements.find((c) => c.id === element.parentId) ?? null;
     if (!parent) return null;
-    const paddedWidth = parent.width + ((parent.padding?.left ?? 0) + (parent.padding?.right ?? 0));
-    const paddedHeight =
-      parent.height + ((parent.padding?.top ?? 0) + (parent.padding?.bottom ?? 0));
+    // parent.width is already border-box (content + padding); no addition needed.
     const isFlowLayoutChild =
       !!parent.display &&
       (parent.type === 'frame' || parent.type === 'rectangle') &&
@@ -540,8 +538,6 @@ export class DimensionsSectionComponent {
         element.position === 'sticky');
     return {
       ...parent,
-      width: paddedWidth,
-      height: paddedHeight,
       padding: isFlowLayoutChild ? parent.padding : undefined,
     };
   }

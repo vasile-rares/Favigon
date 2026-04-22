@@ -125,6 +125,23 @@ export type CanvasJustifyContent =
   | 'space-around'
   | 'space-evenly';
 export type CanvasAlignItems = 'flex-start' | 'flex-end' | 'center' | 'stretch' | 'baseline';
+export type CanvasBlendMode =
+  | 'normal'
+  | 'multiply'
+  | 'screen'
+  | 'overlay'
+  | 'darken'
+  | 'lighten'
+  | 'color-dodge'
+  | 'color-burn'
+  | 'hard-light'
+  | 'soft-light'
+  | 'difference'
+  | 'exclusion'
+  | 'hue'
+  | 'saturation'
+  | 'color'
+  | 'luminosity';
 
 export interface CanvasSpacing {
   top: number;
@@ -212,6 +229,7 @@ export interface CanvasElement {
   strokeSides?: CanvasBorderSides;
   strokeWidths?: CanvasBorderWidths;
   opacity?: number;
+  blendMode?: CanvasBlendMode;
   cornerRadius?: number;
   cornerRadii?: CanvasCornerRadii;
   overflow?: CanvasOverflowMode;

@@ -13,7 +13,7 @@ public class ConverterService(IConverterEngine converterEngine) : IConverterServ
     if (!converterEngine.Validate(root))
       throw new InvalidOperationException("IR validation failed.");
 
-    var output = converterEngine.Generate(root, framework);
+    var output = converterEngine.GenerateSinglePage(root, framework);
     return new ConverterResponse
     {
       Framework = framework,

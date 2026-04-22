@@ -1,17 +1,25 @@
-﻿:host {
-  display: block;
+﻿app-design-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+app-design-tab > * {
+  min-width: 0;
+}
+
+app-dt-extras-section,
+app-dt-transforms-effects-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
   min-width: 0;
 }
 
 .properties-section,
 .properties-empty-state {
   margin: 0;
-}
-
-.properties-section + .properties-section,
-.properties-section + .properties-empty-state,
-.properties-empty-state + .properties-section {
-  margin-top: 0.6rem;
 }
 
 /* â”€â”€ Sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -410,7 +418,7 @@
 
 .pp-style-control--dimension {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   align-items: center;
   gap: 0.35rem;
   width: 100%;
@@ -432,19 +440,27 @@
   width: 100%;
 }
 
-.pp-dimension-mode-control ::ng-deep .dropdown-select__trigger {
-  gap: 0.2rem;
-  padding-left: 0.5rem;
-  padding-right: 0.15rem;
+.pp-dimension-mode-control app-dropdown-select .dropdown-select__trigger {
+  gap: 0.1rem;
+  padding-left: 0.38rem;
+  padding-right: 0.08rem;
 }
 
-.pp-dimension-mode-control ::ng-deep .dropdown-select__trigger-text {
-  font-size: var(--canvas-panel-font-size);
+.pp-dimension-mode-control app-dropdown-select .dropdown-select__trigger-text {
+  font-size: 0.72rem;
+  letter-spacing: -0.01em;
   text-align: left;
+  overflow: visible;
+  text-overflow: clip;
 }
 
-.pp-dimension-mode-control ::ng-deep .dropdown-select__trigger-icon {
-  padding: 0.05rem;
+.pp-dimension-mode-control app-dropdown-select .dropdown-select__trigger-icon {
+  padding: 0.02rem;
+}
+
+.pp-dimension-mode-control app-dropdown-select .dropdown-select__trigger-icon-svg {
+  width: 12px;
+  height: 12px;
 }
 
 .pp-style-control--dropdown app-dropdown-select {

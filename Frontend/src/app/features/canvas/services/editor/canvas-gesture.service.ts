@@ -552,6 +552,7 @@ export class CanvasGestureService {
       draggedBounds.height,
       xCandidates,
       yCandidates,
+      SNAP_THRESHOLD / this.viewport.zoomLevel(),
     );
     absoluteX = snap.x;
     absoluteY = snap.y;
@@ -862,7 +863,7 @@ export class CanvasGestureService {
             resizedElements,
             this.editorState.currentPage(),
           );
-        let bestDelta = SNAP_THRESHOLD;
+        let bestDelta = SNAP_THRESHOLD / this.viewport.zoomLevel();
         let snappedBottom: number | null = null;
         for (const c of candidates) {
           const delta = Math.abs(c - currentBottom);
@@ -1569,20 +1570,24 @@ export class CanvasGestureService {
       this.editorState.elements(),
       this.editorState.currentPage(),
     );
+    const paddingW = this.getElementPaddingAxis(previousElement, 'width');
+    const paddingH = this.getElementPaddingAxis(previousElement, 'height');
+    // Text measurement uses content-box; subtract padding from border-box for constraint.
     const widthConstraint = this.canAutoSizeTextAxis(previousElement, 'width')
       ? undefined
-      : previousRenderedWidth;
+      : previousRenderedWidth - paddingW;
     const size = this.measureTextSize(nextElement, widthConstraint);
     const patch: Partial<CanvasElement> = {};
 
     if (this.canAutoSizeTextAxis(previousElement, 'width')) {
+      const borderBoxWidth = size.width + paddingW;
       const centerX = previousElement.x + previousRenderedWidth / 2;
-      patch.x = roundToTwoDecimals(centerX - size.width / 2);
-      patch.width = size.width;
+      patch.x = roundToTwoDecimals(centerX - borderBoxWidth / 2);
+      patch.width = borderBoxWidth;
     }
 
     if (this.canAutoSizeTextAxis(previousElement, 'height')) {
-      patch.height = size.height;
+      patch.height = size.height + paddingH;
     }
 
     return Object.keys(patch).length > 0 ? patch : null;
@@ -2909,12 +2914,14 @@ export class CanvasGestureService {
     axis: 'width' | 'height',
     renderedSize: number,
   ): number {
-    const paddingTotal = el.padding
-      ? axis === 'width'
-        ? el.padding.left + el.padding.right
-        : el.padding.top + el.padding.bottom
-      : 0;
-    return Math.max(24, roundToTwoDecimals(renderedSize - paddingTotal));
+    // element.width stores border-box (same as rendered size); no padding subtraction needed.
+    return Math.max(24, roundToTwoDecimals(renderedSize));
+  }
+
+  private getElementPaddingAxis(el: CanvasElement, axis: 'width' | 'height'): number {
+    const p = el.padding;
+    if (!p) return 0;
+    return axis === 'width' ? (p.left ?? 0) + (p.right ?? 0) : (p.top ?? 0) + (p.bottom ?? 0);
   }
 
   private isBoundsFullyInsideBounds(inner: Bounds, outer: Bounds): boolean {

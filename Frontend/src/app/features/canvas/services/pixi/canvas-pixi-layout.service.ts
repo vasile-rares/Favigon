@@ -25,6 +25,15 @@ import {
   CanvasPositionMode,
 } from '@app/core';
 import { CanvasElementService } from '../canvas-element.service';
+import {
+  CanvasConstraintField,
+  CanvasSizeAxis,
+  getCanvasConstraintAxis,
+  getCanvasConstraintMode,
+  getCanvasConstraintSizingValue,
+  getCanvasConstraintValue,
+  resolveCanvasConstraintPixels,
+} from '../../utils/element/canvas-sizing.util';
 
 export interface LayoutResult {
   x: number;
@@ -189,21 +198,25 @@ export class CanvasPixiLayoutService {
       }
 
       // Cross axis
-      if (crossFillMode === 'fill') {
-        childNode.setAlignSelf(Align.Stretch);
+      // Use explicit resolved size (which already accounts for fill semantics and max/min
+      // constraints) so the parent's alignItems properly positions the child.
+      // alignSelf: stretch would override alignItems and left-anchor constrained children.
+      if (mainAxisIsWidth) {
+        childNode.setHeight(childHeight);
       } else {
-        if (mainAxisIsWidth) {
-          childNode.setHeight(childHeight);
-        } else {
-          childNode.setWidth(childWidth);
-        }
+        childNode.setWidth(childWidth);
       }
 
-      // Min/max constraints
-      if (child.minWidth != null) childNode.setMinWidth(child.minWidth);
-      if (child.maxWidth != null) childNode.setMaxWidth(child.maxWidth);
-      if (child.minHeight != null) childNode.setMinHeight(child.minHeight);
-      if (child.maxHeight != null) childNode.setMaxHeight(child.maxHeight);
+      // Min/max constraints — resolve modes and convert to Yoga's border-box semantics
+      const resolvedContainerSize: LayoutContainerSize = { width: containerWidth, height: containerHeight };
+      const resolvedMinW = resolveConstraintForYoga(child, 'minWidth', container, resolvedContainerSize);
+      const resolvedMaxW = resolveConstraintForYoga(child, 'maxWidth', container, resolvedContainerSize);
+      const resolvedMinH = resolveConstraintForYoga(child, 'minHeight', container, resolvedContainerSize);
+      const resolvedMaxH = resolveConstraintForYoga(child, 'maxHeight', container, resolvedContainerSize);
+      if (resolvedMinW !== undefined) childNode.setMinWidth(resolvedMinW);
+      if (resolvedMaxW !== undefined) childNode.setMaxWidth(resolvedMaxW);
+      if (resolvedMinH !== undefined) childNode.setMinHeight(resolvedMinH);
+      if (resolvedMaxH !== undefined) childNode.setMaxHeight(resolvedMaxH);
 
       // Margin
       if (child.margin) {
@@ -341,4 +354,42 @@ function resolveGridGap(
   }
 
   return typeof container.gap === 'number' && container.gap > 0 ? container.gap : 0;
+}
+
+/**
+ * Resolves a child's min/max constraint to a border-box pixel value
+ * suitable for Yoga (which uses border-box semantics).
+ * Handles both 'fixed' and 'relative' constraint modes.
+ */
+function resolveConstraintForYoga(
+  child: CanvasElement,
+  field: CanvasConstraintField,
+  container: CanvasElement,
+  containerSize: LayoutContainerSize,
+): number | undefined {
+  const rawValue = getCanvasConstraintValue(child, field);
+  if (!Number.isFinite(rawValue ?? NaN)) {
+    return undefined;
+  }
+
+  const mode = getCanvasConstraintMode(child, field);
+  const axis: CanvasSizeAxis = getCanvasConstraintAxis(field);
+
+  // Build parent reference for relative mode resolution.
+  // For flow children the base is the parent's content area (box - padding).
+  const parentRef = {
+    width: containerSize.width,
+    height: containerSize.height,
+    padding: container.padding,
+  };
+
+  // Constraints are stored as border-box (content + padding),
+  // which matches Yoga's border-box semantics — no adjustment needed.
+  return resolveCanvasConstraintPixels(
+    mode,
+    rawValue as number,
+    axis,
+    getCanvasConstraintSizingValue(child, field),
+    parentRef,
+  );
 }

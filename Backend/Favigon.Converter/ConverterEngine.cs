@@ -36,10 +36,10 @@ public sealed class ConverterEngine : IConverterEngine
   public (string Html, string Css) GenerateFromCanvas(string canvasJson, string framework)
   {
     var root = ParseCanvas(canvasJson);
-    return Generate(root, framework);
+    return GenerateSinglePage(root, framework);
   }
 
-  public (string Html, string Css) Generate(IRNode root, string framework)
+  public (string Html, string Css) GenerateSinglePage(IRNode root, string framework)
   {
     var artifacts = GeneratePageArtifacts(root, framework);
     return (artifacts.Html, artifacts.Css);
@@ -120,11 +120,11 @@ public sealed class ConverterEngine : IConverterEngine
 
     var fw = framework.ToLowerInvariant();
 
-    if (fw == "html")
+    if (fw == FrameworkNames.Html)
       EmitHtmlFiles(pageEntries, files);
-    else if (fw == "react")
+    else if (fw == FrameworkNames.React)
       EmitReactFiles(pageEntries, files);
-    else if (fw == "angular")
+    else if (fw == FrameworkNames.Angular)
       EmitAngularFiles(pageEntries, files);
     else
       throw new ArgumentException($"Unsupported framework '{framework}'.");

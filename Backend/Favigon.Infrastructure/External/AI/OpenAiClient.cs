@@ -31,11 +31,11 @@ public class OpenAiClient : IAiClient
         new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
   }
 
-  public async Task<string> ChatCompletionAsync(string systemPrompt, string userMessage, CancellationToken ct = default)
+  public async Task<string> ChatCompletionAsync(string systemPrompt, string userMessage, string? modelOverride = null, CancellationToken ct = default)
   {
     var payload = new OpenAiChatRequest
     {
-      Model = _model,
+      Model = string.IsNullOrWhiteSpace(modelOverride) ? _model : modelOverride,
       ResponseFormat = new ResponseFormat { Type = "json_object" },
       Messages =
       [
@@ -66,11 +66,12 @@ public class OpenAiClient : IAiClient
   public async IAsyncEnumerable<string> StreamChatCompletionAsync(
       string systemPrompt,
       string userMessage,
+      string? modelOverride = null,
       [EnumeratorCancellation] CancellationToken ct = default)
   {
     var payload = new OpenAiChatRequest
     {
-      Model = _model,
+      Model = string.IsNullOrWhiteSpace(modelOverride) ? _model : modelOverride,
       ResponseFormat = new ResponseFormat { Type = "json_object" },
       Messages =
       [
