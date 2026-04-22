@@ -11,7 +11,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   CanvasElement,
   CanvasElementType,
@@ -22,6 +22,7 @@ import {
   extractApiErrorMessage,
   PendingProjectFlushService,
   ProjectService,
+  CurrentUserService,
 } from '@app/core';
 import { buildCanvasIR, buildCanvasIRPages } from '../../mappers/canvas-to-ir.mapper';
 import { buildCanvasElementsFromIR } from '../../mappers/ir-to-canvas.mapper';
@@ -86,6 +87,7 @@ import { CanvasPixiGridService } from '../../services/pixi/canvas-pixi-grid.serv
 import { CanvasPixiPageShellService } from '../../services/pixi/canvas-pixi-page-shell.service';
 import { CanvasPixiLayoutService } from '../../services/pixi/canvas-pixi-layout.service';
 import { CanvasGestureService } from '../../services/editor/canvas-gesture.service';
+import { firstValueFrom } from 'rxjs';
 
 const ROOT_FRAME_INSERT_GAP = 48;
 const ELEMENT_DRAG_START_THRESHOLD = 3;
@@ -139,8 +141,10 @@ interface RectangleDrawState {
 })
 export class CanvasPage implements OnDestroy, AfterViewChecked {
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
   private readonly projectService = inject(ProjectService);
+  private readonly currentUser = inject(CurrentUserService);
   readonly generation = inject(CanvasGenerationService);
   private readonly zone = inject(NgZone);
 
@@ -978,6 +982,18 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   onProjectPanelWidthChanged(width: number): void {
     this.projectPanelWidth.set(width);
+  }
+
+  async navigateToProjectsList(): Promise<void> {
+    const cachedUser = this.currentUser.user();
+    const username =
+      cachedUser?.username ?? (await firstValueFrom(this.currentUser.load()))?.username;
+
+    if (!username) {
+      return;
+    }
+
+    void this.router.navigate(['/', username]);
   }
 
   onPropertyNumberGestureStarted(): void {
