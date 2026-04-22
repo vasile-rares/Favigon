@@ -32,7 +32,7 @@
         <span class="context-menu__item-arrow">›</span>
 
         @if (openSubmenuId === item.id) {
-          <div class="context-menu__submenu glass-panel" role="menu">
+          <div class="context-menu__submenu glass-panel" role="menu" [class.context-menu__submenu--left]="submenuDirection() === 'left'">
             @for (child of item.children; track child.id) {
               <button
                 type="button"

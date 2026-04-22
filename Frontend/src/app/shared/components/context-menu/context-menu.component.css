@@ -10,8 +10,7 @@
   max-height: calc(100vh - 16px);
   border-radius: 12px;
   padding: 0.3rem;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: visible;
   overscroll-behavior: contain;
   pointer-events: auto;
   user-select: none;
@@ -189,4 +188,9 @@
   .context-menu__item {
     width: 100%;
   }
+}
+
+.context-menu__submenu--left {
+  left: auto;
+  right: calc(100% + 0.75rem);
 }

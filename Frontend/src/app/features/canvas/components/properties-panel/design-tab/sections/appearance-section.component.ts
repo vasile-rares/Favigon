@@ -1,15 +1,16 @@
 ﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
-import { ToggleGroupComponent } from '@app/shared';
+import { ToggleGroupComponent, ContextMenuComponent } from '@app/shared';
 import { NumberInputComponent } from '../../number-input/number-input.component';
 import { FieldInputComponent } from '../../field-input/field-input.component';
-import type { ToggleGroupOption } from '@app/shared';
+import type { ToggleGroupOption, ContextMenuItem } from '@app/shared';
 import {
   CanvasBorderSides,
   CanvasBorderWidths,
   CanvasCornerRadii,
   CanvasElement,
+  CanvasFilterType,
   CanvasOverflowMode,
 } from '@app/core';
 
@@ -31,6 +32,60 @@ import type { DropdownSelectOption } from '@app/shared';
 
 type CornerRadiusMode = 'full' | 'per-corner';
 type EditableNumericField = 'opacity' | 'cornerRadius';
+
+interface FilterDefinition {
+  id: CanvasFilterType;
+  label: string;
+  defaultValue: number;
+  min: number;
+  max: number;
+  step: number;
+  unit: string;
+}
+
+const FILTER_DEFINITIONS: readonly FilterDefinition[] = [
+  { id: 'blur', label: 'Blur', defaultValue: 4, min: 0, max: 100, step: 1, unit: '' },
+  { id: 'backdropBlur', label: 'BG Blur', defaultValue: 4, min: 0, max: 100, step: 1, unit: '' },
+  {
+    id: 'brightness',
+    label: 'Brightness',
+    defaultValue: 100,
+    min: 0,
+    max: 200,
+    step: 1,
+    unit: '%',
+  },
+  { id: 'contrast', label: 'Contrast', defaultValue: 100, min: 0, max: 200, step: 1, unit: '%' },
+  { id: 'grayscale', label: 'Grayscale', defaultValue: 100, min: 0, max: 200, step: 1, unit: '%' },
+  { id: 'hueRotate', label: 'Hue', defaultValue: 0, min: -360, max: 360, step: 1, unit: '°' },
+  { id: 'invert', label: 'Invert', defaultValue: 100, min: 0, max: 200, step: 1, unit: '%' },
+  { id: 'saturate', label: 'Saturate', defaultValue: 100, min: 0, max: 200, step: 1, unit: '%' },
+  { id: 'sepia', label: 'Sepia', defaultValue: 100, min: 0, max: 200, step: 1, unit: '%' },
+] as const;
+
+const FILTER_FIELD_MAP: Record<CanvasFilterType, keyof CanvasElement> = {
+  blur: 'filterBlur',
+  backdropBlur: 'filterBackdropBlur',
+  brightness: 'filterBrightness',
+  contrast: 'filterContrast',
+  grayscale: 'filterGrayscale',
+  hueRotate: 'filterHueRotate',
+  invert: 'filterInvert',
+  saturate: 'filterSaturate',
+  sepia: 'filterSepia',
+};
+
+const FILTER_DEFAULT_VALUES: Record<CanvasFilterType, number> = {
+  blur: 0,
+  backdropBlur: 0,
+  brightness: 100,
+  contrast: 100,
+  grayscale: 0,
+  hueRotate: 0,
+  invert: 0,
+  saturate: 100,
+  sepia: 0,
+};
 
 interface CornerRadiusFieldDefinition {
   key: keyof CanvasCornerRadii;
@@ -54,6 +109,7 @@ const CORNER_RADIUS_FIELD_DEFINITIONS: readonly CornerRadiusFieldDefinition[] = 
     ToggleGroupComponent,
     NumberInputComponent,
     FieldInputComponent,
+    ContextMenuComponent,
   ],
   templateUrl: './appearance-section.component.html',
   encapsulation: ViewEncapsulation.None,
@@ -99,6 +155,12 @@ export class AppearanceSectionComponent {
   ];
   readonly cornerRadiusFields = CORNER_RADIUS_FIELD_DEFINITIONS;
   readonly borderStyleOptions = ['Solid', 'Dashed', 'Dotted', 'Double'];
+
+  styleMenuItems: ContextMenuItem[] = [];
+  styleMenuX = 0;
+  styleMenuY = 0;
+
+  readonly filterDefinitions = FILTER_DEFINITIONS;
 
   private readonly defaultFillColor = '#e0e0e0';
   private readonly defaultFrameFillColor = '#3f3f46';
@@ -286,6 +348,126 @@ export class AppearanceSectionComponent {
 
   shadowValue(element: CanvasElement): string | null {
     return normalizeCanvasShadowValue(element.shadow) ?? null;
+  }
+
+  // --- Filters ---
+
+  hasFilters(element: CanvasElement): boolean {
+    return (element.cssFilterOptions?.length ?? 0) > 0;
+  }
+
+  isFilterAdded(element: CanvasElement, filterId: CanvasFilterType): boolean {
+    return element.cssFilterOptions?.includes(filterId) ?? false;
+  }
+
+  activeFilterDefinitions(element: CanvasElement): readonly FilterDefinition[] {
+    return FILTER_DEFINITIONS.filter((def) => this.isFilterAdded(element, def.id));
+  }
+
+  filterValue(element: CanvasElement, filterId: CanvasFilterType): number {
+    return (
+      (element[FILTER_FIELD_MAP[filterId]] as number | undefined) ?? FILTER_DEFAULT_VALUES[filterId]
+    );
+  }
+
+  onFilterValueChange(filterId: CanvasFilterType, value: number): void {
+    if (!Number.isFinite(value)) return;
+    const element = this.element();
+    this.elementPatch.emit({
+      [FILTER_FIELD_MAP[filterId]]: value,
+      cssFilterOptions: this.mergeFilterOptions(element, filterId),
+    } as Partial<CanvasElement>);
+  }
+
+  removeFilter(filterId: CanvasFilterType): void {
+    const element = this.element();
+    const next = (element.cssFilterOptions ?? []).filter((o) => o !== filterId);
+    this.elementPatch.emit({
+      cssFilterOptions: next.length > 0 ? next : undefined,
+      [FILTER_FIELD_MAP[filterId]]: undefined,
+    } as Partial<CanvasElement>);
+  }
+
+  onStyleSectionHeaderClick(event: MouseEvent): void {
+    this.openStyleMenu(event, this.resolveSectionHeaderTrigger(event));
+  }
+
+  onStyleSectionToggleClick(event: MouseEvent): void {
+    event.stopPropagation();
+    this.onStyleSectionHeaderClick(event);
+  }
+
+  closeStyleMenu(): void {
+    this.styleMenuItems = [];
+  }
+
+  private openStyleMenu(event: MouseEvent | null, trigger: HTMLElement | null): void {
+    const position = this.resolveMenuPosition(event, trigger);
+    if (!position) return;
+    if (this.styleMenuItems.length > 0) {
+      this.closeStyleMenu();
+      return;
+    }
+    this.styleMenuItems = this.buildStyleMenuItems();
+    this.styleMenuX = position.x;
+    this.styleMenuY = position.y;
+  }
+
+  private buildStyleMenuItems(): ContextMenuItem[] {
+    return [
+      {
+        id: 'filters',
+        label: 'Filters',
+        children: FILTER_DEFINITIONS.map((def) => ({
+          id: def.id,
+          label: def.label,
+          action: () => {
+            this.addFilter(def.id);
+            this.closeStyleMenu();
+          },
+        })),
+      },
+    ];
+  }
+
+  private addFilter(filterId: CanvasFilterType): void {
+    const element = this.element();
+    if (this.isFilterAdded(element, filterId)) return;
+    const def = FILTER_DEFINITIONS.find((d) => d.id === filterId);
+    this.elementPatch.emit({
+      cssFilterOptions: [...(element.cssFilterOptions ?? []), filterId],
+      [FILTER_FIELD_MAP[filterId]]: def?.defaultValue ?? FILTER_DEFAULT_VALUES[filterId],
+    } as Partial<CanvasElement>);
+  }
+
+  private mergeFilterOptions(
+    element: CanvasElement,
+    filterId: CanvasFilterType,
+  ): CanvasFilterType[] {
+    const current = element.cssFilterOptions ?? [];
+    if (current.includes(filterId)) return current;
+    return [...current, filterId];
+  }
+
+  private resolveMenuPosition(
+    event: MouseEvent | null,
+    trigger: HTMLElement | null,
+  ): { x: number; y: number } | null {
+    if (event && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+      return { x: event.clientX, y: event.clientY };
+    }
+    if (!trigger) return null;
+    const rect = trigger.getBoundingClientRect();
+    return { x: rect.left, y: rect.top - 6 };
+  }
+
+  private resolveSectionHeaderTrigger(event: MouseEvent): HTMLElement | null {
+    const currentTarget = event.currentTarget;
+    if (!(currentTarget instanceof HTMLElement)) return null;
+    return (
+      (currentTarget.closest('.properties-section-header') as HTMLElement | null) ??
+      (currentTarget.querySelector('.properties-section-header') as HTMLElement | null)
+    );
   }
 
   private formatShadowMetric(value: number): string {

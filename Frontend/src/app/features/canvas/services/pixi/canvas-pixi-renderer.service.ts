@@ -1,5 +1,15 @@
 import { Injectable, inject } from '@angular/core';
-import { Container, Graphics, Text, TextStyle, Sprite, Assets, Texture, BlurFilter } from 'pixi.js';
+import {
+  Container,
+  Graphics,
+  Text,
+  TextStyle,
+  Sprite,
+  Assets,
+  Texture,
+  BlurFilter,
+  ColorMatrixFilter,
+} from 'pixi.js';
 import { CanvasElement, CanvasCornerRadii, CanvasBorderWidths } from '@app/core';
 import { CanvasPixiApplicationService } from './canvas-pixi-application.service';
 import { CanvasPixiLayoutService, LayoutResult } from './canvas-pixi-layout.service';
@@ -14,7 +24,11 @@ import {
 import { getTextFontSizeInPx } from '../../utils/element/canvas-text.util';
 import { roundToTwoDecimals } from '../../utils/canvas-math.util';
 import { Bounds, FlowDragRenderState, CanvasPageLayout } from '../../canvas.types';
-import { parsePixiCssColor, parseAllShadowParams, PixiShadowParams } from '../../utils/pixi/canvas-pixi-shadow.util';
+import {
+  parsePixiCssColor,
+  parseAllShadowParams,
+  PixiShadowParams,
+} from '../../utils/pixi/canvas-pixi-shadow.util';
 
 const MAX_TEXT_RENDER_RESOLUTION = 4;
 const MAX_SHADOW_BLUR_QUALITY = 4;
@@ -441,6 +455,113 @@ export class CanvasPixiRendererService {
     const blendMode = element.blendMode;
     if (blendMode && blendMode !== 'normal') {
       container.blendMode = blendMode as any;
+    }
+
+    // CSS Filters (blur, brightness, contrast, grayscale, hue-rotate, invert, saturate, sepia)
+    if (element.cssFilterOptions && element.cssFilterOptions.length > 0) {
+      const activeOptions = element.cssFilterOptions;
+
+      // Blur: must live on an outer wrapper (no mask) so it can spread beyond element bounds.
+      // Reuse shadowWrapper if one already exists; otherwise create a dedicated wrapper.
+      if (activeOptions.includes('blur') && (element.filterBlur ?? 0) > 0) {
+        const blurStrength = element.filterBlur!;
+        const blurFilter = new BlurFilter({
+          strength: blurStrength,
+          quality: MAX_SHADOW_BLUR_QUALITY,
+        });
+        // updatePadding() overrides any constructor padding option with strength*2.
+        // Set explicitly after construction so the blur can spread freely.
+        blurFilter.padding = Math.ceil(blurStrength * 5);
+        if (!shadowWrapper) {
+          shadowWrapper = new Container({ label: `filter-wrap-${element.id}` });
+        }
+        const existing = shadowWrapper.filters ?? [];
+        shadowWrapper.filters = [...(Array.isArray(existing) ? existing : [existing]), blurFilter];
+      }
+
+      // Color-matrix filters: applied directly to the element container (no spreading needed).
+      const colorFilterIds = [
+        'brightness',
+        'contrast',
+        'grayscale',
+        'hueRotate',
+        'invert',
+        'saturate',
+        'sepia',
+      ] as const;
+      const activeColorFilters = colorFilterIds.filter((id) => activeOptions.includes(id));
+
+      if (activeColorFilters.length > 0) {
+        const cm = new ColorMatrixFilter();
+        let firstOp = true;
+
+        for (const id of activeColorFilters) {
+          const multiply = !firstOp;
+          if (id === 'brightness' && element.filterBrightness != null) {
+            cm.brightness(element.filterBrightness / 100, multiply);
+            firstOp = false;
+          } else if (id === 'contrast' && element.filterContrast != null) {
+            cm.contrast(element.filterContrast / 100 - 1, multiply);
+            firstOp = false;
+          } else if (
+            id === 'grayscale' &&
+            element.filterGrayscale != null &&
+            element.filterGrayscale > 0
+          ) {
+            cm.greyscale(element.filterGrayscale / 100, multiply);
+            firstOp = false;
+          } else if (
+            id === 'hueRotate' &&
+            element.filterHueRotate != null &&
+            element.filterHueRotate !== 0
+          ) {
+            cm.hue(element.filterHueRotate, multiply);
+            firstOp = false;
+          } else if (id === 'invert' && element.filterInvert != null && element.filterInvert > 0) {
+            const t = element.filterInvert / 100;
+            (cm as any)._loadMatrix(
+              [1 - 2 * t, 0, 0, 0, t, 0, 1 - 2 * t, 0, 0, t, 0, 0, 1 - 2 * t, 0, t, 0, 0, 0, 1, 0],
+              multiply,
+            );
+            firstOp = false;
+          } else if (id === 'saturate' && element.filterSaturate != null) {
+            cm.saturate(element.filterSaturate / 100 - 1, multiply);
+            firstOp = false;
+          } else if (id === 'sepia' && element.filterSepia != null && element.filterSepia > 0) {
+            const t = element.filterSepia / 100;
+            (cm as any)._loadMatrix(
+              [
+                0.393 * t + (1 - t),
+                0.769 * t,
+                0.189 * t,
+                0,
+                0,
+                0.349 * t,
+                0.686 * t + (1 - t),
+                0.168 * t,
+                0,
+                0,
+                0.272 * t,
+                0.534 * t,
+                0.131 * t + (1 - t),
+                0,
+                0,
+                0,
+                0,
+                0,
+                1,
+                0,
+              ],
+              multiply,
+            );
+            firstOp = false;
+          }
+        }
+
+        if (!firstOp) {
+          container.filters = [cm];
+        }
+      }
     }
 
     return {
@@ -1125,7 +1246,20 @@ export class CanvasPixiRendererService {
     }
 
     if (normalizedStyle === 'dashed' || normalizedStyle === 'dotted') {
-      this.drawDashedRectStroke(g, x, y, w, h, tl, tr, br, bl, stroke, strokeWidth, normalizedStyle);
+      this.drawDashedRectStroke(
+        g,
+        x,
+        y,
+        w,
+        h,
+        tl,
+        tr,
+        br,
+        bl,
+        stroke,
+        strokeWidth,
+        normalizedStyle,
+      );
       return;
     }
 
@@ -1197,9 +1331,9 @@ export class CanvasPixiRendererService {
         }
       };
 
-      placeDots(x + cornerOff(tl), x + w - cornerOff(tr), y + r,     true);
+      placeDots(x + cornerOff(tl), x + w - cornerOff(tr), y + r, true);
       placeDots(x + cornerOff(bl), x + w - cornerOff(br), y + h - r, true);
-      placeDots(y + cornerOff(tl), y + h - cornerOff(bl), x + r,     false);
+      placeDots(y + cornerOff(tl), y + h - cornerOff(bl), x + r, false);
       placeDots(y + cornerOff(tr), y + h - cornerOff(br), x + w - r, false);
 
       g.fill(fillOpts);
@@ -1276,10 +1410,10 @@ export class CanvasPixiRendererService {
       g.fill(fillOpts);
     };
 
-    drawFilledArc(x + tl,     y + tl,     tl, Math.PI);
-    drawFilledArc(x + w - tr, y + tr,     tr, -Math.PI / 2);
+    drawFilledArc(x + tl, y + tl, tl, Math.PI);
+    drawFilledArc(x + w - tr, y + tr, tr, -Math.PI / 2);
     drawFilledArc(x + w - br, y + h - br, br, 0);
-    drawFilledArc(x + bl,     y + h - bl, bl, Math.PI / 2);
+    drawFilledArc(x + bl, y + h - bl, bl, Math.PI / 2);
   }
 
   /**
@@ -1341,7 +1475,17 @@ export class CanvasPixiRendererService {
     // Inner ring: inset by (strokeWidth - lineW) so the gap sits in between
     const inset = strokeWidth - lineW;
     const clamp = (v: number): number => Math.max(0, v - inset);
-    drawRR(g, x + inset, y + inset, w - inset * 2, h - inset * 2, clamp(tl), clamp(tr), clamp(br), clamp(bl));
+    drawRR(
+      g,
+      x + inset,
+      y + inset,
+      w - inset * 2,
+      h - inset * 2,
+      clamp(tl),
+      clamp(tr),
+      clamp(br),
+      clamp(bl),
+    );
     g.stroke({ width: lineW, color: stroke.color, alpha: stroke.alpha, alignment: 0 });
   }
 
@@ -1568,6 +1712,15 @@ export class CanvasPixiRendererService {
       backgroundSize: el.backgroundSize,
       backgroundPosition: el.backgroundPosition,
       objectFit: el.objectFit,
+      cssFilterOptions: el.cssFilterOptions,
+      filterBlur: el.filterBlur,
+      filterBrightness: el.filterBrightness,
+      filterContrast: el.filterContrast,
+      filterGrayscale: el.filterGrayscale,
+      filterHueRotate: el.filterHueRotate,
+      filterInvert: el.filterInvert,
+      filterSaturate: el.filterSaturate,
+      filterSepia: el.filterSepia,
     });
   }
 

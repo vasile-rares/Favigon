@@ -47,9 +47,7 @@ import {
   getCanvasSizeMode,
   getCanvasSizingValue,
 } from '../utils/element/canvas-sizing.util';
-import {
-  normalizeCanvasShadowValue,
-} from '../utils/element/canvas-shadow.util';
+import { normalizeCanvasShadowValue } from '../utils/element/canvas-shadow.util';
 import { resolveCanvasEffect } from '../utils/element/canvas-effect.util';
 import { collectFrameSubtree, syncBreakpointElements } from './canvas-breakpoint.mapper';
 
@@ -425,6 +423,29 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     style.shadows = parseAllCanvasShadowLayers(shadowStr);
   }
 
+  if (element.cssFilterOptions && element.cssFilterOptions.length > 0) {
+    const filterParts: string[] = [];
+    if (element.cssFilterOptions.includes('blur') && element.filterBlur != null)
+      filterParts.push(`blur(${element.filterBlur}px)`);
+    if (element.cssFilterOptions.includes('brightness') && element.filterBrightness != null)
+      filterParts.push(`brightness(${element.filterBrightness}%)`);
+    if (element.cssFilterOptions.includes('contrast') && element.filterContrast != null)
+      filterParts.push(`contrast(${element.filterContrast}%)`);
+    if (element.cssFilterOptions.includes('grayscale') && element.filterGrayscale != null)
+      filterParts.push(`grayscale(${element.filterGrayscale}%)`);
+    if (element.cssFilterOptions.includes('hueRotate') && element.filterHueRotate != null)
+      filterParts.push(`hue-rotate(${element.filterHueRotate}deg)`);
+    if (element.cssFilterOptions.includes('invert') && element.filterInvert != null)
+      filterParts.push(`invert(${element.filterInvert}%)`);
+    if (element.cssFilterOptions.includes('saturate') && element.filterSaturate != null)
+      filterParts.push(`saturate(${element.filterSaturate}%)`);
+    if (element.cssFilterOptions.includes('sepia') && element.filterSepia != null)
+      filterParts.push(`sepia(${element.filterSepia}%)`);
+    if (filterParts.length > 0) style.filter = filterParts.join(' ');
+    if (element.cssFilterOptions.includes('backdropBlur') && element.filterBackdropBlur != null)
+      style.backdropFilter = `blur(${element.filterBackdropBlur}px)`;
+  }
+
   if (typeof element.cornerRadius === 'number') {
     style.borderRadius = px(element.cornerRadius);
   }
@@ -790,15 +811,11 @@ function resolveCanvasBorderSideWidth(
  * Canvas stores border-box (content + padding); CSS border-box also includes stroke.
  * Only the stroke portion needs to be added for IR output.
  */
-function getBorderBoxAdjustment(
-  element: CanvasElement,
-  axis: 'width' | 'height',
-): number {
+function getBorderBoxAdjustment(element: CanvasElement, axis: 'width' | 'height'): number {
   return axis === 'width'
-    ? resolveCanvasBorderSideWidth(element, 'left') +
-      resolveCanvasBorderSideWidth(element, 'right')
+    ? resolveCanvasBorderSideWidth(element, 'left') + resolveCanvasBorderSideWidth(element, 'right')
     : resolveCanvasBorderSideWidth(element, 'top') +
-      resolveCanvasBorderSideWidth(element, 'bottom');
+        resolveCanvasBorderSideWidth(element, 'bottom');
 }
 
 function normalizeExternalLinkUrl(value: string | undefined): string | undefined {

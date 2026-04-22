@@ -113,6 +113,17 @@ export type CanvasTransformOption =
   | 'backface'
   | 'preserve3d';
 
+export type CanvasFilterType =
+  | 'blur'
+  | 'backdropBlur'
+  | 'brightness'
+  | 'contrast'
+  | 'grayscale'
+  | 'hueRotate'
+  | 'invert'
+  | 'saturate'
+  | 'sepia';
+
 export type CanvasDisplayMode = 'block' | 'flex' | 'grid';
 export type CanvasPositionMode = 'static' | 'relative' | 'absolute' | 'fixed' | 'sticky';
 export type CanvasFlexDirection = 'row' | 'column' | 'row-reverse' | 'column-reverse';
@@ -214,6 +225,16 @@ export interface CanvasElement {
   backfaceVisibility?: CanvasBackfaceVisibility;
   preserve3D?: boolean;
   transformOptions?: CanvasTransformOption[];
+  cssFilterOptions?: CanvasFilterType[];
+  filterBlur?: number;
+  filterBackdropBlur?: number;
+  filterBrightness?: number;
+  filterContrast?: number;
+  filterGrayscale?: number;
+  filterHueRotate?: number;
+  filterInvert?: number;
+  filterSaturate?: number;
+  filterSepia?: number;
   visible?: boolean;
   fill?: string;
   fillMode?: CanvasFillMode;

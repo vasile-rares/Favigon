@@ -82,6 +82,9 @@ export interface IRStyle {
 
   cursor?: string;
 
+  filter?: string;
+  backdropFilter?: string;
+
   padding?: IRSpacing;
   margin?: IRSpacing;
 }

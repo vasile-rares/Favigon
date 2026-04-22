@@ -1,5 +1,20 @@
 <section class="properties-section">
-  <p class="properties-section-title">Style</p>
+  <div
+    class="properties-section-header properties-section-header--menu properties-section-header--actionable"
+    (click)="onStyleSectionHeaderClick($event)">
+    <p class="properties-section-title">Style</p>
+    <button
+      type="button"
+      class="pp-section-toggle pp-section-toggle--plus"
+      aria-label="Add style"
+      title="Add style"
+      (click)="onStyleSectionToggleClick($event)">
+      <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+        <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+        <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+      </svg>
+    </button>
+  </div>
 
   <div class="pp-style-row">
     <span class="pp-row-label">Opacity</span>
@@ -212,5 +227,43 @@
     </div>
   </div>
 }
+  @for (def of activeFilterDefinitions(element()); track def.id) {
+    <div class="pp-style-row">
+      <span class="pp-row-label">{{ def.label }}</span>
+      <div class="pp-style-control pp-style-control--filter">
+        <app-number-input
+          appearance="compact"
+          [ariaLabel]="def.label"
+          [value]="filterValue(element(), def.id)"
+          [min]="def.min"
+          [max]="def.max"
+          [step]="def.step"
+          [suffix]="def.unit"
+          (gestureStarted)="onNumberInputGestureStarted()"
+          (gestureCommitted)="onNumberInputGestureCommitted()"
+          (valueChange)="onFilterValueChange(def.id, $event)"></app-number-input>
+        <button
+          type="button"
+          class="pp-row-remove-btn"
+          aria-label="Remove filter"
+          title="Remove filter"
+          (click)="removeFilter(def.id)">
+          <svg viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  }
 
 </section>
+
+@if (styleMenuItems.length > 0) {
+<app-context-menu
+  [x]="styleMenuX"
+  [y]="styleMenuY"
+  [verticalDirection]="'below'"
+  [submenuDirection]="'left'"
+  [items]="styleMenuItems"
+  (closed)="closeStyleMenu()"></app-context-menu>
+}

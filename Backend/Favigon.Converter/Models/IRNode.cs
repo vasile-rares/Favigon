@@ -135,6 +135,9 @@ public class IRStyle
 
   public string? Cursor { get; set; }
 
+  public string? Filter { get; set; }
+  public string? BackdropFilter { get; set; }
+
   public IRSpacing? Padding { get; set; }
   public IRSpacing? Margin { get; set; }
 }

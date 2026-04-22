@@ -38,6 +38,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy {
   readonly y = input(0);
   readonly items = input<ContextMenuItem[]>([]);
   readonly verticalDirection = input<ContextMenuVerticalDirection>('below');
+  readonly submenuDirection = input<'left' | 'right'>('right');
 
   readonly closed = output<void>();
 
