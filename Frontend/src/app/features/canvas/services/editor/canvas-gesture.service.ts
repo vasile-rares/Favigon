@@ -79,6 +79,14 @@ export class CanvasGestureService {
   readonly draggingFlowChildId = signal<string | null>(null);
   readonly layoutDropTarget = signal<{ containerId: string; index: number } | null>(null);
   readonly autoOpenFillPopupElementId = signal<string | null>(null);
+  /**
+   * Stable (DOM-settled) overlay-scene bounds for the currently selected element,
+   * together with the element ID they belong to. Updated in markFlowBoundsCacheClean()
+   * after ngAfterViewChecked (DOM fully settled). Also used during the dirty phase to
+   * avoid the 1-frame teleport on property changes. The element ID guard prevents using
+   * stale bounds from a previously selected element after a selection change.
+   */
+  readonly stableSelectionBounds = signal<{ elementId: string; bounds: Bounds } | null>(null);
 
   private readonly _flowCacheVersion = signal(0);
   get flowCacheVersion() {
@@ -109,8 +117,8 @@ export class CanvasGestureService {
   private hasMovedElementDuringDrag = false;
   private rectangleDrawState: RectangleDrawState | null = null;
   private isFlowDragInsideContainer = false;
-  private isResizing = false;
-  private isRotating = false;
+  readonly isResizing = signal(false);
+  readonly isRotating = signal(false);
   private isAdjustingCornerRadius = false;
   private isDraggingPage = false;
   private hasMovedPageDuringDrag = false;
@@ -140,6 +148,7 @@ export class CanvasGestureService {
     aspectRatio: 1,
     elementId: '',
     handle: 'se',
+    parentAbsoluteBounds: null,
   };
 
   private rotateStart: RotateState = {
@@ -188,7 +197,7 @@ export class CanvasGestureService {
 
   cancelDragState(): void {
     this.isDragging = false;
-    this.isResizing = false;
+    this.isResizing.set(false);
   }
 
   // ── Gesture starters ──────────────────────────────────────
@@ -211,11 +220,26 @@ export class CanvasGestureService {
         this.editorState.elements(),
         this.editorState.currentPage(),
       );
+    const parentEl = this.element.findElementById(el.parentId ?? null, this.editorState.elements());
+    const parentAbsoluteBounds = parentEl
+      ? (this.getLiveElementCanvasBounds(parentEl) ??
+        this.element.getAbsoluteBounds(
+          parentEl,
+          this.editorState.elements(),
+          this.editorState.currentPage(),
+        ))
+      : null;
     this.captureResizeSubtreeSnapshot(id, this.editorState.elements());
     this.editorState.selectOnlyElement(id);
     this.beginGestureHistory();
     this.isDragging = false;
-    this.isResizing = true;
+    this.isResizing.set(true);
+    // Seed stable bounds immediately so selectionOverlayBounds is correct on the very first
+    // CD cycle of the gesture (before markFlowBoundsCacheClean fires after ngAfterViewChecked).
+    const resizeSnapshot = this.snapshotOverlaySceneBounds(el);
+    this.stableSelectionBounds.set(
+      resizeSnapshot ? { elementId: id, bounds: resizeSnapshot } : null,
+    );
     this.resizeStart = {
       pointerX: pointer.x,
       pointerY: pointer.y,
@@ -228,6 +252,7 @@ export class CanvasGestureService {
       aspectRatio: bounds.width / Math.max(bounds.height, 1),
       elementId: id,
       handle,
+      parentAbsoluteBounds,
     };
   }
 
@@ -255,8 +280,14 @@ export class CanvasGestureService {
     this.editorState.selectOnlyElement(id);
     this.beginGestureHistory();
     this.isDragging = false;
-    this.isResizing = false;
-    this.isRotating = true;
+    this.isResizing.set(false);
+    this.isRotating.set(true);
+    // Seed stable bounds immediately so selectionOverlayBounds is correct on the very first
+    // CD cycle of the gesture (before markFlowBoundsCacheClean fires after ngAfterViewChecked).
+    const rotateSnapshot = this.snapshotOverlaySceneBounds(el);
+    this.stableSelectionBounds.set(
+      rotateSnapshot ? { elementId: id, bounds: rotateSnapshot } : null,
+    );
     this.rotateStart = {
       startAngle,
       initialRotation: el.rotation ?? 0,
@@ -287,8 +318,8 @@ export class CanvasGestureService {
     this.editorState.selectOnlyElement(id);
     this.beginGestureHistory();
     this.isDragging = false;
-    this.isResizing = false;
-    this.isRotating = false;
+    this.isResizing.set(false);
+    this.isRotating.set(false);
     this.isAdjustingCornerRadius = true;
     this.cornerRadiusStart = {
       absoluteX: bounds.x,
@@ -378,8 +409,8 @@ export class CanvasGestureService {
       this.isDraggingPage ||
       !!this.rectangleDrawState ||
       this.viewport.isPanning() ||
-      this.isRotating ||
-      this.isResizing ||
+      this.isRotating() ||
+      this.isResizing() ||
       this.isAdjustingCornerRadius ||
       this.isElementDragPrimed ||
       this.isDragging;
@@ -422,12 +453,12 @@ export class CanvasGestureService {
       return;
     }
 
-    if (this.isRotating) {
+    if (this.isRotating()) {
       this.handleRotatePointerMove(event);
       return;
     }
 
-    if (this.isResizing) {
+    if (this.isResizing()) {
       this.handleResizePointerMove(event);
       return;
     }
@@ -528,8 +559,15 @@ export class CanvasGestureService {
       return;
     }
 
-    const { xCandidates, yCandidates } = buildSnapCandidates(selectedId, elements, (el, els) =>
-      this.element.getAbsoluteBounds(el, els, this.editorState.currentPage()),
+    const { xCandidates, yCandidates } = buildSnapCandidates(
+      selectedId,
+      elements,
+      (el, els) =>
+        // Use live DOM bounds when available — essential for flow children whose stored x/y is 0
+        // (position is CSS-determined by the parent flex container). Model-based getAbsoluteBounds
+        // would return the parent's origin for all flow children, generating false snap candidates.
+        this.getLiveElementCanvasBounds(el) ??
+        this.element.getAbsoluteBounds(el, els, this.editorState.currentPage()),
     );
     const pageWidth = this.page.currentViewportWidth();
     const pageHeight = this.page.currentViewportHeight();
@@ -609,8 +647,8 @@ export class CanvasGestureService {
     const isGroupDrag = this.dragSelectionIds.length > 1;
     const shouldCommitGestureHistory =
       this.isDragging ||
-      this.isResizing ||
-      this.isRotating ||
+      this.isResizing() ||
+      this.isRotating() ||
       this.isAdjustingCornerRadius ||
       this.isDraggingPage;
 
@@ -631,7 +669,7 @@ export class CanvasGestureService {
     }
 
     if (
-      (this.isResizing || (this.isDragging && this.hasMovedElementDuringDrag)) &&
+      (this.isResizing() || (this.isDragging && this.hasMovedElementDuringDrag)) &&
       selectedOnDrop &&
       !isGroupDrag
     ) {
@@ -640,7 +678,7 @@ export class CanvasGestureService {
         if (freshEl?.primarySyncId) {
           return els.map((e) => (e.id === freshEl.id ? { ...e, primarySyncId: undefined } : e));
         }
-        if (this.isResizing && freshEl?.type === 'frame' && !freshEl.parentId) {
+        if (this.isResizing() && freshEl?.type === 'frame' && !freshEl.parentId) {
           return this.syncPrimaryFrameResize(freshEl, els);
         }
         return this.syncElementMoveToPrimary(freshEl, els);
@@ -658,8 +696,8 @@ export class CanvasGestureService {
     this.viewport.endPan();
     this.isElementDragPrimed = false;
     this.isDragging = false;
-    this.isResizing = false;
-    this.isRotating = false;
+    this.isResizing.set(false);
+    this.isRotating.set(false);
     this.isAdjustingCornerRadius = false;
     this.isDraggingPage = false;
     this.hasMovedElementDuringDrag = false;
@@ -815,10 +853,12 @@ export class CanvasGestureService {
       const resizedElements = els.map((el) => {
         if (el.id !== start.elementId) return el;
 
-        const parent = this.element.findElementById(el.parentId ?? null, els);
-        const parentBounds = parent
-          ? this.element.getAbsoluteBounds(parent, els, this.editorState.currentPage())
-          : null;
+        // Use the parent bounds captured at gesture start (live DOM) rather than
+        // recomputing from model. For flow children inside a flex/grid container,
+        // element.x/y is 0 (position is CSS-determined), so getAbsoluteBounds would
+        // return the wrong parent origin, corrupting both the clamping and the
+        // relative-position calculation below.
+        const parentBounds = start.parentAbsoluteBounds;
         const bounds = calculateResizedBounds(
           this.resizeStart,
           parentBounds,
@@ -1064,6 +1104,20 @@ export class CanvasGestureService {
 
   markFlowBoundsCacheClean(): void {
     this.flowBoundsDirty = false;
+    // Capture stable selection bounds from live DOM — DOM is fully settled at this point
+    // (called via setTimeout after ngAfterViewChecked, so all child components have painted).
+    // Works correctly for all element types: flow children (x=0 stored), deeply-nested
+    // absolutes, rotated elements. Stored in stableSelectionBounds so selectionOverlayBounds
+    // can use them during resize/rotate AND during the dirty phase (e.g. property changes)
+    // without reading a stale DOM during the CD pass.
+    const selectedId = this.editorState.selectedElementId();
+    if (selectedId) {
+      const el = this.element.findElementById(selectedId, this.editorState.elements());
+      const snapshot = el ? this.snapshotOverlaySceneBounds(el) : null;
+      this.stableSelectionBounds.set(snapshot ? { elementId: selectedId, bounds: snapshot } : null);
+    } else {
+      this.stableSelectionBounds.set(null);
+    }
     // Bump the version so overlay computeds (selectionOverlayBounds, hoveredOverlayBounds, etc.)
     // re-evaluate AFTER the DOM has been updated by Angular's render phase.
     // Without this, they read live bounds from the stale DOM (before child components paint)
@@ -1284,6 +1338,27 @@ export class CanvasGestureService {
   }
 
   // ── Live bounds ───────────────────────────────────────────
+
+  /**
+   * Non-reactive snapshot of overlay-scene bounds from live DOM.
+   * Safe to call outside a reactive context (ngAfterViewChecked, gesture starters).
+   * Does NOT register a dependency on _flowCacheVersion.
+   */
+  private snapshotOverlaySceneBounds(el: CanvasElement): Bounds | null {
+    const sceneEl = this.getCanvasElement()?.querySelector<HTMLElement>('.canvas-scene') ?? null;
+    if (!sceneEl) return null;
+    const domEl = sceneEl.querySelector<HTMLElement>(`[data-element-id="${el.id}"]`);
+    if (!domEl) return null;
+    const zoom = this.viewport.zoomLevel();
+    const sceneRect = sceneEl.getBoundingClientRect();
+    const rect = domEl.getBoundingClientRect();
+    return {
+      x: roundToTwoDecimals((rect.left - sceneRect.left) / zoom),
+      y: roundToTwoDecimals((rect.top - sceneRect.top) / zoom),
+      width: roundToTwoDecimals(rect.width / zoom),
+      height: roundToTwoDecimals(rect.height / zoom),
+    };
+  }
 
   getLiveOverlaySceneBounds(el: CanvasElement): Bounds | null {
     void this._flowCacheVersion(); // track for overlay reactivity

@@ -272,26 +272,25 @@
 
 .hover-outline {
   position: absolute;
-  border: 2px solid #3b82f6;
+  outline: 2px solid #3b82f6;
   pointer-events: none;
-  border-radius: 1px;
 }
 
 .multi-select-outline {
   position: absolute;
-  border: 2px solid rgba(59, 130, 246, 0.5);
+  outline: 2px solid rgba(59, 130, 246, 0.5);
   pointer-events: none;
 }
 
 .synced-selection-outline {
   position: absolute;
-  border: 2px solid rgba(59, 130, 246, 0.28);
+  outline: 2px solid rgba(59, 130, 246, 0.28);
   pointer-events: none;
 }
 
 .selection-outline {
   position: absolute;
-  border: 2px solid #3b82f6;
+  outline: 2px solid #3b82f6;
   pointer-events: auto;
   cursor: default;
 }

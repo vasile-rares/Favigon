@@ -39,9 +39,7 @@ import { CanvasDomElementComponent } from '../../components/canvas-dom-element/c
 import { mutateNormalizeElement } from '../../utils/element/canvas-element-normalization.util';
 import { roundToTwoDecimals } from '../../utils/canvas-math.util';
 import { collectSubtreeIds, removeWithChildren } from '../../utils/canvas-tree.util';
-import {
-  generateThumbnail,
-} from '../../utils/pixi/canvas-thumbnail.util';
+import { generateThumbnail } from '../../utils/pixi/canvas-thumbnail.util';
 import {
   getTextFontFamily,
   getTextFontWeight,
@@ -199,30 +197,55 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const selected = this.selectedElement();
     if (!selected || this.gesture.isDraggingEl() || this.editingTextElementId()) return null;
     void this.gesture.flowCacheVersion(); // register reactive dependency
-    // When the cache is dirty, Angular hasn't yet re-rendered child components, so reading the
-    // live DOM gives stale positions. Use getCachedOverlaySceneBounds instead — for
-    // absolute-positioned elements it uses updated element.x/y (correct), for flow children
-    // it gives an approximate value that will be corrected on the second pass.
-    // markFlowBoundsCacheClean() bumps flowCacheVersion after ngAfterViewChecked, which
-    // triggers this computed again once the DOM is stable — at that point live bounds are correct.
-    if (this.gesture.isFlowBoundsDirty()) {
-      return this.gesture.getCachedOverlaySceneBounds(selected);
+
+    // Use stable bounds (captured after ngAfterViewChecked when DOM is fully settled) whenever
+    // they belong to the currently selected element. This covers two cases:
+    //
+    // • resize/rotate: model is updated every pointer-move frame. Live-DOM read during CD
+    //   is stale (child components haven't painted yet), causing the dirty/clean oscillation
+    //   that made the outline flicker/teleport for all element types.
+    //
+    // • dirty phase (e.g. property change from Design Tab): invalidateFlowBoundsCache fires,
+    //   dirty=true, getCachedOverlaySceneBounds uses model-based getAbsoluteBounds (wrong for
+    //   flow children where x=0). stableSelectionBounds still holds the last settled position,
+    //   so we use it to avoid the 1-frame teleport before markFlowBoundsCacheClean fires.
+    //
+    // The element ID guard prevents using stale bounds from a previously selected element.
+    const stable = this.gesture.stableSelectionBounds();
+    const stableBounds = stable?.elementId === selected.id ? stable.bounds : null;
+
+    if (this.gesture.isResizing() || this.gesture.isRotating()) {
+      return stableBounds ?? this.gesture.getCachedOverlaySceneBounds(selected);
     }
-    return this.gesture.getLiveOverlaySceneBounds(selected)
-      ?? this.gesture.getCachedOverlaySceneBounds(selected);
+
+    if (this.gesture.isFlowBoundsDirty()) {
+      return stableBounds ?? this.gesture.getCachedOverlaySceneBounds(selected);
+    }
+    return (
+      this.gesture.getLiveOverlaySceneBounds(selected) ??
+      this.gesture.getCachedOverlaySceneBounds(selected)
+    );
   });
 
   /** Whether resize/rotate handles should be shown for the selected element. */
   readonly showSelectionHandles = computed<boolean>(() => {
     const s = this.selectedElement();
     if (!s) return false;
-    return s.type !== 'frame' && s.type !== 'text' && s.widthMode !== 'fill' && s.heightMode !== 'fill';
+    return (
+      s.type !== 'frame' && s.type !== 'text' && s.widthMode !== 'fill' && s.heightMode !== 'fill'
+    );
   });
 
   /** Overlay-space bounds for the hovered element (null if not applicable). */
   readonly hoveredOverlayBounds = computed<Bounds | null>(() => {
     const hoveredId = this.gesture.hoveredElementId();
-    if (!hoveredId || this.gesture.isDraggingEl() || this.selectedElementIds().includes(hoveredId)) {
+    if (
+      !hoveredId ||
+      this.gesture.isDraggingEl() ||
+      this.gesture.isResizing() ||
+      this.gesture.isRotating() ||
+      this.selectedElementIds().includes(hoveredId)
+    ) {
       return null;
     }
     void this.gesture.flowCacheVersion(); // register reactive dependency
@@ -236,8 +259,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if (this.gesture.isFlowBoundsDirty()) {
       return this.gesture.getCachedOverlaySceneBounds(hovered);
     }
-    return this.gesture.getLiveOverlaySceneBounds(hovered)
-      ?? this.gesture.getCachedOverlaySceneBounds(hovered);
+    return (
+      this.gesture.getLiveOverlaySceneBounds(hovered) ??
+      this.gesture.getCachedOverlaySceneBounds(hovered)
+    );
   });
 
   /** Overlay-space bounds for each multi-selected element. */
@@ -1041,8 +1066,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     // Update hover from DOM
     const path = event.composedPath() as Element[];
     const elementEl = path.find(
-      (el): el is HTMLElement =>
-        el instanceof HTMLElement && el.hasAttribute('data-element-id'),
+      (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('data-element-id'),
     );
     const hoveredId = elementEl?.getAttribute('data-element-id') ?? null;
     if (hoveredId !== this.gesture.hoveredElementId()) {

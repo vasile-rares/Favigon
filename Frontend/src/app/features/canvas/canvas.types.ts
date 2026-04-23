@@ -63,6 +63,8 @@ export interface ResizeState {
   aspectRatio: number;
   elementId: string;
   handle: HandlePosition;
+  /** Canvas-space bounds of the parent at gesture start (live DOM). Null for root elements. */
+  parentAbsoluteBounds: Bounds | null;
 }
 
 export interface RotateState {

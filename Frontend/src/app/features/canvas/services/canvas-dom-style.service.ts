@@ -249,19 +249,21 @@ export class CanvasDomStyleService {
     const crossFill = mainIsWidth ? element.heightMode === 'fill' : element.widthMode === 'fill';
 
     if (mainFill) {
-      // Remove the explicit main-axis dimension so flex-basis resolves to `auto` (content size),
-      // matching the CSS `flex: 1` (flex-basis: 0 semantics via grow from content).
-      // Without this, the explicit px value acts as flex-basis and prevents correct distribution
-      // when the parent is itself shrunk by an outer layout (nested fill containers).
+      // Use flex: 1 1 0 semantics: set flex-basis to 0 so all fill siblings start from the
+      // same baseline before distributing available space via flex-grow. Without flex-basis: 0,
+      // flex-basis defaults to `auto` (content size), causing a fill item that contains
+      // children to receive more space than an empty sibling even though both have flex-grow: 1.
       if (mainIsWidth) {
         style['width'] = null;
         style['flex-grow'] = '1';
         style['flex-shrink'] = '1';
+        style['flex-basis'] = '0px';
         style['min-width'] = '0';
       } else {
         style['height'] = null;
         style['flex-grow'] = '1';
         style['flex-shrink'] = '1';
+        style['flex-basis'] = '0px';
         style['min-height'] = '0';
       }
     } else {
