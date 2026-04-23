@@ -17,9 +17,7 @@ import { CanvasHistoryService } from './canvas-history.service';
 import { CanvasElementService } from '../canvas-element.service';
 import { CanvasEditorStateService } from '../canvas-editor-state.service';
 import { CanvasPageService } from '../canvas-page.service';
-import { CanvasPixiGridService } from '../pixi/canvas-pixi-grid.service';
-import { CanvasPixiApplicationService } from '../pixi/canvas-pixi-application.service';
-import { CanvasPixiRendererService } from '../pixi/canvas-pixi-renderer.service';
+
 import { mutateNormalizeElement } from '../../utils/element/canvas-element-normalization.util';
 import { clamp, roundToTwoDecimals } from '../../utils/canvas-math.util';
 import { collectSubtreeIds, removeWithChildren } from '../../utils/canvas-tree.util';
@@ -58,21 +56,12 @@ export class CanvasGestureService {
   private readonly element = inject(CanvasElementService);
   private readonly editorState = inject(CanvasEditorStateService);
   private readonly page = inject(CanvasPageService);
-  private readonly pixiGrid = inject(CanvasPixiGridService);
-  private readonly pixiApp = inject(CanvasPixiApplicationService);
-  private readonly pixiRenderer = inject(CanvasPixiRendererService);
-
-  // ── Canvas element + Pixi scene access (set by component) ─
+  // ── Canvas element access (set by component) ────────────
 
   private canvasElementGetter: (() => HTMLElement | null) | null = null;
-  private _pixiSceneReady = false;
 
   setCanvasElementGetter(getter: () => HTMLElement | null): void {
     this.canvasElementGetter = getter;
-  }
-
-  setPixiSceneReady(ready: boolean): void {
-    this._pixiSceneReady = ready;
   }
 
   private getCanvasElement(): HTMLElement | null {
@@ -215,11 +204,13 @@ export class CanvasGestureService {
     const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) return;
 
-    const bounds = this.element.getAbsoluteBounds(
-      el,
-      this.editorState.elements(),
-      this.editorState.currentPage(),
-    );
+    const bounds =
+      this.getLiveElementCanvasBounds(el) ??
+      this.element.getAbsoluteBounds(
+        el,
+        this.editorState.elements(),
+        this.editorState.currentPage(),
+      );
     this.captureResizeSubtreeSnapshot(id, this.editorState.elements());
     this.editorState.selectOnlyElement(id);
     this.beginGestureHistory();
@@ -250,11 +241,13 @@ export class CanvasGestureService {
     const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) return;
 
-    const bounds = this.element.getAbsoluteBounds(
-      el,
-      this.editorState.elements(),
-      this.editorState.currentPage(),
-    );
+    const bounds =
+      this.getLiveElementCanvasBounds(el) ??
+      this.element.getAbsoluteBounds(
+        el,
+        this.editorState.elements(),
+        this.editorState.currentPage(),
+      );
     const centerX = bounds.x + bounds.width / 2;
     const centerY = bounds.y + bounds.height / 2;
     const startAngle = Math.atan2(pointer.y - centerY, pointer.x - centerX) * (180 / Math.PI);
@@ -347,12 +340,12 @@ export class CanvasGestureService {
       dragIds
         .map((id) => {
           const el = this.element.findElementById(id, elements);
-          return [
-            id,
-            el
-              ? this.element.getAbsoluteBounds(el, elements, this.editorState.currentPage())
-              : null,
-          ];
+          if (!el) return [id, null] as [string, Bounds | null];
+          // Prefer live DOM bounds for flow children whose stored x/y may differ from rendered position.
+          const bounds =
+            this.getLiveElementCanvasBounds(el) ??
+            this.element.getAbsoluteBounds(el, elements, this.editorState.currentPage());
+          return [id, bounds] as [string, Bounds | null];
         })
         .filter((entry): entry is [string, Bounds] => entry[1] !== null),
     );
@@ -1071,6 +1064,11 @@ export class CanvasGestureService {
 
   markFlowBoundsCacheClean(): void {
     this.flowBoundsDirty = false;
+    // Bump the version so overlay computeds (selectionOverlayBounds, hoveredOverlayBounds, etc.)
+    // re-evaluate AFTER the DOM has been updated by Angular's render phase.
+    // Without this, they read live bounds from the stale DOM (before child components paint)
+    // and get stuck at the wrong position until the next interaction.
+    this._flowCacheVersion.update((v) => v + 1);
   }
 
   private handleFlowChildDragMove(
@@ -1306,37 +1304,7 @@ export class CanvasGestureService {
       }
     }
 
-    return this.getLivePixiSceneBounds(el);
-  }
-
-  private getLivePixiSceneBounds(el: CanvasElement): Bounds | null {
-    if (!this._pixiSceneReady) return null;
-
-    const renderedBounds = this.pixiRenderer.getRenderedNodeSceneBounds(el.id);
-    if (renderedBounds) return renderedBounds;
-
-    const container = this.pixiRenderer.getContainerForElement(el.id);
-    if (!container || container.destroyed) return null;
-
-    const globalPos = container.toGlobal({ x: 0, y: 0 });
-    const scenePos = this.pixiApp.sceneContainer.toLocal(globalPos);
-    const renderedSize = this.pixiRenderer.getRenderedNodeSize(el.id);
-    const absoluteBounds = this.element.getAbsoluteBounds(
-      el,
-      this.editorState.elements(),
-      this.editorState.currentPage(),
-    );
-
-    return {
-      x: roundToTwoDecimals(scenePos.x),
-      y: roundToTwoDecimals(scenePos.y),
-      width: roundToTwoDecimals(
-        renderedSize && renderedSize.width > 0 ? renderedSize.width : absoluteBounds.width,
-      ),
-      height: roundToTwoDecimals(
-        renderedSize && renderedSize.height > 0 ? renderedSize.height : absoluteBounds.height,
-      ),
-    };
+    return null;
   }
 
   getCachedOverlaySceneBounds(el: CanvasElement): Bounds {
@@ -1344,9 +1312,6 @@ export class CanvasGestureService {
 
     const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(el.id);
     if (cached) return cached;
-
-    const livePixiBounds = this.getLivePixiSceneBounds(el);
-    if (livePixiBounds) return livePixiBounds;
 
     const layout = this.page.activePageLayout();
     const absolute = this.element.getAbsoluteBounds(

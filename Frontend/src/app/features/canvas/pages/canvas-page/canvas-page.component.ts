@@ -11,6 +11,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { NgStyle } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   CanvasElement,
@@ -35,14 +36,11 @@ import type { ContextMenuItem } from '@app/shared';
 import { ToolbarComponent } from '../../components/toolbar/toolbar.component';
 import { ProjectPanelComponent } from '../../components/project-panel/project-panel.component';
 import { PropertiesPanelComponent } from '../../components/properties-panel/properties-panel.component';
+import { CanvasDomElementComponent } from '../../components/canvas-dom-element/canvas-dom-element.component';
 import { mutateNormalizeElement } from '../../utils/element/canvas-element-normalization.util';
 import { roundToTwoDecimals } from '../../utils/canvas-math.util';
 import { collectSubtreeIds, removeWithChildren } from '../../utils/canvas-tree.util';
-import {
-  generateThumbnail,
-  generateThumbnailFromCanvas,
-} from '../../utils/pixi/canvas-thumbnail.util';
-
+import { generateThumbnail } from '../../utils/pixi/canvas-thumbnail.util';
 import {
   getTextFontFamily,
   getTextFontWeight,
@@ -51,6 +49,7 @@ import {
   getTextLineHeight,
   getTextLetterSpacing,
   getTextAlignValue,
+  getFrameTitle,
 } from '../../utils/element/canvas-text.util';
 import { CanvasPersistenceService } from '../../services/canvas-persistence.service';
 import { CanvasGenerationService } from '../../services/canvas-generation.service';
@@ -80,13 +79,8 @@ import {
 import { CanvasEditorStateService } from '../../services/canvas-editor-state.service';
 import { CanvasPageService } from '../../services/canvas-page.service';
 import { CanvasPageGeometryService } from '../../services/canvas-page-geometry.service';
-import { CanvasPixiApplicationService } from '../../services/pixi/canvas-pixi-application.service';
-import { CanvasPixiRendererService } from '../../services/pixi/canvas-pixi-renderer.service';
-import { CanvasPixiOverlaysService } from '../../services/pixi/canvas-pixi-overlays.service';
-import { CanvasPixiGridService } from '../../services/pixi/canvas-pixi-grid.service';
-import { CanvasPixiPageShellService } from '../../services/pixi/canvas-pixi-page-shell.service';
-import { CanvasPixiLayoutService } from '../../services/pixi/canvas-pixi-layout.service';
 import { CanvasGestureService } from '../../services/editor/canvas-gesture.service';
+import { CanvasDomStyleService } from '../../services/canvas-dom-style.service';
 import { firstValueFrom } from 'rxjs';
 
 const ROOT_FRAME_INSERT_GAP = 48;
@@ -115,6 +109,8 @@ interface RectangleDrawState {
     PropertiesPanelComponent,
     ContextMenuComponent,
     DialogBoxComponent,
+    CanvasDomElementComponent,
+    NgStyle,
   ],
   providers: [
     CanvasEditorStateService,
@@ -128,12 +124,7 @@ interface RectangleDrawState {
     CanvasGenerationService,
     CanvasPageGeometryService,
     CanvasPageService,
-    CanvasPixiApplicationService,
-    CanvasPixiRendererService,
-    CanvasPixiOverlaysService,
-    CanvasPixiGridService,
-    CanvasPixiPageShellService,
-    CanvasPixiLayoutService,
+    CanvasDomStyleService,
     CanvasGestureService,
   ],
   templateUrl: './canvas-page.component.html',
@@ -158,17 +149,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly page = inject(CanvasPageService);
   readonly pageLayout = inject(CanvasPageGeometryService);
 
-  // ── PixiJS Services ───────────────────────────────────────
-  private readonly pixiApp = inject(CanvasPixiApplicationService);
-  private readonly pixiRenderer = inject(CanvasPixiRendererService);
-  private readonly pixiOverlays = inject(CanvasPixiOverlaysService);
-  private readonly pixiGrid = inject(CanvasPixiGridService);
-  private readonly pixiPageShells = inject(CanvasPixiPageShellService);
-  private readonly pixiLayout = inject(CanvasPixiLayoutService);
-  private readonly pendingProjectFlush = inject(PendingProjectFlushService);
   readonly gesture = inject(CanvasGestureService);
-  private readonly pixiSceneReady = signal(false);
-  private pixiInitPending = false;
+  private readonly pendingProjectFlush = inject(PendingProjectFlushService);
 
   readonly canvasSceneRef = viewChild<ElementRef<HTMLElement>>('canvasScene');
 
@@ -194,6 +176,106 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
   readonly projectPanelWidth = signal(DEFAULT_PROJECT_PANEL_WIDTH);
+
+  // ── DOM Overlay Computed Signals ──────────────────────────
+
+  /** Flow drag state for DOM element rendering. */
+  readonly flowDragState = computed<FlowDragRenderState | null>(() => {
+    const isDragging = this.gesture.isDraggingEl();
+    const draggingId = this.gesture.draggingFlowChildId();
+    const ghostBounds = this.gesture.flowDragPlaceholder();
+    const dropTarget = this.gesture.layoutDropTarget();
+    if (!isDragging || !draggingId || !ghostBounds) return null;
+    return {
+      draggingElementId: draggingId,
+      floatingBounds: ghostBounds.bounds,
+      placeholder: dropTarget
+        ? { containerId: dropTarget.containerId, dropIndex: dropTarget.index }
+        : null,
+    };
+  });
+
+  /** Overlay-space bounds (scene-space: multiply by zoom for CSS) for the selection. */
+  readonly selectionOverlayBounds = computed<Bounds | null>(() => {
+    const selected = this.selectedElement();
+    if (!selected || this.gesture.isDraggingEl() || this.editingTextElementId()) return null;
+    void this.gesture.flowCacheVersion(); // register reactive dependency
+    // Two-pass strategy:
+    //  Pass 1 (dirty): DOM hasn't re-rendered yet — for flow children (layout-managed),
+    //   stored x/y is unreliable (often 0,0 after a drop), so return null rather than
+    //   placing the outline at the parent's top-left. For absolute elements, use x/y directly.
+    //  Pass 2 (clean): ngAfterViewChecked has updated the cache and bumped flowCacheVersion
+    //   (inside the Angular zone, so zone.js schedules this second cycle). Live DOM is correct.
+    if (this.gesture.isFlowBoundsDirty()) {
+      const parentEl = selected.parentId
+        ? this.element.findElementById(selected.parentId, this.elements())
+        : null;
+      if (parentEl?.display) return null; // hide for one frame; second pass shows correct position
+      return this.gesture.getCachedOverlaySceneBounds(selected);
+    }
+    return (
+      this.gesture.getLiveOverlaySceneBounds(selected) ??
+      this.gesture.getCachedOverlaySceneBounds(selected)
+    );
+  });
+
+  /** Whether resize/rotate handles should be shown for the selected element. */
+  readonly showSelectionHandles = computed<boolean>(() => {
+    const s = this.selectedElement();
+    if (!s) return false;
+    return (
+      s.type !== 'frame' && s.type !== 'text' && s.widthMode !== 'fill' && s.heightMode !== 'fill'
+    );
+  });
+
+  /** Overlay-space bounds for the hovered element (null if not applicable). */
+  readonly hoveredOverlayBounds = computed<Bounds | null>(() => {
+    const hoveredId = this.gesture.hoveredElementId();
+    if (
+      !hoveredId ||
+      this.gesture.isDraggingEl() ||
+      this.selectedElementIds().includes(hoveredId)
+    ) {
+      return null;
+    }
+    void this.gesture.flowCacheVersion(); // register reactive dependency
+    const pageId = this.findPageIdByElementId(hoveredId);
+    if (!pageId) return null;
+    const elements = this.getPageElementsById(pageId);
+    const hovered = this.element.findElementById(hoveredId, elements);
+    if (!hovered || hovered.type === 'frame') return null;
+    // Same two-pass strategy as selectionOverlayBounds.
+    if (this.gesture.isFlowBoundsDirty()) {
+      const parentEl = hovered.parentId
+        ? this.element.findElementById(hovered.parentId, elements)
+        : null;
+      if (parentEl?.display) return null;
+      return this.gesture.getCachedOverlaySceneBounds(hovered);
+    }
+    return (
+      this.gesture.getLiveOverlaySceneBounds(hovered) ??
+      this.gesture.getCachedOverlaySceneBounds(hovered)
+    );
+  });
+
+  /** Overlay-space bounds for each multi-selected element. */
+  readonly multiSelectOverlayBounds = computed<Bounds[]>(() => {
+    const selectedElements = this.selectedElements();
+    if (selectedElements.length <= 1) return [];
+    void this.gesture.flowCacheVersion();
+    return selectedElements.map((el) => this.gesture.getCachedOverlaySceneBounds(el));
+  });
+
+  /** Overlay-space bounds for synced selection highlight elements. */
+  readonly syncedSelectionOverlayBounds = computed<Bounds[]>(() => {
+    const els = this.getSyncedSelectionHighlightElements(this.selectedElements(), this.elements());
+    if (els.length === 0) return [];
+    void this.gesture.flowCacheVersion();
+    return els.map((el) => this.gesture.getCachedOverlaySceneBounds(el));
+  });
+
+  // ── Exported template helpers ─────────────────────────────
+  readonly getFrameTitle = getFrameTitle;
 
   // ── API / Generation State ────────────────────────────────
 
@@ -228,7 +310,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   constructor() {
     this.loadProjectDesign();
 
-    // Wire gesture service to canvas DOM + Pixi scene state
+    // Wire gesture service to canvas DOM
     this.gesture.setCanvasElementGetter(
       () => document.querySelector('.canvas-container') as HTMLElement | null,
     );
@@ -249,231 +331,25 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.elements();
       this.gesture.invalidateFlowBoundsCache();
     });
-
-    // ── PixiJS Sync Effects ─────────────────────────────────
-
-    // Sync viewport (pan + zoom) to PixiJS containers
-    effect(() => {
-      const offset = this.viewport.viewportOffset();
-      const zoom = this.viewport.zoomLevel();
-      this.pixiApp.syncViewport(offset.x, offset.y, zoom);
-      this.pixiGrid.syncGrid(offset.x, offset.y, zoom);
-    });
-
-    // Sync elements + page layouts → PixiJS renderer
-    effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const pages = this.pages();
-      const currentPageId = this.currentPageId();
-      const layouts = this.page.pageLayouts();
-      const editingTextId = this.editingTextElementId();
-      const zoom = this.viewport.zoomLevel();
-      const selectedPageId = this.page.selectedCanvasPageId();
-      const selectedElementIds = this.selectedElementIds();
-      const isElementDragging = this.gesture.isDraggingEl();
-      const selectedToolbarPageId =
-        !isElementDragging && selectedElementIds.length === 0 ? selectedPageId : null;
-
-      const pixiPages = pages.map((p) => {
-        const layout = layouts.find((l) => l.pageId === p.id);
-        return {
-          pageId: p.id,
-          elements: p.elements,
-          layout: layout ?? {
-            pageId: p.id,
-            x: 0,
-            y: 0,
-            width: p.viewportWidth ?? 1280,
-            height: p.viewportHeight ?? 720,
-          },
-        };
-      });
-
-      // Compute flow-drag render state from transient drag signals
-      this.pixiRenderer.setEditingTextElementId(editingTextId);
-      // Only activate when isDragging is true (after threshold exceeded),
-      // not on pointerdown — so the element stays at its yoga position
-      // and the selection outline remains correct until actual drag starts.
-      const draggingId = this.gesture.draggingFlowChildId();
-      const ghostBounds = this.gesture.flowDragPlaceholder();
-      const dropTarget = this.gesture.layoutDropTarget();
-      const isFlowDragInsideContainer = !!dropTarget;
-      const flowDragState: FlowDragRenderState | null =
-        isElementDragging && draggingId && ghostBounds
-          ? {
-              draggingElementId: draggingId,
-              floatingBounds: ghostBounds.bounds,
-              placeholder:
-                isFlowDragInsideContainer && dropTarget
-                  ? { containerId: dropTarget.containerId, dropIndex: dropTarget.index }
-                  : null,
-            }
-          : null;
-
-      this.pixiRenderer.syncPages(pixiPages, currentPageId, flowDragState, zoom);
-
-      // Sync page shells
-      const pageNames = new Map(pages.map((p) => [p.id, p.name]));
-      const editingPageId = this.page.editingCanvasHeaderPageId();
-      this.pixiPageShells.syncPageShells(
-        layouts,
-        currentPageId,
-        this.viewport.zoomLevel(),
-        pageNames,
-        selectedToolbarPageId,
-        editingPageId,
-      );
-    });
-
-    // Sync selection overlay
-    effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const selected = this.selectedElement();
-      const elements = this.elements();
-      const zoom = this.viewport.zoomLevel();
-      const layout = this.page.activePageLayout();
-      const isDragging = this.gesture.isDraggingEl();
-      const editingText = this.editingTextElementId();
-      const selectedElements = this.selectedElements();
-
-      if (isDragging || editingText) {
-        this.pixiOverlays.drawSelectionOutline(null, elements, zoom, layout, false);
-        this.pixiOverlays.drawSyncedSelectionOutlines([], elements, zoom, layout);
-        return;
-      }
-
-      const showHandles =
-        !!selected &&
-        selected.type !== 'frame' &&
-        selected.type !== 'text' &&
-        selected.widthMode !== 'fill' &&
-        selected.heightMode !== 'fill';
-      this.pixiOverlays.drawSelectionOutline(selected, elements, zoom, layout, showHandles);
-      this.pixiOverlays.drawSyncedSelectionOutlines(
-        this.getSyncedSelectionHighlightElements(selectedElements, elements),
-        elements,
-        zoom,
-        layout,
-      );
-
-      // Multi-selection outlines
-      if (selectedElements.length > 1) {
-        this.pixiOverlays.drawMultiSelectionOutlines(selectedElements, elements, zoom, layout);
-      }
-    });
-
-    // Sync hover outline
-    effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const hoveredId = this.gesture.hoveredElementId();
-      const zoom = this.viewport.zoomLevel();
-      const isDragging = this.gesture.isDraggingEl();
-      const selectedIds = this.selectedElementIds();
-
-      if (!hoveredId || isDragging || selectedIds.includes(hoveredId)) {
-        this.pixiOverlays.drawHoverOutline(
-          null,
-          this.elements(),
-          zoom,
-          this.page.activePageLayout(),
-        );
-        return;
-      }
-
-      const hoveredPageId = this.findPageIdByElementId(hoveredId);
-      if (!hoveredPageId) {
-        this.pixiOverlays.drawHoverOutline(
-          null,
-          this.elements(),
-          zoom,
-          this.page.activePageLayout(),
-        );
-        return;
-      }
-
-      const hoveredElements = this.getPageElementsById(hoveredPageId);
-      const hoveredLayout = this.page.getPageLayoutById(hoveredPageId);
-      const hovered = this.element.findElementById(hoveredId, hoveredElements);
-      if (!hoveredLayout || hovered?.type === 'frame') {
-        this.pixiOverlays.drawHoverOutline(null, hoveredElements, zoom, hoveredLayout);
-        return;
-      }
-
-      this.pixiOverlays.drawHoverOutline(hovered, hoveredElements, zoom, hoveredLayout);
-    });
-
-    // Sync snap lines
-    effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const lines = this.gesture.snapLines();
-      const zoom = this.viewport.zoomLevel();
-      const layout = this.page.activePageLayout();
-      this.pixiOverlays.drawSnapLines(lines, zoom, layout);
-    });
-
-    // Sync rectangle draw preview
-    effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const preview = this.gesture.rectangleDrawPreview();
-      const layout = this.page.activePageLayout();
-      this.pixiOverlays.drawRectanglePreview(preview, layout);
-    });
-
-    // Sync page shell selection outline
-    effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const isDragging = this.gesture.isDraggingEl();
-      const zoom = this.viewport.zoomLevel();
-
-      void isDragging;
-      void zoom;
-      this.pixiOverlays.drawPageShellSelectionOutline(null, 1);
-    });
   }
 
   ngAfterViewChecked(): void {
     this.page.setCanvasElement(this.getCanvasElement());
     this.restorePendingInitialPageFocus();
 
-    // Initialize PixiJS once the canvas container DOM element is available
-    if (!this.pixiInitPending) {
-      const canvasHost = document.querySelector('.canvas-container') as HTMLElement | null;
-      if (canvasHost) {
-        this.pixiInitPending = true;
-        this.zone.runOutsideAngular(() => {
-          Promise.all([this.pixiApp.init(canvasHost), this.pixiLayout.init()]).then(() => {
-            this.pixiGrid.init();
-            this.pixiRenderer.init();
-            this.pixiOverlays.init();
-            this.pixiPageShells.init();
-            this.setupPixiEventListeners();
-            this.zone.run(() => {
-              this.pixiSceneReady.set(true);
-              this.gesture.setPixiSceneReady(true);
-            });
-          });
-        });
-      }
-    }
-
-    this.zone.runOutsideAngular(() => {
-      if (this.gesture.isFlowBoundsDirty()) {
+    if (this.gesture.isFlowBoundsDirty()) {
+      // Read DOM bounds outside zone (pure DOM reads — avoids unnecessary zone-triggered cycles).
+      this.zone.runOutsideAngular(() => {
         this.gesture.updateFlowBoundsCache(this.canvasSceneRef()?.nativeElement ?? null);
-        this.gesture.markFlowBoundsCacheClean();
-      }
-    });
+      });
+      // Mark clean INSIDE the zone so zone.js sees the signal bump and schedules a new CD cycle.
+      // That second cycle evaluates overlay computeds against the now-correct live DOM.
+      this.gesture.markFlowBoundsCacheClean();
+    }
   }
 
   ngOnDestroy(): void {
-    this.pixiSceneReady.set(false);
-    this.gesture.setPixiSceneReady(false);
-
-    // Cleanup PixiJS
-    this.pixiRenderer.destroy();
-    this.pixiOverlays.destroy();
-    this.pixiGrid.destroy();
-    this.pixiPageShells.destroy();
-    this.pixiLayout.destroy();
+    // No pixi services to clean up
   }
 
   async flushPendingPersistence(): Promise<boolean> {
@@ -1179,22 +1055,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   @HostListener('window:pointermove', ['$event'])
   onPointerMove(event: MouseEvent): void {
-    const canvas = this.getCanvasElement();
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      const insideCanvas =
-        event.clientX >= rect.left &&
-        event.clientX <= rect.right &&
-        event.clientY >= rect.top &&
-        event.clientY <= rect.bottom;
-
-      if (insideCanvas) {
-        this.pixiGrid.updatePointerGlow(event.clientX - rect.left, event.clientY - rect.top);
-      } else {
-        this.pixiGrid.hideGlow();
-      }
-    } else {
-      this.pixiGrid.hideGlow();
+    // Update hover from DOM
+    const path = event.composedPath() as Element[];
+    const elementEl = path.find(
+      (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('data-element-id'),
+    );
+    const hoveredId = elementEl?.getAttribute('data-element-id') ?? null;
+    if (hoveredId !== this.gesture.hoveredElementId()) {
+      this.gesture.hoveredElementId.set(hoveredId);
     }
 
     this.gesture.handlePointerMove(event);
@@ -1286,6 +1154,83 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   isPanReady(): boolean {
     return this.currentTool() === 'select' || this.viewport.isSpacePressed();
+  }
+
+  // ── DOM Scene Template Helpers ────────────────────────────
+
+  getTopLevelElements(pg: CanvasPageModel): CanvasElement[] {
+    return pg.elements.filter((el) => !el.parentId && el.visible !== false);
+  }
+
+  getRootFrames(pg: CanvasPageModel): CanvasElement[] {
+    return pg.elements.filter((el) => el.type === 'frame' && !el.parentId);
+  }
+
+  getPageShellStyle(pageId: string): Record<string, string> {
+    const layouts = this.page.pageLayouts();
+    const zoom = this.viewport.zoomLevel();
+    return {
+      left: this.pageLayout.getPageShellLeft(pageId, layouts) * zoom + 'px',
+      top: this.pageLayout.getPageShellTop(pageId, layouts) * zoom + 'px',
+      width: this.pageLayout.getPageShellWidth(pageId, layouts) * zoom + 'px',
+      height: this.pageLayout.getPageShellHeight(pageId, layouts) * zoom + 'px',
+    };
+  }
+
+  getPageHeaderStyle(pageId: string): Record<string, string> {
+    const layouts = this.page.pageLayouts();
+    return {
+      left: this.pageLayout.getPageShellHeaderScreenLeft(pageId, layouts) + 'px',
+      top: this.pageLayout.getPageShellHeaderScreenTop(pageId, layouts) + 'px',
+      width: this.pageLayout.getPageShellHeaderScreenWidth(pageId, layouts) + 'px',
+    };
+  }
+
+  getFrameTitleStyle(pageId: string, frame: CanvasElement): Record<string, string> {
+    const layout = this.page.getPageLayoutById(pageId);
+    const zoom = this.viewport.zoomLevel();
+    if (!layout) return {};
+    return {
+      left: (layout.x + frame.x) * zoom + 'px',
+      top: (layout.y + frame.y) * zoom - 19 + 'px',
+    };
+  }
+
+  // ── Page header event handlers ────────────────────────────
+
+  onPageHeaderPointerDown(event: MouseEvent, pageId: string): void {
+    if (event.button !== 0) return;
+    this.selectPageFromToolbar(pageId);
+  }
+
+  onPageHeaderPlayClick(pageId: string): void {
+    this.selectPageFromToolbar(pageId);
+    this.page.openPreviewForPage(this.projectSlug, pageId);
+  }
+
+  onPageHeaderNameDblClick(pageId: string): void {
+    this.selectPageFromToolbar(pageId);
+    const syntheticEvent = { preventDefault: () => {}, stopPropagation: () => {} } as MouseEvent;
+    this.page.onCanvasHeaderPageNameDoubleClick(syntheticEvent, pageId);
+  }
+
+  onPageHeaderAddDeviceClick(event: MouseEvent, pageId: string): void {
+    const btn = event.currentTarget as HTMLElement | null;
+    const rect = btn?.getBoundingClientRect() ?? { left: 0, bottom: 0 };
+    this.suppressNextWindowMenuClose = true;
+    this.selectPageFromToolbar(pageId);
+    this.page.openDeviceFrameMenuAt(rect.left, rect.bottom, pageId);
+  }
+
+  onFrameTitlePointerDown(pageId: string, frameId: string): void {
+    if (this.currentPageId() !== pageId) {
+      this.currentPageId.set(pageId);
+    }
+    this.page.layersFocusedPageId.set(pageId);
+    this.page.selectedPageLayerId.set(null);
+    this.currentTool.set('select');
+    this.gesture.setSuppressNextCanvasClick(true);
+    this.selectOnlyElement(frameId);
   }
 
   // ── Page name editor positioning ──────────────────────────
@@ -1475,7 +1420,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   handleWindowBlur(): void {
     this.viewport.isSpacePressed.set(false);
     this.viewport.endPan();
-    this.pixiGrid.hideGlow();
     this.gesture.cancelDragState();
     this.history.commitGestureHistory(() => this.createHistorySnapshot());
     this.gesture.finalizeTextEditing(this.editingTextElementId());
@@ -1642,7 +1586,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const thumbnail =
       precomputedThumbnail !== undefined
         ? precomputedThumbnail
-        : (this.captureRenderedThumbnail() ?? generateThumbnail(this.currentPage()));
+        : generateThumbnail(this.currentPage());
     if (!thumbnail) {
       return;
     }
@@ -1687,7 +1631,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.pendingProjectFlush.queueAndDispatch(
       this.projectIdAsNumber,
       this.buildCurrentPersistedDesignJson(),
-      this.captureRenderedThumbnail() ?? generateThumbnail(this.currentPage()),
+      generateThumbnail(this.currentPage()),
     );
     this.hasTriggeredBrowserExitFlush = true;
   }
@@ -1698,111 +1642,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   private buildCurrentPersistedDesignJson(): string {
     return JSON.stringify(buildPersistedCanvasDesign(this.buildCurrentProjectDocument()));
-  }
-
-  private captureRenderedThumbnail(): string | null {
-    const sourceCanvas = this.pixiApp.canvas;
-    const app = this.pixiApp.pixiApp as {
-      render?: () => void;
-      stage?: unknown;
-      renderer?: { render?: (target?: unknown) => void };
-    } | null;
-    const currentPage = this.currentPage();
-    const layout = this.page.activePageLayout();
-
-    if (!sourceCanvas || !app || !layout || !currentPage) {
-      return null;
-    }
-
-    const targetSceneBounds = this.resolveThumbnailSceneBounds(currentPage, layout);
-
-    const canvasWidth = sourceCanvas.clientWidth || sourceCanvas.width;
-    const canvasHeight = sourceCanvas.clientHeight || sourceCanvas.height;
-    if (
-      canvasWidth <= 0 ||
-      canvasHeight <= 0 ||
-      targetSceneBounds.width <= 0 ||
-      targetSceneBounds.height <= 0
-    ) {
-      return null;
-    }
-
-    const previousOffset = this.viewport.viewportOffset();
-    const previousZoom = this.viewport.zoomLevel();
-    const previousOverlayVisible = this.pixiApp.overlayContainer.visible;
-    const fitPadding = 32;
-    const availableWidth = Math.max(1, canvasWidth - fitPadding);
-    const availableHeight = Math.max(1, canvasHeight - fitPadding);
-    const captureZoom = Math.min(
-      availableWidth / targetSceneBounds.width,
-      availableHeight / targetSceneBounds.height,
-    );
-    const captureOffset = {
-      x: roundToTwoDecimals(
-        (canvasWidth - targetSceneBounds.width * captureZoom) / 2 -
-          targetSceneBounds.x * captureZoom,
-      ),
-      y: roundToTwoDecimals(
-        (canvasHeight - targetSceneBounds.height * captureZoom) / 2 -
-          targetSceneBounds.y * captureZoom,
-      ),
-    };
-
-    try {
-      this.pixiApp.overlayContainer.visible = false;
-      this.pixiGrid.setVisible(false);
-      this.pixiApp.syncViewport(captureOffset.x, captureOffset.y, captureZoom);
-      this.pixiGrid.syncGrid(captureOffset.x, captureOffset.y, captureZoom);
-      this.forcePixiRender(app);
-
-      return generateThumbnailFromCanvas(sourceCanvas, {
-        x: captureOffset.x + targetSceneBounds.x * captureZoom,
-        y: captureOffset.y + targetSceneBounds.y * captureZoom,
-        width: targetSceneBounds.width * captureZoom,
-        height: targetSceneBounds.height * captureZoom,
-      });
-    } finally {
-      this.pixiApp.syncViewport(previousOffset.x, previousOffset.y, previousZoom);
-      this.pixiGrid.setVisible(true);
-      this.pixiGrid.syncGrid(previousOffset.x, previousOffset.y, previousZoom);
-      this.pixiApp.overlayContainer.visible = previousOverlayVisible;
-      this.forcePixiRender(app);
-    }
-  }
-
-  private resolveThumbnailSceneBounds(page: CanvasPageModel, layout: CanvasPageLayout): Bounds {
-    const primaryFrame = this.gesture.getPrimaryFrameFromElements(page.elements);
-    if (!primaryFrame) {
-      return {
-        x: layout.x,
-        y: layout.y,
-        width: layout.width,
-        height: layout.height,
-      };
-    }
-
-    const primaryBounds = this.element.getAbsoluteBounds(primaryFrame, page.elements, page);
-    return {
-      x: roundToTwoDecimals(layout.x + primaryBounds.x),
-      y: roundToTwoDecimals(layout.y + primaryBounds.y),
-      width: primaryBounds.width,
-      height: primaryBounds.height,
-    };
-  }
-
-  private forcePixiRender(app: {
-    render?: () => void;
-    stage?: unknown;
-    renderer?: { render?: (target?: unknown) => void };
-  }): void {
-    if (typeof app.render === 'function') {
-      app.render();
-      return;
-    }
-
-    if (typeof app.renderer?.render === 'function') {
-      app.renderer.render(app.stage);
-    }
   }
 
   // ── Private: Helpers ──────────────────────────────────────
@@ -1852,260 +1691,32 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return document.querySelector('.canvas-container') as HTMLElement | null;
   }
 
-  /** Set up PixiJS stage event listeners to forward interactions to existing handlers. */
-  private setupPixiEventListeners(): void {
-    const app = this.pixiApp.pixiApp;
-    if (!app) return;
-
-    // ── Element interactions (pointerdown, hover, dblclick, contextmenu) ──
-    // Listen on the scene container to catch all element events via bubbling.
-    const sceneContainer = this.pixiApp.sceneContainer;
-
-    sceneContainer.eventMode = 'static';
-    sceneContainer.on('pointerdown', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      const native = e.nativeEvent as MouseEvent;
-      // Prevent the canvas-container DOM handler from also firing
-      native.stopPropagation();
-      this.zone.run(() => this.onElementPointerDown(native, elId));
-    });
-
-    // Stop the native click from bubbling to .canvas-container when a PixiJS element
-    // was clicked — otherwise onCanvasClick() would fire and clear the selection.
-    sceneContainer.on('click', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      (e.nativeEvent as MouseEvent).stopPropagation();
-    });
-
-    sceneContainer.on('pointerover', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      this.zone.run(() => this.gesture.hoveredElementId.set(elId));
-    });
-
-    sceneContainer.on('pointerout', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      this.zone.run(() => {
-        if (this.gesture.hoveredElementId() === elId) {
-          this.gesture.hoveredElementId.set(null);
-        }
-      });
-    });
-
-    sceneContainer.on('rightclick', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      const native = e.nativeEvent as MouseEvent;
-      native.stopPropagation();
-      native.preventDefault();
-      this.zone.run(() => this.onElementContextMenu(native, elId));
-    });
-
-    // Double-click for text editing
-    let lastPointerDownTime = 0;
-    let lastPointerDownId: string | null = null;
-    sceneContainer.on('pointerdown', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      const now = Date.now();
-      if (elId === lastPointerDownId && now - lastPointerDownTime < 400) {
-        const native = e.nativeEvent as MouseEvent;
-        this.zone.run(() => this.onElementDoubleClick(native, elId));
-        lastPointerDownId = null;
-        lastPointerDownTime = 0;
-      } else {
-        lastPointerDownId = elId;
-        lastPointerDownTime = now;
-      }
-    });
-
-    // ── Page shell interactions ──
-    this.pixiPageShells.onShellPointerDown((pageId, pixiEvent) => {
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      native.stopPropagation();
-      this.zone.run(() => this.onPageShellPointerDown(native, pageId));
-    });
-
-    this.pixiPageShells.onShellClick((pageId) => {
-      this.zone.run(() => {
-        if (pageId === this.currentPageId()) {
-          this.onActivePageShellClick(pageId);
-        } else {
-          this.onInactivePageShellClick(pageId);
-        }
-      });
-    });
-
-    // ── Page header interactions ──
-    this.pixiPageShells.onHeaderPointerDown((pageId, pixiEvent) => {
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      native.stopPropagation();
-      this.zone.run(() => {
-        if (native.button !== 0) {
-          return;
-        }
-
-        this.selectPageFromToolbar(pageId);
-      });
-    });
-
-    this.pixiPageShells.onHeaderPlayClick((pageId) => {
-      this.zone.run(() => {
-        this.selectPageFromToolbar(pageId);
-        this.page.openPreviewForPage(this.projectSlug, pageId);
-      });
-    });
-
-    this.pixiPageShells.onHeaderNamePointerDown((pageId, pixiEvent) => {
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      native.stopPropagation();
-      this.zone.run(() => this.onPageNamePointerDown(native, pageId));
-    });
-
-    this.pixiPageShells.onHeaderNameDblClick((pageId) => {
-      this.zone.run(() => {
-        this.selectPageFromToolbar(pageId);
-        const syntheticEvent = {
-          preventDefault: () => {},
-          stopPropagation: () => {},
-        } as MouseEvent;
-        this.page.onCanvasHeaderPageNameDoubleClick(syntheticEvent, pageId);
-      });
-    });
-
-    this.pixiPageShells.onHeaderAddDeviceClick((pageId) => {
-      const canvasEl = this.getCanvasElement();
-      const layouts = this.page.pageLayouts();
-      const offset = this.viewport.viewportOffset();
-      const canvasRect = canvasEl?.getBoundingClientRect() ?? { left: 0, top: 0 };
-      const headerLeft =
-        canvasRect.left + offset.x + this.pageLayout.getPageShellHeaderScreenLeft(pageId, layouts);
-      const headerTop =
-        canvasRect.top + offset.y + this.pageLayout.getPageShellHeaderScreenTop(pageId, layouts);
-      const headerWidth = this.getPageShellToolbarWidth(pageId);
-      const btnLeft = headerLeft + headerWidth - 38;
-      const btnBottom = headerTop + 36;
-      this.suppressNextWindowMenuClose = true;
-      this.zone.run(() => {
-        this.selectPageFromToolbar(pageId);
-        this.page.openDeviceFrameMenuAt(btnLeft, btnBottom, pageId);
-      });
-    });
-
-    this.pixiPageShells.onFrameTitlePointerDown((pageId, frameId) => {
-      this.zone.run(() => {
-        if (this.currentPageId() !== pageId) {
-          this.currentPageId.set(pageId);
-        }
-        this.page.layersFocusedPageId.set(pageId);
-        this.page.selectedPageLayerId.set(null);
-        this.currentTool.set('select');
-        this.gesture.setSuppressNextCanvasClick(true);
-        this.selectOnlyElement(frameId);
-      });
-    });
-
-    // ── Selection overlay handle events ──
-    this.pixiOverlays.onHandlePointerDown((handle, pixiEvent) => {
-      const selEl = this.selectedElement();
-      if (!selEl) return;
-      const nativeEvent = pixiEvent.nativeEvent as MouseEvent;
-      nativeEvent.stopPropagation();
-      nativeEvent.preventDefault();
-      this.zone.run(() => {
-        this.onResizeHandlePointerDown(nativeEvent, selEl.id, handle);
-      });
-    });
-
-    this.pixiOverlays.onCornerRadiusHandlePointerDown((pixiEvent) => {
-      const selEl = this.selectedElement();
-      if (!selEl) return;
-      const nativeEvent = pixiEvent.nativeEvent as MouseEvent;
-      nativeEvent.stopPropagation();
-      nativeEvent.preventDefault();
-      this.zone.run(() => {
-        this.onCornerRadiusHandlePointerDown(nativeEvent, selEl.id);
-      });
-    });
-
-    // ── Selection outline pointerdown (interior click-through + edge resize) ──
-    this.pixiOverlays.onSelectionOutlinePointerDown((pixiEvent) => {
-      const selEl = this.selectedElement();
-      if (!selEl) return;
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      native.stopPropagation();
-      this.zone.run(() => this.onSelectionOutlinePointerDown(native, selEl.id));
-    });
-
-    // ── Selection outline double-click for text editing ──
-    this.pixiOverlays.onSelectionOutlineDoubleClick((pixiEvent) => {
-      const selEl = this.selectedElement();
-      if (!selEl) return;
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      this.zone.run(() => this.onElementDoubleClick(native, selEl.id));
-    });
-
-    // ── Selection outline context menu ──
-    this.pixiOverlays.onSelectionOutlineContextMenu((pixiEvent) => {
-      const selEl = this.selectedElement();
-      if (!selEl) return;
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      native.preventDefault();
-      native.stopPropagation();
-      this.zone.run(() => this.onElementContextMenu(native, selEl.id));
-    });
-  }
-
-  /** Returns the id of the topmost non-frame element whose bounds contain (x, y)
-   *  in active-page coordinates, preferring deeper nested children over parents. */
+  /** Returns the id of the topmost element with data-element-id at a given point. */
   private getTopElementIdAtPoint(x: number, y: number): string | null {
     const elements = this.visibleElements();
     let bestId: string | null = null;
     let bestDepth = -1;
 
-    for (let i = 0; i < elements.length; i++) {
-      const el = elements[i];
+    for (const el of elements) {
       if (el.type === 'frame') continue;
-      const b = this.getElementHitTestBounds(el);
+      const live = this.gesture.getLiveElementCanvasBounds(el);
+      const b = live ?? this.element.getAbsoluteBounds(el, elements, this.currentPage());
       if (x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height) {
-        const depth = this.getElementNestingDepth(el, elements);
+        let depth = 0;
+        let parentId = el.parentId ?? null;
+        while (parentId) {
+          const parent = this.element.findElementById(parentId, elements);
+          if (!parent) break;
+          depth++;
+          parentId = parent.parentId ?? null;
+        }
         if (depth > bestDepth) {
           bestId = el.id;
           bestDepth = depth;
         }
       }
     }
-
     return bestId;
-  }
-
-  private getElementHitTestBounds(element: CanvasElement): Bounds {
-    const live = this.gesture.getLiveElementCanvasBounds(element);
-    if (live) {
-      return live;
-    }
-
-    return this.element.getAbsoluteBounds(element, this.elements(), this.currentPage());
-  }
-
-  private getElementNestingDepth(element: CanvasElement, elements: CanvasElement[]): number {
-    let depth = 0;
-    let currentParentId = element.parentId ?? null;
-
-    while (currentParentId) {
-      const parent = this.element.findElementById(currentParentId, elements);
-      if (!parent) {
-        break;
-      }
-
-      depth += 1;
-      currentParentId = parent.parentId ?? null;
-    }
-
-    return depth;
   }
 
   // ── Private: History Shortcuts ────────────────────────────

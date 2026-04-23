@@ -1,0 +1,46 @@
+@if (element().visible !== false) {
+  <div
+    class="canvas-el"
+    [class.canvas-el--text-editing]="editingTextId() === element().id"
+    [attr.data-element-id]="element().id"
+    [attr.data-flow-child]="isFlowChildInLayout() ? 'true' : null"
+    [ngStyle]="style()"
+    (pointerdown)="onPointerDown($event)"
+    (dblclick)="onDblClick($event)"
+    (contextmenu)="onContextMenu($event)">
+
+    @if (element().type === 'text' && editingTextId() !== element().id) {
+      <div class="canvas-text-wrapper" [ngStyle]="textWrapperStyle()">
+        <span class="canvas-text-content" [ngStyle]="textContentStyle()">{{ element().text }}</span>
+      </div>
+    }
+
+    @if (element().type === 'image' && element().imageUrl) {
+      <img
+        class="canvas-image-el"
+        [src]="element().imageUrl"
+        [alt]="element().imageAltText ?? ''"
+        style="width: 100%; height: 100%; display: block;"
+        [style.object-fit]="element().objectFit ?? 'cover'" />
+    }
+
+    @if (element().type !== 'text' && element().type !== 'image') {
+      @for (item of childrenWithPlaceholder(); track trackChildItem($index, item)) {
+        @if (item.kind === 'placeholder') {
+          <div class="canvas-flow-placeholder" [ngStyle]="placeholderStyle()"></div>
+        } @else {
+          <app-canvas-dom-element
+            [element]="item.child"
+            [allElements]="allElements()"
+            [page]="page()"
+            [editingTextId]="editingTextId()"
+            [draggingElementId]="draggingElementId()"
+            [flowDragState]="flowDragState()"
+            (elementPointerDown)="elementPointerDown.emit($event)"
+            (elementDblClick)="elementDblClick.emit($event)"
+            (elementContextMenu)="elementContextMenu.emit($event)" />
+        }
+      }
+    }
+  </div>
+}

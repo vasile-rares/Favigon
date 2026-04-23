@@ -134,3 +134,299 @@
   caret-color: currentColor;
   cursor: text;
 }
+
+/* -- DOM Viewport -------------------------------------------- */
+
+.dom-bg {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.18) 1px, transparent 1px);
+  pointer-events: none;
+}
+
+.dom-world {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dom-scene {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: auto;
+}
+
+.dom-page-bg {
+  position: absolute;
+  pointer-events: auto;
+  cursor: default;
+}
+
+.dom-page {
+  position: absolute;
+}
+
+.dom-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* -- Page shells -------------------------------------------- */
+
+.page-shell-bg {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.page-shell-bg--active {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.page-shell-header {
+  position: absolute;
+  height: 36px;
+  background: rgba(30, 30, 36, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  pointer-events: auto;
+  cursor: default;
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 0;
+}
+.page-shell-header--active {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.page-shell-header--selected {
+  border-color: #3b82f6;
+}
+
+.page-shell-play-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.page-shell-play-btn:hover {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.page-shell-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  font-family: Inter, system-ui, sans-serif;
+}
+.page-shell-header--active .page-shell-name {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.page-shell-add-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 4px 6px;
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.page-shell-add-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.frame-title {
+  position: absolute;
+  font-size: 13px;
+  font-weight: 500;
+  color: #888888;
+  font-family: Inter, system-ui, sans-serif;
+  pointer-events: auto;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1;
+}
+.frame-title--active {
+  color: #ffffff;
+}
+
+/* -- Overlays ------------------------------------------------ */
+
+.hover-outline {
+  position: absolute;
+  border: 2px solid #3b82f6;
+  pointer-events: none;
+  border-radius: 1px;
+}
+
+.multi-select-outline {
+  position: absolute;
+  border: 2px solid rgba(59, 130, 246, 0.5);
+  pointer-events: none;
+}
+
+.synced-selection-outline {
+  position: absolute;
+  border: 2px solid rgba(59, 130, 246, 0.28);
+  pointer-events: none;
+}
+
+.selection-outline {
+  position: absolute;
+  border: 2px solid #3b82f6;
+  pointer-events: auto;
+  cursor: default;
+}
+
+.sel-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border: 1px solid #3b82f6;
+  pointer-events: auto;
+}
+.sel-handle-nw {
+  left: -4px;
+  top: -4px;
+  cursor: nw-resize;
+}
+.sel-handle-ne {
+  right: -4px;
+  top: -4px;
+  cursor: ne-resize;
+}
+.sel-handle-sw {
+  left: -4px;
+  bottom: -4px;
+  cursor: sw-resize;
+}
+.sel-handle-se {
+  right: -4px;
+  bottom: -4px;
+  cursor: se-resize;
+}
+
+.sel-edge-hit {
+  position: absolute;
+  pointer-events: auto;
+  opacity: 0;
+}
+.sel-edge-n {
+  top: -4px;
+  left: 8px;
+  right: 8px;
+  height: 8px;
+  cursor: n-resize;
+}
+.sel-edge-s {
+  bottom: -4px;
+  left: 8px;
+  right: 8px;
+  height: 8px;
+  cursor: s-resize;
+}
+.sel-edge-e {
+  right: -4px;
+  top: 8px;
+  bottom: 8px;
+  width: 8px;
+  cursor: e-resize;
+}
+.sel-edge-w {
+  left: -4px;
+  top: 8px;
+  bottom: 8px;
+  width: 8px;
+  cursor: w-resize;
+}
+
+.sel-corner-zone {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: auto;
+  cursor: alias;
+}
+.sel-corner-nw {
+  left: -16px;
+  top: -16px;
+}
+.sel-corner-ne {
+  right: -16px;
+  top: -16px;
+}
+.sel-corner-sw {
+  left: -16px;
+  bottom: -16px;
+}
+.sel-corner-se {
+  right: -16px;
+  bottom: -16px;
+}
+
+.corner-radius-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border: 1px solid #3b82f6;
+  border-radius: 50%;
+  left: 6px;
+  top: 6px;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* -- Snap lines -------------------------------------------- */
+
+.snap-line {
+  position: absolute;
+  background: #ea47ff;
+  pointer-events: none;
+}
+.snap-line-v {
+  top: -10000px;
+  bottom: -10000px;
+  width: 1px;
+}
+.snap-line-h {
+  left: -10000px;
+  right: -10000px;
+  height: 1px;
+}
+
+/* -- Draw / drag previews ---------------------------------- */
+
+.rect-draw-preview {
+  position: absolute;
+  background: rgba(224, 224, 224, 0.5);
+  border: 1px solid #3b82f6;
+  pointer-events: none;
+}
+
+.flow-drag-ghost {
+  position: absolute;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px dashed #3b82f6;
+  border-radius: 4px;
+  pointer-events: none;
+}
