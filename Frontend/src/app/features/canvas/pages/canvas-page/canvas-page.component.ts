@@ -3,7 +3,6 @@ import {
   Component,
   ElementRef,
   HostListener,
-  NgZone,
   OnDestroy,
   viewChild,
   computed,
@@ -40,7 +39,9 @@ import { CanvasDomElementComponent } from '../../components/canvas-dom-element/c
 import { mutateNormalizeElement } from '../../utils/element/canvas-element-normalization.util';
 import { roundToTwoDecimals } from '../../utils/canvas-math.util';
 import { collectSubtreeIds, removeWithChildren } from '../../utils/canvas-tree.util';
-import { generateThumbnail } from '../../utils/pixi/canvas-thumbnail.util';
+import {
+  generateThumbnail,
+} from '../../utils/pixi/canvas-thumbnail.util';
 import {
   getTextFontFamily,
   getTextFontWeight,
@@ -137,8 +138,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private readonly projectService = inject(ProjectService);
   private readonly currentUser = inject(CurrentUserService);
   readonly generation = inject(CanvasGenerationService);
-  private readonly zone = inject(NgZone);
-
   readonly viewport = inject(CanvasViewportService);
   private readonly history = inject(CanvasHistoryService);
   private readonly clipboard = inject(CanvasClipboardService);
@@ -200,42 +199,30 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const selected = this.selectedElement();
     if (!selected || this.gesture.isDraggingEl() || this.editingTextElementId()) return null;
     void this.gesture.flowCacheVersion(); // register reactive dependency
-    // Two-pass strategy:
-    //  Pass 1 (dirty): DOM hasn't re-rendered yet — for flow children (layout-managed),
-    //   stored x/y is unreliable (often 0,0 after a drop), so return null rather than
-    //   placing the outline at the parent's top-left. For absolute elements, use x/y directly.
-    //  Pass 2 (clean): ngAfterViewChecked has updated the cache and bumped flowCacheVersion
-    //   (inside the Angular zone, so zone.js schedules this second cycle). Live DOM is correct.
+    // When the cache is dirty, Angular hasn't yet re-rendered child components, so reading the
+    // live DOM gives stale positions. Use getCachedOverlaySceneBounds instead — for
+    // absolute-positioned elements it uses updated element.x/y (correct), for flow children
+    // it gives an approximate value that will be corrected on the second pass.
+    // markFlowBoundsCacheClean() bumps flowCacheVersion after ngAfterViewChecked, which
+    // triggers this computed again once the DOM is stable — at that point live bounds are correct.
     if (this.gesture.isFlowBoundsDirty()) {
-      const parentEl = selected.parentId
-        ? this.element.findElementById(selected.parentId, this.elements())
-        : null;
-      if (parentEl?.display) return null; // hide for one frame; second pass shows correct position
       return this.gesture.getCachedOverlaySceneBounds(selected);
     }
-    return (
-      this.gesture.getLiveOverlaySceneBounds(selected) ??
-      this.gesture.getCachedOverlaySceneBounds(selected)
-    );
+    return this.gesture.getLiveOverlaySceneBounds(selected)
+      ?? this.gesture.getCachedOverlaySceneBounds(selected);
   });
 
   /** Whether resize/rotate handles should be shown for the selected element. */
   readonly showSelectionHandles = computed<boolean>(() => {
     const s = this.selectedElement();
     if (!s) return false;
-    return (
-      s.type !== 'frame' && s.type !== 'text' && s.widthMode !== 'fill' && s.heightMode !== 'fill'
-    );
+    return s.type !== 'frame' && s.type !== 'text' && s.widthMode !== 'fill' && s.heightMode !== 'fill';
   });
 
   /** Overlay-space bounds for the hovered element (null if not applicable). */
   readonly hoveredOverlayBounds = computed<Bounds | null>(() => {
     const hoveredId = this.gesture.hoveredElementId();
-    if (
-      !hoveredId ||
-      this.gesture.isDraggingEl() ||
-      this.selectedElementIds().includes(hoveredId)
-    ) {
+    if (!hoveredId || this.gesture.isDraggingEl() || this.selectedElementIds().includes(hoveredId)) {
       return null;
     }
     void this.gesture.flowCacheVersion(); // register reactive dependency
@@ -244,18 +231,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const elements = this.getPageElementsById(pageId);
     const hovered = this.element.findElementById(hoveredId, elements);
     if (!hovered || hovered.type === 'frame') return null;
-    // Same two-pass strategy as selectionOverlayBounds.
+    // Same two-pass strategy as selectionOverlayBounds:
+    // dirty → cached bounds (avoids stale DOM); clean → live DOM (accurate after render).
     if (this.gesture.isFlowBoundsDirty()) {
-      const parentEl = hovered.parentId
-        ? this.element.findElementById(hovered.parentId, elements)
-        : null;
-      if (parentEl?.display) return null;
       return this.gesture.getCachedOverlaySceneBounds(hovered);
     }
-    return (
-      this.gesture.getLiveOverlaySceneBounds(hovered) ??
-      this.gesture.getCachedOverlaySceneBounds(hovered)
-    );
+    return this.gesture.getLiveOverlaySceneBounds(hovered)
+      ?? this.gesture.getCachedOverlaySceneBounds(hovered);
   });
 
   /** Overlay-space bounds for each multi-selected element. */
@@ -338,13 +320,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.restorePendingInitialPageFocus();
 
     if (this.gesture.isFlowBoundsDirty()) {
-      // Read DOM bounds outside zone (pure DOM reads — avoids unnecessary zone-triggered cycles).
-      this.zone.runOutsideAngular(() => {
-        this.gesture.updateFlowBoundsCache(this.canvasSceneRef()?.nativeElement ?? null);
-      });
-      // Mark clean INSIDE the zone so zone.js sees the signal bump and schedules a new CD cycle.
-      // That second cycle evaluates overlay computeds against the now-correct live DOM.
-      this.gesture.markFlowBoundsCacheClean();
+      this.gesture.updateFlowBoundsCache(this.canvasSceneRef()?.nativeElement ?? null);
+      // Defer the clean signal so it runs as a new zone.js macrotask. Writing
+      // _flowCacheVersion synchronously inside ngAfterViewChecked stays within the
+      // current CD cycle and zone.js never schedules a follow-up tick for it.
+      // With setTimeout(0) the callback is a fresh macrotask: zone.js detects its
+      // completion and triggers another CD cycle, causing selectionOverlayBounds to
+      // re-evaluate with dirty=false and read correct live DOM bounds.
+      setTimeout(() => this.gesture.markFlowBoundsCacheClean(), 0);
     }
   }
 
@@ -1058,7 +1041,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     // Update hover from DOM
     const path = event.composedPath() as Element[];
     const elementEl = path.find(
-      (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('data-element-id'),
+      (el): el is HTMLElement =>
+        el instanceof HTMLElement && el.hasAttribute('data-element-id'),
     );
     const hoveredId = elementEl?.getAttribute('data-element-id') ?? null;
     if (hoveredId !== this.gesture.hoveredElementId()) {

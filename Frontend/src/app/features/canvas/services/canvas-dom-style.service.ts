@@ -32,6 +32,7 @@ export class CanvasDomStyleService {
       ...this.buildElementStyle(element, allElements, page),
       ...this.buildPositionStyle(element, parent),
       ...this.buildFlexChildStyle(element, parent),
+      ...this.buildGridChildStyle(element, parent),
     };
   }
 
@@ -248,22 +249,53 @@ export class CanvasDomStyleService {
     const crossFill = mainIsWidth ? element.heightMode === 'fill' : element.widthMode === 'fill';
 
     if (mainFill) {
-      // Grow to fill available main-axis space; allow shrinking when multiple fill children share it.
-      style['flex-grow'] = '1';
-      style['flex-shrink'] = '1';
-      // Prevent flex from compressing below 0 (width or height already set to resolved value).
-      if (mainIsWidth) style['min-width'] = '0';
-      else style['min-height'] = '0';
+      // Remove the explicit main-axis dimension so flex-basis resolves to `auto` (content size),
+      // matching the CSS `flex: 1` (flex-basis: 0 semantics via grow from content).
+      // Without this, the explicit px value acts as flex-basis and prevents correct distribution
+      // when the parent is itself shrunk by an outer layout (nested fill containers).
+      if (mainIsWidth) {
+        style['width'] = null;
+        style['flex-grow'] = '1';
+        style['flex-shrink'] = '1';
+        style['min-width'] = '0';
+      } else {
+        style['height'] = null;
+        style['flex-grow'] = '1';
+        style['flex-shrink'] = '1';
+        style['min-height'] = '0';
+      }
     } else {
       // Fixed or fit-content on main axis — must NOT be shrunk by flex layout.
       style['flex-shrink'] = '0';
     }
 
     if (crossFill) {
-      // Stretch across the cross axis instead of relying solely on the resolved pixel value.
+      // Remove the explicit cross-axis dimension so align-self: stretch takes effect.
+      // An explicit px value would override stretch, breaking fill when the parent's
+      // cross-axis size differs from the model-computed value (e.g. parent is itself fill).
+      if (mainIsWidth) style['height'] = null;
+      else style['width'] = null;
       style['align-self'] = 'stretch';
     }
 
+    return style;
+  }
+
+  /**
+   * Removes explicit fill dimensions for grid children so the browser's default
+   * align-self: stretch / justify-self: stretch can size the item to its grid cell.
+   */
+  private buildGridChildStyle(
+    element: CanvasElement,
+    parent: CanvasElement | null | undefined,
+  ): DomStyleMap {
+    const pos = element.position;
+    const isFlow = !pos || pos === 'static' || pos === 'relative' || pos === 'sticky';
+    if (!isFlow || parent?.display !== 'grid') return {};
+
+    const style: DomStyleMap = {};
+    if (element.widthMode === 'fill') style['width'] = null;
+    if (element.heightMode === 'fill') style['height'] = null;
     return style;
   }
 
