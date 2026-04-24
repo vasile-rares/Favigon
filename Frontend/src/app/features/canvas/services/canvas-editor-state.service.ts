@@ -1,6 +1,7 @@
 import { Injectable, computed, effect, signal } from '@angular/core';
 import { CanvasElement, CanvasElementType, CanvasPageModel } from '@app/core';
 import { HistorySnapshot } from '../canvas.types';
+import { buildElementMap, buildChildrenMap } from '../utils/canvas-tree.util';
 
 @Injectable()
 export class CanvasEditorStateService {
@@ -74,6 +75,16 @@ export class CanvasEditorStateService {
 
     return this.elements().filter((element) => selectedIds.has(element.id));
   });
+
+  /** O(1) lookup of any element on the current page by id. */
+  readonly elementMap = computed<Map<string, CanvasElement>>(() =>
+    buildElementMap(this.elements()),
+  );
+
+  /** O(1) lookup of children by parentId (use `null` key for root elements). */
+  readonly childrenMap = computed<Map<string | null, CanvasElement[]>>(() =>
+    buildChildrenMap(this.elements()),
+  );
 
   // ── Mutation Helpers ──────────────────────────────────────
 

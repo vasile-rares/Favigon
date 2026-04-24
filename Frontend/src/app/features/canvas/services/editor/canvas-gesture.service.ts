@@ -886,8 +886,9 @@ export class CanvasGestureService {
 
       let snappedElements = resizedElements;
       if (resizedTarget && this.isRootFrame(resizedTarget) && start.handle.includes('s')) {
-        const candidates: number[] = els
-          .filter((el) => el.type === 'frame' && !el.parentId && el.id !== start.elementId)
+        const candidates: number[] = this.element
+          .getRootFrames(els)
+          .filter((el) => el.id !== start.elementId)
           .flatMap((el) => [
             el.y + this.element.getRenderedHeight(el, els, this.editorState.currentPage()),
             el.y,
@@ -2130,7 +2131,7 @@ export class CanvasGestureService {
   }
 
   private getPrimaryFrame(elements: CanvasElement[]): CanvasElement | null {
-    const rootFrames = elements.filter((el) => el.type === 'frame' && !el.parentId);
+    const rootFrames = this.element.getRootFrames(elements);
     return (
       rootFrames.find((el) => el.isPrimary) ??
       rootFrames.find((el) => el.name?.toLowerCase() === 'desktop') ??
@@ -2181,9 +2182,9 @@ export class CanvasGestureService {
       }
     }
 
-    const otherRootFrames = elements.filter(
-      (el) => this.isRootFrame(el) && el.id !== primaryFrame.id,
-    );
+    const otherRootFrames = this.element
+      .getRootFrames(elements)
+      .filter((el) => el.id !== primaryFrame.id);
     if (otherRootFrames.length === 0) return elements;
 
     let nextElements =
@@ -2899,7 +2900,7 @@ export class CanvasGestureService {
   }
 
   getRootFrameCount(elements: CanvasElement[]): number {
-    return elements.filter((el) => this.isRootFrame(el)).length;
+    return this.element.getRootFrames(elements).length;
   }
 
   private reflowRootFrames(
@@ -2907,7 +2908,7 @@ export class CanvasGestureService {
     draggedId?: string,
     draggedX?: number,
   ): CanvasElement[] {
-    const rootFrames = elements.filter((el) => this.isRootFrame(el));
+    const rootFrames = this.element.getRootFrames(elements);
     if (rootFrames.length <= 1) return elements;
 
     const ordered = [...rootFrames].sort((a, b) => {

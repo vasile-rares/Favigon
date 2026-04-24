@@ -38,7 +38,11 @@ import { PropertiesPanelComponent } from '../../components/properties-panel/prop
 import { CanvasDomElementComponent } from '../../components/canvas-dom-element/canvas-dom-element.component';
 import { mutateNormalizeElement } from '../../utils/element/canvas-element-normalization.util';
 import { roundToTwoDecimals } from '../../utils/canvas-math.util';
-import { collectSubtreeIds, removeWithChildren } from '../../utils/canvas-tree.util';
+import {
+  collectSubtreeIds,
+  removeWithChildren,
+  buildChildrenMap,
+} from '../../utils/canvas-tree.util';
 import { generateThumbnail } from '../../utils/pixi/canvas-thumbnail.util';
 import {
   getTextFontFamily,
@@ -164,6 +168,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly elements = this.editorState.elements;
   readonly selectedElement = this.editorState.selectedElement;
   readonly selectedElements = this.editorState.selectedElements;
+  readonly elementMap = this.editorState.elementMap;
 
   readonly visibleElements = computed<CanvasElement[]>(() =>
     this.elements().filter((element) =>
@@ -173,6 +178,18 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
   readonly projectPanelWidth = signal(DEFAULT_PROJECT_PANEL_WIDTH);
+
+  /** Per-page children maps for O(1) parent→children lookup in templates. */
+  readonly pageChildrenMaps = computed<Map<string, Map<string | null, CanvasElement[]>>>(() => {
+    const result = new Map<string, Map<string | null, CanvasElement[]>>();
+    for (const pg of this.pages()) {
+      result.set(pg.id, buildChildrenMap(pg.elements));
+    }
+    return result;
+  });
+
+  /** Stable empty map used as fallback in template bindings. */
+  readonly emptyChildrenMap = new Map<string | null, CanvasElement[]>();
 
   // ── DOM Overlay Computed Signals ──────────────────────────
 
@@ -1188,11 +1205,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   // ── DOM Scene Template Helpers ────────────────────────────
 
   getTopLevelElements(pg: CanvasPageModel): CanvasElement[] {
-    return pg.elements.filter((el) => !el.parentId && el.visible !== false);
+    const cm = this.pageChildrenMaps().get(pg.id) ?? this.emptyChildrenMap;
+    return (cm.get(null) ?? []).filter((el) => el.visible !== false);
   }
 
   getRootFrames(pg: CanvasPageModel): CanvasElement[] {
-    return pg.elements.filter((el) => el.type === 'frame' && !el.parentId);
+    const cm = this.pageChildrenMaps().get(pg.id) ?? this.emptyChildrenMap;
+    return (cm.get(null) ?? []).filter((el) => el.type === 'frame');
   }
 
   getPageShellStyle(pageId: string): Record<string, string> {

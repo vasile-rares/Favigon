@@ -489,7 +489,7 @@ export class CanvasPageService {
     const targetId = pageId ?? this.editorState.currentPageId();
     this.deviceMenuTargetPageId.set(targetId);
     const targetPage = targetId ? this.getPageById(targetId) : null;
-    const rootFrames = targetPage?.elements.filter((e) => e.type === 'frame' && !e.parentId) ?? [];
+    const rootFrames = targetPage ? this.el.getRootFrames(targetPage.elements) : [];
     const hasMobile = rootFrames.some((f) => (f.name ?? '').toLowerCase().startsWith('mobile'));
     const hasTablet = rootFrames.some((f) => (f.name ?? '').toLowerCase().startsWith('tablet'));
     this.deviceMenuItems.set([
@@ -945,18 +945,12 @@ export class CanvasPageService {
       return null;
     }
 
-    return (
-      page.elements.find(
-        (element) =>
-          element.type === 'frame' && !element.parentId && getFrameTitle(element) === 'Desktop',
-      ) ??
-      page.elements.find((element) => element.type === 'frame' && !element.parentId) ??
-      null
-    );
+    const frames = this.el.getRootFrames(page.elements);
+    return frames.find((element) => getFrameTitle(element) === 'Desktop') ?? frames[0] ?? null;
   }
 
   private getPrimaryFrame(elements: CanvasElement[]): CanvasElement | null {
-    const rootFrames = elements.filter((el) => el.type === 'frame' && !el.parentId);
+    const rootFrames = this.el.getRootFrames(elements);
     return (
       rootFrames.find((el) => el.isPrimary) ??
       rootFrames.find((el) => el.name?.toLowerCase() === 'desktop') ??

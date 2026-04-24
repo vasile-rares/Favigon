@@ -8,7 +8,12 @@ import {
 } from '@app/core';
 import { hasPerCornerRadius } from '../utils/element/canvas-element-normalization.util';
 import { clamp, roundToTwoDecimals } from '../utils/canvas-math.util';
-import { collectSubtreeIds } from '../utils/canvas-tree.util';
+import { collectSubtreeIds, buildElementMap, buildChildrenMap } from '../utils/canvas-tree.util';
+
+export interface ElementIndex {
+  readonly elementMap: Map<string, CanvasElement>;
+  readonly childrenMap: Map<string | null, CanvasElement[]>;
+}
 import { formatCanvasElementTypeLabel } from '../utils/element/canvas-element-normalization.util';
 import {
   getTextFontFamily,
@@ -45,6 +50,22 @@ const DEFAULT_ELEMENT_DIMENSIONS: Record<CanvasElementType, { width: number; hei
 
 @Injectable()
 export class CanvasElementService {
+  // -- Index Cache (O(1) element/children lookup) ------------
+
+  private readonly _indexCache = new WeakMap<CanvasElement[], ElementIndex>();
+
+  private getOrBuildIndex(elements: CanvasElement[]): ElementIndex {
+    let idx = this._indexCache.get(elements);
+    if (!idx) {
+      idx = {
+        elementMap: buildElementMap(elements),
+        childrenMap: buildChildrenMap(elements),
+      };
+      this._indexCache.set(elements, idx);
+    }
+    return idx;
+  }
+
   // G��G�� Element Factories G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
   createElementAtPoint(
@@ -291,7 +312,17 @@ export class CanvasElementService {
     if (!id) {
       return null;
     }
-    return elements.find((element) => element.id === id) ?? null;
+    return this.getOrBuildIndex(elements).elementMap.get(id) ?? null;
+  }
+
+  getRootFrames(elements: CanvasElement[]): CanvasElement[] {
+    return (this.getOrBuildIndex(elements).childrenMap.get(null) ?? []).filter(
+      (el) => el.type === 'frame',
+    );
+  }
+
+  getChildrenOf(parentId: string, elements: CanvasElement[]): CanvasElement[] {
+    return this.getOrBuildIndex(elements).childrenMap.get(parentId) ?? [];
   }
 
   getRenderedWidth(
@@ -405,30 +436,28 @@ export class CanvasElementService {
     const mode = getCanvasSizeMode(element, axis);
     let resolvedPixels = fallbackPixels;
 
-    const parent = this.findElementById(element.parentId ?? null, elements);
+    const idx = this.getOrBuildIndex(elements);
+    const parent = element.parentId ? (idx.elementMap.get(element.parentId) ?? null) : null;
     const parentSizeRef = this.getParentSizeReferenceForChild(element, parent, elements, page);
 
     if (element.type === 'text' && mode === 'fit-content') {
       const widthConstraint = this.getTextMeasurementWidthConstraint(element, elements, page);
       const measured = this.measureTextContentSize(element, widthConstraint);
       // Text measurement returns content-only size; add padding for border-box storage.
-      resolvedPixels = (axis === 'width' ? measured.width : measured.height)
-        + this.getPaddingAxisTotal(element, axis);
+      resolvedPixels =
+        (axis === 'width' ? measured.width : measured.height) +
+        this.getPaddingAxisTotal(element, axis);
     } else if (
       (element.type === 'rectangle' || element.type === 'frame') &&
       mode === 'fit-content'
     ) {
-      const children = elements.filter((c) => c.parentId === element.id);
+      const children = idx.childrenMap.get(element.id) ?? [];
       if (children.length > 0) {
         // computeContainerFitContentSize returns children's extent (content-only);
         // add own padding for border-box storage.
-        resolvedPixels = this.computeContainerFitContentSize(
-          element,
-          children,
-          elements,
-          axis,
-          page,
-        ) + this.getPaddingAxisTotal(element, axis);
+        resolvedPixels =
+          this.computeContainerFitContentSize(element, children, elements, axis, page) +
+          this.getPaddingAxisTotal(element, axis);
       }
     } else if (mode !== 'fixed' && mode !== 'fit-content') {
       if (mode === 'viewport' && !page) {
@@ -648,13 +677,7 @@ export class CanvasElementService {
     page?: CanvasPageModel | null,
   ): number {
     if (this.isLayoutContainerElement(container)) {
-      return this.computeLayoutContainerFitContent(
-        container,
-        children,
-        elements,
-        axis,
-        page,
-      );
+      return this.computeLayoutContainerFitContent(container, children, elements, axis, page);
     }
     return this.computeFreeContainerFitContent(children, elements, axis, page);
   }
@@ -688,9 +711,7 @@ export class CanvasElementService {
           const childMode = getCanvasSizeMode(child, axis);
           // Fill children don't contribute intrinsic size on the main axis
           const childBoxSize =
-            childMode === 'fill'
-              ? 0
-              : this.getChildIntrinsicBoxSize(child, elements, axis, page);
+            childMode === 'fill' ? 0 : this.getChildIntrinsicBoxSize(child, elements, axis, page);
           total += childBoxSize + this.getMarginAxisTotal(child, axis);
           count++;
         }
@@ -703,13 +724,8 @@ export class CanvasElementService {
           const childMode = getCanvasSizeMode(child, axis);
           // Fill children on the cross axis stretch — they don't contribute intrinsic size
           const childBoxSize =
-            childMode === 'fill'
-              ? 0
-              : this.getChildIntrinsicBoxSize(child, elements, axis, page);
-          contentSize = Math.max(
-            contentSize,
-            childBoxSize + this.getMarginAxisTotal(child, axis),
-          );
+            childMode === 'fill' ? 0 : this.getChildIntrinsicBoxSize(child, elements, axis, page);
+          contentSize = Math.max(contentSize, childBoxSize + this.getMarginAxisTotal(child, axis));
         }
       }
     }
@@ -774,7 +790,7 @@ export class CanvasElementService {
           return (axis === 'width' ? measured.width : measured.height) + padding;
         }
         if (child.type === 'rectangle' || child.type === 'frame') {
-          const grandchildren = elements.filter((gc) => gc.parentId === child.id);
+          const grandchildren = this.getOrBuildIndex(elements).childrenMap.get(child.id) ?? [];
           if (grandchildren.length > 0) {
             // Children extent is content-only; add own padding for border-box
             return (
@@ -810,10 +826,7 @@ export class CanvasElementService {
     }
   }
 
-  private getMarginAxisTotal(
-    element: Pick<CanvasElement, 'margin'>,
-    axis: CanvasSizeAxis,
-  ): number {
+  private getMarginAxisTotal(element: Pick<CanvasElement, 'margin'>, axis: CanvasSizeAxis): number {
     const margin = element.margin;
     if (!margin) {
       return 0;
@@ -873,7 +886,7 @@ export class CanvasElementService {
   // G��G�� Frame Positioning G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��G��
 
   getNextFramePosition(elements: CanvasElement[], width: number, height: number): Point | null {
-    const rootFrames = elements.filter((element) => element.type === 'frame' && !element.parentId);
+    const rootFrames = this.getRootFrames(elements);
 
     if (rootFrames.length === 0) {
       return null;

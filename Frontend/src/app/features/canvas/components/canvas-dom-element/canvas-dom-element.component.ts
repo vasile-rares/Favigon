@@ -21,6 +21,8 @@ export class CanvasDomElementComponent {
 
   readonly element = input.required<CanvasElement>();
   readonly allElements = input.required<CanvasElement[]>();
+  readonly childrenMap = input.required<Map<string | null, CanvasElement[]>>();
+  readonly elementMap = input.required<Map<string, CanvasElement>>();
   readonly page = input<CanvasPageModel | null>(null);
   readonly editingTextId = input<string | null>(null);
   readonly draggingElementId = input<string | null>(null);
@@ -48,9 +50,8 @@ export class CanvasDomElementComponent {
 
   readonly isFlowChildInLayout = computed(() => {
     const el = this.element();
-    const allEl = this.allElements();
     if (!el.parentId) return false;
-    const parent = allEl.find((p) => p.id === el.parentId);
+    const parent = this.elementMap().get(el.parentId) ?? null;
     if (!parent?.display) return false;
     const pos = el.position;
     return !pos || pos === 'static' || pos === 'relative' || pos === 'sticky';
@@ -58,13 +59,11 @@ export class CanvasDomElementComponent {
 
   readonly childrenWithPlaceholder = computed<ChildItem[]>(() => {
     const el = this.element();
-    const allEl = this.allElements();
     const dragState = this.flowDragState();
     const draggingId = dragState?.draggingElementId ?? null;
 
-    const children = allEl.filter(
-      (e) => e.parentId === el.id && e.visible !== false && e.id !== draggingId,
-    );
+    const allChildren = this.childrenMap().get(el.id) ?? [];
+    const children = allChildren.filter((e) => e.visible !== false && e.id !== draggingId);
 
     const ph = dragState?.placeholder;
     if (!ph || ph.containerId !== el.id) {

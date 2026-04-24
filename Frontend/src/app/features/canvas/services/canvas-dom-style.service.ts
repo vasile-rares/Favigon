@@ -116,6 +116,30 @@ export class CanvasDomStyleService {
       }
     }
 
+    // ── Stroke outline (solid uniform) ────────────────────
+    // CSS outline is painted at step 8 of the CSS stacking order — after all
+    // positioned descendants including those with positive z-index. This means it
+    // renders above all children without needing a separate overlay element.
+    // A negative outline-offset equal to the stroke width draws the outline fully
+    // inside the element boundary, which:
+    //   1. Shares the exact same compositing boundary as background-color → no
+    //      sub-pixel gap between fill and stroke at any zoom level.
+    //   2. Is not clipped by the element's own overflow:hidden (it's on the element
+    //      itself, not a child), so it always renders completely.
+    //   3. Follows border-radius correctly in all modern browsers.
+    // Per-side and non-solid strokes cannot use outline and are handled by the
+    // overlay div via buildStrokeOverlayStyle().
+    if (element.type !== 'text' && element.stroke && !hasPerSideStrokeWidths(element)) {
+      const strokeStyleForOutline = (element.strokeStyle ?? 'Solid').toLowerCase();
+      if (strokeStyleForOutline === 'solid') {
+        const sw = getStrokeWidth(element);
+        if (sw > 0) {
+          style['outline'] = `${sw}px solid ${element.stroke}`;
+          style['outline-offset'] = `-${sw}px`;
+        }
+      }
+    }
+
     // ── Layout (flex / grid / block) ──────────────────────
     if (element.display === 'flex') {
       style['display'] = 'flex';
@@ -356,6 +380,10 @@ export class CanvasDomStyleService {
     }
     const sw = getStrokeWidth(element);
     if (sw <= 0) return {};
+    // Solid uniform stroke is rendered via CSS outline on the parent element (see
+    // buildElementStyle). The overlay is only needed for non-solid styles (dashed,
+    // dotted) which cannot be expressed with outline.
+    if (strokeStyleCss === 'solid') return {};
     return { border: `${sw}px ${strokeStyleCss} ${element.stroke}` };
   }
 

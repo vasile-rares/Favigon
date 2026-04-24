@@ -95,6 +95,8 @@
                   <app-canvas-dom-element
                     [element]="el"
                     [allElements]="pg.elements"
+                    [childrenMap]="pageChildrenMaps().get(pg.id) ?? emptyChildrenMap"
+                    [elementMap]="elementMap()"
                     [page]="pg"
                     [editingTextId]="editingTextElementId()"
                     [draggingElementId]="gesture.draggingFlowChildId()"
