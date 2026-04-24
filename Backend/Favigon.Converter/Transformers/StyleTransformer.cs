@@ -52,12 +52,12 @@ public static class StyleTransformer
 
     if (style.Cursor is not null) css["cursor"] = style.Cursor;
 
-    if (style.Width is not null) css["width"] = style.Width.ToString();
-    if (style.Height is not null) css["height"] = style.Height.ToString();
-    if (style.MinWidth is not null) css["min-width"] = style.MinWidth.ToString();
-    if (style.MaxWidth is not null) css["max-width"] = style.MaxWidth.ToString();
-    if (style.MinHeight is not null) css["min-height"] = style.MinHeight.ToString();
-    if (style.MaxHeight is not null) css["max-height"] = style.MaxHeight.ToString();
+    if (style.Width is not null) css["width"] = FormatDimensionPx(style.Width);
+    if (style.Height is not null) css["height"] = FormatDimensionPx(style.Height);
+    if (style.MinWidth is not null) css["min-width"] = FormatDimensionPx(style.MinWidth);
+    if (style.MaxWidth is not null) css["max-width"] = FormatDimensionPx(style.MaxWidth);
+    if (style.MinHeight is not null) css["min-height"] = FormatDimensionPx(style.MinHeight);
+    if (style.MaxHeight is not null) css["max-height"] = FormatDimensionPx(style.MaxHeight);
 
     if (style.Padding is not null) ApplySpacing(css, "padding", style.Padding);
     if (style.Margin is not null) ApplySpacing(css, "margin", style.Margin);
@@ -184,4 +184,12 @@ public static class StyleTransformer
     Models.BorderStyle.Double => "double",
     _ => "solid"
   };
+
+  /// <summary>
+  /// Formats a dimension (width/height) as an integer px value when the unit is px,
+  /// or falls back to the standard IRLength string for other units (%, vw, vh, fit-content…).
+  /// Sub-pixel precision has no practical value for element dimensions in a design tool.
+  /// </summary>
+  private static string FormatDimensionPx(IRLength len) =>
+    len.Unit == "px" ? $"{(int)Math.Round(len.Value)}px" : len.ToString();
 }

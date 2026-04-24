@@ -263,6 +263,81 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return Math.max((s?.cornerRadius ?? 0) * this.viewport.zoomLevel(), 8);
   });
 
+  /**
+   * For a rotated element, returns the unrotated outline bounds in overlay-scene space.
+   * Uses the AABB's center (from live/cached DOM) which always equals the element's
+   * true center regardless of rotation, then places model-width × model-height around it.
+   * This is correct even for flow children where element.x/y = 0 (CSS-determined position).
+   */
+  private getRotatedElementOverlayBounds(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    aabb: Bounds | null,
+  ): Bounds | null {
+    if (!aabb) return null;
+    // CSS rotate() keeps the center fixed, so AABB center = actual element center.
+    const centerX = aabb.x + aabb.width / 2;
+    const centerY = aabb.y + aabb.height / 2;
+    // Model dimensions are correct (getAbsoluteBounds handles fill/relative sizing).
+    const absolute = this.element.getAbsoluteBounds(
+      element,
+      elements,
+      this.editorState.currentPage(),
+    );
+    return {
+      x: roundToTwoDecimals(centerX - absolute.width / 2),
+      y: roundToTwoDecimals(centerY - absolute.height / 2),
+      width: absolute.width,
+      height: absolute.height,
+    };
+  }
+
+  /** Rotation angle (deg) of the selected element – drives the CSS rotate on the selection outline. */
+  readonly selectionOutlineRotation = computed<number>(() => this.selectedElement()?.rotation ?? 0);
+
+  /**
+   * Bounds used purely for displaying the selection outline.
+   * When the element is rotated we use model-based unrotated bounds (x/y/width/height)
+   * and apply a CSS rotate transform, because getBoundingClientRect() returns the AABB
+   * which is too large and doesn't follow the element's orientation.
+   */
+  readonly selectionOutlineDisplayBounds = computed<Bounds | null>(() => {
+    const selected = this.selectedElement();
+    if (!selected) return null;
+
+    const rotation = selected.rotation ?? 0;
+    if (rotation === 0) {
+      // No rotation – use existing live-DOM-tracking bounds (accurate for flow/flex children).
+      return this.selectionOverlayBounds();
+    }
+
+    // Rotated element: skip live DOM (gives AABB), derive center from AABB then place
+    // unrotated dimensions around it. This is correct even for flow children (x/y = 0).
+    if (this.gesture.isDraggingEl() || this.editingTextElementId()) return null;
+
+    // Register reactive dependency so bounds update while isRotating() / isResizing().
+    void this.gesture.flowCacheVersion();
+
+    // Use the same stable/cached/live strategy as selectionOverlayBounds.
+    const stable = this.gesture.stableSelectionBounds();
+    const stableBounds = stable?.elementId === selected.id ? stable.bounds : null;
+
+    let aabb: Bounds | null;
+    if (
+      this.gesture.isResizing() ||
+      this.gesture.isRotating() ||
+      this.gesture.isFlowBoundsDirty()
+    ) {
+      aabb = stableBounds ?? this.gesture.getCachedOverlaySceneBounds(selected);
+    } else {
+      aabb =
+        this.gesture.getLiveOverlaySceneBounds(selected) ??
+        this.gesture.getCachedOverlaySceneBounds(selected);
+    }
+
+    return this.getRotatedElementOverlayBounds(selected, this.editorState.elements(), aabb);
+  });
+
   readonly selectionHandleMode = computed<'all' | 'ns' | 'ew' | 'none'>(() => {
     const s = this.selectedElement();
     if (!s || s.type === 'frame' || s.type === 'text') return 'none';
@@ -292,6 +367,18 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const elements = this.getPageElementsById(pageId);
     const hovered = this.element.findElementById(hoveredId, elements);
     if (!hovered || hovered.type === 'frame') return null;
+
+    // For rotated elements, live DOM gives the AABB – derive center from it and
+    // place unrotated dimensions around it (correct even for flow children).
+    const rotation = hovered.rotation ?? 0;
+    if (rotation !== 0) {
+      const aabb = this.gesture.isFlowBoundsDirty()
+        ? this.gesture.getCachedOverlaySceneBounds(hovered)
+        : (this.gesture.getLiveOverlaySceneBounds(hovered) ??
+          this.gesture.getCachedOverlaySceneBounds(hovered));
+      return this.getRotatedElementOverlayBounds(hovered, elements, aabb);
+    }
+
     // Same two-pass strategy as selectionOverlayBounds:
     // dirty → cached bounds (avoids stale DOM); clean → live DOM (accurate after render).
     if (this.gesture.isFlowBoundsDirty()) {
@@ -301,6 +388,16 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.gesture.getLiveOverlaySceneBounds(hovered) ??
       this.gesture.getCachedOverlaySceneBounds(hovered)
     );
+  });
+
+  /** Rotation angle (deg) of the hovered element – drives CSS rotate on the hover outline. */
+  readonly hoveredOutlineRotation = computed<number>(() => {
+    const hoveredId = this.gesture.hoveredElementId();
+    if (!hoveredId) return 0;
+    const pageId = this.findPageIdByElementId(hoveredId);
+    if (!pageId) return 0;
+    const elements = this.getPageElementsById(pageId);
+    return this.element.findElementById(hoveredId, elements)?.rotation ?? 0;
   });
 
   /** Overlay-space bounds for each multi-selected element. */
@@ -1626,6 +1723,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.persistDesign();
   }
 
+  private generateThumbnailWithDomBounds(): string | null {
+    const domBounds = this.gesture.snapshotAllElementSceneBounds();
+    return generateThumbnail(this.currentPage(), domBounds.size > 0 ? domBounds : null);
+  }
+
   private persistThumbnailIfDue(precomputedThumbnail?: string | null): void {
     if (!Number.isInteger(this.projectIdAsNumber)) {
       return;
@@ -1634,7 +1736,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const thumbnail =
       precomputedThumbnail !== undefined
         ? precomputedThumbnail
-        : generateThumbnail(this.currentPage());
+        : this.generateThumbnailWithDomBounds();
     if (!thumbnail) {
       return;
     }
@@ -1679,7 +1781,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.pendingProjectFlush.queueAndDispatch(
       this.projectIdAsNumber,
       this.buildCurrentPersistedDesignJson(),
-      generateThumbnail(this.currentPage()),
+      this.generateThumbnailWithDomBounds(),
     );
     this.hasTriggeredBrowserExitFlush = true;
   }

@@ -116,26 +116,21 @@ export class CanvasDomStyleService {
       }
     }
 
-    // ── Stroke outline (solid uniform) ────────────────────
-    // CSS outline is painted at step 8 of the CSS stacking order — after all
-    // positioned descendants including those with positive z-index. This means it
-    // renders above all children without needing a separate overlay element.
-    // A negative outline-offset equal to the stroke width draws the outline fully
-    // inside the element boundary, which:
-    //   1. Shares the exact same compositing boundary as background-color → no
-    //      sub-pixel gap between fill and stroke at any zoom level.
-    //   2. Is not clipped by the element's own overflow:hidden (it's on the element
-    //      itself, not a child), so it always renders completely.
-    //   3. Follows border-radius correctly in all modern browsers.
-    // Per-side and non-solid strokes cannot use outline and are handled by the
-    // overlay div via buildStrokeOverlayStyle().
-    if (element.type !== 'text' && element.stroke && !hasPerSideStrokeWidths(element)) {
-      const strokeStyleForOutline = (element.strokeStyle ?? 'Solid').toLowerCase();
-      if (strokeStyleForOutline === 'solid') {
+    // ── Stroke / Border ──────────────────────────────────
+    // Real CSS border on the element: children are constrained to the content
+    // area inside the border (CSS box-model, box-sizing: border-box).
+    if (element.type !== 'text' && element.stroke) {
+      const strokeStyleCss = (element.strokeStyle ?? 'Solid').toLowerCase();
+      if (hasPerSideStrokeWidths(element)) {
+        const widths = getStrokeWidths(element);
+        style['border-top'] = `${widths.top}px ${strokeStyleCss} ${element.stroke}`;
+        style['border-right'] = `${widths.right}px ${strokeStyleCss} ${element.stroke}`;
+        style['border-bottom'] = `${widths.bottom}px ${strokeStyleCss} ${element.stroke}`;
+        style['border-left'] = `${widths.left}px ${strokeStyleCss} ${element.stroke}`;
+      } else {
         const sw = getStrokeWidth(element);
         if (sw > 0) {
-          style['outline'] = `${sw}px solid ${element.stroke}`;
-          style['outline-offset'] = `-${sw}px`;
+          style['border'] = `${sw}px ${strokeStyleCss} ${element.stroke}`;
         }
       }
     }
@@ -152,9 +147,9 @@ export class CanvasDomStyleService {
       if (typeof gapX === 'number' && typeof gapY === 'number') {
         style['gap'] = `${gapY}px ${gapX}px`;
       } else if (typeof gapX === 'number') {
-        style['gap'] = `${gapX}px`;
+        style['column-gap'] = `${gapX}px`;
       } else if (typeof gapY === 'number') {
-        style['gap'] = `${gapY}px`;
+        style['row-gap'] = `${gapY}px`;
       }
     } else if (element.display === 'grid') {
       style['display'] = 'grid';
@@ -165,9 +160,9 @@ export class CanvasDomStyleService {
       if (typeof gapX === 'number' && typeof gapY === 'number') {
         style['gap'] = `${gapY}px ${gapX}px`;
       } else if (typeof gapX === 'number') {
-        style['gap'] = `${gapX}px`;
+        style['column-gap'] = `${gapX}px`;
       } else if (typeof gapY === 'number') {
-        style['gap'] = `${gapY}px`;
+        style['row-gap'] = `${gapY}px`;
       }
     } else if (element.display === 'block') {
       style['display'] = 'block';
@@ -267,16 +262,24 @@ export class CanvasDomStyleService {
         style['flex-grow'] = '1';
         style['flex-shrink'] = '1';
         style['flex-basis'] = '0px';
-        style['min-width'] = '0';
+        // Allow flex to compress below content width (enables text wrapping instead of overflow).
+        // Skip when an explicit minWidth constraint is set — buildElementStyle already applied
+        // it and min-width: 0 must not override it.
+        if (element.minWidth == null) {
+          style['min-width'] = '0';
+        }
       } else {
         style['height'] = null;
         style['flex-grow'] = '1';
         style['flex-shrink'] = '1';
         style['flex-basis'] = '0px';
-        style['min-height'] = '0';
+        if (element.minHeight == null) {
+          style['min-height'] = '0';
+        }
       }
     } else {
-      // Fixed or fit-content on main axis — must NOT be shrunk by flex layout.
+      // Fixed or fit-content on main axis — must NOT be shrunk or grown by flex layout.
+      style['flex-grow'] = '0';
       style['flex-shrink'] = '0';
     }
 
@@ -327,8 +330,14 @@ export class CanvasDomStyleService {
 
     const effectivePos = pos === 'fixed' ? 'fixed' : 'absolute';
     const style: DomStyleMap = { position: effectivePos };
-    style['left'] = `${element.x}px`;
-    style['top'] = `${element.y}px`;
+
+    // element.x/y is measured from the parent's outer edge (border-box origin).
+    // CSS left/top for position:absolute is measured from the parent's padding-box
+    // (inner border edge). Subtract the parent's border width so the stored
+    // coordinates remain outer-edge-based while CSS renders them correctly.
+    const parentWidths = parent ? getStrokeWidths(parent) : null;
+    style['left'] = `${element.x - (parentWidths?.left ?? 0)}px`;
+    style['top'] = `${element.y - (parentWidths?.top ?? 0)}px`;
     return style;
   }
 
@@ -362,29 +371,11 @@ export class CanvasDomStyleService {
   }
 
   /**
-   * Returns border styles for the stroke overlay div that is rendered as the
-   * LAST child of .canvas-el, ensuring it paints ABOVE all sibling children.
-   * Returns an empty map when the element has no stroke.
+   * Stroke overlay is unused when border is rendered directly on the element.
+   * Returns an empty map for all elements.
    */
-  buildStrokeOverlayStyle(element: CanvasElement): DomStyleMap {
-    if (element.type === 'text' || !element.stroke) return {};
-    const strokeStyleCss = (element.strokeStyle ?? 'Solid').toLowerCase();
-    if (hasPerSideStrokeWidths(element)) {
-      const widths = getStrokeWidths(element);
-      return {
-        'border-top': `${widths.top}px ${strokeStyleCss} ${element.stroke}`,
-        'border-right': `${widths.right}px ${strokeStyleCss} ${element.stroke}`,
-        'border-bottom': `${widths.bottom}px ${strokeStyleCss} ${element.stroke}`,
-        'border-left': `${widths.left}px ${strokeStyleCss} ${element.stroke}`,
-      };
-    }
-    const sw = getStrokeWidth(element);
-    if (sw <= 0) return {};
-    // Solid uniform stroke is rendered via CSS outline on the parent element (see
-    // buildElementStyle). The overlay is only needed for non-solid styles (dashed,
-    // dotted) which cannot be expressed with outline.
-    if (strokeStyleCss === 'solid') return {};
-    return { border: `${sw}px ${strokeStyleCss} ${element.stroke}` };
+  buildStrokeOverlayStyle(_element: CanvasElement): DomStyleMap {
+    return {};
   }
 
   buildTextVerticalAlignStyle(element: CanvasElement): DomStyleMap {

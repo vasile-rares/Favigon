@@ -137,11 +137,14 @@ export class DimensionsSectionComponent {
 
   dimensionModeOptions(element: CanvasElement, axis: CanvasSizeAxis): DropdownSelectOption[] {
     const parent = this.parentElement(element);
+    const hasChildren = (this.currentPageModel()?.elements ?? []).some(
+      (e) => e.parentId === element.id,
+    );
     return this.dimensionModeDefinitions.map((definition) => ({
       label: definition.label,
       triggerLabel: this.getDimensionModeTriggerLabel(definition.mode),
       value: definition.mode,
-      disabled: !supportsCanvasSizeMode(definition.mode, element, parent),
+      disabled: !supportsCanvasSizeMode(definition.mode, element, parent, hasChildren),
     }));
   }
 

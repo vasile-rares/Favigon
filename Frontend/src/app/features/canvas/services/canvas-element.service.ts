@@ -227,12 +227,12 @@ export class CanvasElementService {
     const maxHeight = selectedContainer
       ? Math.max(placementHeight ?? MIN_ELEMENT_SIZE, MIN_ELEMENT_SIZE)
       : null;
-    const width = roundToTwoDecimals(
+    const width = Math.round(
       maxWidth == null
         ? Math.max(bounds.width, MIN_ELEMENT_SIZE)
         : clamp(bounds.width, MIN_ELEMENT_SIZE, maxWidth),
     );
-    const height = roundToTwoDecimals(
+    const height = Math.round(
       maxHeight == null
         ? Math.max(bounds.height, MIN_ELEMENT_SIZE)
         : clamp(bounds.height, MIN_ELEMENT_SIZE, maxHeight),
@@ -587,7 +587,16 @@ export class CanvasElementService {
     axis: CanvasSizeAxis,
     page?: CanvasPageModel | null,
   ): string {
-    return getCanvasSizeMode(element, axis) === 'fit-content'
+    if (getCanvasSizeMode(element, axis) !== 'fit-content') {
+      return `${this.getResolvedContentSizePx(element, elements, axis, page)}px`;
+    }
+    // Text and layout containers (display: flex/grid/block) can use the CSS `fit-content`
+    // keyword — the browser measures intrinsic size from flow content / text nodes.
+    // Non-layout containers have only position:absolute children, which do NOT participate
+    // in intrinsic sizing, so the CSS keyword collapses the element to ~0px. Use the
+    // model-computed pixel value instead, which correctly accounts for absolute children.
+    const canUseCssKeyword = element.type === 'text' || this.isLayoutContainerElement(element);
+    return canUseCssKeyword
       ? 'fit-content'
       : `${this.getResolvedContentSizePx(element, elements, axis, page)}px`;
   }

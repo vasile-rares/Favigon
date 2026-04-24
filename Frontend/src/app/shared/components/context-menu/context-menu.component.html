@@ -18,7 +18,7 @@
         class="context-menu__item context-menu__item--submenu"
         role="menuitem"
         [class.context-menu__item--disabled]="item.disabled"
-        (mouseenter)="openSubmenuId = item.disabled ? null : item.id">
+        (mouseenter)="onSubmenuMouseEnter(item, $event)">
         <span class="context-menu__item-main" [class.context-menu__item-main--with-check]="item.showCheckSlot">
           @if (item.showCheckSlot) {
             <span class="context-menu__item-check" [class.context-menu__item-check--active]="item.checked" aria-hidden="true">
@@ -32,7 +32,7 @@
         <span class="context-menu__item-arrow">›</span>
 
         @if (openSubmenuId === item.id) {
-          <div class="context-menu__submenu glass-panel" role="menu" [class.context-menu__submenu--left]="submenuDirection() === 'left'">
+          <div class="context-menu__submenu glass-panel" role="menu" [class.context-menu__submenu--left]="submenuDirection() === 'left'" [class.context-menu__submenu--above]="submenuFlipAbove">
             @for (child of item.children; track child.id) {
               <button
                 type="button"

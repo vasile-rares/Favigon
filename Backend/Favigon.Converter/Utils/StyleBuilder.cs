@@ -21,6 +21,13 @@ public sealed class StyleBuilder
       _pseudoRules.Add(($".{cssClass}:{pseudoClass}", props));
   }
 
+  /// <summary>Adds a rule with a fully-specified CSS selector, e.g. ".class::after { ... }"</summary>
+  public void AddRule(string fullSelector, Dictionary<string, string> props)
+  {
+    if (props.Count > 0)
+      _pseudoRules.Add((fullSelector, props));
+  }
+
   public void AddKeyframes(string name, string body)
   {
     if (!_keyframeRules.Exists(k => k.Name == name))

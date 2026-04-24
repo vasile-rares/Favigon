@@ -274,6 +274,7 @@
   position: absolute;
   outline: 2px solid #3b82f6;
   pointer-events: none;
+  transform-origin: center center;
 }
 
 .multi-select-outline {
@@ -293,6 +294,7 @@
   outline: 2px solid #3b82f6;
   pointer-events: auto;
   cursor: default;
+  transform-origin: center center;
 }
 
 .sel-handle {
@@ -303,6 +305,7 @@
   border: 1.5px solid #3b82f6;
   border-radius: 50%;
   pointer-events: auto;
+  z-index: 1;
 }
 .sel-handle-nw {
   left: -4px;

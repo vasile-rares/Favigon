@@ -149,6 +149,7 @@ export class CanvasGestureService {
     elementId: '',
     handle: 'se',
     parentAbsoluteBounds: null,
+    rotation: 0,
   };
 
   private rotateStart: RotateState = {
@@ -213,13 +214,23 @@ export class CanvasGestureService {
     const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) return;
 
+    // For rotated elements, getLiveElementCanvasBounds returns the AABB (axis-aligned box),
+    // which gives wrong width/height for the rotation-aware resize algorithm.
+    // Use model-based bounds so we always work with the actual unrotated dimensions.
+    const rotation = el.rotation ?? 0;
     const bounds =
-      this.getLiveElementCanvasBounds(el) ??
-      this.element.getAbsoluteBounds(
-        el,
-        this.editorState.elements(),
-        this.editorState.currentPage(),
-      );
+      rotation !== 0
+        ? this.element.getAbsoluteBounds(
+            el,
+            this.editorState.elements(),
+            this.editorState.currentPage(),
+          )
+        : (this.getLiveElementCanvasBounds(el) ??
+          this.element.getAbsoluteBounds(
+            el,
+            this.editorState.elements(),
+            this.editorState.currentPage(),
+          ));
     const parentEl = this.element.findElementById(el.parentId ?? null, this.editorState.elements());
     const parentAbsoluteBounds = parentEl
       ? (this.getLiveElementCanvasBounds(parentEl) ??
@@ -253,6 +264,7 @@ export class CanvasGestureService {
       elementId: id,
       handle,
       parentAbsoluteBounds,
+      rotation,
     };
   }
 
@@ -870,12 +882,38 @@ export class CanvasGestureService {
           event.altKey,
         );
 
+        const storedWidth = this.getStoredAxisSizeFromRendered(el, 'width', bounds.width);
+        const storedHeight = this.getStoredAxisSizeFromRendered(el, 'height', bounds.height);
+
+        // Re-anchor position to the fixed edge after storing width/height.
+        // getStoredAxisSizeFromRendered applies Math.round and Math.max(24,...), so the
+        // stored size can differ from bounds.width/height. Without re-anchoring, the edge
+        // that should stay fixed (right edge for 'w' handles, bottom for 'n' handles) drifts.
+        const parentOriginX = parentBounds ? parentBounds.x : 0;
+        const parentOriginY = parentBounds ? parentBounds.y : 0;
+
+        let localX = bounds.x - parentOriginX;
+        let localY = bounds.y - parentOriginY;
+
+        if (!start.rotation) {
+          if (start.handle.includes('w')) {
+            // Right edge is fixed; re-derive x so that x + storedWidth = fixedRight.
+            const fixedAbsRight = start.absoluteX + start.width;
+            localX = fixedAbsRight - parentOriginX - storedWidth;
+          }
+          if (start.handle.includes('n')) {
+            // Bottom edge is fixed; re-derive y so that y + storedHeight = fixedBottom.
+            const fixedAbsBottom = start.absoluteY + start.height;
+            localY = fixedAbsBottom - parentOriginY - storedHeight;
+          }
+        }
+
         const nextElement: CanvasElement = {
           ...el,
-          x: parentBounds ? bounds.x - parentBounds.x : bounds.x,
-          y: parentBounds ? bounds.y - parentBounds.y : bounds.y,
-          width: this.getStoredAxisSizeFromRendered(el, 'width', bounds.width),
-          height: this.getStoredAxisSizeFromRendered(el, 'height', bounds.height),
+          x: localX,
+          y: localY,
+          width: storedWidth,
+          height: storedHeight,
         };
 
         mutateNormalizeElement(nextElement, els);
@@ -1049,8 +1087,8 @@ export class CanvasGestureService {
         ...nextEl,
         x: shouldScalePosition ? roundToTwoDecimals(sourceEl.x * scaleX) : nextEl.x,
         y: shouldScalePosition ? roundToTwoDecimals(sourceEl.y * scaleY) : nextEl.y,
-        width: roundToTwoDecimals(sourceEl.width * scaleX),
-        height: roundToTwoDecimals(sourceEl.height * scaleY),
+        width: Math.round(sourceEl.width * scaleX),
+        height: Math.round(sourceEl.height * scaleY),
       };
 
       if (updatedElement.type === 'text' && typeof sourceEl.fontSize === 'number') {
@@ -1362,6 +1400,35 @@ export class CanvasGestureService {
       width: roundToTwoDecimals(rect.width / zoom),
       height: roundToTwoDecimals(rect.height / zoom),
     };
+  }
+
+  /**
+   * Reads every rendered canvas element from the DOM and returns a map of
+   * element-id → scene-space bounds (zoom=1). Used by the thumbnail generator
+   * to get accurate positions for flow children whose model x/y is 0.
+   */
+  snapshotAllElementSceneBounds(): Map<string, Bounds> {
+    const result = new Map<string, Bounds>();
+    const sceneEl = this.getCanvasElement()?.querySelector<HTMLElement>('.canvas-scene') ?? null;
+    if (!sceneEl) return result;
+
+    const zoom = this.viewport.zoomLevel();
+    if (zoom <= 0) return result;
+
+    const sceneRect = sceneEl.getBoundingClientRect();
+    const domEls = sceneEl.querySelectorAll<HTMLElement>('[data-element-id]');
+    for (const domEl of domEls) {
+      const id = domEl.getAttribute('data-element-id');
+      if (!id) continue;
+      const rect = domEl.getBoundingClientRect();
+      result.set(id, {
+        x: roundToTwoDecimals((rect.left - sceneRect.left) / zoom),
+        y: roundToTwoDecimals((rect.top - sceneRect.top) / zoom),
+        width: roundToTwoDecimals(rect.width / zoom),
+        height: roundToTwoDecimals(rect.height / zoom),
+      });
+    }
+    return result;
   }
 
   getLiveOverlaySceneBounds(el: CanvasElement): Bounds | null {
@@ -2959,7 +3026,8 @@ export class CanvasGestureService {
     renderedSize: number,
   ): number {
     // element.width stores border-box (same as rendered size); no padding subtraction needed.
-    return Math.max(24, roundToTwoDecimals(renderedSize));
+    // Round to integer — sub-pixel width/height has no practical value in a design tool.
+    return Math.max(24, Math.round(renderedSize));
   }
 
   private getElementPaddingAxis(el: CanvasElement, axis: 'width' | 'height'): number {

@@ -65,6 +65,8 @@ export interface ResizeState {
   handle: HandlePosition;
   /** Canvas-space bounds of the parent at gesture start (live DOM). Null for root elements. */
   parentAbsoluteBounds: Bounds | null;
+  /** Rotation of the element in degrees at gesture start (0 if not rotated). */
+  rotation: number;
 }
 
 export interface RotateState {

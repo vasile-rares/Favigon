@@ -16,6 +16,7 @@
     </button>
   </div>
 
+@if (element().type !== 'frame') {
   <div class="pp-style-row">
     <span class="pp-row-label">Opacity</span>
     <div class="pp-style-control pp-style-control--opacity">
@@ -49,6 +50,7 @@
       [value]="isVisible(element())"
       (valueChange)="setVisible($event === true)"></app-toggle-group>
   </div>
+}
 
   @if (hasFill(element().type)) {
 <div class="pp-style-row">
@@ -95,7 +97,7 @@
   </div>
 }
 
-  @if (supportsCornerRadius(element().type)) {
+  @if (supportsCornerRadius(element().type) && element().type !== 'frame') {
 <div class="pp-style-row pp-style-row--corner-radius">
     <span class="pp-row-label">Radius</span>
     <div class="pp-style-control pp-style-control--corner-radius">
@@ -181,7 +183,7 @@
   </div>
 }
 
-  @if (hasStroke(element().type)) {
+  @if (hasStroke(element().type) && element().type !== 'frame') {
 
     <div class="pp-style-row">
       <span class="pp-row-label">Border</span>
@@ -209,7 +211,7 @@
 
 }
 
-  @if (supportsShadow(element().type)) {
+  @if (supportsShadow(element().type) && element().type !== 'frame') {
 <div class="pp-style-row">
     <span class="pp-row-label">Shadows</span>
     <div class="pp-style-control pp-style-control--popup">
@@ -228,6 +230,7 @@
   </div>
 }
   @for (def of activeFilterDefinitions(element()); track def.id) {
+    @if (element().type !== 'frame') {
     <div class="pp-style-row">
       <span class="pp-row-label">{{ def.label }}</span>
       <div class="pp-style-control pp-style-control--filter">
@@ -254,6 +257,7 @@
         </button>
       </div>
     </div>
+    }
   }
 
 </section>

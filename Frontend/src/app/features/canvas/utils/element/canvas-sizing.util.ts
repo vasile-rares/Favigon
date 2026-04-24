@@ -59,25 +59,23 @@ export function supportsCanvasSizeMode(
   mode: CanvasSizeMode,
   element: Pick<CanvasElement, 'type' | 'parentId' | 'position' | 'fillMode' | 'backgroundImage'>,
   parent: Pick<CanvasElement, 'id'> | null,
+  hasChildren = true,
 ): boolean {
+  // Frames only support fixed sizing — they are top-level artboards with explicit dimensions.
+  if (element.type === 'frame') return mode === 'fixed';
+
   switch (mode) {
     case 'fixed':
       return true;
     case 'relative':
-      return !!parent && element.type !== 'frame';
+      return !!parent;
     case 'fill':
-      return (
-        !!parent &&
-        element.type !== 'frame' &&
-        element.position !== 'absolute' &&
-        element.position !== 'fixed'
-      );
+      return !!parent && element.position !== 'absolute' && element.position !== 'fixed';
     case 'fit-content':
       return (
         element.type === 'text' ||
         element.type === 'image' ||
-        element.type === 'rectangle' ||
-        element.type === 'frame'
+        (element.type === 'rectangle' && hasChildren)
       );
     case 'viewport':
       return !parent;

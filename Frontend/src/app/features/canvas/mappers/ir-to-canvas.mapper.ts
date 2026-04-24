@@ -74,7 +74,7 @@ export function buildCanvasElementsFromIR(root: IRNode | null | undefined): Canv
   flattened.push(rootElement);
 
   for (const child of root.children) {
-    flattenIRNode(child, root.id, flattened);
+    flattenIRNode(child, root.id, flattened, root);
   }
 
   return flattened;
@@ -106,12 +106,6 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
   const preservedProps = removeManagedProps(node.props);
   const transformFields = parseCanvasTransformStyle(node.style);
 
-  // Compute CSS border-box → canvas border-box adjustment per axis.
-  // IR values include padding + stroke; canvas stores content + padding (no stroke).
-  // Only the stroke portion needs subtracting.
-  const bbAdjW = getImportedBorderBoxAdjustment(node.style, 'width');
-  const bbAdjH = getImportedBorderBoxAdjustment(node.style, 'height');
-
   // Treat explicit zero width/height as fill (AI sometimes generates width:0 for flex children)
   const effectiveWidthMode =
     importedWidthMode === 'fixed' &&
@@ -129,14 +123,14 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     y: readLength(node.position?.top, DEFAULT_POSITION),
     width:
       effectiveWidthMode === 'fixed'
-        ? Math.max(1, readLength(node.style?.width, defaults.width + bbAdjW) - bbAdjW)
+        ? Math.max(1, readLength(node.style?.width, defaults.width))
         : defaults.width,
     widthMode: effectiveWidthMode === 'fixed' ? undefined : effectiveWidthMode,
     widthSizingValue: readImportedSizeValue(node.style?.width, effectiveWidthMode),
-    minWidth: subtractBorderBoxFromConstraint(node.style?.minWidth, bbAdjW),
+    minWidth: readOptionalLength(node.style?.minWidth),
     minWidthMode: readConstraintModeFromLength(node.style?.minWidth),
     minWidthSizingValue: readImportedConstraintValue(node.style?.minWidth),
-    maxWidth: subtractBorderBoxFromConstraint(node.style?.maxWidth, bbAdjW),
+    maxWidth: readOptionalLength(node.style?.maxWidth),
     maxWidthMode: readConstraintModeFromLength(node.style?.maxWidth),
     maxWidthSizingValue: readImportedConstraintValue(node.style?.maxWidth),
     height:
@@ -147,17 +141,17 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
               node.style?.height,
               readLength(
                 node.style?.minHeight?.unit === 'px' ? node.style?.minHeight : undefined,
-                defaults.height + bbAdjH,
+                defaults.height,
               ),
-            ) - bbAdjH,
+            ),
           )
         : defaults.height,
     heightMode: importedHeightMode === 'fixed' ? undefined : importedHeightMode,
     heightSizingValue: readImportedSizeValue(node.style?.height, importedHeightMode),
-    minHeight: subtractBorderBoxFromConstraint(node.style?.minHeight, bbAdjH),
+    minHeight: readOptionalLength(node.style?.minHeight),
     minHeightMode: readConstraintModeFromLength(node.style?.minHeight),
     minHeightSizingValue: readImportedConstraintValue(node.style?.minHeight),
-    maxHeight: subtractBorderBoxFromConstraint(node.style?.maxHeight, bbAdjH),
+    maxHeight: readOptionalLength(node.style?.maxHeight),
     maxHeightMode: readConstraintModeFromLength(node.style?.maxHeight),
     maxHeightSizingValue: readImportedConstraintValue(node.style?.maxHeight),
     visible: !(node.meta?.hidden ?? false),
@@ -274,9 +268,18 @@ function mapIRType(type: string): CanvasElement['type'] {
   }
 }
 
-function flattenIRNode(node: IRNode, parentId: string | null, target: CanvasElement[]) {
+function flattenIRNode(node: IRNode, parentId: string | null, target: CanvasElement[], parentNode?: IRNode) {
   const mapped = mapIRNodeToCanvasElement(node);
   mapped.parentId = parentId;
+
+  // canvas-to-ir.mapper subtracts the parent's border widths from left/top so that
+  // CSS position:absolute (which measures from the padding-box) renders correctly.
+  // Add them back here so element.x/y remain outer-edge-based in the canvas model.
+  if (parentNode?.style?.border) {
+    mapped.x += readImportedBorderSideWidth(parentNode.style.border, 'left');
+    mapped.y += readImportedBorderSideWidth(parentNode.style.border, 'top');
+  }
+
   target.push(mapped);
 
   if (!Array.isArray(node.children)) {
@@ -284,7 +287,7 @@ function flattenIRNode(node: IRNode, parentId: string | null, target: CanvasElem
   }
 
   for (const child of node.children) {
-    flattenIRNode(child, node.id, target);
+    flattenIRNode(child, node.id, target, node);
   }
 }
 
@@ -355,51 +358,6 @@ function readImportedConstraintValue(len: IRLength | undefined): number | undefi
   return Number.isFinite(len.value) ? len.value : undefined;
 }
 
-/**
- * For a fixed (px) constraint, subtract the stroke/border so the canvas
- * stores border-box (content + padding) without stroke.
- */
-function subtractBorderBoxFromConstraint(
-  len: IRLength | undefined,
-  adjustment: number,
-): number | undefined {
-  const raw = readOptionalLength(len);
-  if (raw === undefined) return undefined;
-  // Only adjust pixel-based (fixed) constraints
-  if (len?.unit !== 'px') return raw;
-  return Math.max(0, raw - adjustment);
-}
-
-/**
- * Compute the stroke/border width total for one axis from the IR style.
- * Canvas stores border-box (content + padding); CSS border-box also includes stroke.
- * Only the stroke portion needs subtracting when importing IR → canvas.
- */
-function getImportedBorderBoxAdjustment(
-  style: IRStyle | undefined,
-  axis: 'width' | 'height',
-): number {
-  if (!style) return 0;
-
-  const border = style.border;
-  if (!border) return 0;
-
-  const sides = readImportedBorderSides(border);
-  const widths = readImportedBorderWidths(border);
-  const uniformWidth = border.width ? readLength(border.width, 0) : 0;
-
-  if (axis === 'width') {
-    return (
-      ((sides?.left !== false) ? (widths?.left ?? uniformWidth) : 0) +
-      ((sides?.right !== false) ? (widths?.right ?? uniformWidth) : 0)
-    );
-  }
-  return (
-    ((sides?.top !== false) ? (widths?.top ?? uniformWidth) : 0) +
-    ((sides?.bottom !== false) ? (widths?.bottom ?? uniformWidth) : 0)
-  );
-}
-
 function readSizeModeFromLength(styleLength: IRLength | undefined): CanvasSizeMode {
   if (styleLength) {
     if (styleLength.unit === 'fit-content') return 'fit-content';
@@ -422,6 +380,14 @@ function readImportedSizeValue(
   }
 
   return Number.isFinite(len?.value ?? Number.NaN) ? len?.value : undefined;
+}
+
+function readImportedBorderSideWidth(border: IRBorder, side: 'top' | 'right' | 'bottom' | 'left'): number {
+  const specificWidth = border[`${side}Width` as keyof IRBorder] as IRLength | undefined;
+  if (specificWidth) return readLength(specificWidth, 0);
+  const uniform = border.width ? readLength(border.width, 0) : 0;
+  const enabled = border[side as keyof IRBorder] as boolean | undefined;
+  return enabled === false ? 0 : uniform;
 }
 
 function readImportedBorderWidths(border: IRBorder | undefined): CanvasBorderWidths | undefined {

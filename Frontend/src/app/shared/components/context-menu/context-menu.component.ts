@@ -45,6 +45,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy {
   adjustedX = 0;
   adjustedY = 0;
   openSubmenuId: string | null = null;
+  submenuFlipAbove = false;
   isClosing = false;
   private closeTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -100,6 +101,15 @@ export class ContextMenuComponent implements OnInit, OnDestroy {
         this.adjustedY = Math.max(0, this.y() - rect.height);
       }
     });
+  }
+
+  onSubmenuMouseEnter(item: ContextMenuItem, event: MouseEvent): void {
+    if (item.disabled) return;
+    const itemEl = event.currentTarget as HTMLElement;
+    const rect = itemEl.getBoundingClientRect();
+    const estimatedHeight = (item.children?.length ?? 0) * 30 + 10;
+    this.submenuFlipAbove = rect.bottom + estimatedHeight > window.innerHeight - 8;
+    this.openSubmenuId = item.id;
   }
 
   onItemClick(item: ContextMenuItem): void {

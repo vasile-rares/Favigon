@@ -233,7 +233,9 @@ function buildNodeLayout(element: CanvasElement): IRLayout | undefined {
     if (element.flexDirection) layout.direction = mapFlexDirection(element.flexDirection);
     if (element.flexWrap !== undefined) layout.wrap = element.flexWrap === 'wrap';
     if (element.justifyContent) layout.justify = mapJustifyContent(element.justifyContent);
-    if (element.alignItems) layout.align = mapAlignItems(element.alignItems);
+    // Always emit align: canvas default is 'flex-start', CSS default is 'stretch'.
+    // Without this, exported HTML would use stretch instead of what the canvas shows.
+    layout.align = mapAlignItems(element.alignItems ?? 'flex-start');
     if (typeof element.gap === 'number') layout.gap = px(element.gap);
   }
   if (element.display === 'grid') {
@@ -529,10 +531,10 @@ function applyNodeDimensionStyle(
   }
 
   if (mode === 'fixed' || mode === 'fit-image') {
-    // Canvas stores border-box (content + padding); CSS border-box also includes stroke.
-    // Add only the stroke/border width for the CSS value.
+    // Canvas stores border-box (content + padding). CSS also uses border-box (with global
+    // box-sizing: border-box reset), so the border is inset — no adjustment needed.
     const base = axis === 'width' ? element.width : element.height;
-    style[axis] = px(base + getBorderBoxAdjustment(element, axis));
+    style[axis] = px(base);
     return;
   }
 
@@ -565,9 +567,9 @@ function applyNodeConstraintStyle(
     return;
   }
 
-  // Fixed constraints are border-box (content + padding) on canvas; add stroke for CSS.
-  const axis: 'width' | 'height' = field.toLowerCase().includes('width') ? 'width' : 'height';
-  style[field] = px((pixels as number) + getBorderBoxAdjustment(element, axis));
+  // Fixed constraints are border-box (content + padding) on canvas; CSS also uses border-box,
+  // so no stroke adjustment is needed.
+  style[field] = px(pixels as number);
 }
 
 function buildNodeProps(element: CanvasElement, primitiveType: string): Record<string, unknown> {
@@ -804,18 +806,6 @@ function resolveCanvasBorderSideWidth(
   return typeof element.strokeWidth === 'number'
     ? Math.max(0, element.strokeWidth)
     : DEFAULT_STROKE_WIDTH;
-}
-
-/**
- * Returns the stroke/border width total for an axis.
- * Canvas stores border-box (content + padding); CSS border-box also includes stroke.
- * Only the stroke portion needs to be added for IR output.
- */
-function getBorderBoxAdjustment(element: CanvasElement, axis: 'width' | 'height'): number {
-  return axis === 'width'
-    ? resolveCanvasBorderSideWidth(element, 'left') + resolveCanvasBorderSideWidth(element, 'right')
-    : resolveCanvasBorderSideWidth(element, 'top') +
-        resolveCanvasBorderSideWidth(element, 'bottom');
 }
 
 function normalizeExternalLinkUrl(value: string | undefined): string | undefined {
