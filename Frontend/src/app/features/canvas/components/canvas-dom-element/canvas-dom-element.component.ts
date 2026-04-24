@@ -34,6 +34,10 @@ export class CanvasDomElementComponent {
     this.styleService.buildStyle(this.element(), this.allElements(), this.page()),
   );
 
+  readonly strokeOverlayStyle = computed<Record<string, string | null | undefined>>(() =>
+    this.styleService.buildStrokeOverlayStyle(this.element()),
+  );
+
   readonly textWrapperStyle = computed(() =>
     this.styleService.buildTextVerticalAlignStyle(this.element()),
   );

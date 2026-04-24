@@ -1,4 +1,4 @@
-﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
+﻿import { Component, OnInit, inject, input, output, ViewEncapsulation } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { DropdownSelectComponent, ToggleGroupComponent } from '@app/shared';
@@ -14,6 +14,7 @@ import {
 } from '@app/core';
 
 import { roundToTwoDecimals } from '../../../../utils/canvas-math.util';
+import { GoogleFontsService } from '../../../../services/google-fonts.service';
 
 type EditableTypographyField =
   | 'fontFamily'
@@ -37,7 +38,9 @@ type EditableNumericTypographyField = 'fontSize' | 'letterSpacing' | 'lineHeight
   templateUrl: './typography-section.component.html',
   encapsulation: ViewEncapsulation.None,
 })
-export class TypographySectionComponent {
+export class TypographySectionComponent implements OnInit {
+  private readonly googleFonts = inject(GoogleFontsService);
+
   readonly element = input.required<CanvasElement>();
   readonly projectId = input<number | null>(null);
 
@@ -47,14 +50,15 @@ export class TypographySectionComponent {
 
   private readonly defaultFillColor = '#e0e0e0';
 
-  readonly fontFamilyOptions: DropdownSelectOption[] = [
-    { label: 'Inter', value: 'Inter' },
-    { label: 'Poppins', value: 'Poppins' },
-    { label: 'Montserrat', value: 'Montserrat' },
-    { label: 'Space Grotesk', value: 'Space Grotesk' },
-    { label: 'Georgia', value: 'Georgia' },
-    { label: 'Arial', value: 'Arial' },
-  ];
+  readonly fontFamilyOptions: DropdownSelectOption[] = this.googleFonts.fontList.map((f) => ({
+    label: f.family,
+    value: f.family,
+  }));
+
+  ngOnInit(): void {
+    // Ensure the current element's font is loaded when the panel opens
+    this.googleFonts.ensureLoaded(this.element().fontFamily);
+  }
   readonly fontWeightOptions: DropdownSelectOption[] = [
     { label: 'Light', value: 300 },
     { label: 'Regular', value: 400 },
@@ -133,6 +137,9 @@ export class TypographySectionComponent {
       return;
     }
     if (typeof value !== 'string') return;
+    if (field === 'fontFamily') {
+      this.googleFonts.loadFont(value);
+    }
     this.elementPatch.emit({ [field]: value } as Partial<CanvasElement>);
   }
 

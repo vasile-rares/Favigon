@@ -42,5 +42,10 @@
         }
       }
     }
+
+    @if (element().type !== 'text') {
+      <!-- Stroke overlay: absolutely positioned above all children, inherits border-radius -->
+      <div class="canvas-el-stroke-overlay" [ngStyle]="strokeOverlayStyle()"></div>
+    }
   </div>
 }

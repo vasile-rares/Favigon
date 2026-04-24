@@ -4,6 +4,24 @@
 
 .canvas-el {
   box-sizing: border-box;
+  position: relative;
+}
+
+/*
+ * Stroke overlay — a real div rendered as the last child of .canvas-el.
+ * position: absolute; inset: 0 makes it cover the same area as the parent.
+ * z-index: 1 ensures it paints above all sibling children (which have z-index: auto).
+ * border-radius: inherit follows the parent's corner radius automatically.
+ * Border styles are set via [ngStyle] from buildStrokeOverlayStyle().
+ * When there is no stroke the style map is empty, making this div invisible.
+ */
+.canvas-el-stroke-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .canvas-el--text-editing {

@@ -797,7 +797,10 @@ export class CanvasGestureService {
         targetContainer,
         containerBounds,
       );
-      this.commitElementCreationResult(result);
+      const newElement = this.commitElementCreationResult(result);
+      this.autoOpenFillPopupElementId.set(
+        state.tool === 'image' && newElement ? newElement.id : null,
+      );
     });
   }
 

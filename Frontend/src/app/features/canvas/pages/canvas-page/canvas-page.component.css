@@ -300,7 +300,8 @@
   width: 8px;
   height: 8px;
   background: white;
-  border: 1px solid #3b82f6;
+  border: 1.5px solid #3b82f6;
+  border-radius: 50%;
   pointer-events: auto;
 }
 .sel-handle-nw {
@@ -322,6 +323,30 @@
   right: -4px;
   bottom: -4px;
   cursor: se-resize;
+}
+.sel-handle-n {
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: n-resize;
+}
+.sel-handle-s {
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: s-resize;
+}
+.sel-handle-e {
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: e-resize;
+}
+.sel-handle-w {
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: w-resize;
 }
 
 .sel-edge-hit {
@@ -387,12 +412,14 @@
   width: 8px;
   height: 8px;
   background: white;
-  border: 1px solid #3b82f6;
+  border: 1.5px solid #3b82f6;
   border-radius: 50%;
-  left: 6px;
-  top: 6px;
+  /* left/top are set dynamically via [style] binding = cornerRadius * zoom - 4 */
   pointer-events: auto;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* -- Snap lines -------------------------------------------- */

@@ -17,8 +17,8 @@
     <span class="pp-row-label">Font</span>
     <div class="pp-style-control pp-style-control--dropdown">
       <app-dropdown-select
-        [enableSearch]="false"
-        [placeholder]="'Select font'"
+        [enableSearch]="true"
+        [placeholder]="'Search font...'"
         [options]="fontFamilyOptions"
         [ngModel]="fontFamilyValue(element())"
         (ngModelChange)="onTypographySelectChange('fontFamily', $event)"></app-dropdown-select>

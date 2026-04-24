@@ -227,13 +227,34 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
   });
 
-  /** Whether resize/rotate handles should be shown for the selected element. */
-  readonly showSelectionHandles = computed<boolean>(() => {
+  /**
+   * Which resize handle set to show for the selected element:
+   * - 'all' : corner + edge handles (no fill constraints)
+   * - 'ns'  : only top-center and bottom-center (widthMode=fill, heightMode≠fill)
+   * - 'ew'  : only left-center and right-center (heightMode=fill, widthMode≠fill)
+   * - 'none': no handles (frame, text, or both axes fill)
+   */
+  /**
+   * Pixel offset (in screen space) of the corner radius drag handle from the
+   * top-left corner of the selection outline box. Equals cornerRadius * zoomLevel.
+   * The handle center sits at (offset, offset) from top-left, tracking the radius.
+   */
+  readonly cornerRadiusHandleOffset = computed<number>(() => {
     const s = this.selectedElement();
-    if (!s) return false;
-    return (
-      s.type !== 'frame' && s.type !== 'text' && s.widthMode !== 'fill' && s.heightMode !== 'fill'
-    );
+    // Enforce a minimum of 8px so the handle never overlaps the NW corner resize handle
+    // (which sits at left:-4px; top:-4px). At radius=0 the handle sits at left:4; top:4.
+    return Math.max((s?.cornerRadius ?? 0) * this.viewport.zoomLevel(), 8);
+  });
+
+  readonly selectionHandleMode = computed<'all' | 'ns' | 'ew' | 'none'>(() => {
+    const s = this.selectedElement();
+    if (!s || s.type === 'frame' || s.type === 'text') return 'none';
+    const wFill = s.widthMode === 'fill';
+    const hFill = s.heightMode === 'fill';
+    if (!wFill && !hFill) return 'all';
+    if (wFill && !hFill) return 'ns';
+    if (!wFill && hFill) return 'ew';
+    return 'none'; // both axes fill
   });
 
   /** Overlay-space bounds for the hovered element (null if not applicable). */

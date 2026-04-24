@@ -69,23 +69,8 @@ export class CanvasDomStyleService {
       }
     }
 
-    // ── Stroke / Border ───────────────────────────────────
-    if (element.type !== 'text' && element.stroke) {
-      const strokeStyleCss = (element.strokeStyle ?? 'Solid').toLowerCase();
-      if (hasPerSideStrokeWidths(element)) {
-        const widths = getStrokeWidths(element);
-        style['border-top'] = `${widths.top}px ${strokeStyleCss} ${element.stroke}`;
-        style['border-right'] = `${widths.right}px ${strokeStyleCss} ${element.stroke}`;
-        style['border-bottom'] = `${widths.bottom}px ${strokeStyleCss} ${element.stroke}`;
-        style['border-left'] = `${widths.left}px ${strokeStyleCss} ${element.stroke}`;
-      } else {
-        const sw = getStrokeWidth(element);
-        if (sw > 0) {
-          style['outline'] = `${sw}px ${strokeStyleCss} ${element.stroke}`;
-          style['outline-offset'] = `-${sw}px`;
-        }
-      }
-    }
+    // Stroke is rendered via a dedicated overlay div (last child of .canvas-el)
+    // that paints ABOVE children. See buildStrokeOverlayStyle() and canvas-dom-element template.
 
     // ── Corner Radius ─────────────────────────────────────
     if (element.type !== 'text') {
@@ -350,6 +335,28 @@ export class CanvasDomStyleService {
       'white-space': 'pre-wrap',
       'word-break': 'break-word',
     };
+  }
+
+  /**
+   * Returns border styles for the stroke overlay div that is rendered as the
+   * LAST child of .canvas-el, ensuring it paints ABOVE all sibling children.
+   * Returns an empty map when the element has no stroke.
+   */
+  buildStrokeOverlayStyle(element: CanvasElement): DomStyleMap {
+    if (element.type === 'text' || !element.stroke) return {};
+    const strokeStyleCss = (element.strokeStyle ?? 'Solid').toLowerCase();
+    if (hasPerSideStrokeWidths(element)) {
+      const widths = getStrokeWidths(element);
+      return {
+        'border-top': `${widths.top}px ${strokeStyleCss} ${element.stroke}`,
+        'border-right': `${widths.right}px ${strokeStyleCss} ${element.stroke}`,
+        'border-bottom': `${widths.bottom}px ${strokeStyleCss} ${element.stroke}`,
+        'border-left': `${widths.left}px ${strokeStyleCss} ${element.stroke}`,
+      };
+    }
+    const sw = getStrokeWidth(element);
+    if (sw <= 0) return {};
+    return { border: `${sw}px ${strokeStyleCss} ${element.stroke}` };
   }
 
   buildTextVerticalAlignStyle(element: CanvasElement): DomStyleMap {
