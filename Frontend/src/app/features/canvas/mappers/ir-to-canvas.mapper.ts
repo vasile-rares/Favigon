@@ -91,11 +91,11 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
   const importedWidthMode = readSizeModeFromLength(node.style?.width);
   const importedHeightMode = readSizeModeFromLength(node.style?.height);
   const importedAriaLabel =
-    (mappedType === 'image' || isImageNode)
+    mappedType === 'image' || isImageNode
       ? (readOptionalStringProp(node.props, 'alt') ??
         readOptionalStringProp(node.props, 'ariaLabel'))
       : readOptionalStringProp(node.props, 'ariaLabel');
-  const defaultCornerRadius = (mappedType === 'image' || isImageNode) ? DEFAULT_IMAGE_RADIUS : 0;
+  const defaultCornerRadius = mappedType === 'image' || isImageNode ? DEFAULT_IMAGE_RADIUS : 0;
   const cornerRadius =
     mappedType !== 'text'
       ? resolveImportedCornerRadius(node.style, defaultCornerRadius)
@@ -159,7 +159,9 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     visible: !(node.meta?.hidden ?? false),
     fill:
       mappedType !== 'text'
-        ? (node.style?.gradient?.stops[0]?.color ?? node.style?.background ?? (mappedType === 'frame' ? DEFAULT_FRAME_FILL : DEFAULT_FILL))
+        ? (node.style?.gradient?.stops[0]?.color ??
+          node.style?.background ??
+          (mappedType === 'frame' ? DEFAULT_FRAME_FILL : DEFAULT_FILL))
         : (node.style?.color ?? '#000000'),
     stroke: node.style?.border?.color,
     strokeWidth:
@@ -177,7 +179,11 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
       mappedType === 'frame' || mappedType === 'rectangle'
         ? readOverflow(node.style?.overflow, 'clip')
         : undefined,
-    fillMode: node.style?.gradient ? 'gradient' : (isImageNode || node.style?.backgroundImage) ? 'image' : undefined,
+    fillMode: node.style?.gradient
+      ? 'gradient'
+      : isImageNode || node.style?.backgroundImage
+        ? 'image'
+        : undefined,
     gradient: node.style?.gradient ? mapIRGradientToCanvas(node.style.gradient) : undefined,
     backgroundImage: isImageNode
       ? readStringProp(node.props, 'src', '')
@@ -192,9 +198,10 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
       ? (node.style?.backgroundRepeat ?? 'no-repeat')
       : node.style?.backgroundRepeat,
     objectFit: node.style?.objectFit as CanvasElement['objectFit'],
-    imageAltText: (isImageNode || node.style?.backgroundImage)
-      ? normalizeCanvasAccessibilityLabel(importedAriaLabel)
-      : undefined,
+    imageAltText:
+      isImageNode || node.style?.backgroundImage
+        ? normalizeCanvasAccessibilityLabel(importedAriaLabel)
+        : undefined,
     shadow: readShadow(node.style?.shadows),
     text:
       mappedType === 'text'
@@ -271,7 +278,12 @@ function mapIRType(type: string): CanvasElement['type'] {
   }
 }
 
-function flattenIRNode(node: IRNode, parentId: string | null, target: CanvasElement[], parentNode?: IRNode) {
+function flattenIRNode(
+  node: IRNode,
+  parentId: string | null,
+  target: CanvasElement[],
+  parentNode?: IRNode,
+) {
   const mapped = mapIRNodeToCanvasElement(node);
   mapped.parentId = parentId;
 
@@ -385,7 +397,10 @@ function readImportedSizeValue(
   return Number.isFinite(len?.value ?? Number.NaN) ? len?.value : undefined;
 }
 
-function readImportedBorderSideWidth(border: IRBorder, side: 'top' | 'right' | 'bottom' | 'left'): number {
+function readImportedBorderSideWidth(
+  border: IRBorder,
+  side: 'top' | 'right' | 'bottom' | 'left',
+): number {
   const specificWidth = border[`${side}Width` as keyof IRBorder] as IRLength | undefined;
   if (specificWidth) return readLength(specificWidth, 0);
   const uniform = border.width ? readLength(border.width, 0) : 0;
@@ -716,9 +731,22 @@ function readShadow(value: unknown): string | undefined {
 }
 
 const VALID_BLEND_MODES: ReadonlySet<string> = new Set([
-  'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
-  'color-dodge', 'color-burn', 'hard-light', 'soft-light',
-  'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity',
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'darken',
+  'lighten',
+  'color-dodge',
+  'color-burn',
+  'hard-light',
+  'soft-light',
+  'difference',
+  'exclusion',
+  'hue',
+  'saturation',
+  'color',
+  'luminosity',
 ]);
 
 function readBlendMode(value: unknown): CanvasBlendMode | undefined {

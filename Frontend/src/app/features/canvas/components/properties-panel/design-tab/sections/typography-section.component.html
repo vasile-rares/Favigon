@@ -1,5 +1,18 @@
 <section class="properties-section properties-section--text">
-  <p class="properties-section-title">Text</p>
+  <div class="properties-section-header properties-section-header--menu properties-section-header--actionable">
+    <p class="properties-section-title">Text</p>
+    <button
+      type="button"
+      class="pp-section-toggle pp-section-toggle--plus"
+      aria-label="Add typography option"
+      title="Add typography option"
+      (click)="onTypographyPlusClick($event)">
+      <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+        <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+        <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+      </svg>
+    </button>
+  </div>
 
   <div class="pp-style-row">
     <span class="pp-row-label">Content</span>
@@ -146,4 +159,240 @@
     </div>
   </div>
 
+  @for (opt of activeOptionals(element()); track opt.id) {
+    @switch (opt.id) {
+      @case ('fill') {
+        <div class="pp-style-row">
+          <span class="pp-row-label">Fill</span>
+          <div class="pp-style-control pp-style-control--removable">
+            <app-field-input
+              kind="fill"
+              [solidColorOnly]="true"
+              [hasValue]="true"
+              [hideClearButton]="true"
+              [triggerText]="backgroundColorValue(element())"
+              [swatchColor]="backgroundColorValue(element())"
+              [colorValue]="backgroundColorValue(element())"
+              [pickerColor]="backgroundColorValue(element())"
+              [clearPatch]="{ backgroundColor: undefined }"
+              (patchRequested)="onBackgroundColorPatch($event)"
+              (numberGestureStarted)="onNumberInputGestureStarted()"
+              (numberGestureCommitted)="onNumberInputGestureCommitted()">
+            </app-field-input>
+            <button type="button" class="pp-row-remove-btn" aria-label="Remove fill" title="Remove fill" (click)="removeOptional('fill')">
+              <svg viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+            </button>
+          </div>
+        </div>
+      }
+      @case ('radius') {
+        <div class="pp-style-row pp-style-row--corner-radius">
+          <span class="pp-row-label">Radius</span>
+          <div class="pp-style-control pp-style-control--corner-radius">
+            <div class="pp-corner-radius-header pp-corner-radius-header--removable">
+              <app-number-input
+                appearance="compact"
+                ariaLabel="Corner radius"
+                [value]="fullCornerRadiusInputValue(element())"
+                [min]="0"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onCornerRadiusChange($event)" />
+              <div class="pp-corner-radius-mode">
+                <app-toggle-group
+                  [ariaLabel]="'Corner radius mode'"
+                  [options]="cornerRadiusModeOptions"
+                  [value]="cornerRadiusMode(element())"
+                  [stretch]="true"
+                  [minWidth]="null"
+                  (valueChange)="onCornerRadiusModeChange($event)"></app-toggle-group>
+              </div>
+              <button type="button" class="pp-row-remove-btn" aria-label="Remove radius" title="Remove radius" (click)="removeOptional('radius')">
+                <svg viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+              </button>
+            </div>
+            @if (cornerRadiusMode(element()) === 'per-corner') {
+              <div class="pp-corner-radius-grid">
+                @for (corner of cornerRadiusFields; track corner.key) {
+                  <div class="pp-corner-radius-field">
+                    <div class="pp-corner-radius-input">
+                      <app-number-input
+                        appearance="compact"
+                        [ariaLabel]="corner.ariaLabel"
+                        [value]="cornerRadiusValue(element(), corner.key)"
+                        [min]="0"
+                        [step]="1"
+                        (gestureStarted)="onNumberInputGestureStarted()"
+                        (gestureCommitted)="onNumberInputGestureCommitted()"
+                        (valueChange)="onCornerRadiusCornerChange(corner.key, $event)"></app-number-input>
+                      <span class="pp-corner-radius-tag" aria-hidden="true">
+                        @if (corner.key === 'topLeft') {
+                          <svg class="pp-corner-radius-tag-icon" viewBox="0 0 12 12" fill="none"><path d="M9.5 2H2V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                        }
+                        @if (corner.key === 'topRight') {
+                          <svg class="pp-corner-radius-tag-icon" viewBox="0 0 12 12" fill="none"><path d="M2.5 2H10V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                        }
+                        @if (corner.key === 'bottomLeft') {
+                          <svg class="pp-corner-radius-tag-icon" viewBox="0 0 12 12" fill="none"><path d="M9.5 10H2V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                        }
+                        @if (corner.key === 'bottomRight') {
+                          <svg class="pp-corner-radius-tag-icon" viewBox="0 0 12 12" fill="none"><path d="M2.5 10H10V2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                        }
+                      </span>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      }
+      @case ('padding') {
+        <div class="pp-style-row pp-style-row--corner-radius">
+          <span class="pp-row-label">Padding</span>
+          <div class="pp-style-control pp-style-control--corner-radius">
+            <div class="pp-corner-radius-header pp-corner-radius-header--removable">
+              <app-number-input
+                appearance="compact"
+                ariaLabel="Padding"
+                [value]="uniformPaddingValue(element())"
+                [min]="0"
+                [step]="1"
+                (gestureStarted)="onNumberInputGestureStarted()"
+                (gestureCommitted)="onNumberInputGestureCommitted()"
+                (valueChange)="onUniformPaddingChange($event)" />
+              <div class="pp-corner-radius-mode">
+                <app-toggle-group
+                  [ariaLabel]="'Padding mode'"
+                  [options]="paddingModeOptions"
+                  [value]="paddingMode(element())"
+                  [stretch]="true"
+                  [minWidth]="null"
+                  (valueChange)="onPaddingModeChange($event)"></app-toggle-group>
+              </div>
+              <button type="button" class="pp-row-remove-btn" aria-label="Remove padding" title="Remove padding" (click)="removeOptional('padding')">
+                <svg viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+              </button>
+            </div>
+            @if (paddingMode(element()) === 'per-side') {
+              <div class="pp-corner-radius-grid">
+                @for (side of paddingSideFields; track side.key) {
+                  <div class="pp-corner-radius-field">
+                    <div class="pp-corner-radius-input">
+                      <app-number-input
+                        appearance="compact"
+                        [ariaLabel]="side.ariaLabel"
+                        [value]="paddingSideValue(element(), side.key)"
+                        [min]="0"
+                        [step]="1"
+                        (gestureStarted)="onNumberInputGestureStarted()"
+                        (gestureCommitted)="onNumberInputGestureCommitted()"
+                        (valueChange)="onPaddingSideChange(side.key, $event)"></app-number-input>
+                      <span class="pp-corner-radius-tag pp-corner-radius-tag--text" aria-hidden="true">{{ side.label }}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      }
+      @case ('shadow') {
+        <div class="pp-style-row">
+          <span class="pp-row-label">Shadows</span>
+          <div class="pp-style-control pp-style-control--removable">
+            <app-field-input
+              kind="text-shadow"
+              [hasValue]="true"
+              [hideClearButton]="true"
+              [triggerText]="textShadowSummary(element())"
+              [swatchColor]="textShadowSwatchColor(element())"
+              [textShadowValue]="textShadowInputValue(element())"
+              [activationPatch]="null"
+              [clearPatch]="null"
+              (patchRequested)="elementPatch.emit($event)"
+              (numberGestureStarted)="onNumberInputGestureStarted()"
+              (numberGestureCommitted)="onNumberInputGestureCommitted()">
+            </app-field-input>
+            <button type="button" class="pp-row-remove-btn" aria-label="Remove shadow" title="Remove shadow" (click)="removeOptional('shadow')">
+              <svg viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+            </button>
+          </div>
+        </div>
+      }
+      @case ('transform') {
+        <div class="pp-style-row">
+          <span class="pp-row-label">Transform</span>
+          <div class="pp-style-control pp-style-control--removable">
+            <app-dropdown-select
+              [enableSearch]="false"
+              [options]="textTransformOptions"
+              [ngModel]="textTransformValue(element())"
+              (ngModelChange)="onTextTransformChange($event)"></app-dropdown-select>
+            <button type="button" class="pp-row-remove-btn" aria-label="Remove transform" title="Remove transform" (click)="removeOptional('transform')">
+              <svg viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+            </button>
+          </div>
+        </div>
+      }
+      @case ('decoration') {
+        <div class="pp-style-row" [class.is-disabled]="isDecorationDisabled(element())">
+          <span class="pp-row-label">Decoration</span>
+          <div class="pp-style-control pp-style-control--removable">
+            <app-field-input
+              kind="text-decoration"
+              [hasValue]="true"
+              [hideClearButton]="true"
+              [triggerText]="decorationSummary(element())"
+              [swatchColor]="decorationSwatchColor(element())"
+              [colorValue]="decorationSwatchColor(element())"
+              [pickerColor]="decorationSwatchColor(element())"
+              [solidColorOnly]="true"
+              [textDecorationLine]="element().textDecorationLine ?? null"
+              [textDecorationColor]="element().textDecorationColor ?? null"
+              [textDecorationStyle]="element().textDecorationStyle ?? null"
+              [textDecorationThickness]="element().textDecorationThickness ?? null"
+              [textDecorationThicknessUnit]="element().textDecorationThicknessUnit ?? 'px'"
+              [activationPatch]="null"
+              [clearPatch]="null"
+              (patchRequested)="elementPatch.emit($event)"
+              (numberGestureStarted)="onNumberInputGestureStarted()"
+              (numberGestureCommitted)="onNumberInputGestureCommitted()">
+            </app-field-input>
+            <button type="button" class="pp-row-remove-btn" aria-label="Remove decoration" title="Remove decoration" (click)="removeOptional('decoration')">
+              <svg viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+            </button>
+          </div>
+        </div>
+      }
+      @case ('balance') {
+        <div class="pp-style-row">
+          <span class="pp-row-label">Balance</span>
+          <div class="pp-style-control pp-style-control--removable">
+            <app-toggle-group
+              [ariaLabel]="'Text balance'"
+              [options]="balanceOptions"
+              [value]="element().textBalance === true"
+              (valueChange)="onTextBalanceChange($event)"></app-toggle-group>
+            <button type="button" class="pp-row-remove-btn" aria-label="Remove balance" title="Remove balance" (click)="removeOptional('balance')">
+              <svg viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+            </button>
+          </div>
+        </div>
+      }
+    }
+  }
+
 </section>
+
+@if (typographyMenuItems.length > 0) {
+  <app-context-menu
+    [x]="typographyMenuX"
+    [y]="typographyMenuY"
+    [verticalDirection]="'below'"
+    [submenuDirection]="'left'"
+    [items]="typographyMenuItems"
+    (closed)="closeTypographyMenu()">
+  </app-context-menu>
+}

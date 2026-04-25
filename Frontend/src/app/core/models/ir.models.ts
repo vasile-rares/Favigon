@@ -78,6 +78,16 @@ export interface IRStyle {
 
   textAlign?: string;
 
+  textShadow?: string;
+  textTransform?: string;
+  textWrap?: string;
+  textDecorationLine?: string;
+  textDecorationColor?: string;
+  textDecorationStyle?: string;
+  textDecorationThickness?: string;
+
+  backgroundColor?: string;
+
   borderRadius?: IRLength;
   borderTopLeftRadius?: IRLength;
   borderTopRightRadius?: IRLength;

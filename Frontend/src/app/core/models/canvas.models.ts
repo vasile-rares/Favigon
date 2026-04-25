@@ -8,6 +8,9 @@ export type CanvasFontSizeUnit = 'px' | 'rem';
 export type CanvasTextSpacingUnit = 'px' | 'em';
 export type CanvasOverflowMode = 'clip' | 'visible' | 'hidden' | 'scroll';
 export type CanvasFillMode = 'color' | 'image' | 'gradient';
+export type CanvasTextTransform = 'inherit' | 'capitalize' | 'uppercase' | 'lowercase';
+export type CanvasTextDecorationLine = 'underline' | 'line-through';
+export type CanvasTextDecorationStyle = 'solid' | 'double' | 'dotted' | 'dashed' | 'wavy';
 
 export interface GradientStop {
   color: string;
@@ -292,6 +295,16 @@ export interface CanvasElement {
   letterSpacingUnit?: CanvasTextSpacingUnit;
   lineHeight?: number;
   lineHeightUnit?: CanvasTextSpacingUnit;
+  textShadow?: string;
+  textTransform?: CanvasTextTransform;
+  textBalance?: boolean;
+  textDecorationLine?: CanvasTextDecorationLine;
+  textDecorationColor?: string;
+  textDecorationStyle?: CanvasTextDecorationStyle;
+  textDecorationThickness?: number;
+  textDecorationThicknessUnit?: 'px' | 'em';
+  backgroundColor?: string;
+  squircle?: number;
   imageUrl?: string;
   linkType?: CanvasLinkType;
   linkPageId?: string | null;
@@ -310,6 +323,7 @@ export interface CanvasElement {
   gridTemplateColumns?: string;
   gridTemplateRows?: string;
   padding?: CanvasSpacing;
+  paddingPerSide?: boolean;
   // Position (not for frame)
   position?: CanvasPositionMode;
   margin?: CanvasSpacing;

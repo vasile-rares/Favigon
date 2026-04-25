@@ -362,7 +362,8 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     style.background = gradientToCss(element.gradient);
     style.gradient = {
       type: element.gradient.type,
-      angle: 'angle' in element.gradient ? (element.gradient as { angle: number }).angle : undefined,
+      angle:
+        'angle' in element.gradient ? (element.gradient as { angle: number }).angle : undefined,
       stops: element.gradient.stops.map((s) => ({ color: s.color, position: s.position })),
     };
   }
@@ -496,6 +497,28 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
 
     if (typeof element.letterSpacing === 'number') {
       style.letterSpacing = length(element.letterSpacing, element.letterSpacingUnit ?? 'px');
+    }
+
+    if (element.backgroundColor) {
+      style.backgroundColor = element.backgroundColor;
+    }
+    if (element.textShadow) {
+      style.textShadow = element.textShadow;
+    }
+    if (element.textTransform && element.textTransform !== 'inherit') {
+      style.textTransform = element.textTransform;
+    }
+    if (element.textBalance === true) {
+      style.textWrap = 'balance';
+    }
+    if (element.textDecorationLine) {
+      style.textDecorationLine = element.textDecorationLine;
+      if (element.textDecorationColor) style.textDecorationColor = element.textDecorationColor;
+      if (element.textDecorationStyle) style.textDecorationStyle = element.textDecorationStyle;
+      if (element.textDecorationThickness != null) {
+        const unit = element.textDecorationThicknessUnit ?? 'px';
+        style.textDecorationThickness = `${element.textDecorationThickness}${unit}`;
+      }
     }
   }
 

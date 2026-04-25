@@ -39,6 +39,17 @@ public static class StyleTransformer
     if (style.FontFamily is not null) css["font-family"] = style.FontFamily;
     if (style.FontStyle is not null) css["font-style"] = style.FontStyle;
     if (style.TextAlign is not null) css["text-align"] = style.TextAlign;
+    if (style.TextShadow is not null) css["text-shadow"] = style.TextShadow;
+    if (style.TextTransform is not null) css["text-transform"] = style.TextTransform;
+    if (style.TextWrap is not null) css["text-wrap"] = style.TextWrap;
+    if (style.TextDecorationLine is not null)
+    {
+      css["text-decoration-line"] = style.TextDecorationLine;
+      if (style.TextDecorationColor is not null) css["text-decoration-color"] = style.TextDecorationColor;
+      if (style.TextDecorationStyle is not null) css["text-decoration-style"] = style.TextDecorationStyle;
+      if (style.TextDecorationThickness is not null) css["text-decoration-thickness"] = style.TextDecorationThickness;
+    }
+    if (style.BackgroundColor is not null) css["background-color"] = style.BackgroundColor;
     if (style.LineHeight is not null) css["line-height"] = style.LineHeight.ToString();
     if (style.LetterSpacing is not null) css["letter-spacing"] = style.LetterSpacing.ToString();
     if (style.Overflow is not null) css["overflow"] = style.Overflow.Value.ToString().ToLower();

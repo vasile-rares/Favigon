@@ -16,6 +16,7 @@ import {
   getStrokeWidths,
 } from '../utils/element/canvas-element-normalization.util';
 import { gradientToCss } from '../utils/gradient.utils';
+import { buildSquircleMaskImage } from '../utils/element/canvas-text-shadow.util';
 
 export type DomStyleMap = Record<string, string | null | undefined>;
 
@@ -76,7 +77,7 @@ export class CanvasDomStyleService {
     // that paints ABOVE children. See buildStrokeOverlayStyle() and canvas-dom-element template.
 
     // ── Corner Radius ─────────────────────────────────────
-    if (element.type !== 'text') {
+    {
       const effectiveRadius =
         (element.cornerRadius ?? 0) > 0 || hasPerCornerRadius(element) || element.type === 'image';
       if (effectiveRadius) {
@@ -226,6 +227,52 @@ export class CanvasDomStyleService {
     // ── Text color ────────────────────────────────────────
     if (element.type === 'text' && element.fill) {
       style['color'] = element.fill;
+    }
+
+    // ── Text container background ──────────────────────────
+    if (element.type === 'text' && element.backgroundColor) {
+      style['background-color'] = element.backgroundColor;
+    }
+
+    // ── Text shadow ───────────────────────────────────────
+    if (element.type === 'text' && element.textShadow) {
+      style['text-shadow'] = element.textShadow;
+    }
+
+    // ── Text transform ────────────────────────────────────
+    if (element.type === 'text' && element.textTransform) {
+      style['text-transform'] = element.textTransform;
+    }
+
+    // ── Text balance ──────────────────────────────────────
+    if (element.type === 'text' && element.textBalance) {
+      style['text-wrap'] = 'balance';
+    }
+
+    // ── Text decoration ───────────────────────────────────
+    if (element.type === 'text' && element.textDecorationLine) {
+      style['text-decoration-line'] = element.textDecorationLine;
+      if (element.textDecorationColor) {
+        style['text-decoration-color'] = element.textDecorationColor;
+      }
+      if (element.textDecorationStyle) {
+        style['text-decoration-style'] = element.textDecorationStyle;
+      }
+      if (element.textDecorationThickness != null) {
+        const unit = element.textDecorationThicknessUnit ?? 'px';
+        style['text-decoration-thickness'] = `${element.textDecorationThickness}${unit}`;
+      }
+    }
+
+    // ── Squircle mask ─────────────────────────────────────
+    if (element.type === 'text' && element.squircle != null && element.squircle > 0) {
+      const maskImage = buildSquircleMaskImage(element.squircle);
+      if (maskImage) {
+        style['mask-image'] = maskImage;
+        style['mask-size'] = '100% 100%';
+        style['-webkit-mask-image'] = maskImage;
+        style['-webkit-mask-size'] = '100% 100%';
+      }
     }
 
     // ── Cursor ────────────────────────────────────────────

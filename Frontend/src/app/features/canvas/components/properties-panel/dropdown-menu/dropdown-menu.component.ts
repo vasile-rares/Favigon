@@ -13,7 +13,13 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 import { CanvasElement, GradientFill, GradientStop } from '@app/core';
-import type { CanvasBorderSides, CanvasBorderWidths, CanvasObjectFit } from '@app/core';
+import type {
+  CanvasBorderSides,
+  CanvasBorderWidths,
+  CanvasObjectFit,
+  CanvasTextDecorationLine,
+  CanvasTextDecorationStyle,
+} from '@app/core';
 import { ProjectService } from '@app/core/services/project.service';
 import { roundToTwoDecimals } from '../../../utils/canvas-math.util';
 import {
@@ -22,6 +28,11 @@ import {
   DEFAULT_EDITABLE_CANVAS_SHADOW,
   resolveEditableCanvasShadow,
 } from '../../../utils/element/canvas-shadow.util';
+import {
+  buildTextShadowCss,
+  DEFAULT_EDITABLE_TEXT_SHADOW,
+  resolveEditableTextShadow,
+} from '../../../utils/element/canvas-text-shadow.util';
 import { DropdownSelectComponent, ToggleGroupComponent } from '@app/shared';
 import type { DropdownSelectOption, ToggleGroupOption, ToggleGroupValue } from '@app/shared';
 import { NumberInputComponent } from '../number-input/number-input.component';
@@ -35,7 +46,13 @@ import {
   buildGradient,
 } from '../../../utils/gradient.utils';
 
-type StylePopupFieldKind = 'fill' | 'stroke' | 'shadow' | 'effect';
+type StylePopupFieldKind =
+  | 'fill'
+  | 'stroke'
+  | 'shadow'
+  | 'effect'
+  | 'text-shadow'
+  | 'text-decoration';
 type ColorPickerDragTarget = 'surface' | 'hue' | 'alpha' | null;
 type ColorPickerFormat = 'hex' | 'rgb' | 'hsl';
 type ColorPickerMode = 'solid' | 'linear' | 'radial' | 'conic' | 'image';
@@ -82,6 +99,13 @@ export class DropdownMenuComponent implements OnDestroy {
   readonly imageAltText = input('');
   readonly initialColorMode = input<ColorPickerMode>('solid');
   readonly gradient = input<GradientFill | null>(null);
+  readonly solidColorOnly = input(false);
+  readonly textShadowValue = input<string | null>(null);
+  readonly textDecorationLine = input<CanvasTextDecorationLine | null>(null);
+  readonly textDecorationColor = input<string | null>(null);
+  readonly textDecorationStyle = input<CanvasTextDecorationStyle | null>(null);
+  readonly textDecorationThickness = input<number | null>(null);
+  readonly textDecorationThicknessUnit = input<'px' | 'em'>('px');
 
   // ── Outputs ───────────────────────────────────────────────
 
@@ -104,6 +128,16 @@ export class DropdownMenuComponent implements OnDestroy {
   shadowY = DEFAULT_EDITABLE_CANVAS_SHADOW.y;
   shadowBlur = DEFAULT_EDITABLE_CANVAS_SHADOW.blur;
   shadowSpread = DEFAULT_EDITABLE_CANVAS_SHADOW.spread;
+  // Text shadow state
+  textShadowX = DEFAULT_EDITABLE_TEXT_SHADOW.x;
+  textShadowY = DEFAULT_EDITABLE_TEXT_SHADOW.y;
+  textShadowBlur = DEFAULT_EDITABLE_TEXT_SHADOW.blur;
+  // Text decoration state
+  selectedDecorationLine: CanvasTextDecorationLine = 'underline';
+  selectedDecorationStyle: CanvasTextDecorationStyle = 'solid';
+  decorationThicknessValue: number | null = null;
+  showDecorationColorPicker = false;
+  showShadowColorPicker = false;
   isScreenPickerActive = false;
   isUploadingImage = false;
   imageUploadError = '';
@@ -128,6 +162,24 @@ export class DropdownMenuComponent implements OnDestroy {
     { label: '', value: 'radial', icon: 'paint-radial', ariaLabel: 'Radial', title: 'Radial' },
     { label: '', value: 'conic', icon: 'paint-conic', ariaLabel: 'Conic', title: 'Conic' },
     { label: '', value: 'image', icon: 'paint-image', ariaLabel: 'Image', title: 'Image' },
+  ];
+  readonly colorModeOptionsSolid: readonly ToggleGroupOption[] = [
+    { label: '', value: 'solid', icon: 'paint-solid', ariaLabel: 'Solid', title: 'Solid' },
+  ];
+  readonly decorationLineOptions: DropdownSelectOption[] = [
+    { label: 'Underline', value: 'underline' },
+    { label: 'Linethrough', value: 'line-through' },
+  ];
+  readonly decorationStyleOptions: DropdownSelectOption[] = [
+    { label: 'Solid', value: 'solid' },
+    { label: 'Double', value: 'double' },
+    { label: 'Dotted', value: 'dotted' },
+    { label: 'Dashed', value: 'dashed' },
+    { label: 'Wavy', value: 'wavy' },
+  ];
+  readonly decorationThicknessUnitOptions: DropdownSelectOption[] = [
+    { label: 'Px', value: 'px' },
+    { label: 'Em', value: 'em' },
   ];
   readonly shadowPositionOptions: readonly ToggleGroupOption[] = [
     { label: 'Outside', value: 'outside', ariaLabel: 'Outside shadow', title: 'Outside' },
@@ -220,6 +272,27 @@ export class DropdownMenuComponent implements OnDestroy {
     });
 
     effect(() => {
+      const textShadowValue = this.textShadowValue();
+      if (this.kind() === 'text-shadow') {
+        this.syncTextShadowEditorFromValue(textShadowValue);
+      }
+    });
+
+    effect(() => {
+      if (this.kind() === 'text-decoration') {
+        this.selectedDecorationLine = this.textDecorationLine() ?? 'underline';
+        this.selectedDecorationStyle = this.textDecorationStyle() ?? 'solid';
+        this.decorationThicknessValue = this.textDecorationThickness();
+        const color = this.textDecorationColor();
+        if (color) {
+          this.syncPickerFromColor(color);
+          const fmt = inferCssColorFormat(color);
+          if (fmt) this.selectedColorFormat = fmt;
+        }
+      }
+    });
+
+    effect(() => {
       this.imagePreviewUrl = this.backgroundImage();
       this.imageUploadError = '';
     });
@@ -233,7 +306,12 @@ export class DropdownMenuComponent implements OnDestroy {
 
     effect(() => {
       const gradient = this.gradient();
-      if (this.kind() === 'fill' && gradient && this.gradientDragStopIndex < 0 && !this.colorPickerDragTarget) {
+      if (
+        this.kind() === 'fill' &&
+        gradient &&
+        this.gradientDragStopIndex < 0 &&
+        !this.colorPickerDragTarget
+      ) {
         this.gradientStops = gradient.stops.slice();
         this.gradientAngle = 'angle' in gradient ? (gradient as { angle: number }).angle : 0;
         const stop = this.gradientStops[this.selectedStopIndex] ?? this.gradientStops[0];
@@ -698,7 +776,11 @@ export class DropdownMenuComponent implements OnDestroy {
     const rect = bar.getBoundingClientRect();
     const position = clampPosition(((event.clientX - rect.left) / Math.max(rect.width, 1)) * 100);
     const color = interpolateGradientColor(
-      buildGradient(this.selectedColorMode as GradientFill['type'], this.gradientStops, this.gradientAngle),
+      buildGradient(
+        this.selectedColorMode as GradientFill['type'],
+        this.gradientStops,
+        this.gradientAngle,
+      ),
       position,
     );
     const newStop: GradientStop = { color, position };
@@ -731,9 +813,7 @@ export class DropdownMenuComponent implements OnDestroy {
 
   onGradientStopPositionChange(value: number, index: number): void {
     const position = clampPosition(value);
-    this.gradientStops = this.gradientStops.map((s, i) =>
-      i === index ? { ...s, position } : s,
-    );
+    this.gradientStops = this.gradientStops.map((s, i) => (i === index ? { ...s, position } : s));
     this.emitGradientPatch();
   }
 
@@ -760,9 +840,7 @@ export class DropdownMenuComponent implements OnDestroy {
     const position = clampPosition(((clientX - rect.left) / Math.max(rect.width, 1)) * 100);
     const idx = this.gradientDragStopIndex;
     if (idx < 0 || idx >= this.gradientStops.length) return;
-    this.gradientStops = this.gradientStops.map((s, i) =>
-      i === idx ? { ...s, position } : s,
-    );
+    this.gradientStops = this.gradientStops.map((s, i) => (i === idx ? { ...s, position } : s));
     this.emitGradientPatch();
   }
 
@@ -839,7 +917,13 @@ export class DropdownMenuComponent implements OnDestroy {
   // ── Private Helpers ───────────────────────────────────────
 
   private isColorKind(): boolean {
-    return this.kind() === 'fill' || this.kind() === 'stroke' || this.kind() === 'shadow';
+    return (
+      this.kind() === 'fill' ||
+      this.kind() === 'stroke' ||
+      this.kind() === 'shadow' ||
+      this.kind() === 'text-shadow' ||
+      this.kind() === 'text-decoration'
+    );
   }
 
   private beginColorGesture(): void {
@@ -854,6 +938,14 @@ export class DropdownMenuComponent implements OnDestroy {
   private getInitialPickerColor(): string {
     if (this.kind() === 'shadow') {
       return resolveEditableCanvasShadow(this.shadowValue()).color;
+    }
+
+    if (this.kind() === 'text-shadow') {
+      return resolveEditableTextShadow(this.textShadowValue()).color;
+    }
+
+    if (this.kind() === 'text-decoration') {
+      return this.textDecorationColor() ?? '#000000';
     }
 
     if (this.pickerColor()) {
@@ -971,6 +1063,16 @@ export class DropdownMenuComponent implements OnDestroy {
       return;
     }
 
+    if (this.kind() === 'text-shadow') {
+      this.emitTextShadowPatch(colorValue);
+      return;
+    }
+
+    if (this.kind() === 'text-decoration') {
+      this.emitDecorationPatch({ color: colorValue });
+      return;
+    }
+
     this.emitShadowPatch(colorValue);
   }
 
@@ -1009,6 +1111,84 @@ export class DropdownMenuComponent implements OnDestroy {
         spread: this.shadowSpread,
         color: colorOverride ?? this.pickerColorValue(),
       }),
+    });
+  }
+
+  // ── Text Shadow handlers ──────────────────────────────────
+
+  onTextShadowNumberChange(field: 'x' | 'y' | 'blur', value: number): void {
+    if (!Number.isFinite(value)) return;
+    const normalized =
+      field === 'blur' ? Math.max(0, roundToTwoDecimals(value)) : roundToTwoDecimals(value);
+    switch (field) {
+      case 'x':
+        this.textShadowX = normalized;
+        break;
+      case 'y':
+        this.textShadowY = normalized;
+        break;
+      case 'blur':
+        this.textShadowBlur = normalized;
+        break;
+    }
+    this.emitTextShadowPatch();
+  }
+
+  private syncTextShadowEditorFromValue(value: string | null): void {
+    const shadow = resolveEditableTextShadow(value);
+    this.textShadowX = shadow.x;
+    this.textShadowY = shadow.y;
+    this.textShadowBlur = shadow.blur;
+    this.syncPickerFromColor(shadow.color);
+    const fmt = inferCssColorFormat(shadow.color);
+    if (fmt) this.selectedColorFormat = fmt;
+  }
+
+  private emitTextShadowPatch(colorOverride?: string): void {
+    this.patchRequested.emit({
+      textShadow: buildTextShadowCss({
+        x: this.textShadowX,
+        y: this.textShadowY,
+        blur: this.textShadowBlur,
+        color: colorOverride ?? this.pickerColorValue(),
+      }),
+    });
+  }
+
+  // ── Text Decoration handlers ──────────────────────────────
+
+  onDecorationLineChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string') return;
+    this.selectedDecorationLine = value as CanvasTextDecorationLine;
+    this.emitDecorationPatch({ line: this.selectedDecorationLine });
+  }
+
+  onDecorationStyleChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string') return;
+    this.selectedDecorationStyle = value as CanvasTextDecorationStyle;
+    this.emitDecorationPatch({ style: this.selectedDecorationStyle });
+  }
+
+  onDecorationThicknessChange(value: number): void {
+    if (!Number.isFinite(value)) return;
+    this.decorationThicknessValue = Math.max(0, roundToTwoDecimals(value));
+    this.emitDecorationPatch({ thickness: this.decorationThicknessValue });
+  }
+
+  private emitDecorationPatch(
+    override: {
+      line?: CanvasTextDecorationLine;
+      color?: string;
+      style?: CanvasTextDecorationStyle;
+      thickness?: number;
+    } = {},
+  ): void {
+    this.patchRequested.emit({
+      textDecorationLine: override.line ?? this.selectedDecorationLine,
+      textDecorationColor: override.color ?? this.pickerColorValue(),
+      textDecorationStyle: override.style ?? this.selectedDecorationStyle,
+      textDecorationThickness: override.thickness ?? this.decorationThicknessValue ?? undefined,
+      textDecorationThicknessUnit: 'px',
     });
   }
 }

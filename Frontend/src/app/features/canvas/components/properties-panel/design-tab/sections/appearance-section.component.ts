@@ -220,9 +220,12 @@ export class AppearanceSectionComponent {
     if (element.fillMode === 'image') return 'Image';
     if (element.fillMode === 'gradient') {
       switch (element.gradient?.type) {
-        case 'linear': return 'Linear';
-        case 'radial': return 'Radial';
-        case 'conic': return 'Conic';
+        case 'linear':
+          return 'Linear';
+        case 'radial':
+          return 'Radial';
+        case 'conic':
+          return 'Conic';
       }
     }
     const value = this.fillInputValue(element);

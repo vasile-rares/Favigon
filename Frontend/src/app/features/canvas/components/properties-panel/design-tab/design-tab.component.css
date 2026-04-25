@@ -61,6 +61,10 @@ app-dt-transforms-effects-section {
     gap: var(--pp-row-gap);
   }
 
+  .pp-style-row--corner-radius {
+    align-items: start;
+  }
+
   .pp-row-label {
     width: auto;
   }
@@ -974,6 +978,26 @@ app-dt-transforms-effects-section {
   font-size: var(--canvas-panel-font-size);
   color: var(--canvas-panel-section-muted-color);
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Removable controls (control + remove btn inline) ─────────── */
+.pp-style-control--removable {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.pp-style-control--removable > app-field-input,
+.pp-style-control--removable > app-toggle-group,
+.pp-style-control--removable > app-dropdown-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pp-corner-radius-header--removable {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 22px;
 }
 
 /* ── Filter rows ─────────────────────────────────────────────── */

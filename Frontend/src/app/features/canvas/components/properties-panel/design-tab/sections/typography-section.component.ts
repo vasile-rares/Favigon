@@ -1,20 +1,37 @@
 ﻿import { Component, OnInit, inject, input, output, ViewEncapsulation } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
-import { DropdownSelectComponent, ToggleGroupComponent } from '@app/shared';
+import { DropdownSelectComponent, ToggleGroupComponent, ContextMenuComponent } from '@app/shared';
 import { NumberInputComponent } from '../../number-input/number-input.component';
 import { FieldInputComponent } from '../../field-input/field-input.component';
-import type { DropdownSelectOption, ToggleGroupOption } from '@app/shared';
+import type { DropdownSelectOption, ToggleGroupOption, ContextMenuItem } from '@app/shared';
 import {
+  CanvasCornerRadii,
   CanvasElement,
   CanvasFontSizeUnit,
   CanvasFontStyle,
+  CanvasSpacing,
   CanvasTextAlign,
+  CanvasTextDecorationLine,
+  CanvasTextDecorationStyle,
   CanvasTextSpacingUnit,
+  CanvasTextTransform,
 } from '@app/core';
 
 import { roundToTwoDecimals } from '../../../../utils/canvas-math.util';
 import { GoogleFontsService } from '../../../../services/google-fonts.service';
+import {
+  getDefaultCornerRadius,
+  getResolvedCornerRadii,
+  hasPerCornerRadius,
+} from '../../../../utils/element/canvas-element-normalization.util';
+import {
+  buildTextShadowCss,
+  DEFAULT_EDITABLE_TEXT_SHADOW,
+  hasTextShadow,
+  normalizeTextShadowValue,
+  resolveEditableTextShadow,
+} from '../../../../utils/element/canvas-text-shadow.util';
 
 type EditableTypographyField =
   | 'fontFamily'
@@ -24,6 +41,49 @@ type EditableTypographyField =
   | 'textVerticalAlign';
 type EditableTextMetricUnitField = 'fontSizeUnit' | 'letterSpacingUnit' | 'lineHeightUnit';
 type EditableNumericTypographyField = 'fontSize' | 'letterSpacing' | 'lineHeight';
+type TypographyOptionalId =
+  | 'fill'
+  | 'radius'
+  | 'padding'
+  | 'shadow'
+  | 'transform'
+  | 'decoration'
+  | 'balance';
+type CornerRadiusMode = 'full' | 'per-corner';
+type PaddingMode = 'uniform' | 'per-side';
+
+interface TypographyOptionalDef {
+  id: TypographyOptionalId;
+  label: string;
+  isAdded: (el: CanvasElement) => boolean;
+}
+
+interface CornerRadiusFieldDefinition {
+  key: keyof CanvasCornerRadii;
+  label: string;
+  ariaLabel: string;
+}
+
+const CORNER_RADIUS_FIELD_DEFINITIONS: readonly CornerRadiusFieldDefinition[] = [
+  { key: 'topLeft', label: 'TL', ariaLabel: 'Top left corner radius' },
+  { key: 'topRight', label: 'TR', ariaLabel: 'Top right corner radius' },
+  { key: 'bottomLeft', label: 'BL', ariaLabel: 'Bottom left corner radius' },
+  { key: 'bottomRight', label: 'BR', ariaLabel: 'Bottom right corner radius' },
+];
+
+const TYPOGRAPHY_OPTIONAL_DEFS: readonly TypographyOptionalDef[] = [
+  { id: 'fill', label: 'Fill', isAdded: (el) => el.backgroundColor != null },
+  {
+    id: 'radius',
+    label: 'Radius',
+    isAdded: (el) => el.cornerRadius != null || hasPerCornerRadius(el),
+  },
+  { id: 'padding', label: 'Padding', isAdded: (el) => el.padding != null },
+  { id: 'shadow', label: 'Shadows', isAdded: (el) => hasTextShadow(el.textShadow) },
+  { id: 'transform', label: 'Transform', isAdded: (el) => el.textTransform != null },
+  { id: 'decoration', label: 'Decoration', isAdded: (el) => el.textDecorationLine != null },
+  { id: 'balance', label: 'Balance', isAdded: (el) => typeof el.textBalance === 'boolean' },
+];
 
 @Component({
   selector: 'app-dt-typography-section',
@@ -34,6 +94,7 @@ type EditableNumericTypographyField = 'fontSize' | 'letterSpacing' | 'lineHeight
     ToggleGroupComponent,
     NumberInputComponent,
     FieldInputComponent,
+    ContextMenuComponent,
   ],
   templateUrl: './typography-section.component.html',
   encapsulation: ViewEncapsulation.None,
@@ -49,6 +110,72 @@ export class TypographySectionComponent implements OnInit {
   readonly numberInputGestureCommitted = output<void>();
 
   private readonly defaultFillColor = '#e0e0e0';
+
+  // ── Optional props menu state ────────────────────────────────────────────
+  typographyMenuItems: ContextMenuItem[] = [];
+  typographyMenuX = 0;
+  typographyMenuY = 0;
+
+  // ── Corner radius ────────────────────────────────────────────────────────
+  readonly cornerRadiusFields = CORNER_RADIUS_FIELD_DEFINITIONS;
+  readonly cornerRadiusModeOptions: readonly ToggleGroupOption[] = [
+    {
+      label: '',
+      value: 'full',
+      icon: 'radius-full',
+      ariaLabel: 'Full corner radius',
+      title: 'Full radius',
+    },
+    {
+      label: '',
+      value: 'per-corner',
+      icon: 'radius-corners',
+      ariaLabel: 'Per-corner radius',
+      title: 'Per-corner radius',
+    },
+  ];
+
+  // ── Padding ──────────────────────────────────────────────────────────────
+  readonly paddingModeOptions: readonly ToggleGroupOption[] = [
+    {
+      label: '',
+      value: 'uniform',
+      icon: 'radius-full',
+      ariaLabel: 'Uniform padding',
+      title: 'Uniform',
+    },
+    {
+      label: '',
+      value: 'per-side',
+      icon: 'border-sides',
+      ariaLabel: 'Per-side padding',
+      title: 'Per side',
+    },
+  ];
+  readonly paddingSideFields: readonly {
+    key: keyof CanvasSpacing;
+    label: string;
+    ariaLabel: string;
+  }[] = [
+    { key: 'top', label: 'T', ariaLabel: 'Top padding' },
+    { key: 'right', label: 'R', ariaLabel: 'Right padding' },
+    { key: 'bottom', label: 'B', ariaLabel: 'Bottom padding' },
+    { key: 'left', label: 'L', ariaLabel: 'Left padding' },
+  ];
+
+  // ── Text transform ───────────────────────────────────────────────────────
+  readonly textTransformOptions: DropdownSelectOption[] = [
+    { label: 'Inherit', value: 'inherit' },
+    { label: 'Capitalize', value: 'capitalize' },
+    { label: 'Uppercase', value: 'uppercase' },
+    { label: 'Lowercase', value: 'lowercase' },
+  ];
+
+  // ── Balance ──────────────────────────────────────────────────────────────
+  readonly balanceOptions: readonly ToggleGroupOption[] = [
+    { label: 'On', value: true },
+    { label: 'Off', value: false },
+  ];
 
   readonly fontFamilyOptions: DropdownSelectOption[] = this.googleFonts.fontList.map((f) => ({
     label: f.family,
@@ -111,6 +238,261 @@ export class TypographySectionComponent implements OnInit {
 
   onNumberInputGestureCommitted(): void {
     this.numberInputGestureCommitted.emit();
+  }
+
+  // ── Optional props management ────────────────────────────────────────────
+
+  activeOptionals(element: CanvasElement): readonly TypographyOptionalDef[] {
+    return TYPOGRAPHY_OPTIONAL_DEFS.filter((def) => def.isAdded(element));
+  }
+
+  onTypographyPlusClick(event: MouseEvent): void {
+    event.stopPropagation();
+    if (this.typographyMenuItems.length > 0) {
+      this.closeTypographyMenu();
+      return;
+    }
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.typographyMenuX = rect.right;
+    this.typographyMenuY = rect.top;
+    this.typographyMenuItems = this.buildTypographyMenuItems();
+  }
+
+  closeTypographyMenu(): void {
+    this.typographyMenuItems = [];
+  }
+
+  private buildTypographyMenuItems(): ContextMenuItem[] {
+    const element = this.element();
+    return TYPOGRAPHY_OPTIONAL_DEFS.filter((def) => !def.isAdded(element)).map((def) => ({
+      id: def.id,
+      label: def.label,
+      action: () => {
+        this.addOptional(def.id);
+        this.closeTypographyMenu();
+      },
+    }));
+  }
+
+  private addOptional(id: TypographyOptionalId): void {
+    switch (id) {
+      case 'fill':
+        this.elementPatch.emit({ backgroundColor: '#e0e0e0' });
+        break;
+      case 'radius':
+        this.elementPatch.emit({ cornerRadius: 8 });
+        break;
+      case 'padding':
+        this.elementPatch.emit({ padding: { top: 8, right: 8, bottom: 8, left: 8 } });
+        break;
+      case 'shadow':
+        this.elementPatch.emit({ textShadow: buildTextShadowCss(DEFAULT_EDITABLE_TEXT_SHADOW) });
+        break;
+      case 'transform':
+        this.elementPatch.emit({ textTransform: 'uppercase' });
+        break;
+      case 'decoration':
+        this.elementPatch.emit({
+          textDecorationLine: 'underline',
+          textDecorationColor: '#000000',
+          textDecorationStyle: 'solid',
+          textDecorationThickness: 1,
+          textDecorationThicknessUnit: 'px',
+        });
+        break;
+      case 'balance':
+        this.elementPatch.emit({ textBalance: true });
+        break;
+    }
+  }
+
+  removeOptional(id: TypographyOptionalId): void {
+    switch (id) {
+      case 'fill':
+        this.elementPatch.emit({ backgroundColor: undefined });
+        break;
+      case 'radius':
+        this.elementPatch.emit({ cornerRadius: 0, cornerRadii: undefined });
+        break;
+      case 'padding':
+        this.elementPatch.emit({ padding: undefined, paddingPerSide: undefined });
+        break;
+      case 'shadow':
+        this.elementPatch.emit({ textShadow: undefined });
+        break;
+      case 'transform':
+        this.elementPatch.emit({ textTransform: undefined });
+        break;
+      case 'decoration':
+        this.elementPatch.emit({
+          textDecorationLine: undefined,
+          textDecorationColor: undefined,
+          textDecorationStyle: undefined,
+          textDecorationThickness: undefined,
+          textDecorationThicknessUnit: undefined,
+        });
+        break;
+      case 'balance':
+        this.elementPatch.emit({ textBalance: undefined });
+        break;
+    }
+  }
+
+  // ── Corner radius ────────────────────────────────────────────────────────
+
+  cornerRadiusMode(element: CanvasElement): CornerRadiusMode {
+    return hasPerCornerRadius(element) ? 'per-corner' : 'full';
+  }
+
+  fullCornerRadiusInputValue(element: CanvasElement): number | null {
+    return this.cornerRadiusMode(element) === 'per-corner' ? null : getDefaultCornerRadius(element);
+  }
+
+  cornerRadiusValue(element: CanvasElement, corner: keyof CanvasCornerRadii): number {
+    return getResolvedCornerRadii(element)[corner];
+  }
+
+  onCornerRadiusModeChange(value: string | number | boolean | null): void {
+    if (value !== 'full' && value !== 'per-corner') return;
+    const element = this.element();
+    const uniformValue = getDefaultCornerRadius(element);
+    if (value === 'per-corner') {
+      this.elementPatch.emit({
+        cornerRadius: uniformValue,
+        cornerRadii: getResolvedCornerRadii(element),
+      });
+    } else {
+      this.elementPatch.emit({ cornerRadius: uniformValue, cornerRadii: undefined });
+    }
+  }
+
+  onCornerRadiusChange(value: number): void {
+    if (!Number.isFinite(value)) return;
+    this.elementPatch.emit({ cornerRadius: Math.max(0, roundToTwoDecimals(value)) });
+  }
+
+  onCornerRadiusCornerChange(corner: keyof CanvasCornerRadii, value: number): void {
+    if (!Number.isFinite(value)) return;
+    const nextRadii: CanvasCornerRadii = {
+      ...getResolvedCornerRadii(this.element()),
+      [corner]: Math.max(0, roundToTwoDecimals(value)),
+    };
+    this.elementPatch.emit({ cornerRadii: nextRadii });
+  }
+
+  // ── Padding ──────────────────────────────────────────────────────────────
+
+  paddingMode(element: CanvasElement): PaddingMode {
+    return element.paddingPerSide === true ? 'per-side' : 'uniform';
+  }
+
+  uniformPaddingValue(element: CanvasElement): number {
+    return element.padding?.top ?? 0;
+  }
+
+  paddingSideValue(element: CanvasElement, side: keyof CanvasSpacing): number {
+    return element.padding?.[side] ?? 0;
+  }
+
+  onPaddingModeChange(value: string | number | boolean | null): void {
+    if (value !== 'uniform' && value !== 'per-side') return;
+    const el = this.element();
+    if (value === 'uniform') {
+      const uniform = this.uniformPaddingValue(el);
+      this.elementPatch.emit({
+        paddingPerSide: undefined,
+        padding: { top: uniform, right: uniform, bottom: uniform, left: uniform },
+      });
+    } else {
+      this.elementPatch.emit({ paddingPerSide: true });
+    }
+  }
+
+  onUniformPaddingChange(value: number): void {
+    if (!Number.isFinite(value)) return;
+    const v = Math.max(0, roundToTwoDecimals(value));
+    this.elementPatch.emit({ padding: { top: v, right: v, bottom: v, left: v } });
+  }
+
+  onPaddingSideChange(side: keyof CanvasSpacing, value: number): void {
+    if (!Number.isFinite(value)) return;
+    const current = this.element().padding ?? { top: 0, right: 0, bottom: 0, left: 0 };
+    this.elementPatch.emit({
+      padding: { ...current, [side]: Math.max(0, roundToTwoDecimals(value)) },
+    });
+  }
+
+  // ── Squircle ─────────────────────────────────────────────────────────────
+
+  squircleValue(element: CanvasElement): number {
+    return element.squircle ?? 0;
+  }
+
+  onSquircleChange(value: number): void {
+    if (!Number.isFinite(value)) return;
+    this.elementPatch.emit({ squircle: Math.max(0, Math.min(100, roundToTwoDecimals(value))) });
+  }
+
+  // ── Background color ─────────────────────────────────────────────────────
+
+  backgroundColorValue(element: CanvasElement): string {
+    return element.backgroundColor ?? '#e0e0e0';
+  }
+
+  onBackgroundColorPatch(patch: Partial<CanvasElement>): void {
+    if ('fill' in patch) {
+      this.elementPatch.emit({ backgroundColor: (patch as Record<string, string>)['fill'] });
+    } else {
+      this.elementPatch.emit(patch);
+    }
+  }
+
+  // ── Text shadow ──────────────────────────────────────────────────────────
+
+  textShadowSummary(element: CanvasElement): string {
+    if (!hasTextShadow(element.textShadow)) return 'None';
+    const s = resolveEditableTextShadow(element.textShadow);
+    return `${s.x}, ${s.y}, ${s.blur}`;
+  }
+
+  textShadowInputValue(element: CanvasElement): string | null {
+    return normalizeTextShadowValue(element.textShadow) ?? null;
+  }
+
+  textShadowSwatchColor(element: CanvasElement): string {
+    return resolveEditableTextShadow(element.textShadow).color;
+  }
+
+  // ── Text transform ───────────────────────────────────────────────────────
+
+  textTransformValue(element: CanvasElement): string {
+    return element.textTransform ?? 'inherit';
+  }
+
+  onTextTransformChange(value: string | number | boolean | null): void {
+    if (typeof value !== 'string') return;
+    this.elementPatch.emit({ textTransform: value as CanvasTextTransform });
+  }
+
+  // ── Balance ──────────────────────────────────────────────────────────────
+
+  onTextBalanceChange(value: string | number | boolean | null): void {
+    this.elementPatch.emit({ textBalance: value === true });
+  }
+
+  // ── Decoration ───────────────────────────────────────────────────────────
+
+  isDecorationDisabled(element: CanvasElement): boolean {
+    return element.fillMode === 'gradient';
+  }
+
+  decorationSummary(element: CanvasElement): string {
+    if (!element.textDecorationLine) return 'None';
+    return element.textDecorationLine === 'line-through' ? 'Linethrough' : 'Underline';
+  }
+
+  decorationSwatchColor(element: CanvasElement): string {
+    return element.textDecorationColor ?? '#000000';
   }
 
   onTextChange(field: 'text', event: Event): void {

@@ -119,6 +119,16 @@ public class IRStyle
 
   public string? TextAlign { get; set; }
 
+  public string? TextShadow { get; set; }
+  public string? TextTransform { get; set; }
+  public string? TextWrap { get; set; }
+  public string? TextDecorationLine { get; set; }
+  public string? TextDecorationColor { get; set; }
+  public string? TextDecorationStyle { get; set; }
+  public string? TextDecorationThickness { get; set; }
+
+  public string? BackgroundColor { get; set; }
+
   public IRLength? BorderRadius { get; set; }
   public IRLength? BorderTopLeftRadius { get; set; }
   public IRLength? BorderTopRightRadius { get; set; }
