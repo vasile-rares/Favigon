@@ -1,4 +1,5 @@
 <!-- Link -->
+@if (element().type !== 'frame') {
 <section
   class="properties-section properties-section--collapsible"
   [class.properties-section--compact]="!hasLink(element())"
@@ -80,6 +81,7 @@
   
 }
 </section>
+}
 
 <!-- Position -->
 @if (supportsPosition(element().type)) {
@@ -140,6 +142,7 @@
 </section>
 
 <!-- Accessibility -->
+@if (element().type !== 'frame') {
 <section
   class="properties-section properties-section--collapsible"
   [class.properties-section--compact]="!hasAccessibilityFields(element())"
@@ -196,6 +199,7 @@
   </p>
 }
 </section>
+}
 
 @if (accessibilityMenuItems.length > 0) {
 <app-context-menu

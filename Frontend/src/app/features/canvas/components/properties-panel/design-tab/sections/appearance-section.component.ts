@@ -1,4 +1,4 @@
-﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
+import { Component, input, output, ViewEncapsulation } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { ToggleGroupComponent, ContextMenuComponent } from '@app/shared';
@@ -12,7 +12,9 @@ import {
   CanvasElement,
   CanvasFilterType,
   CanvasOverflowMode,
+  GradientFill,
 } from '@app/core';
+import { gradientToCss } from '../../../../utils/gradient.utils';
 
 import {
   getDefaultCornerRadius,
@@ -210,12 +212,19 @@ export class AppearanceSectionComponent {
   }
 
   isTransparentFill(element: CanvasElement): boolean {
-    if (element.fillMode === 'image') return false;
+    if (element.fillMode === 'image' || element.fillMode === 'gradient') return false;
     return isTransparentColor(this.fillInputValue(element));
   }
 
   fillLabel(element: CanvasElement): string {
     if (element.fillMode === 'image') return 'Image';
+    if (element.fillMode === 'gradient') {
+      switch (element.gradient?.type) {
+        case 'linear': return 'Linear';
+        case 'radial': return 'Radial';
+        case 'conic': return 'Conic';
+      }
+    }
     const value = this.fillInputValue(element);
     return value === 'transparent' ? 'Transparent' : preserveColorDisplayValue(value);
   }
@@ -224,19 +233,32 @@ export class AppearanceSectionComponent {
     if (element.fillMode === 'image' && element.backgroundImage) {
       return `url(${element.backgroundImage}) center/cover no-repeat`;
     }
+    if (element.fillMode === 'gradient' && element.gradient) {
+      return gradientToCss(element.gradient);
+    }
     const value = this.fillInputValue(element);
     return value === 'transparent' ? null : value;
   }
 
   fillInputValue(element: CanvasElement): string {
+    if (element.fillMode === 'gradient') {
+      return element.gradient?.stops[0]?.color ?? '#000000';
+    }
     const fallback = element.type === 'frame' ? this.defaultFrameFillColor : this.defaultFillColor;
     return this.toHexColorOrFallback(element.fill, fallback);
   }
 
   fillPickerValue(element: CanvasElement): string {
+    if (element.fillMode === 'gradient') {
+      return element.gradient?.stops[0]?.color ?? '#000000';
+    }
     const fillValue = this.fillInputValue(element);
     if (fillValue !== 'transparent') return fillValue;
     return element.type === 'frame' ? this.defaultFrameFillColor : this.defaultFillColor;
+  }
+
+  fillGradient(element: CanvasElement): GradientFill | null {
+    return element.fillMode === 'gradient' ? (element.gradient ?? null) : null;
   }
 
   supportsOverflow(type: CanvasElement['type']): boolean {

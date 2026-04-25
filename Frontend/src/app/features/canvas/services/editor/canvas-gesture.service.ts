@@ -1730,10 +1730,14 @@ export class CanvasGestureService {
     const textForMeasure = (el.text || ' ').replace(/\n+$/, (m) => m + '\u200b');
     mirror.textContent = textForMeasure;
     document.body.appendChild(mirror);
-    const w = widthConstraint ?? mirror.offsetWidth;
-    const h = mirror.offsetHeight;
+    // Use getBoundingClientRect().width for subpixel-accurate measurement, then
+    // Math.ceil so the stored pixel value is never smaller than the actual text width.
+    // offsetWidth is an integer (rounded) which can be smaller than the true width,
+    // causing the last character to wrap when the element is rendered at that size.
+    const rawW = widthConstraint ?? Math.ceil(mirror.getBoundingClientRect().width);
+    const rawH = Math.ceil(mirror.getBoundingClientRect().height);
     document.body.removeChild(mirror);
-    return { width: Math.max(w, 24), height: Math.max(h, 4) };
+    return { width: Math.max(rawW, 24), height: Math.max(rawH, 4) };
   }
 
   getAutoSizedTextLayoutPatch(

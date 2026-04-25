@@ -38,6 +38,71 @@
             </div>
           </div>
 
+          @if (isGradientMode()) {
+            <div class="field-input__popup-divider" aria-hidden="true"></div>
+
+            <div
+              class="field-input__gradient-bar"
+              [style.background]="gradientBarBackground()"
+              (click)="onGradientBarClick($event)">
+              @for (stop of gradientStops; track $index; let i = $index) {
+                <div
+                  class="field-input__gradient-stop-marker"
+                  [class.is-selected]="selectedStopIndex === i"
+                  [style.left.%]="stop.position"
+                  (pointerdown)="onGradientStopMarkerDown($event, i)"
+                  (click)="$event.stopPropagation()">
+                  <div class="field-input__gradient-stop-marker-color" [style.background]="stop.color"></div>
+                </div>
+              }
+            </div>
+
+            @if (selectedColorMode !== 'radial') {
+              <div class="field-input__gradient-angle-row">
+                <span class="field-input__popup-field-label">Angle</span>
+                <app-number-input
+                  class="field-input__gradient-angle-input"
+                  appearance="compact"
+                  ariaLabel="Gradient angle"
+                  [value]="gradientAngle"
+                  [min]="0"
+                  [max]="360"
+                  suffix="°"
+                  (gestureStarted)="onNumberGestureStarted()"
+                  (gestureCommitted)="onNumberGestureCommitted()"
+                  (valueChange)="onGradientAngleChange($event)" />
+              </div>
+            }
+
+            <div class="field-input__gradient-stops-list">
+              @for (stop of gradientStops; track $index; let i = $index) {
+                <div
+                  class="field-input__gradient-stop-row"
+                  [class.is-selected]="selectedStopIndex === i"
+                  (click)="onGradientStopSelect(i)">
+                  <div class="field-input__gradient-stop-swatch" [style.background]="stop.color"></div>
+                  <app-number-input
+                    class="field-input__gradient-stop-position"
+                    appearance="compact"
+                    ariaLabel="Stop position"
+                    [value]="stop.position"
+                    [min]="0"
+                    [max]="100"
+                    suffix="%"
+                    (gestureStarted)="onNumberGestureStarted()"
+                    (gestureCommitted)="onNumberGestureCommitted()"
+                    (valueChange)="onGradientStopPositionChange($event, i)" />
+                  @if (gradientStops.length > 2) {
+                    <button
+                      type="button"
+                      class="field-input__gradient-stop-delete"
+                      (click)="$event.stopPropagation(); onGradientStopDelete(i)">×</button>
+                  }
+                </div>
+              }
+            </div>
+          }
+
 }
 
         @if (selectedColorMode === 'image') {

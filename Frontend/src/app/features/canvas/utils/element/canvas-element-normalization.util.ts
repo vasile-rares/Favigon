@@ -151,7 +151,8 @@ export function getStrokeWidth(element: CanvasElement): number {
 }
 
 export function getStrokeWidths(element: CanvasElement): CanvasBorderWidths {
-  if (!element.stroke || element.type === 'text') {
+  const hasActiveStroke = element.stroke != null;
+  if (!hasActiveStroke || element.type === 'text') {
     return { top: 0, right: 0, bottom: 0, left: 0 };
   }
 

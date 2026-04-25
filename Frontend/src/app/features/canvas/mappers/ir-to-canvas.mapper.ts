@@ -17,7 +17,9 @@ import {
   CanvasSizeMode,
   CanvasSpacing,
   CanvasTextSpacingUnit,
+  GradientFill,
   IRBorder,
+  IRGradient,
   IRLayout,
   IRLength,
   IRNode,
@@ -157,7 +159,7 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     visible: !(node.meta?.hidden ?? false),
     fill:
       mappedType !== 'text'
-        ? (node.style?.background ?? (mappedType === 'frame' ? DEFAULT_FRAME_FILL : DEFAULT_FILL))
+        ? (node.style?.gradient?.stops[0]?.color ?? node.style?.background ?? (mappedType === 'frame' ? DEFAULT_FRAME_FILL : DEFAULT_FILL))
         : (node.style?.color ?? '#000000'),
     stroke: node.style?.border?.color,
     strokeWidth:
@@ -175,7 +177,8 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
       mappedType === 'frame' || mappedType === 'rectangle'
         ? readOverflow(node.style?.overflow, 'clip')
         : undefined,
-    fillMode: (isImageNode || node.style?.backgroundImage) ? 'image' : undefined,
+    fillMode: node.style?.gradient ? 'gradient' : (isImageNode || node.style?.backgroundImage) ? 'image' : undefined,
+    gradient: node.style?.gradient ? mapIRGradientToCanvas(node.style.gradient) : undefined,
     backgroundImage: isImageNode
       ? readStringProp(node.props, 'src', '')
       : readBackgroundImageUrl(node.style?.backgroundImage),
@@ -627,6 +630,18 @@ function readBackgroundImageUrl(value: string | undefined): string | undefined {
   if (!value) return undefined;
   const match = value.match(/^url\((.+)\)$/);
   return match ? match[1] : value;
+}
+
+function mapIRGradientToCanvas(irGradient: IRGradient): GradientFill {
+  const stops = irGradient.stops.map((s) => ({ color: s.color, position: s.position }));
+  switch (irGradient.type) {
+    case 'linear':
+      return { type: 'linear', angle: irGradient.angle ?? 90, stops };
+    case 'radial':
+      return { type: 'radial', stops };
+    case 'conic':
+      return { type: 'conic', angle: irGradient.angle ?? 0, stops };
+  }
 }
 
 function readStringProp(

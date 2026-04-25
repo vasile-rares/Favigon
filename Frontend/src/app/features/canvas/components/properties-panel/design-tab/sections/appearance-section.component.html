@@ -72,9 +72,10 @@
         [backgroundRepeat]="element().backgroundRepeat ?? 'no-repeat'"
         [objectFit]="element().objectFit ?? 'cover'"
         [imageAltText]="element().imageAltText ?? element().ariaLabel ?? ''"
-        [initialColorMode]="element().fillMode === 'image' ? 'image' : 'solid'"
-        [activationPatch]="{ fill: fillPickerValue(element()) }"
-        [clearPatch]="{ fill: 'transparent', fillMode: 'color', backgroundImage: undefined }"
+        [initialColorMode]="element().fillMode === 'gradient' ? (element().gradient?.type ?? 'linear') : element().fillMode === 'image' ? 'image' : 'solid'"
+        [gradient]="fillGradient(element())"
+        [activationPatch]="element().fillMode === 'gradient' ? { fillMode: 'gradient', gradient: element().gradient } : { fill: fillPickerValue(element()) }"
+        [clearPatch]="{ fill: 'transparent', fillMode: 'color', backgroundImage: undefined, gradient: undefined }"
         (patchRequested)="elementPatch.emit($event)"
         (numberGestureStarted)="onNumberInputGestureStarted()"
         (numberGestureCommitted)="onNumberInputGestureCommitted()">

@@ -39,6 +39,7 @@
 }
 
 .canvas-text-content {
+  /* Default for fixed-width text; overridden via [ngStyle] for fit-content text */
   white-space: pre-wrap;
   word-break: break-word;
 }

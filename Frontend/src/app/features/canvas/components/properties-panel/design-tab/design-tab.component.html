@@ -88,10 +88,12 @@
         </section>
       }
 
-      <app-dt-transforms-effects-section
-        [element]="element"
-        [projectId]="projectId()"
-        (elementPatch)="elementPatch.emit($event)"
-        (numberInputGestureStarted)="numberInputGestureStarted.emit()"
-        (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-transforms-effects-section>
+      @if (element.type !== 'frame') {
+        <app-dt-transforms-effects-section
+          [element]="element"
+          [projectId]="projectId()"
+          (elementPatch)="elementPatch.emit($event)"
+          (numberInputGestureStarted)="numberInputGestureStarted.emit()"
+          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-transforms-effects-section>
+      }
     }

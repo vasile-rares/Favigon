@@ -29,6 +29,7 @@ import {
   length,
   px,
 } from '@app/core';
+import { gradientToCss } from '../utils/gradient.utils';
 import {
   buildCanvasElementBackfaceVisibility,
   buildCanvasElementTransform,
@@ -349,12 +350,21 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
   applyNodeConstraintStyle(style, element, 'minHeight');
   applyNodeConstraintStyle(style, element, 'maxHeight');
 
-  if (element.fill && element.fillMode !== 'image') {
+  if (element.fill && element.fillMode !== 'image' && element.fillMode !== 'gradient') {
     if (element.type === 'text') {
       style.color = element.fill;
     } else {
       style.background = element.fill;
     }
+  }
+
+  if (element.fillMode === 'gradient' && element.gradient) {
+    style.background = gradientToCss(element.gradient);
+    style.gradient = {
+      type: element.gradient.type,
+      angle: 'angle' in element.gradient ? (element.gradient as { angle: number }).angle : undefined,
+      stops: element.gradient.stops.map((s) => ({ color: s.color, position: s.position })),
+    };
   }
 
   if (element.fillMode === 'image' && element.backgroundImage) {

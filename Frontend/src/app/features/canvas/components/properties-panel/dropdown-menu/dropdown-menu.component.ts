@@ -12,7 +12,7 @@ import {
   TemplateRef,
   ViewEncapsulation,
 } from '@angular/core';
-import { CanvasElement } from '@app/core';
+import { CanvasElement, GradientFill, GradientStop } from '@app/core';
 import type { CanvasBorderSides, CanvasBorderWidths, CanvasObjectFit } from '@app/core';
 import { ProjectService } from '@app/core/services/project.service';
 import { roundToTwoDecimals } from '../../../utils/canvas-math.util';
@@ -25,6 +25,15 @@ import {
 import { DropdownSelectComponent, ToggleGroupComponent } from '@app/shared';
 import type { DropdownSelectOption, ToggleGroupOption, ToggleGroupValue } from '@app/shared';
 import { NumberInputComponent } from '../number-input/number-input.component';
+import {
+  gradientToCss,
+  defaultLinearGradient,
+  defaultRadialGradient,
+  defaultConicGradient,
+  interpolateGradientColor,
+  clampPosition,
+  buildGradient,
+} from '../../../utils/gradient.utils';
 
 type StylePopupFieldKind = 'fill' | 'stroke' | 'shadow' | 'effect';
 type ColorPickerDragTarget = 'surface' | 'hue' | 'alpha' | null;
@@ -72,6 +81,7 @@ export class DropdownMenuComponent implements OnDestroy {
   readonly objectFit = input<CanvasObjectFit>('cover');
   readonly imageAltText = input('');
   readonly initialColorMode = input<ColorPickerMode>('solid');
+  readonly gradient = input<GradientFill | null>(null);
 
   // ── Outputs ───────────────────────────────────────────────
 
@@ -97,6 +107,13 @@ export class DropdownMenuComponent implements OnDestroy {
   isScreenPickerActive = false;
   isUploadingImage = false;
   imageUploadError = '';
+  // Gradient state
+  gradientStops: GradientStop[] = [
+    { color: '#FFFFFF', position: 0 },
+    { color: 'rgba(0,0,0,0)', position: 100 },
+  ];
+  gradientAngle = 90;
+  selectedStopIndex = 0;
 
   // ── Options ───────────────────────────────────────────────
 
@@ -165,6 +182,7 @@ export class DropdownMenuComponent implements OnDestroy {
   private readonly projectService = inject(ProjectService);
   private colorPickerDragTarget: ColorPickerDragTarget = null;
   private isColorGestureActive = false;
+  private gradientDragStopIndex = -1;
 
   // ── Lifecycle ─────────────────────────────────────────────
 
@@ -212,6 +230,18 @@ export class DropdownMenuComponent implements OnDestroy {
         this.selectedColorMode = initialColorMode;
       }
     });
+
+    effect(() => {
+      const gradient = this.gradient();
+      if (this.kind() === 'fill' && gradient && this.gradientDragStopIndex < 0 && !this.colorPickerDragTarget) {
+        this.gradientStops = gradient.stops.slice();
+        this.gradientAngle = 'angle' in gradient ? (gradient as { angle: number }).angle : 0;
+        const stop = this.gradientStops[this.selectedStopIndex] ?? this.gradientStops[0];
+        if (stop) {
+          this.syncPickerFromColor(stop.color);
+        }
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -228,6 +258,12 @@ export class DropdownMenuComponent implements OnDestroy {
 
   @HostListener('document:pointermove', ['$event'])
   onDocumentPointerMove(event: PointerEvent): void {
+    if (this.gradientDragStopIndex >= 0) {
+      event.preventDefault();
+      this.updateGradientStopFromBarCoordinates(event.clientX);
+      return;
+    }
+
     if (!this.colorPickerDragTarget) {
       return;
     }
@@ -248,6 +284,17 @@ export class DropdownMenuComponent implements OnDestroy {
 
   @HostListener('document:pointerup')
   onDocumentPointerUp(): void {
+    if (this.gradientDragStopIndex >= 0) {
+      this.gradientDragStopIndex = -1;
+      document.body.style.userSelect = '';
+      document.body.style.cursor = '';
+      if (this.isColorGestureActive) {
+        this.isColorGestureActive = false;
+        this.numberGestureCommitted.emit();
+      }
+      return;
+    }
+
     const hadActiveColorGesture = !!this.colorPickerDragTarget;
     this.colorPickerDragTarget = null;
     document.body.style.userSelect = '';
@@ -316,8 +363,34 @@ export class DropdownMenuComponent implements OnDestroy {
           backgroundSize: 'cover',
           backgroundRepeat: 'no-repeat',
         });
+      } else if (isGradientMode(value)) {
+        const prevMode = this.selectedColorMode;
+        // Preserve existing stops when switching between gradient types
+        const existingStops = isGradientMode(prevMode) ? this.gradientStops : null;
+        const baseColor = this.pickerColorValue();
+        let gradient: GradientFill;
+        switch (value) {
+          case 'linear':
+            gradient = defaultLinearGradient(baseColor);
+            break;
+          case 'radial':
+            gradient = defaultRadialGradient(baseColor);
+            break;
+          case 'conic':
+            gradient = defaultConicGradient(baseColor);
+            break;
+        }
+        if (existingStops && existingStops.length >= 2) {
+          gradient = { ...gradient, stops: existingStops } as GradientFill;
+        }
+        this.gradientStops = gradient.stops.slice();
+        this.gradientAngle = 'angle' in gradient ? (gradient as { angle: number }).angle : 0;
+        this.selectedStopIndex = Math.min(this.selectedStopIndex, this.gradientStops.length - 1);
+        this.patchRequested.emit({ fillMode: 'gradient', gradient, fill: undefined });
       } else {
-        this.patchRequested.emit({ fillMode: 'color' });
+        // solid
+        const solidColor = this.gradientStops[0]?.color ?? this.pickerColorValue();
+        this.patchRequested.emit({ fillMode: 'color', fill: solidColor, gradient: undefined });
       }
     }
   }
@@ -597,6 +670,111 @@ export class DropdownMenuComponent implements OnDestroy {
     this.numberGestureCommitted.emit();
   }
 
+  // ── Gradient Editor ───────────────────────────────────────
+
+  isGradientMode(): boolean {
+    return isGradientMode(this.selectedColorMode);
+  }
+
+  gradientBarBackground(): string {
+    const stops = this.gradientStops
+      .slice()
+      .sort((a, b) => a.position - b.position)
+      .map((s) => `${s.color} ${s.position}%`)
+      .join(', ');
+    // Checkerboard beneath the gradient so semi-transparent stops reveal transparency
+    return [
+      `linear-gradient(90deg, ${stops})`,
+      'linear-gradient(45deg, #4d4d4d 25%, transparent 25%) 0 0 / 8px 8px',
+      'linear-gradient(-45deg, #4d4d4d 25%, transparent 25%) 0 4px / 8px 8px',
+      'linear-gradient(45deg, transparent 75%, #4d4d4d 75%) 4px -4px / 8px 8px',
+      'linear-gradient(-45deg, transparent 75%, #4d4d4d 75%) -4px 0 / 8px 8px',
+      '#2a2a2a',
+    ].join(', ');
+  }
+
+  onGradientBarClick(event: MouseEvent): void {
+    const bar = event.currentTarget as HTMLElement;
+    const rect = bar.getBoundingClientRect();
+    const position = clampPosition(((event.clientX - rect.left) / Math.max(rect.width, 1)) * 100);
+    const color = interpolateGradientColor(
+      buildGradient(this.selectedColorMode as GradientFill['type'], this.gradientStops, this.gradientAngle),
+      position,
+    );
+    const newStop: GradientStop = { color, position };
+    this.gradientStops = [...this.gradientStops, newStop].sort((a, b) => a.position - b.position);
+    this.selectedStopIndex = this.gradientStops.findIndex((s) => s === newStop);
+    this.syncPickerFromColor(color);
+    this.emitGradientPatch();
+  }
+
+  onGradientStopMarkerDown(event: PointerEvent, index: number): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.selectedStopIndex = index;
+    this.gradientDragStopIndex = index;
+    this.beginColorGesture();
+    document.body.style.userSelect = 'none';
+    const stop = this.gradientStops[index];
+    if (stop) {
+      this.syncPickerFromColor(stop.color);
+    }
+  }
+
+  onGradientStopSelect(index: number): void {
+    this.selectedStopIndex = index;
+    const stop = this.gradientStops[index];
+    if (stop) {
+      this.syncPickerFromColor(stop.color);
+    }
+  }
+
+  onGradientStopPositionChange(value: number, index: number): void {
+    const position = clampPosition(value);
+    this.gradientStops = this.gradientStops.map((s, i) =>
+      i === index ? { ...s, position } : s,
+    );
+    this.emitGradientPatch();
+  }
+
+  onGradientStopDelete(index: number): void {
+    if (this.gradientStops.length <= 2) return;
+    this.gradientStops = this.gradientStops.filter((_, i) => i !== index);
+    this.selectedStopIndex = Math.min(this.selectedStopIndex, this.gradientStops.length - 1);
+    const stop = this.gradientStops[this.selectedStopIndex];
+    if (stop) this.syncPickerFromColor(stop.color);
+    this.emitGradientPatch();
+  }
+
+  onGradientAngleChange(value: number): void {
+    this.gradientAngle = ((value % 360) + 360) % 360;
+    this.emitGradientPatch();
+  }
+
+  private updateGradientStopFromBarCoordinates(clientX: number): void {
+    const bar = this.hostRef.nativeElement.querySelector(
+      '.field-input__gradient-bar',
+    ) as HTMLElement | null;
+    if (!bar) return;
+    const rect = bar.getBoundingClientRect();
+    const position = clampPosition(((clientX - rect.left) / Math.max(rect.width, 1)) * 100);
+    const idx = this.gradientDragStopIndex;
+    if (idx < 0 || idx >= this.gradientStops.length) return;
+    this.gradientStops = this.gradientStops.map((s, i) =>
+      i === idx ? { ...s, position } : s,
+    );
+    this.emitGradientPatch();
+  }
+
+  private emitGradientPatch(): void {
+    const gradient = buildGradient(
+      this.selectedColorMode as GradientFill['type'],
+      this.gradientStops,
+      this.gradientAngle,
+    );
+    this.patchRequested.emit({ fillMode: 'gradient', gradient });
+  }
+
   // ── Color Picker Computed ──────────────────────────────────
 
   pickerHueColor(): string {
@@ -777,7 +955,14 @@ export class DropdownMenuComponent implements OnDestroy {
   private commitPickerColor(): void {
     const colorValue = this.pickerColorValue();
     if (this.kind() === 'fill') {
-      this.patchRequested.emit({ fill: colorValue });
+      if (isGradientMode(this.selectedColorMode)) {
+        this.gradientStops = this.gradientStops.slice();
+        const idx = Math.min(this.selectedStopIndex, this.gradientStops.length - 1);
+        this.gradientStops[idx] = { ...this.gradientStops[idx], color: colorValue };
+        this.emitGradientPatch();
+      } else {
+        this.patchRequested.emit({ fill: colorValue });
+      }
       return;
     }
 
@@ -832,6 +1017,10 @@ export class DropdownMenuComponent implements OnDestroy {
 
 function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
+}
+
+function isGradientMode(mode: string): mode is 'linear' | 'radial' | 'conic' {
+  return mode === 'linear' || mode === 'radial' || mode === 'conic';
 }
 
 export function parseCssColor(

@@ -166,6 +166,8 @@ export class CanvasElementService {
         letterSpacingUnit: createdType === 'text' ? 'px' : undefined,
         lineHeight: createdType === 'text' ? 1.2 : undefined,
         lineHeightUnit: createdType === 'text' ? 'em' : undefined,
+        widthMode: createdType === 'text' ? 'fit-content' : undefined,
+        heightMode: createdType === 'text' ? 'fit-content' : undefined,
         position: this.getDefaultPositionForPlacement(createdType, selectedContainer),
         parentId,
       },
@@ -590,15 +592,18 @@ export class CanvasElementService {
     if (getCanvasSizeMode(element, axis) !== 'fit-content') {
       return `${this.getResolvedContentSizePx(element, elements, axis, page)}px`;
     }
-    // Text and layout containers (display: flex/grid/block) can use the CSS `fit-content`
-    // keyword — the browser measures intrinsic size from flow content / text nodes.
+    // Text and layout containers (display: flex/grid/block) can use CSS intrinsic-size
+    // keywords — the browser measures size from flow content / text nodes.
     // Non-layout containers have only position:absolute children, which do NOT participate
     // in intrinsic sizing, so the CSS keyword collapses the element to ~0px. Use the
     // model-computed pixel value instead, which correctly accounts for absolute children.
     const canUseCssKeyword = element.type === 'text' || this.isLayoutContainerElement(element);
-    return canUseCssKeyword
-      ? 'fit-content'
-      : `${this.getResolvedContentSizePx(element, elements, axis, page)}px`;
+    if (!canUseCssKeyword)
+      return `${this.getResolvedContentSizePx(element, elements, axis, page)}px`;
+    // Text elements use `max-content` (not `fit-content`) so they are never capped by
+    // available space in a parent container. fit-content = min(max-content, available),
+    // which constrains text inside a narrower frame and causes unexpected wrapping.
+    return element.type === 'text' ? 'max-content' : 'fit-content';
   }
 
   private getRenderedConstraintPx(

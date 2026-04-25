@@ -152,6 +152,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly gesture = inject(CanvasGestureService);
   private readonly pendingProjectFlush = inject(PendingProjectFlushService);
+  private readonly hostEl = inject(ElementRef<HTMLElement>);
 
   readonly canvasSceneRef = viewChild<ElementRef<HTMLElement>>('canvasScene');
 
@@ -472,6 +473,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     effect(() => {
       this.elements();
       this.gesture.invalidateFlowBoundsCache();
+    });
+
+    // Sync dot-grid CSS vars so the glow mask can align with the dots.
+    effect(() => {
+      const s = this.hostEl.nativeElement.style;
+      s.setProperty('--dot-size', this.viewport.canvasBackgroundSize());
+      s.setProperty('--dot-pos', this.viewport.canvasBackgroundPosition());
     });
   }
 
@@ -1198,6 +1206,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   @HostListener('window:pointermove', ['$event'])
   onPointerMove(event: MouseEvent): void {
+    const s = this.hostEl.nativeElement.style;
+    s.setProperty('--cursor-x', `${event.clientX}px`);
+    s.setProperty('--cursor-y', `${event.clientY}px`);
+
     // Update hover from DOM
     const path = event.composedPath() as Element[];
     const elementEl = path.find(

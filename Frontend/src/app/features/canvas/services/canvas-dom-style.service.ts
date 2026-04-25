@@ -15,6 +15,7 @@ import {
   hasPerSideStrokeWidths,
   getStrokeWidths,
 } from '../utils/element/canvas-element-normalization.util';
+import { gradientToCss } from '../utils/gradient.utils';
 
 export type DomStyleMap = Record<string, string | null | undefined>;
 
@@ -64,6 +65,8 @@ export class CanvasDomStyleService {
         style['background-size'] = element.backgroundSize ?? 'cover';
         style['background-position'] = element.backgroundPosition ?? 'center';
         style['background-repeat'] = element.backgroundRepeat ?? 'no-repeat';
+      } else if (element.fillMode === 'gradient' && element.gradient) {
+        style['background'] = gradientToCss(element.gradient);
       } else if (element.fill) {
         style['background-color'] = element.fill;
       }
@@ -365,8 +368,11 @@ export class CanvasDomStyleService {
       'text-align': element.textAlign ?? 'left',
       'line-height': lineHeightValue,
       'letter-spacing': letterSpacingValue,
-      'white-space': 'pre-wrap',
-      'word-break': 'break-word',
+      // For non-fixed text (fit-content / fill etc.), use white-space:pre so the browser
+      // never soft-wraps the content — the element always sizes to the text's natural width.
+      // For fixed-width text, pre-wrap is correct: text wraps within the explicit width.
+      'white-space': (element.widthMode ?? 'fixed') === 'fixed' ? 'pre-wrap' : 'pre',
+      'word-break': (element.widthMode ?? 'fixed') === 'fixed' ? 'break-word' : null,
     };
   }
 

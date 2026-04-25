@@ -32,6 +32,10 @@ public static class IrValidator
       @"|rgb\(.+\)|rgba\(.+\)|hsl\(.+\)|hsla\(.+\)|var\(--[a-zA-Z0-9_-]+\)|[a-zA-Z]+)$",
       RegexOptions.Compiled);
 
+  private static readonly Regex CssGradient = new(
+      @"^(linear-gradient|radial-gradient|conic-gradient)\(.+\)$",
+      RegexOptions.Compiled | RegexOptions.Singleline);
+
   public static bool Validate(IRNode node) => GetValidationErrors(node).Count == 0;
 
   public static IReadOnlyList<string> GetValidationErrors(IRNode node)
@@ -96,7 +100,7 @@ public static class IrValidator
   private static void ValidateStyle(IRStyle style, string path, List<string> errors)
   {
     ValidateColor(style.Color, path, "color", errors);
-    ValidateColor(style.Background, path, "background", errors);
+    ValidateBackground(style.Background, path, errors);
 
     ValidateOptionalLength(style.BorderRadius, path, "borderRadius", errors, allowNegative: false);
     ValidateOptionalLength(style.BorderTopLeftRadius, path, "borderTopLeftRadius", errors, allowNegative: false);
@@ -168,6 +172,12 @@ public static class IrValidator
 
     if (!ValidUnits.Contains(len.Unit))
       errors.Add(Error(path, field, $"Invalid unit '{len.Unit}' for {field}. Must be: px | % | rem | em | vw | vh | fit-content | auto | max-content | min-content."));
+  }
+
+  private static void ValidateBackground(string? value, string path, List<string> errors)
+  {
+    if (value is not null && !CssColor.IsMatch(value) && !CssGradient.IsMatch(value))
+      errors.Add(Error(path, "background", $"Invalid background value '{value}'."));
   }
 
   private static void ValidateColor(string? value, string path, string field, List<string> errors)

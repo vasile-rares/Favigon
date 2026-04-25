@@ -14,7 +14,7 @@ import {
 import { CanvasElement } from '@app/core';
 import { CanvasBorderWidths } from '@app/core';
 import { CanvasBorderSides } from '@app/core';
-import type { CanvasObjectFit } from '@app/core';
+import type { CanvasObjectFit, GradientFill } from '@app/core';
 import { resolveEditableCanvasShadow } from '../../../utils/element/canvas-shadow.util';
 import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component';
 
@@ -54,6 +54,7 @@ export class FieldInputComponent implements AfterViewInit, OnDestroy {
   readonly objectFit = input<CanvasObjectFit>('cover');
   readonly imageAltText = input('');
   readonly initialColorMode = input<'solid' | 'linear' | 'radial' | 'conic' | 'image'>('solid');
+  readonly gradient = input<GradientFill | null>(null);
   readonly popupTitleOverride = input('');
   readonly popupWidthOverride = input<number | null>(null);
   readonly inlineContentOnly = input(false);

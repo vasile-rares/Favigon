@@ -312,6 +312,7 @@
           [style.letter-spacing]="getTextLetterSpacing(editEl)"
           [style.text-align]="getTextAlignValue(editEl)"
           [style.color]="editEl.fill"
+          [style.white-space]="(editEl.widthMode ?? 'fixed') === 'fixed' ? 'pre-wrap' : 'pre'"
           [style.transform]="'scale(' + viewport.zoomLevel() + ')'"
           [style.transform-origin]="'0 0'"
           (pointerdown)="onTextEditorPointerDown($event)"

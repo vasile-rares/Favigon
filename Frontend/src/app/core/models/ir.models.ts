@@ -34,9 +34,21 @@ export interface IRPosition {
   left?: IRLength;
 }
 
+export interface IRGradientStop {
+  color: string;
+  position: number; // 0–100
+}
+
+export interface IRGradient {
+  type: 'linear' | 'radial' | 'conic';
+  angle?: number;
+  stops: IRGradientStop[];
+}
+
 export interface IRStyle {
   color?: string;
   background?: string;
+  gradient?: IRGradient;
   backgroundImage?: string;
   backgroundSize?: string;
   backgroundPosition?: string;
