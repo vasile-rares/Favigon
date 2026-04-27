@@ -51,6 +51,7 @@ const DEFAULT_ELEMENT_SIZE = {
 const MANAGED_PROP_KEYS = [
   'content',
   'src',
+  'svgContent',
   'name',
   'primitive',
   'sourceType',
@@ -232,6 +233,7 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
         ? readLengthUnit<CanvasTextSpacingUnit>(node.style?.lineHeight, 'em', ['px', 'em'])
         : undefined,
     imageUrl: mappedType === 'image' ? readStringProp(node.props, 'src', '') : undefined,
+    svgContent: mappedType === 'svg' ? readStringProp(node.props, 'svgContent', '') : undefined,
     linkType,
     linkPageId: readOptionalStringProp(node.props, 'linkPageId') ?? undefined,
     linkUrl: readOptionalStringProp(node.props, 'href') ?? undefined,
@@ -273,6 +275,8 @@ function mapIRType(type: string): CanvasElement['type'] {
       return 'text';
     case 'Image':
       return 'rectangle'; // Images are rectangles with fill-image background
+    case 'Svg':
+      return 'svg';
     default:
       return 'rectangle';
   }

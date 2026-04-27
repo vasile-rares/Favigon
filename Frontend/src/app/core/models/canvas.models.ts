@@ -1,6 +1,6 @@
 import { IRStyle } from './ir.models';
 
-export type CanvasElementType = 'frame' | 'rectangle' | 'text' | 'image';
+export type CanvasElementType = 'frame' | 'rectangle' | 'text' | 'image' | 'svg';
 export type CanvasTextAlign = 'left' | 'center' | 'right' | 'justify';
 export type CanvasTextVerticalAlign = 'top' | 'middle' | 'bottom';
 export type CanvasFontStyle = 'normal' | 'italic';
@@ -306,6 +306,7 @@ export interface CanvasElement {
   backgroundColor?: string;
   squircle?: number;
   imageUrl?: string;
+  svgContent?: string;
   linkType?: CanvasLinkType;
   linkPageId?: string | null;
   linkUrl?: string;

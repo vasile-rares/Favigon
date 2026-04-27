@@ -247,6 +247,7 @@ export class AppearanceSectionComponent {
     if (element.fillMode === 'gradient') {
       return element.gradient?.stops[0]?.color ?? '#000000';
     }
+    if (element.type === 'svg' && !element.fill) return 'transparent';
     const fallback = element.type === 'frame' ? this.defaultFrameFillColor : this.defaultFillColor;
     return this.toHexColorOrFallback(element.fill, fallback);
   }
@@ -278,7 +279,7 @@ export class AppearanceSectionComponent {
   }
 
   supportsCornerRadius(type: CanvasElement['type']): boolean {
-    return type !== 'text';
+    return type !== 'text' && type !== 'svg';
   }
 
   cornerRadiusMode(element: CanvasElement): CornerRadiusMode {
@@ -317,7 +318,7 @@ export class AppearanceSectionComponent {
   }
 
   hasStroke(type: CanvasElement['type']): boolean {
-    return type !== 'text';
+    return type !== 'text' && type !== 'svg';
   }
 
   hasActiveBorder(element: CanvasElement): boolean {
@@ -359,6 +360,15 @@ export class AppearanceSectionComponent {
 
   supportsShadow(type: CanvasElement['type']): boolean {
     return type !== 'text';
+  }
+
+  svgRotationValue(element: CanvasElement): number {
+    return element.rotation ?? 0;
+  }
+
+  onSvgRotationChange(value: number): void {
+    if (!Number.isFinite(value)) return;
+    this.elementPatch.emit({ rotation: value });
   }
 
   hasActiveShadow(element: CanvasElement): boolean {

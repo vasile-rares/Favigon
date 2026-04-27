@@ -66,6 +66,15 @@ export class ExtrasSectionComponent {
     { label: 'Sticky', value: 'sticky' },
   ];
 
+  readonly svgPositionOptions: DropdownSelectOption[] = [
+    { label: 'Relative', value: 'relative' },
+    { label: 'Absolute', value: 'absolute' },
+  ];
+
+  positionOptionsForElement(element: CanvasElement): DropdownSelectOption[] {
+    return element.type === 'svg' ? this.svgPositionOptions : this.positionOptions;
+  }
+
   readonly cursorOptions: DropdownSelectOption[] = [
     { label: 'Auto (inherit)', value: 'auto' },
     { label: 'Default', value: 'default' },

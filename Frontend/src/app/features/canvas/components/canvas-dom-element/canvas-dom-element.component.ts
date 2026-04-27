@@ -1,5 +1,6 @@
 import { Component, ChangeDetectionStrategy, inject, computed, input, output } from '@angular/core';
 import { NgStyle } from '@angular/common';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { CanvasElement, CanvasPageModel } from '@app/core';
 import { FlowDragRenderState } from '../../canvas.types';
 import { CanvasDomStyleService } from '../../services/canvas-dom-style.service';
@@ -18,6 +19,7 @@ type ChildItem = { kind: 'element'; child: CanvasElement } | { kind: 'placeholde
 export class CanvasDomElementComponent {
   private readonly styleService = inject(CanvasDomStyleService);
   private readonly elementService = inject(CanvasElementService);
+  private readonly sanitizer = inject(DomSanitizer);
 
   readonly element = input.required<CanvasElement>();
   readonly allElements = input.required<CanvasElement[]>();
@@ -35,6 +37,13 @@ export class CanvasDomElementComponent {
   readonly style = computed<Record<string, string | null | undefined>>(() =>
     this.styleService.buildStyle(this.element(), this.allElements(), this.page()),
   );
+
+  readonly sanitizedSvgContent = computed<SafeHtml | null>(() => {
+    const el = this.element();
+    if (el.type !== 'svg' || !el.svgContent) return null;
+    // svgContent is already sanitized at import time; just mark it trusted.
+    return this.sanitizer.bypassSecurityTrustHtml(el.svgContent);
+  });
 
   readonly strokeOverlayStyle = computed<Record<string, string | null | undefined>>(() =>
     this.styleService.buildStrokeOverlayStyle(this.element()),

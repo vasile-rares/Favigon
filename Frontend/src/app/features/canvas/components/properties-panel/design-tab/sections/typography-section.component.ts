@@ -312,7 +312,7 @@ export class TypographySectionComponent implements OnInit {
         this.elementPatch.emit({ backgroundColor: undefined });
         break;
       case 'radius':
-        this.elementPatch.emit({ cornerRadius: 0, cornerRadii: undefined });
+        this.elementPatch.emit({ cornerRadius: undefined, cornerRadii: undefined });
         break;
       case 'padding':
         this.elementPatch.emit({ padding: undefined, paddingPerSide: undefined });

@@ -7,6 +7,13 @@
   position: relative;
 }
 
+.canvas-svg-el {
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
+}
+
 /*
  * Stroke overlay — a real div rendered as the last child of .canvas-el.
  * position: absolute; inset: 0 makes it cover the same area as the parent.

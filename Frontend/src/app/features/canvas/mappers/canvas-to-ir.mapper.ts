@@ -624,6 +624,10 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
     props['src'] = element.imageUrl ?? '';
   }
 
+  if (element.type === 'svg') {
+    props['svgContent'] = element.svgContent ?? '';
+  }
+
   if (element.irMeta?.type && element.irMeta.type !== primitiveType) {
     props['sourceType'] = element.irMeta.type;
   }
@@ -675,6 +679,8 @@ function mapElementType(type: CanvasElement['type']): IRNodeType {
       return 'Text';
     case 'image':
       return 'Image';
+    case 'svg':
+      return 'Svg';
     default:
       return 'Frame';
   }

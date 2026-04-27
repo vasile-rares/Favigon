@@ -517,5 +517,6 @@ function isFlowLayoutChild(
 }
 
 export function formatCanvasElementTypeLabel(type: CanvasElementType): string {
+  if (type === 'svg') return 'SVG';
   return `${type.charAt(0).toUpperCase()}${type.slice(1)}`;
 }

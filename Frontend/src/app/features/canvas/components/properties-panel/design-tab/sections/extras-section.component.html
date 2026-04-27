@@ -1,5 +1,5 @@
 <!-- Link -->
-@if (element().type !== 'frame') {
+@if (element().type !== 'frame' && element().type !== 'svg') {
 <section
   class="properties-section properties-section--collapsible"
   [class.properties-section--compact]="!hasLink(element())"
@@ -93,7 +93,7 @@
       <app-dropdown-select
         [enableSearch]="false"
         [placeholder]="'Select position type'"
-        [options]="positionOptions"
+        [options]="positionOptionsForElement(element())"
         [ngModel]="positionValue(element())"
         (ngModelChange)="onPositionChange($event)"></app-dropdown-select>
     </div>
@@ -102,6 +102,7 @@
 }
 
 <!-- Cursor -->
+@if (element().type !== 'svg') {
 <section
   class="properties-section properties-section--collapsible"
   [class.properties-section--compact]="!hasCursor(element())"
@@ -140,9 +141,10 @@
   
 }
 </section>
+}
 
 <!-- Accessibility -->
-@if (element().type !== 'frame') {
+@if (element().type !== 'frame' && element().type !== 'svg') {
 <section
   class="properties-section properties-section--collapsible"
   [class.properties-section--compact]="!hasAccessibilityFields(element())"

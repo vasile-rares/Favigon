@@ -874,8 +874,50 @@ export class CanvasGestureService {
         // return the wrong parent origin, corrupting both the clamping and the
         // relative-position calculation below.
         const parentBounds = start.parentAbsoluteBounds;
+
+        // For flow children in layout containers, the element's canvas position can shift
+        // during resize due to flex/grid reflow (e.g. centered layouts shift the element
+        // left/right as its width changes). The gesture-start absoluteX/Y are then stale,
+        // causing the active edge to lag behind the cursor. Fix: read the current live DOM
+        // bounds each frame and anchor the resize from the element's actual current position.
+        let effectiveStart = this.resizeStart;
+        if (!start.rotation && parentBounds !== null) {
+          const parentEl = els.find((e) => e.id === el.parentId);
+          if (parentEl && this.isLayoutContainer(parentEl) && this.isChildInFlow(el)) {
+            const liveBounds = this.getLiveElementCanvasBounds(el);
+            if (liveBounds) {
+              const handle = start.handle;
+              effectiveStart = {
+                ...this.resizeStart,
+                absoluteX: liveBounds.x,
+                absoluteY: liveBounds.y,
+                width: liveBounds.width,
+                height: liveBounds.height,
+                centerX: liveBounds.x + liveBounds.width / 2,
+                centerY: liveBounds.y + liveBounds.height / 2,
+                // Anchor pointerX/Y to the current handle edge so deltaX/Y reflects
+                // the distance from the current rendered edge to the cursor each frame.
+                pointerX:
+                  liveBounds.x +
+                  (handle.includes('e')
+                    ? liveBounds.width
+                    : handle.includes('w')
+                      ? 0
+                      : liveBounds.width / 2),
+                pointerY:
+                  liveBounds.y +
+                  (handle.includes('s')
+                    ? liveBounds.height
+                    : handle.includes('n')
+                      ? 0
+                      : liveBounds.height / 2),
+              };
+            }
+          }
+        }
+
         const bounds = calculateResizedBounds(
-          this.resizeStart,
+          effectiveStart,
           parentBounds,
           pointer,
           event.shiftKey,
@@ -895,15 +937,15 @@ export class CanvasGestureService {
         let localX = bounds.x - parentOriginX;
         let localY = bounds.y - parentOriginY;
 
-        if (!start.rotation) {
-          if (start.handle.includes('w')) {
+        if (!effectiveStart.rotation) {
+          if (effectiveStart.handle.includes('w')) {
             // Right edge is fixed; re-derive x so that x + storedWidth = fixedRight.
-            const fixedAbsRight = start.absoluteX + start.width;
+            const fixedAbsRight = effectiveStart.absoluteX + effectiveStart.width;
             localX = fixedAbsRight - parentOriginX - storedWidth;
           }
-          if (start.handle.includes('n')) {
+          if (effectiveStart.handle.includes('n')) {
             // Bottom edge is fixed; re-derive y so that y + storedHeight = fixedBottom.
-            const fixedAbsBottom = start.absoluteY + start.height;
+            const fixedAbsBottom = effectiveStart.absoluteY + effectiveStart.height;
             localY = fixedAbsBottom - parentOriginY - storedHeight;
           }
         }
@@ -994,9 +1036,9 @@ export class CanvasGestureService {
     const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) return;
 
-    const cornerX = start.absoluteX + start.width;
+    const cornerX = start.absoluteX;
     const cornerY = start.absoluteY;
-    const xRadius = cornerX - pointer.x;
+    const xRadius = pointer.x - cornerX;
     const yRadius = pointer.y - cornerY;
     const rawRadius = Math.min(xRadius, yRadius);
     const maxRadius = Math.max(0, Math.min(start.width, start.height) / 2);
@@ -1839,6 +1881,63 @@ export class CanvasGestureService {
     }
 
     return newElement;
+  }
+
+  importSvgContent(svgContent: string, naturalWidth: number, naturalHeight: number): void {
+    const elements = this.editorState.elements();
+    const center = this.viewport.getViewportCenterCanvasPoint(this.getCanvasElement());
+    const x = Math.round(center.x - naturalWidth / 2);
+    const y = Math.round(center.y - naturalHeight / 2);
+    const newElement: CanvasElement = {
+      id: crypto.randomUUID(),
+      type: 'svg',
+      name: this.element.getNextElementName('svg', elements),
+      x,
+      y,
+      width: naturalWidth,
+      height: naturalHeight,
+      visible: true,
+      opacity: 1,
+      svgContent,
+      position: 'absolute',
+      parentId: null,
+    };
+    this.commitElementCreationResult({ element: newElement, error: null });
+  }
+
+  importImageAsset(assetUrl: string, naturalWidth: number, naturalHeight: number): void {
+    const elements = this.editorState.elements();
+    const center = this.viewport.getViewportCenterCanvasPoint(this.getCanvasElement());
+    const maxDim = 400;
+    const scale = Math.min(1, maxDim / Math.max(naturalWidth, naturalHeight, 1));
+    const width = Math.round(naturalWidth * scale);
+    const height = Math.round(naturalHeight * scale);
+    const x = Math.round(center.x - width / 2);
+    const y = Math.round(center.y - height / 2);
+    const newElement: CanvasElement = {
+      id: crypto.randomUUID(),
+      type: 'rectangle',
+      name: this.element.getNextElementName('image', elements),
+      x,
+      y,
+      width,
+      height,
+      visible: true,
+      opacity: 1,
+      fill: '#e0e0e0',
+      fillMode: 'image',
+      backgroundImage: assetUrl,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      objectFit: 'cover',
+      strokeWidth: 1,
+      strokeStyle: 'Solid',
+      cornerRadius: 6,
+      position: 'absolute',
+      parentId: null,
+    };
+    this.commitElementCreationResult({ element: newElement, error: null });
   }
 
   private autoGroupOnDrop(): void {

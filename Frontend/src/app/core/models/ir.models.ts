@@ -183,7 +183,7 @@ export interface IRVariant {
 }
 
 // Must match C# enum names exactly (JsonStringEnumConverter uses PascalCase names)
-export type IRNodeType = 'Frame' | 'Container' | 'Text' | 'Image';
+export type IRNodeType = 'Frame' | 'Container' | 'Text' | 'Image' | 'Svg';
 export type OverflowMode = 'Clip' | 'Visible' | 'Hidden' | 'Scroll';
 export type LayoutMode = 'Block' | 'Flex' | 'Grid';
 export type PositionMode = 'Flow' | 'Relative' | 'Absolute' | 'Fixed' | 'Sticky';

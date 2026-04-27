@@ -428,6 +428,10 @@ app-dt-transforms-effects-section {
   width: 100%;
 }
 
+.pp-style-control--dimension.pp-style-control--dimension--full {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .pp-style-control--dimension > app-number-input {
   width: 100% !important;
   min-width: 0 !important;

@@ -38,6 +38,7 @@ import { PropertiesPanelComponent } from '../../components/properties-panel/prop
 import { CanvasDomElementComponent } from '../../components/canvas-dom-element/canvas-dom-element.component';
 import { mutateNormalizeElement } from '../../utils/element/canvas-element-normalization.util';
 import { roundToTwoDecimals } from '../../utils/canvas-math.util';
+import { sanitizeSvg, parseSvgDimensions } from '../../utils/svg-sanitizer.util';
 import {
   collectSubtreeIds,
   removeWithChildren,
@@ -259,15 +260,20 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
    */
   readonly cornerRadiusHandleOffset = computed<number>(() => {
     const s = this.selectedElement();
+    const zoom = this.viewport.zoomLevel();
+    const radius = s?.cornerRadius ?? 0;
+    // Clamp to half the shortest side so the handle never exits the element boundary
+    const maxRadius = s ? Math.min(s.width, s.height) / 2 : Infinity;
+    const clampedRadius = Math.min(radius, maxRadius);
     // Enforce a minimum of 8px so the handle never overlaps the NW corner resize handle
     // (which sits at left:-4px; top:-4px). At radius=0 the handle sits at left:4; top:4.
-    return Math.max((s?.cornerRadius ?? 0) * this.viewport.zoomLevel(), 8);
+    return Math.max(clampedRadius * zoom, 8);
   });
 
   /**
-   * For a rotated element, returns the unrotated outline bounds in overlay-scene space.
-   * Uses the AABB's center (from live/cached DOM) which always equals the element's
-   * true center regardless of rotation, then places model-width × model-height around it.
+   * For a rotated/skewed/3D-transformed element, returns the un-transformed outline bounds
+   * in overlay-scene space. Uses the AABB's center (from live/cached DOM) which always equals
+   * the element's true transform-origin center, then places model-width × model-height around it.
    * This is correct even for flow children where element.x/y = 0 (CSS-determined position).
    */
   private getRotatedElementOverlayBounds(
@@ -276,7 +282,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     aabb: Bounds | null,
   ): Bounds | null {
     if (!aabb) return null;
-    // CSS rotate() keeps the center fixed, so AABB center = actual element center.
+    // CSS transforms keep the transform-origin fixed; with default 50%/50%, AABB center
+    // equals the element center regardless of rotation, skew, or 3D transform.
     const centerX = aabb.x + aabb.width / 2;
     const centerY = aabb.y + aabb.height / 2;
     // Model dimensions are correct (getAbsoluteBounds handles fill/relative sizing).
@@ -293,27 +300,74 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     };
   }
 
-  /** Rotation angle (deg) of the selected element – drives the CSS rotate on the selection outline. */
-  readonly selectionOutlineRotation = computed<number>(() => this.selectedElement()?.rotation ?? 0);
+  /** Returns true if the element has any visual CSS transform (rotation, skew, scale, 3D). */
+  private hasNonTrivialTransform(el: CanvasElement): boolean {
+    return (
+      (el.rotation ?? 0) !== 0 ||
+      (el.skewX ?? 0) !== 0 ||
+      (el.skewY ?? 0) !== 0 ||
+      (el.scaleX ?? 1) !== 1 ||
+      (el.scaleY ?? 1) !== 1 ||
+      el.rotationMode === '3d' ||
+      (el.depth ?? 0) !== 0
+    );
+  }
+
+  /**
+   * True when the element has ONLY a 2D rotation (no skew, no 3D, no scale).
+   * In this case we can apply rotate() to the outline div and it will look correct.
+   * For skew / 3D / scale the outline must use the AABB so handles are not distorted.
+   */
+  private hasOnlyRotation(el: CanvasElement): boolean {
+    return (
+      (el.rotation ?? 0) !== 0 &&
+      (el.skewX ?? 0) === 0 &&
+      (el.skewY ?? 0) === 0 &&
+      (el.scaleX ?? 1) === 1 &&
+      (el.scaleY ?? 1) === 1 &&
+      el.rotationMode !== '3d' &&
+      (el.depth ?? 0) === 0
+    );
+  }
+
+  /** Returns "rotate(Xdeg)" for pure-2D-rotation elements, null otherwise. */
+  private buildOutlineTransform(el: CanvasElement): string | null {
+    if (!this.hasOnlyRotation(el)) return null;
+    return `rotate(${el.rotation}deg)`;
+  }
+
+  /** Full CSS transform string for the selection outline (mirrors element's visual transform). */
+  readonly selectionOutlineTransform = computed<string | null>(() => {
+    const el = this.selectedElement();
+    if (!el) return null;
+    return this.buildOutlineTransform(el);
+  });
+
+  /** CSS transform-origin for the selection outline, matching the element's transform origin. */
+  readonly selectionOutlineTransformOrigin = computed<string | null>(() => {
+    const el = this.selectedElement();
+    if (!el || !this.hasOnlyRotation(el)) return null;
+    return `${el.transformOriginX ?? 50}% ${el.transformOriginY ?? 50}%`;
+  });
 
   /**
    * Bounds used purely for displaying the selection outline.
-   * When the element is rotated we use model-based unrotated bounds (x/y/width/height)
-   * and apply a CSS rotate transform, because getBoundingClientRect() returns the AABB
-   * which is too large and doesn't follow the element's orientation.
+   * When the element has any visual transform (rotate, skew, 3D, scale) we use
+   * model-based unrotated bounds and apply the transform via CSS, because
+   * getBoundingClientRect() returns the AABB which is too large and doesn't
+   * follow the element's orientation.
    */
   readonly selectionOutlineDisplayBounds = computed<Bounds | null>(() => {
     const selected = this.selectedElement();
     if (!selected) return null;
 
-    const rotation = selected.rotation ?? 0;
-    if (rotation === 0) {
-      // No rotation – use existing live-DOM-tracking bounds (accurate for flow/flex children).
+    if (!this.hasNonTrivialTransform(selected)) {
+      // No visual transform – use live-DOM-tracking bounds (accurate for flow/flex children).
       return this.selectionOverlayBounds();
     }
 
-    // Rotated element: skip live DOM (gives AABB), derive center from AABB then place
-    // unrotated dimensions around it. This is correct even for flow children (x/y = 0).
+    // Transformed element: skip live DOM (gives AABB), derive center from AABB then place
+    // model dimensions around it. This is correct even for flow children (x/y = 0).
     if (this.gesture.isDraggingEl() || this.editingTextElementId()) return null;
 
     // Register reactive dependency so bounds update while isRotating() / isResizing().
@@ -336,7 +390,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
         this.gesture.getCachedOverlaySceneBounds(selected);
     }
 
-    return this.getRotatedElementOverlayBounds(selected, this.editorState.elements(), aabb);
+    // For pure 2D rotation: show model-sized rotated box (outline is rotated via CSS).
+    // For skew / 3D / scale: use the AABB directly so handles are never stretched/distorted.
+    if (this.hasOnlyRotation(selected)) {
+      return this.getRotatedElementOverlayBounds(selected, this.editorState.elements(), aabb);
+    }
+    return aabb;
   });
 
   readonly selectionHandleMode = computed<'all' | 'ns' | 'ew' | 'none'>(() => {
@@ -369,15 +428,18 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const hovered = this.element.findElementById(hoveredId, elements);
     if (!hovered || hovered.type === 'frame') return null;
 
-    // For rotated elements, live DOM gives the AABB – derive center from it and
-    // place unrotated dimensions around it (correct even for flow children).
-    const rotation = hovered.rotation ?? 0;
-    if (rotation !== 0) {
+    // For transformed elements, live DOM gives the AABB.
+    // Pure 2D rotation: derive model-sized rotated box (outline rotated via CSS).
+    // Skew / 3D / scale: use AABB directly so the hover outline is never distorted.
+    if (this.hasNonTrivialTransform(hovered)) {
       const aabb = this.gesture.isFlowBoundsDirty()
         ? this.gesture.getCachedOverlaySceneBounds(hovered)
         : (this.gesture.getLiveOverlaySceneBounds(hovered) ??
           this.gesture.getCachedOverlaySceneBounds(hovered));
-      return this.getRotatedElementOverlayBounds(hovered, elements, aabb);
+      if (this.hasOnlyRotation(hovered)) {
+        return this.getRotatedElementOverlayBounds(hovered, elements, aabb);
+      }
+      return aabb;
     }
 
     // Same two-pass strategy as selectionOverlayBounds:
@@ -391,14 +453,28 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
   });
 
-  /** Rotation angle (deg) of the hovered element – drives CSS rotate on the hover outline. */
-  readonly hoveredOutlineRotation = computed<number>(() => {
+  /** Full CSS transform string for the hover outline (mirrors element's visual transform). */
+  readonly hoveredOutlineTransform = computed<string | null>(() => {
     const hoveredId = this.gesture.hoveredElementId();
-    if (!hoveredId) return 0;
+    if (!hoveredId) return null;
     const pageId = this.findPageIdByElementId(hoveredId);
-    if (!pageId) return 0;
+    if (!pageId) return null;
     const elements = this.getPageElementsById(pageId);
-    return this.element.findElementById(hoveredId, elements)?.rotation ?? 0;
+    const el = this.element.findElementById(hoveredId, elements);
+    if (!el) return null;
+    return this.buildOutlineTransform(el);
+  });
+
+  /** CSS transform-origin for the hover outline, matching the element's transform origin. */
+  readonly hoveredOutlineTransformOrigin = computed<string | null>(() => {
+    const hoveredId = this.gesture.hoveredElementId();
+    if (!hoveredId) return null;
+    const pageId = this.findPageIdByElementId(hoveredId);
+    if (!pageId) return null;
+    const elements = this.getPageElementsById(pageId);
+    const el = this.element.findElementById(hoveredId, elements);
+    if (!el || !this.hasOnlyRotation(el)) return null;
+    return `${el.transformOriginX ?? 50}% ${el.transformOriginY ?? 50}%`;
   });
 
   /** Overlay-space bounds for each multi-selected element. */
@@ -557,6 +633,125 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     this.selectTool(tool);
+  }
+
+  // ── File drag-and-drop ────────────────────────────────────
+
+  private readonly SUPPORTED_IMAGE_TYPES = new Set([
+    'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+    'image/avif', 'image/bmp', 'image/tiff',
+  ]);
+
+  private classifyDropFile(file: File): 'svg' | 'image' | 'unsupported' {
+    if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) return 'svg';
+    if (this.SUPPORTED_IMAGE_TYPES.has(file.type)) return 'image';
+    return 'unsupported';
+  }
+
+  readonly isFileDragOver = signal(false);
+  readonly fileImportToast = signal<{ state: 'importing' | 'done' | 'error'; message: string } | null>(null);
+  readonly isToastLeaving = signal(false);
+  private fileToastTimer: ReturnType<typeof setTimeout> | null = null;
+  private toastLeaveTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private startToastLeave(): void {
+    if (this.toastLeaveTimer) clearTimeout(this.toastLeaveTimer);
+    this.isToastLeaving.set(true);
+    this.toastLeaveTimer = setTimeout(() => {
+      this.fileImportToast.set(null);
+      this.isToastLeaving.set(false);
+    }, 200);
+  }
+
+  private showFileToast(state: 'importing' | 'done' | 'error', message: string): void {
+    if (this.fileToastTimer) clearTimeout(this.fileToastTimer);
+    if (this.toastLeaveTimer) clearTimeout(this.toastLeaveTimer);
+    this.isToastLeaving.set(false);
+    this.fileImportToast.set({ state, message });
+    if (state !== 'importing') {
+      this.fileToastTimer = setTimeout(() => this.startToastLeave(), 2800);
+    }
+  }
+
+  dismissFileToast(): void {
+    if (this.fileToastTimer) clearTimeout(this.fileToastTimer);
+    this.startToastLeave();
+  }
+
+  onCanvasDragOver(event: DragEvent): void {
+    const hasFile = Array.from(event.dataTransfer?.items ?? []).some(
+      (item) => item.kind === 'file',
+    );
+    if (!hasFile) return;
+    event.preventDefault();
+    event.dataTransfer!.dropEffect = 'copy';
+    this.isFileDragOver.set(true);
+  }
+
+  onCanvasDragLeave(event: DragEvent): void {
+    const related = event.relatedTarget as HTMLElement | null;
+    const container = event.currentTarget as HTMLElement;
+    if (!related || !container.contains(related)) {
+      this.isFileDragOver.set(false);
+    }
+  }
+
+  onCanvasDrop(event: DragEvent): void {
+    this.isFileDragOver.set(false);
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    if (!files.length) return;
+    event.preventDefault();
+
+    const file = files[0];
+    const kind = this.classifyDropFile(file);
+
+    if (kind === 'unsupported') {
+      const ext = file.name.includes('.') ? '.' + file.name.split('.').pop()!.toLowerCase() : file.type || 'unknown';
+      this.showFileToast('error', `Cannot import ${ext} files`);
+      return;
+    }
+
+    if (kind === 'svg') {
+      this.showFileToast('importing', 'Importing SVG…');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        if (!text) { this.showFileToast('error', 'Import failed'); return; }
+        try {
+          const sanitized = sanitizeSvg(text);
+          const dims = parseSvgDimensions(text);
+          this.gesture.importSvgContent(sanitized, dims.width, dims.height);
+          this.showFileToast('done', 'SVG imported');
+        } catch {
+          this.showFileToast('error', 'Import failed');
+        }
+      };
+      reader.onerror = () => this.showFileToast('error', 'Import failed');
+      reader.readAsText(file);
+      return;
+    }
+
+    // kind === 'image'
+    if (!Number.isInteger(this.projectIdAsNumber)) {
+      this.showFileToast('error', 'Save the project first');
+      return;
+    }
+    this.showFileToast('importing', 'Uploading image…');
+    this.projectService.uploadImageAsset(this.projectIdAsNumber, file).subscribe({
+      next: ({ assetUrl }) => {
+        const img = new Image();
+        img.onload = () => {
+          this.gesture.importImageAsset(assetUrl, img.naturalWidth, img.naturalHeight);
+          this.showFileToast('done', 'Image imported');
+        };
+        img.onerror = () => {
+          this.gesture.importImageAsset(assetUrl, 400, 400);
+          this.showFileToast('done', 'Image imported');
+        };
+        img.src = assetUrl;
+      },
+      error: () => this.showFileToast('error', 'Upload failed'),
+    });
   }
 
   selectTool(tool: CanvasElementType | 'select'): void {
@@ -1203,6 +1398,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   // ── Global Pointer Events ─────────────────────────────────
+
+  @HostListener('document:dragleave', ['$event'])
+  onDocumentDragLeave(event: DragEvent): void {
+    // relatedTarget is null when cursor leaves the browser viewport
+    if (event.relatedTarget === null) {
+      this.isFileDragOver.set(false);
+    }
+  }
 
   @HostListener('window:pointermove', ['$event'])
   onPointerMove(event: MouseEvent): void {

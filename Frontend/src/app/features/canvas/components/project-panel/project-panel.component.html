@@ -200,7 +200,10 @@
                   @if (usesImageLayerIcon(layer) && !isText(layer.type)) {
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
 }
-                  @if (!isFrame(layer.type) && !isRectangle(layer.type) && !isText(layer.type) && !usesImageLayerIcon(layer)) {
+                  @if (layer.type === 'svg') {
+<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L22 12L12 22L2 12Z"/></svg>
+}
+                  @if (!isFrame(layer.type) && !isRectangle(layer.type) && !isText(layer.type) && !usesImageLayerIcon(layer) && layer.type !== 'svg') {
 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
 }
                 </span>

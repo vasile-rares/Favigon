@@ -13,6 +13,7 @@ public static class AngularMapperCatalog
     new AngularFrameMapper(),
     new AngularContainerMapper(),
     new AngularTextMapper(),
-    new AngularImageMapper()
+    new AngularImageMapper(),
+    new AngularSvgMapper()
   ];
 }

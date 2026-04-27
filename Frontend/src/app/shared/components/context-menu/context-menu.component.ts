@@ -63,6 +63,10 @@ export class ContextMenuComponent implements OnInit, OnDestroy {
       const _y = this.y();
       const _items = this.items();
       const _dir = this.verticalDirection();
+      if (this.closeTimeout) {
+        clearTimeout(this.closeTimeout);
+        this.closeTimeout = null;
+      }
       this.isClosing = false;
       this.openSubmenuId = null;
       this.adjustPosition();

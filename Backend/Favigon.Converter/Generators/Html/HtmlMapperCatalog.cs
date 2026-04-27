@@ -13,6 +13,7 @@ public static class HtmlMapperCatalog
     new HtmlFrameMapper(),
     new HtmlContainerMapper(),
     new HtmlTextMapper(),
-    new HtmlImageMapper()
+    new HtmlImageMapper(),
+    new HtmlSvgMapper()
   ];
 }

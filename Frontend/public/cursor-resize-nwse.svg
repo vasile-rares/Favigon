@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="-80 -80 672 672">
+  <g transform="rotate(90 256 256)">
+
+    <!-- Outline alb (subÈ›ire, apropiat de stroke-ul principal) -->
+    <polyline points="304 96 416 96 416 208"
+      style="fill:none;stroke:#fff;stroke-linecap:round;stroke-linejoin:round;stroke-width:120px"/>
+
+    <line x1="405.77" y1="106.2" x2="111.98" y2="400.02"
+      style="fill:none;stroke:#fff;stroke-linecap:round;stroke-linejoin:round;stroke-width:120px"/>
+
+    <polyline points="208 416 96 416 96 304"
+      style="fill:none;stroke:#fff;stroke-linecap:round;stroke-linejoin:round;stroke-width:120px"/>
+
+    <!-- Stroke principal -->
+    <polyline points="304 96 416 96 416 208"
+      style="fill:none;stroke:#000;stroke-linecap:round;stroke-linejoin:round;stroke-width:68px"/>
+
+    <line x1="405.77" y1="106.2" x2="111.98" y2="400.02"
+      style="fill:none;stroke:#000;stroke-linecap:round;stroke-linejoin:round;stroke-width:68px"/>
+
+    <polyline points="208 416 96 416 96 304"
+      style="fill:none;stroke:#000;stroke-linecap:round;stroke-linejoin:round;stroke-width:68px"/>
+
+  </g>
+</svg>
+

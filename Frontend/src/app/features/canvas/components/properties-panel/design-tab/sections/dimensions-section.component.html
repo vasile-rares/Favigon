@@ -2,6 +2,7 @@
 <section class="properties-section">
   <div class="properties-section-header properties-section-header--actionable" (click)="onDimensionSectionHeaderClick($event)">
     <p class="properties-section-title">Dimensions</p>
+    @if (element().type !== 'svg') {
     <button
       type="button"
       class="pp-section-toggle pp-section-toggle--plus"
@@ -13,12 +14,13 @@
         <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
       </svg>
     </button>
+    }
   </div>
 
   <div class="pp-metric-list">
     <div class="pp-style-row pp-style-row--metric">
       <span class="pp-row-label">Width</span>
-      <div class="pp-style-control pp-style-control--dimension">
+      <div class="pp-style-control pp-style-control--dimension" [class.pp-style-control--dimension--full]="element().type === 'svg'">
         <app-number-input
           appearance="boxed"
           ariaLabel="Width"
@@ -30,6 +32,7 @@
           (gestureStarted)="onNumberInputGestureStarted()"
           (gestureCommitted)="onNumberInputGestureCommitted()"
           (valueChange)="onDimensionValueChange('width', $event)" />
+        @if (element().type !== 'svg') {
         <div class="pp-dimension-mode-control">
           <app-dropdown-select
             [enableSearch]="false"
@@ -38,12 +41,13 @@
             [ngModel]="dimensionModeValue(element(), 'width')"
             (ngModelChange)="onDimensionModeChange('width', $event)"></app-dropdown-select>
         </div>
+        }
       </div>
     </div>
 
     <div class="pp-style-row pp-style-row--metric">
       <span class="pp-row-label">Height</span>
-      <div class="pp-style-control pp-style-control--dimension">
+      <div class="pp-style-control pp-style-control--dimension" [class.pp-style-control--dimension--full]="element().type === 'svg'">
         <app-number-input
           appearance="boxed"
           ariaLabel="Height"
@@ -55,6 +59,7 @@
           (gestureStarted)="onNumberInputGestureStarted()"
           (gestureCommitted)="onNumberInputGestureCommitted()"
           (valueChange)="onDimensionValueChange('height', $event)" />
+        @if (element().type !== 'svg') {
         <div class="pp-dimension-mode-control">
           <app-dropdown-select
             [enableSearch]="false"
@@ -63,10 +68,11 @@
             [ngModel]="dimensionModeValue(element(), 'height')"
             (ngModelChange)="onDimensionModeChange('height', $event)"></app-dropdown-select>
         </div>
+        }
       </div>
     </div>
 
-    @if (hasDimensionConstraintField(element(), 'minWidth')) {
+    @if (hasDimensionConstraintField(element(), 'minWidth') && element().type !== 'svg') {
 <div class="pp-style-row pp-style-row--metric">
       <span class="pp-row-label">Min W</span>
       <div class="pp-style-control pp-style-control--dimension">
@@ -92,7 +98,7 @@
     </div>
 }
 
-    @if (hasDimensionConstraintField(element(), 'maxWidth')) {
+    @if (hasDimensionConstraintField(element(), 'maxWidth') && element().type !== 'svg') {
 <div class="pp-style-row pp-style-row--metric">
       <span class="pp-row-label">Max W</span>
       <div class="pp-style-control pp-style-control--dimension">
@@ -118,7 +124,7 @@
     </div>
 }
 
-    @if (hasDimensionConstraintField(element(), 'minHeight')) {
+    @if (hasDimensionConstraintField(element(), 'minHeight') && element().type !== 'svg') {
 <div class="pp-style-row pp-style-row--metric">
       <span class="pp-row-label">Min H</span>
       <div class="pp-style-control pp-style-control--dimension">
@@ -144,7 +150,7 @@
     </div>
 }
 
-    @if (hasDimensionConstraintField(element(), 'maxHeight')) {
+    @if (hasDimensionConstraintField(element(), 'maxHeight') && element().type !== 'svg') {
 <div class="pp-style-row pp-style-row--metric">
       <span class="pp-row-label">Max H</span>
       <div class="pp-style-control pp-style-control--dimension">

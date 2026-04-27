@@ -30,3 +30,10 @@ public sealed class HtmlFrameMapper : HtmlMapperBase
   protected override string EmitElement(IRNode node, EmitContext ctx) =>
     MapperLogic.EmitFrame(node, ctx, NodeClass, BuildLinkAttrs);
 }
+
+public sealed class HtmlSvgMapper : HtmlMapperBase
+{
+  public override string Type => "Svg";
+  protected override string EmitElement(IRNode node, EmitContext ctx) =>
+    MapperLogic.EmitSvg(node, ctx, NodeClass);
+}

@@ -65,10 +65,14 @@
       class="canvas-container"
       [class.pan-ready]="isPanReady()"
       [class.panning]="viewport.isPanning()"
+      [class.svg-drag-over]="isFileDragOver()"
       (pointerdown)="onCanvasPointerDown($event)"
       (click)="onCanvasClick($event)"
       (wheel)="onCanvasWheel($event)"
-      (contextmenu)="onCanvasContextMenu($event)">
+      (contextmenu)="onCanvasContextMenu($event)"
+      (dragover)="onCanvasDragOver($event)"
+      (dragleave)="onCanvasDragLeave($event)"
+      (drop)="onCanvasDrop($event)">
       <!-- DOM background grid -->
       <div class="dom-bg"
         [style.background-size]="viewport.canvasBackgroundSize()"
@@ -155,10 +159,11 @@
                   </svg>
                 </button>
                 @if (page.editingCanvasHeaderPageId() !== pg.id) {
-                  <div class="page-shell-name"
+                  <div class="page-shell-info"
                     (pointerdown)="$event.stopPropagation(); onPageNamePointerDown($event, pg.id)"
                     (dblclick)="$event.stopPropagation(); onPageHeaderNameDblClick(pg.id)">
-                    {{ pg.name }}
+                    <div class="page-shell-name">{{ pg.name }}</div>
+                    <div class="page-shell-device-count">{{ getRootFrames(pg).length }} Device{{ getRootFrames(pg).length !== 1 ? 's' : '' }}</div>
                   </div>
                 }
                 <button type="button" class="page-shell-add-btn"
@@ -186,7 +191,8 @@
               [style.top.px]="hb.y * viewport.zoomLevel()"
               [style.width.px]="hb.width * viewport.zoomLevel()"
               [style.height.px]="hb.height * viewport.zoomLevel()"
-              [style.transform]="hoveredOutlineRotation() ? 'rotate(' + hoveredOutlineRotation() + 'deg)' : null"></div>
+              [style.transform]="hoveredOutlineTransform()"
+              [style.transform-origin]="hoveredOutlineTransformOrigin()"></div>
           }
 
           <!-- Multi-select outlines -->
@@ -214,7 +220,8 @@
               [style.top.px]="sb.y * viewport.zoomLevel()"
               [style.width.px]="sb.width * viewport.zoomLevel()"
               [style.height.px]="sb.height * viewport.zoomLevel()"
-              [style.transform]="selectionOutlineRotation() ? 'rotate(' + selectionOutlineRotation() + 'deg)' : null"
+              [style.transform]="selectionOutlineTransform()"
+              [style.transform-origin]="selectionOutlineTransformOrigin()"
               (pointerdown)="onSelectionOutlinePointerDown($event, selectedElementId()!)"
               (dblclick)="onElementDoubleClick($event, selectedElementId()!)"
               (contextmenu)="onElementContextMenu($event, selectedElementId()!)">
@@ -232,28 +239,34 @@
                   <div class="sel-corner-zone sel-corner-ne" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'ne')"></div>
                   <div class="sel-corner-zone sel-corner-sw" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'sw')"></div>
                   <div class="sel-corner-zone sel-corner-se" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'se')"></div>
-                  <div class="corner-radius-handle"
-                    [style.left.px]="cornerRadiusHandleOffset() - 4"
-                    [style.top.px]="cornerRadiusHandleOffset() - 4"
-                    (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
+                  @if (selectedElement()?.type !== 'svg') {
+                    <div class="corner-radius-handle"
+                      [style.left.px]="cornerRadiusHandleOffset() - 4"
+                      [style.top.px]="cornerRadiusHandleOffset() - 4"
+                      (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
+                  }
                 }
                 @case ('ns') {
                   <!-- widthMode=fill: only top-center and bottom-center handles -->
                   <div class="sel-handle sel-handle-n" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'n')"></div>
                   <div class="sel-handle sel-handle-s" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 's')"></div>
-                  <div class="corner-radius-handle"
-                    [style.left.px]="cornerRadiusHandleOffset() - 4"
-                    [style.top.px]="cornerRadiusHandleOffset() - 4"
-                    (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
+                  @if (selectedElement()?.type !== 'svg') {
+                    <div class="corner-radius-handle"
+                      [style.left.px]="cornerRadiusHandleOffset() - 4"
+                      [style.top.px]="cornerRadiusHandleOffset() - 4"
+                      (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
+                  }
                 }
                 @case ('ew') {
                   <!-- heightMode=fill: only left-center and right-center handles -->
                   <div class="sel-handle sel-handle-e" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'e')"></div>
                   <div class="sel-handle sel-handle-w" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'w')"></div>
-                  <div class="corner-radius-handle"
-                    [style.left.px]="cornerRadiusHandleOffset() - 4"
-                    [style.top.px]="cornerRadiusHandleOffset() - 4"
-                    (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
+                  @if (selectedElement()?.type !== 'svg') {
+                    <div class="corner-radius-handle"
+                      [style.left.px]="cornerRadiusHandleOffset() - 4"
+                      [style.top.px]="cornerRadiusHandleOffset() - 4"
+                      (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
+                  }
                 }
               }
             </div>
@@ -345,6 +358,41 @@
       (numberInputGestureStarted)="onPropertyNumberGestureStarted()"
       (numberInputGestureCommitted)="onPropertyNumberGestureCommitted()"
       (elementPatch)="onSelectedElementPatch($event)"></app-properties-panel>
+
+    <!-- File drop overlay -->
+    @if (isFileDragOver()) {
+      <div class="svg-drop-overlay" aria-hidden="true">
+        <div class="svg-drop-overlay__inner">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <span>Drop file to import</span>
+        </div>
+      </div>
+    }
+
+    <!-- File import toast -->
+    @if (fileImportToast(); as toast) {
+      <div class="file-import-toast glass-panel" [class.file-import-toast--error]="toast.state === 'error'" [class.file-import-toast--leaving]="isToastLeaving()" role="status" aria-live="polite">
+        <div class="file-import-toast__icon">
+          @if (toast.state === 'importing') {
+            <div class="file-import-toast__spinner"></div>
+          }
+          @if (toast.state === 'done') {
+            <svg class="file-import-toast__icon--success" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          }
+          @if (toast.state === 'error') {
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          }
+        </div>
+        <span class="file-import-toast__message">{{ toast.message }}</span>
+        @if (toast.state !== 'importing') {
+          <button class="file-import-toast__dismiss" [class.file-import-toast__dismiss--error]="toast.state === 'error'" (click)="dismissFileToast()" type="button" aria-label="Dismiss">
+            Dismiss
+          </button>
+        }
+      </div>
+    }
   </div>
 </div>
 

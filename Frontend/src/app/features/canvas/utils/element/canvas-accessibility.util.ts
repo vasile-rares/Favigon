@@ -20,6 +20,7 @@ const DEFAULT_TAG_BY_TYPE: Record<CanvasElementType, CanvasSemanticTag> = {
   rectangle: 'div',
   text: 'p',
   image: 'img',
+  svg: 'div',
 };
 
 export function hasCanvasElementLink(element: Pick<CanvasElement, 'linkType'>): boolean {

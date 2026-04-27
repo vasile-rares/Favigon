@@ -144,7 +144,7 @@ export class DropdownMenuComponent implements OnDestroy {
   // Gradient state
   gradientStops: GradientStop[] = [
     { color: '#FFFFFF', position: 0 },
-    { color: 'rgba(0,0,0,0)', position: 100 },
+    { color: '#000000', position: 100 },
   ];
   gradientAngle = 90;
   selectedStopIndex = 0;

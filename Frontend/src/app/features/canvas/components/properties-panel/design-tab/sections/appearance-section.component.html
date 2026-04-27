@@ -50,6 +50,25 @@
       [value]="isVisible(element())"
       (valueChange)="setVisible($event === true)"></app-toggle-group>
   </div>
+
+  @if (element().type === 'svg') {
+  <div class="pp-style-row">
+    <span class="pp-row-label">Rotate</span>
+    <div class="pp-style-control">
+      <app-number-input
+        appearance="boxed"
+        ariaLabel="Rotation"
+        [value]="svgRotationValue(element())"
+        [min]="0"
+        [max]="360"
+        [step]="1"
+        [suffix]="'°'"
+        (gestureStarted)="onNumberInputGestureStarted()"
+        (gestureCommitted)="onNumberInputGestureCommitted()"
+        (valueChange)="onSvgRotationChange($event)"></app-number-input>
+    </div>
+  </div>
+  }
 }
 
   @if (hasFill(element().type)) {
@@ -231,7 +250,7 @@
   </div>
 }
   @for (def of activeFilterDefinitions(element()); track def.id) {
-    @if (element().type !== 'frame') {
+    @if (element().type !== 'frame' && element().type !== 'svg') {
     <div class="pp-style-row">
       <span class="pp-row-label">{{ def.label }}</span>
       <div class="pp-style-control pp-style-control--filter">

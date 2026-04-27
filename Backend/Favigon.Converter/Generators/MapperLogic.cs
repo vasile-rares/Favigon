@@ -89,4 +89,16 @@ internal static class MapperLogic
     attrs += FrameworkMapperBase.FocusAttr(node);
     return FrameworkMapperBase.Paired(tag, attrs, FrameworkMapperBase.EmitChildren(node, ctx), ctx.Indent);
   }
+
+  internal static string EmitSvg(
+    IRNode node,
+    EmitContext ctx,
+    Func<IRNode, string> nodeClass)
+  {
+    var svgContent = IrProps.GetString(node, "svgContent");
+    var attrs = nodeClass(node);
+    // Inline the raw SVG markup as the element's content.
+    // The wrapper div carries the sizing/positioning CSS class.
+    return FrameworkMapperBase.Paired("div", attrs, svgContent, ctx.Indent, inlineContent: true);
+  }
 }

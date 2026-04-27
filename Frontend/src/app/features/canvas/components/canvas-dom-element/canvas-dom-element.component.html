@@ -24,7 +24,11 @@
         [style.object-fit]="element().objectFit ?? 'cover'" />
     }
 
-    @if (element().type !== 'text' && element().type !== 'image') {
+    @if (element().type === 'svg' && sanitizedSvgContent()) {
+      <div class="canvas-svg-el" [innerHTML]="sanitizedSvgContent()"></div>
+    }
+
+    @if (element().type !== 'text' && element().type !== 'image' && element().type !== 'svg') {
       @for (item of childrenWithPlaceholder(); track trackChildItem($index, item)) {
         @if (item.kind === 'placeholder') {
           <div class="canvas-flow-placeholder" [ngStyle]="placeholderStyle()"></div>

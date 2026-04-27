@@ -52,11 +52,13 @@
         (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-dimensions-section>
 
 
-      <app-dt-layout-section
-        [element]="element"
-        (elementPatch)="elementPatch.emit($event)"
-        (numberInputGestureStarted)="numberInputGestureStarted.emit()"
-        (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-layout-section>
+      @if (element.type !== 'svg') {
+        <app-dt-layout-section
+          [element]="element"
+          (elementPatch)="elementPatch.emit($event)"
+          (numberInputGestureStarted)="numberInputGestureStarted.emit()"
+          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-layout-section>
+      }
 
       <app-dt-appearance-section
         [element]="element"
@@ -88,7 +90,7 @@
         </section>
       }
 
-      @if (element.type !== 'frame') {
+      @if (element.type !== 'frame' && element.type !== 'svg') {
         <app-dt-transforms-effects-section
           [element]="element"
           [projectId]="projectId()"

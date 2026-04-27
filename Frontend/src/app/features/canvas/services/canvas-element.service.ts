@@ -46,6 +46,7 @@ const DEFAULT_ELEMENT_DIMENSIONS: Record<CanvasElementType, { width: number; hei
   text: { width: 150, height: 40 },
   image: { width: 180, height: 120 },
   rectangle: { width: 100, height: 100 },
+  svg: { width: 200, height: 200 },
 };
 
 @Injectable()
@@ -82,6 +83,7 @@ export class CanvasElementService {
     );
     const createdType: CanvasElementType = tool === 'image' ? 'rectangle' : tool;
     const isImageFillPreset = tool === 'image';
+    const isSvg = tool === 'svg';
 
     let x = roundToTwoDecimals(pointer.x - defaultWidth / 2);
     let y = roundToTwoDecimals(pointer.y - defaultHeight / 2);
@@ -140,18 +142,20 @@ export class CanvasElementService {
         height: defaultHeight,
         visible: true,
         fill:
-          createdType === 'frame'
-            ? DEFAULT_FRAME_FILL
-            : createdType === 'text'
-              ? '#000000'
-              : DEFAULT_ELEMENT_FILL,
+          isSvg
+            ? undefined
+            : createdType === 'frame'
+              ? DEFAULT_FRAME_FILL
+              : createdType === 'text'
+                ? '#000000'
+                : DEFAULT_ELEMENT_FILL,
         fillMode: isImageFillPreset ? 'image' : undefined,
         backgroundSize: isImageFillPreset ? 'cover' : undefined,
         backgroundPosition: isImageFillPreset ? 'center' : undefined,
         backgroundRepeat: isImageFillPreset ? 'no-repeat' : undefined,
         objectFit: isImageFillPreset ? 'cover' : undefined,
-        strokeWidth: createdType === 'text' ? undefined : 1,
-        strokeStyle: createdType === 'text' ? undefined : 'Solid',
+        strokeWidth: createdType === 'text' || isSvg ? undefined : 1,
+        strokeStyle: createdType === 'text' || isSvg ? undefined : 'Solid',
         opacity: 1,
         cornerRadius: isImageFillPreset ? 6 : 0,
         text: createdType === 'text' ? '' : undefined,
