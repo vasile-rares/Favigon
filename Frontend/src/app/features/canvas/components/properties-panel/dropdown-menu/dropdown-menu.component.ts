@@ -384,7 +384,7 @@ export class DropdownMenuComponent implements OnDestroy {
     }
   }
 
-  /** Called by parent (FieldInputComponent) just before closing the popup. */
+  
   finalizeGesture(): void {
     if (this.isColorGestureActive) {
       this.isColorGestureActive = false;

@@ -137,13 +137,13 @@ export interface IRSpacing {
 export interface IRBorder {
   width?: IRLength;
   color?: string;
-  /** Defaults to 'Solid' */
+  
   style: BorderStyle;
   topWidth?: IRLength;
   rightWidth?: IRLength;
   bottomWidth?: IRLength;
   leftWidth?: IRLength;
-  /** Selective sides — if all are absent the border applies to all four sides */
+  
   top?: boolean;
   right?: boolean;
   bottom?: boolean;

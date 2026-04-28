@@ -1,4 +1,4 @@
-﻿using Favigon.Application.DTOs.Requests;
+using Favigon.Application.DTOs.Requests;
 using Favigon.Application.DTOs.Responses;
 using Favigon.Application.Interfaces;
 using Favigon.Application.Validators;
@@ -78,5 +78,4 @@ public class ConverterController(IConverterService converterService) : Controlle
         return Ok(result);
     }
 }
-
 

@@ -76,12 +76,12 @@ export class CanvasEditorStateService {
     return this.elements().filter((element) => selectedIds.has(element.id));
   });
 
-  /** O(1) lookup of any element on the current page by id. */
+  
   readonly elementMap = computed<Map<string, CanvasElement>>(() =>
     buildElementMap(this.elements()),
   );
 
-  /** O(1) lookup of children by parentId (use `null` key for root elements). */
+  
   readonly childrenMap = computed<Map<string | null, CanvasElement[]>>(() =>
     buildChildrenMap(this.elements()),
   );

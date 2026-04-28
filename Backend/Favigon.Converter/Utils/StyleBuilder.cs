@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 
 namespace Favigon.Converter.Transformers;
 
@@ -14,14 +14,12 @@ public sealed class StyleBuilder
       _baseRules.Add((cssClass, props));
   }
 
-  /// <summary>Adds a rule scoped to a CSS pseudo-class, e.g. ".class:hover { animation: ... }"</summary>
   public void AddPseudo(string cssClass, string pseudoClass, Dictionary<string, string> props)
   {
     if (props.Count > 0)
       _pseudoRules.Add(($".{cssClass}:{pseudoClass}", props));
   }
 
-  /// <summary>Adds a rule with a fully-specified CSS selector, e.g. ".class::after { ... }"</summary>
   public void AddRule(string fullSelector, Dictionary<string, string> props)
   {
     if (props.Count > 0)
@@ -36,7 +34,6 @@ public sealed class StyleBuilder
 
   public bool IsEmpty => _baseRules.Count == 0 && _pseudoRules.Count == 0 && _keyframeRules.Count == 0;
 
-  /// <summary>Returns a snapshot of all base rules as {className: {prop: value}} for diff computation.</summary>
   public IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> GetBaseRulesSnapshot()
   {
     var map = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
@@ -45,11 +42,9 @@ public sealed class StyleBuilder
     return map;
   }
 
-  /// <summary>Returns a snapshot of all pseudo-class rules as (selector, props) pairs.</summary>
   public IReadOnlyList<(string Selector, IReadOnlyDictionary<string, string> Props)> GetPseudoRulesSnapshot() =>
     _pseudoRules.Select(r => (r.Selector, (IReadOnlyDictionary<string, string>)r.Props)).ToList();
 
-  /// <summary>Returns a snapshot of all keyframe rules as (name, body) pairs.</summary>
   public IReadOnlyList<(string Name, string Body)> GetKeyframesSnapshot() =>
     [.. _keyframeRules];
 

@@ -5,7 +5,6 @@ using Favigon.Converter.Models;
 
 namespace Favigon.Converter.Utils;
 
-/// <summary>Builds CSS keyframes for configurable appear-style effects.</summary>
 public static class AnimationPresets
 {
   public static bool TryBuild(IREffect effect, out string name, out string body)

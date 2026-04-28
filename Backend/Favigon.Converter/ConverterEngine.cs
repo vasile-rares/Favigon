@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Favigon.Converter.Abstractions;
@@ -31,7 +31,6 @@ public sealed class ConverterEngine : IConverterEngine
       ["react"] = CreateMap(ReactMapperCatalog.Create()),
       ["angular"] = CreateMap(AngularMapperCatalog.Create())
     };
-
 
   public (string Html, string Css) GenerateFromCanvas(string canvasJson, string framework)
   {
@@ -326,11 +325,6 @@ public sealed class ConverterEngine : IConverterEngine
     };
   }
 
-  /// <summary>
-  /// Returns a style copy where width is overridden to 100% and height to 100vh so the page
-  /// root fills the browser viewport dynamically instead of being a fixed canvas size.
-  /// All other style properties (background, overflow, border-radius, etc.) are preserved.
-  /// </summary>
   private static IRStyle MakePageRootStyle(IRStyle? source)
   {
     var s = new IRStyle();
@@ -500,13 +494,6 @@ public sealed class ConverterEngine : IConverterEngine
 
   // ── Responsive diff helpers ───────────────────────────────
 
-  /// <summary>
-  /// Generates HTML + CSS for a primary page with responsive overrides from the given
-  /// breakpoints. Exclusive breakpoint nodes (not in primary) are appended to the HTML
-  /// hidden by default and revealed in their respective @media block. Primary-only nodes
-  /// (not in a given breakpoint) receive <c>display: none</c> in that breakpoint's @media
-  /// block.
-  /// </summary>
   private (string Html, string Css) BuildResponsiveArtifacts(
     GeneratedPageArtifacts primaryArtifacts,
     IEnumerable<(GeneratedPageArtifacts Artifacts, int ViewportWidth, string Label)> breakpoints,
@@ -546,21 +533,6 @@ public sealed class ConverterEngine : IConverterEngine
     return (htmlSb.ToString(), baseCssSb.ToString());
   }
 
-  /// <summary>
-  /// Compares primary and breakpoint styles and returns a CSS string with:
-  /// <list type="bullet">
-  /// <item>Any new <c>@keyframes</c> (in breakpoint but not in primary), placed before the @media block.</item>
-  /// <item>A <c>@media (max-width: Npx)</c> block containing:
-  ///   <list type="bullet">
-  ///   <item>Changed base-class properties (or <c>display: block</c> for exclusive BP nodes).</item>
-  ///   <item><c>display: none</c> for primary-only classes absent from the breakpoint.</item>
-  ///   <item><c>order: N</c> for reordered flex/grid children.</item>
-  ///   <item>Changed pseudo-class (hover/focus/etc.) rules.</item>
-  ///   </list>
-  /// </item>
-  /// </list>
-  /// Returns empty string when there are no differences.
-  /// </summary>
   private static string BuildBreakpointDiffCss(
     StyleBuilder primaryStyles,
     StyleBuilder bpStyles,
@@ -686,11 +658,6 @@ public sealed class ConverterEngine : IConverterEngine
     return ids;
   }
 
-  /// <summary>
-  /// Returns top-level nodes in <paramref name="bpRoot"/>'s tree whose IDs are not in
-  /// <paramref name="primaryIds"/> and have not yet been processed (<paramref name="alreadyProcessed"/>).
-  /// Does not recurse into found nodes — their entire subtree is emitted together.
-  /// </summary>
   private static List<IRNode> CollectExclusiveRoots(
     IRNode bpRoot,
     HashSet<string> primaryIds,
@@ -713,10 +680,6 @@ public sealed class ConverterEngine : IConverterEngine
     return result;
   }
 
-  /// <summary>
-  /// Emits HTML for <paramref name="node"/> and its subtree using the provided CSS class map,
-  /// accumulating generated styles into <paramref name="styles"/>.
-  /// </summary>
   private string EmitSubtree(
     IRNode node,
     IReadOnlyDictionary<string, NodeCssClasses> cssClassMap,
@@ -737,11 +700,6 @@ public sealed class ConverterEngine : IConverterEngine
 
   // ── Responsive order helpers ──────────────────────────────
 
-  /// <summary>
-  /// Detects flex/grid children whose order differs between primary and breakpoint trees.
-  /// For each such parent, emits an explicit <c>order: N</c> value for every child.
-  /// Uses the primary CSS class map so class names resolve to the HTML already emitted.
-  /// </summary>
   private static List<(string CssClass, int Order)> BuildNodeOrderDiffs(
     IRNode primaryRoot,
     IRNode bpRoot,

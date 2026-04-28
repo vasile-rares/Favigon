@@ -36,6 +36,7 @@ import { ToolbarComponent } from '../../components/toolbar/toolbar.component';
 import { ProjectPanelComponent } from '../../components/project-panel/project-panel.component';
 import { PropertiesPanelComponent } from '../../components/properties-panel/properties-panel.component';
 import { CanvasDomElementComponent } from '../../components/canvas-dom-element/canvas-dom-element.component';
+import { CanvasLoadingOverlayComponent } from '../../components/canvas-loading-overlay/canvas-loading-overlay.component';
 import { mutateNormalizeElement } from '../../utils/element/canvas-element-normalization.util';
 import { roundToTwoDecimals } from '../../utils/canvas-math.util';
 import { sanitizeSvg, parseSvgDimensions } from '../../utils/svg-sanitizer.util';
@@ -86,6 +87,7 @@ import { CanvasPageGeometryService } from '../../services/canvas-page-geometry.s
 import { CanvasGestureService } from '../../services/editor/canvas-gesture.service';
 import { CanvasDomStyleService } from '../../services/canvas-dom-style.service';
 import { firstValueFrom } from 'rxjs';
+import gsap from 'gsap';
 
 const ROOT_FRAME_INSERT_GAP = 48;
 const ELEMENT_DRAG_START_THRESHOLD = 3;
@@ -114,6 +116,7 @@ interface RectangleDrawState {
     ContextMenuComponent,
     DialogBoxComponent,
     CanvasDomElementComponent,
+    CanvasLoadingOverlayComponent,
     NgStyle,
   ],
   providers: [
@@ -135,7 +138,6 @@ interface RectangleDrawState {
   styleUrl: './canvas-page.component.css',
 })
 export class CanvasPage implements OnDestroy, AfterViewChecked {
-  /** Tracks the element id for which the text editor has already been populated. */
   private textEditorInitializedId: string | null = null;
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -183,7 +185,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
   readonly projectPanelWidth = signal(DEFAULT_PROJECT_PANEL_WIDTH);
 
-  /** Per-page children maps for O(1) parent→children lookup in templates. */
   readonly pageChildrenMaps = computed<Map<string, Map<string | null, CanvasElement[]>>>(() => {
     const result = new Map<string, Map<string | null, CanvasElement[]>>();
     for (const pg of this.pages()) {
@@ -192,12 +193,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return result;
   });
 
-  /** Stable empty map used as fallback in template bindings. */
   readonly emptyChildrenMap = new Map<string | null, CanvasElement[]>();
 
   // ── DOM Overlay Computed Signals ──────────────────────────
 
-  /** Flow drag state for DOM element rendering. */
   readonly flowDragState = computed<FlowDragRenderState | null>(() => {
     const isDragging = this.gesture.isDraggingEl();
     const draggingId = this.gesture.draggingFlowChildId();
@@ -213,7 +212,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     };
   });
 
-  /** Overlay-space bounds (scene-space: multiply by zoom for CSS) for the selection. */
   readonly selectionOverlayBounds = computed<Bounds | null>(() => {
     const selected = this.selectedElement();
     if (!selected || this.gesture.isDraggingEl() || this.editingTextElementId()) return null;
@@ -248,18 +246,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
   });
 
-  /**
-   * Which resize handle set to show for the selected element:
-   * - 'all' : corner + edge handles (no fill constraints)
-   * - 'ns'  : only top-center and bottom-center (widthMode=fill, heightMode≠fill)
-   * - 'ew'  : only left-center and right-center (heightMode=fill, widthMode≠fill)
-   * - 'none': no handles (frame, text, or both axes fill)
-   */
-  /**
-   * Pixel offset (in screen space) of the corner radius drag handle from the
-   * top-left corner of the selection outline box. Equals cornerRadius * zoomLevel.
-   * The handle center sits at (offset, offset) from top-left, tracking the radius.
-   */
   readonly cornerRadiusHandleOffset = computed<number>(() => {
     const s = this.selectedElement();
     const zoom = this.viewport.zoomLevel();
@@ -272,12 +258,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return Math.max(clampedRadius * zoom, 8);
   });
 
-  /**
-   * For a rotated/skewed/3D-transformed element, returns the un-transformed outline bounds
-   * in overlay-scene space. Uses the AABB's center (from live/cached DOM) which always equals
-   * the element's true transform-origin center, then places model-width × model-height around it.
-   * This is correct even for flow children where element.x/y = 0 (CSS-determined position).
-   */
   private getRotatedElementOverlayBounds(
     element: CanvasElement,
     elements: CanvasElement[],
@@ -302,7 +282,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     };
   }
 
-  /** Returns true if the element has any visual CSS transform (rotation, skew, scale, 3D). */
   private hasNonTrivialTransform(el: CanvasElement): boolean {
     return (
       (el.rotation ?? 0) !== 0 ||
@@ -315,11 +294,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
   }
 
-  /**
-   * True when the element has ONLY a 2D rotation (no skew, no 3D, no scale).
-   * In this case we can apply rotate() to the outline div and it will look correct.
-   * For skew / 3D / scale the outline must use the AABB so handles are not distorted.
-   */
   private hasOnlyRotation(el: CanvasElement): boolean {
     return (
       (el.rotation ?? 0) !== 0 &&
@@ -332,33 +306,23 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
   }
 
-  /** Returns "rotate(Xdeg)" for pure-2D-rotation elements, null otherwise. */
   private buildOutlineTransform(el: CanvasElement): string | null {
     if (!this.hasOnlyRotation(el)) return null;
     return `rotate(${el.rotation}deg)`;
   }
 
-  /** Full CSS transform string for the selection outline (mirrors element's visual transform). */
   readonly selectionOutlineTransform = computed<string | null>(() => {
     const el = this.selectedElement();
     if (!el) return null;
     return this.buildOutlineTransform(el);
   });
 
-  /** CSS transform-origin for the selection outline, matching the element's transform origin. */
   readonly selectionOutlineTransformOrigin = computed<string | null>(() => {
     const el = this.selectedElement();
     if (!el || !this.hasOnlyRotation(el)) return null;
     return `${el.transformOriginX ?? 50}% ${el.transformOriginY ?? 50}%`;
   });
 
-  /**
-   * Bounds used purely for displaying the selection outline.
-   * When the element has any visual transform (rotate, skew, 3D, scale) we use
-   * model-based unrotated bounds and apply the transform via CSS, because
-   * getBoundingClientRect() returns the AABB which is too large and doesn't
-   * follow the element's orientation.
-   */
   readonly selectionOutlineDisplayBounds = computed<Bounds | null>(() => {
     const selected = this.selectedElement();
     if (!selected) return null;
@@ -424,7 +388,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return 'none'; // both axes fill
   });
 
-  /** Overlay-space bounds for the hovered element (null if not applicable). */
   readonly hoveredOverlayBounds = computed<Bounds | null>(() => {
     const hoveredId = this.gesture.hoveredElementId();
     if (
@@ -468,7 +431,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
   });
 
-  /** Full CSS transform string for the hover outline (mirrors element's visual transform). */
   readonly hoveredOutlineTransform = computed<string | null>(() => {
     const hoveredId = this.gesture.hoveredElementId();
     if (!hoveredId) return null;
@@ -480,7 +442,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return this.buildOutlineTransform(el);
   });
 
-  /** CSS transform-origin for the hover outline, matching the element's transform origin. */
   readonly hoveredOutlineTransformOrigin = computed<string | null>(() => {
     const hoveredId = this.gesture.hoveredElementId();
     if (!hoveredId) return null;
@@ -492,7 +453,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return `${el.transformOriginX ?? 50}% ${el.transformOriginY ?? 50}%`;
   });
 
-  /** Overlay-space bounds for each multi-selected element. */
   readonly multiSelectOverlayBounds = computed<Bounds[]>(() => {
     const selectedElements = this.selectedElements();
     if (selectedElements.length <= 1) return [];
@@ -500,7 +460,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return selectedElements.map((el) => this.gesture.getCachedOverlaySceneBounds(el));
   });
 
-  /** Overlay-space bounds for synced selection highlight elements. */
   readonly syncedSelectionOverlayBounds = computed<Bounds[]>(() => {
     const els = this.getSyncedSelectionHighlightElements(this.selectedElements(), this.elements());
     if (els.length === 0) return [];
@@ -514,7 +473,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   // ── API / Generation State ────────────────────────────────
 
   readonly apiError = this.page.apiError;
-  readonly isLoadingDesign = signal(false);
+  readonly isLoadingDesign = signal(true);
+  readonly loadingMessage = signal('Preparing the editor...');
+  readonly loadingPercent = signal(5);
+  readonly loadingFadingOut = signal(false);
   readonly isSavingDesign = signal(false);
   readonly lastSavedAt = signal<string | null>(null);
 
@@ -571,6 +533,27 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       const s = this.hostEl.nativeElement.style;
       s.setProperty('--dot-size', this.viewport.canvasBackgroundSize());
       s.setProperty('--dot-pos', this.viewport.canvasBackgroundPosition());
+    });
+
+    // Animate toast in with GSAP when it first appears.
+    effect(() => {
+      const toast = this.fileImportToast();
+      if (toast && this.wasToastNull) {
+        this.wasToastNull = false;
+        requestAnimationFrame(() => {
+          const el = this.hostEl.nativeElement.querySelector(
+            '.file-import-toast',
+          ) as HTMLElement | null;
+          if (el) {
+            gsap.fromTo(
+              el,
+              { opacity: 0, y: 10 },
+              { opacity: 1, y: 0, duration: 0.22, ease: 'power3.out' },
+            );
+          }
+        });
+      }
+      if (!toast) this.wasToastNull = true;
     });
   }
 
@@ -706,23 +689,45 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     state: 'importing' | 'done' | 'error';
     message: string;
   } | null>(null);
-  readonly isToastLeaving = signal(false);
+  private wasToastNull = true;
+  private isToastLeaving = false;
   private fileToastTimer: ReturnType<typeof setTimeout> | null = null;
-  private toastLeaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   private startToastLeave(): void {
-    if (this.toastLeaveTimer) clearTimeout(this.toastLeaveTimer);
-    this.isToastLeaving.set(true);
-    this.toastLeaveTimer = setTimeout(() => {
+    if (this.isToastLeaving) return;
+    this.isToastLeaving = true;
+    const el = this.hostEl.nativeElement.querySelector('.file-import-toast') as HTMLElement | null;
+    if (!el) {
       this.fileImportToast.set(null);
-      this.isToastLeaving.set(false);
-    }, 200);
+      this.isToastLeaving = false;
+      return;
+    }
+    gsap.to(el, {
+      opacity: 0,
+      y: 8,
+      scale: 0.97,
+      duration: 0.2,
+      ease: 'power1.in',
+      overwrite: true,
+      onComplete: () => {
+        this.fileImportToast.set(null);
+        this.isToastLeaving = false;
+      },
+    });
   }
 
   private showFileToast(state: 'importing' | 'done' | 'error', message: string): void {
     if (this.fileToastTimer) clearTimeout(this.fileToastTimer);
-    if (this.toastLeaveTimer) clearTimeout(this.toastLeaveTimer);
-    this.isToastLeaving.set(false);
+    this.isToastLeaving = false;
+    if (this.fileImportToast()) {
+      const el = this.hostEl.nativeElement.querySelector(
+        '.file-import-toast',
+      ) as HTMLElement | null;
+      if (el) {
+        gsap.killTweensOf(el);
+        gsap.set(el, { opacity: 1, y: 0, scale: 1 });
+      }
+    }
     this.fileImportToast.set({ state, message });
     if (state !== 'importing') {
       this.fileToastTimer = setTimeout(() => this.startToastLeave(), 2800);
@@ -1809,7 +1814,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
   }
 
-  /** Returns the element currently being text-edited, or null. */
   getTextEditorElement(): CanvasElement | null {
     return this.gesture.getTextEditorElement();
   }
@@ -1901,12 +1905,29 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     this.isLoadingDesign.set(true);
+    this.loadingMessage.set('Fetching project details...');
+    this.loadingPercent.set(20);
     this.apiError.set(null);
     this.canPersistDesign = false;
+
+    const loadingStartedAt = Date.now();
+    const hideOverlay = () => {
+      const elapsed = Date.now() - loadingStartedAt;
+      const remaining = Math.max(0, 1000 - elapsed);
+      setTimeout(() => {
+        this.loadingFadingOut.set(true);
+        setTimeout(() => {
+          this.isLoadingDesign.set(false);
+          this.loadingFadingOut.set(false);
+        }, 380);
+      }, remaining);
+    };
 
     this.projectService.getBySlug(this.projectSlug).subscribe({
       next: (project) => {
         this.projectIdAsNumber = project.projectId;
+        this.loadingMessage.set('Loading design...');
+        this.loadingPercent.set(55);
         this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
           next: (response) => {
             const pages = response.pages;
@@ -1923,8 +1944,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
             this.pendingInitialPageFocusId = activePageId;
             this.lastSavedAt.set(response.updatedAt ?? null);
             this.history.resetHistory();
-            this.isLoadingDesign.set(false);
+            this.loadingMessage.set('Finishing up...');
+            this.loadingPercent.set(100);
             this.canPersistDesign = true;
+            hideOverlay();
           },
           error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
             this.apiError.set(extractApiErrorMessage(error, 'Failed to load project design.'));
@@ -2136,7 +2159,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return document.querySelector('.canvas-container') as HTMLElement | null;
   }
 
-  /** Returns the id of the topmost element with data-element-id at a given point. */
   private getTopElementIdAtPoint(x: number, y: number): string | null {
     const elements = this.visibleElements();
     let bestId: string | null = null;
@@ -2420,7 +2442,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
               const el = elements.find((e) => e.id === targetId);
               if (!el?.parentId) continue;
               const parent = elements.find((e) => e.id === el.parentId);
-              if (!parent || parent.type !== 'frame' || parent.heightMode !== 'fit-content') continue;
+              if (!parent || parent.type !== 'frame' || parent.heightMode !== 'fit-content')
+                continue;
               if (!fitContentFrameHeights.has(parent.id)) {
                 fitContentFrameHeights.set(
                   parent.id,

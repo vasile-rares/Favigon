@@ -1,6 +1,5 @@
 namespace Favigon.Converter.Utils;
 
-/// <summary>String constants for the supported output framework names.</summary>
 public static class FrameworkNames
 {
   public const string Html = "html";

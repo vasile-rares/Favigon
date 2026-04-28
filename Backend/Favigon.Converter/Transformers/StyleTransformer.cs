@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using Favigon.Converter.Models;
 
 namespace Favigon.Converter.Transformers;
@@ -198,11 +198,6 @@ public static class StyleTransformer
     _ => "solid"
   };
 
-  /// <summary>
-  /// Formats a dimension (width/height) as an integer px value when the unit is px,
-  /// or falls back to the standard IRLength string for other units (%, vw, vh, fit-content…).
-  /// Sub-pixel precision has no practical value for element dimensions in a design tool.
-  /// </summary>
   private static string FormatDimensionPx(IRLength len) =>
     len.Unit == "px" ? $"{(int)Math.Round(len.Value)}px" : len.ToString();
 }

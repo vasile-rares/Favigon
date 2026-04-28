@@ -66,13 +66,7 @@ export function generateThumbnailFromCanvas(
 
 export function generateThumbnail(
   page: CanvasPageModel | null,
-  /**
-   * Optional map of element-id → scene-space bounds read from the live DOM.
-   * Provide this to get accurate positions for flow children (whose model x/y is 0)
-   * and correct AABB dimensions for rotated elements.
-   * The map uses scene-space coords (origin at top-left of the canvas scene, zoom=1).
-   * pageLayout.x/y must be subtracted to convert to element canvas space.
-   */
+  
   domBounds?: Map<string, Bounds> | null,
   pageLayoutX = 0,
   pageLayoutY = 0,

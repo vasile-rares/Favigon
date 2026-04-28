@@ -1,7 +1,4 @@
-/**
- * Converts a base64 data URL (image/jpeg, image/png, or image/webp) to a Blob.
- * Returns null if the input is null, empty, or not a valid image data URL.
- */
+
 export function dataUrlToBlob(dataUrl: string | null): Blob | null {
   if (!dataUrl) {
     return null;

@@ -124,11 +124,7 @@ export class GoogleFontsService {
 
   readonly fontList: GoogleFont[] = GOOGLE_FONTS;
 
-  /**
-   * Loads a Google Font (all common weights) by injecting a <link> tag into <head>.
-   * Idempotent — calling twice for the same family is a no-op.
-   * System fonts are skipped.
-   */
+  
   loadFont(family: string): void {
     const font = this.fontList.find((f) => f.family === family);
     if (!font || font.category === 'system') return;
@@ -145,7 +141,7 @@ export class GoogleFontsService {
     this.document.head.appendChild(link);
   }
 
-  /** Preload the initial font used by a text element on canvas init. */
+  
   ensureLoaded(family: string | undefined | null): void {
     if (family) this.loadFont(family);
   }

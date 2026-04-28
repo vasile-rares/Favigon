@@ -687,10 +687,7 @@ export class CanvasElementService {
 
   // ── Fit-Content Container Sizing ──────────────────────────
 
-  /**
-   * Computes the intrinsic content size for a container (rectangle/frame)
-   * with fit-content sizing, matching CSS intrinsic sizing semantics.
-   */
+  
   private computeContainerFitContentSize(
     container: CanvasElement,
     children: CanvasElement[],
@@ -704,11 +701,7 @@ export class CanvasElementService {
     return this.computeFreeContainerFitContent(children, elements, axis, page);
   }
 
-  /**
-   * For layout containers (display: flex/grid/block), computes intrinsic
-   * content size based on flex direction, gaps, and margins.
-   * Fill children contribute 0 intrinsic size on the main axis (like CSS).
-   */
+  
   private computeLayoutContainerFitContent(
     container: CanvasElement,
     children: CanvasElement[],
@@ -762,10 +755,7 @@ export class CanvasElementService {
     return Math.max(contentSize, 1);
   }
 
-  /**
-   * For non-layout containers (no display mode), computes fit-content
-   * from absolute child positions + resolved sizes.
-   */
+  
   private computeFreeContainerFitContent(
     children: CanvasElement[],
     elements: CanvasElement[],
@@ -781,11 +771,7 @@ export class CanvasElementService {
     return Math.max(maxExtent, 1);
   }
 
-  /**
-   * Computes a child's box size without referencing the parent's size,
-   * avoiding circular dependencies when the parent has fit-content sizing.
-   * For fill/relative children (parent-dependent), uses the raw stored value.
-   */
+  
   private getChildIntrinsicBoxSize(
     child: CanvasElement,
     elements: CanvasElement[],

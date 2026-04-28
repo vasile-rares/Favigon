@@ -1,4 +1,4 @@
-﻿import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   AbstractControl,
@@ -16,13 +16,6 @@ import { TextInputComponent, ActionButtonComponent, DIALOG_BOX_IMPORTS } from '@
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const CREDENTIAL_MAX_LENGTH = 100;
 
-/**
- * Validates password complexity:
- * - Minimum 8 characters
- * - At least one lowercase letter
- * - At least one uppercase letter
- * - At least one digit
- */
 function passwordStrengthValidator(): ValidatorFn {
   return (control: AbstractControl): ValidationErrors | null => {
     if (!control.value) {
@@ -345,7 +338,7 @@ export class AuthPage implements OnInit {
 
   // --- Private Helpers ---
 
-  /** Cross-field validator for password matching attached to the FormGroup */
+  
   private passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
     const password = group.get('password')?.value;
     const confirmControl = group.get('confirmPassword');

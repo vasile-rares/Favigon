@@ -3,7 +3,6 @@ using Favigon.Converter.Models;
 
 namespace Favigon.Converter.Utils;
 
-/// <summary>Shared prop extraction helpers for IRNode.Props.</summary>
 internal static class IrProps
 {
   internal static string GetString(IRNode node, string key, string defaultValue = "")

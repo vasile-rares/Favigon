@@ -18,7 +18,7 @@ export interface ContextMenuItem {
   shortcut?: string;
   variant?: 'danger';
   disabled?: boolean;
-  /** Render a separator line before this item */
+  
   separator?: boolean;
   children?: ContextMenuItem[];
   action?: () => void;

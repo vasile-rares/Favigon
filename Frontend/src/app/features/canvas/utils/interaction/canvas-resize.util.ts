@@ -3,10 +3,6 @@ import type { Bounds, Point, ResizeState } from '../../canvas.types';
 
 const MIN_RESIZE_SIZE = 1;
 
-/**
- * Rotation-aware resize: projects the mouse delta into the element's local frame
- * and computes new dimensions + position while keeping the opposite anchor fixed.
- */
 function calculateRotatedResizedBounds(
   start: ResizeState,
   pointer: Point,

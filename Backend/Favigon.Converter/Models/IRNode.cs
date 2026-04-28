@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
@@ -209,13 +209,6 @@ public class IRLength
     CssKeywordUnits.Contains(Unit) ? Unit : $"{Value}{Unit}";
 }
 
-/// <summary>
-/// Tolerant deserializer for IRLength.
-/// Handles three AI-generated formats:
-///   1. { "value": 16, "unit": "px" }   — correct
-///   2. { "value": "16px", "unit": "px" } — value is a string
-///   3. "16px"  — entire length is a plain CSS string
-/// </summary>
 internal sealed class IRLengthConverter : JsonConverter<IRLength>
 {
   private static readonly Regex CssLengthRegex = new(

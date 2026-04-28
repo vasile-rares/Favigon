@@ -3,11 +3,6 @@ using Favigon.Converter.Utils;
 
 namespace Favigon.Converter.Generators;
 
-/// <summary>
-/// Framework-agnostic mapper implementations.
-/// Framework-specific behaviour (class attribute name, link href format, image src syntax)
-/// is injected via delegates so the same logic runs for HTML, Angular, and React.
-/// </summary>
 internal static class MapperLogic
 {
   internal static string EmitText(

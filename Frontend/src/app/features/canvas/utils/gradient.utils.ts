@@ -55,10 +55,6 @@ export function defaultConicGradient(baseColor: string): ConicGradientFill {
   };
 }
 
-/**
- * Returns the interpolated color at a given position (0–100) in the gradient.
- * Simplified: returns the color of the nearest left stop.
- */
 export function interpolateGradientColor(gradient: GradientFill, position: number): string {
   const sorted = [...gradient.stops].sort((a, b) => a.position - b.position);
   if (sorted.length === 0) return '#000000';

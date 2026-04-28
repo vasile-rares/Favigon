@@ -184,7 +184,6 @@ export function hasPerSideStrokeWidths(element: CanvasElement): boolean {
   return widths.top !== widths.right || widths.top !== widths.bottom || widths.top !== widths.left;
 }
 
-/** Mutates `element` in place to enforce minimum sizes, valid ranges, and frame constraints. */
 export function mutateNormalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
   element.width = Math.max(MIN_SIZE, element.width);
   element.height = Math.max(MIN_SIZE, element.height);

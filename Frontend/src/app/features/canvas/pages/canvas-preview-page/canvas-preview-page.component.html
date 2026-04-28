@@ -4,7 +4,7 @@
     appearance="preview"
     (runPreviewClicked)="refreshPreview()">
 
-    <!-- Left extra: back, device select, w/h inputs -->
+    
     <div header-left-extra class="preview-nav-left">
       <button type="button" class="preview-back-btn" (click)="goBack()" aria-label="Back to editor">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
@@ -47,7 +47,7 @@
       </div>
     </div>
 
-    <!-- Center: address bar + reload -->
+    
     <div header-center class="preview-nav-center">
       <div class="preview-address-bar">
         <svg class="preview-address-bar__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -107,7 +107,7 @@
             frameborder="0"></iframe>
         </div>
 
-        <!-- Resize handles -->
+        
         <div
           class="resize-handle resize-handle--right"
           (pointerdown)="onResizeHandlePointerDown($event, 'right')">

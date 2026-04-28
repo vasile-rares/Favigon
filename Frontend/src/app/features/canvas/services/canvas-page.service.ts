@@ -1211,7 +1211,7 @@ export class CanvasPageService {
     };
   }
 
-  /** Used internally by applyPageSelection — requires canvas DOM reference. */
+  
   private getCanvasElement(): HTMLElement | null {
     // The canvas element reference is held by the component.
     // The service accesses it through focusPageSmooth's parameter.
@@ -1219,7 +1219,7 @@ export class CanvasPageService {
     return this._canvasElement;
   }
 
-  /** The component sets this so internal focus calls can reach the DOM. */
+  
   private _canvasElement: HTMLElement | null = null;
 
   setCanvasElement(el: HTMLElement | null): void {

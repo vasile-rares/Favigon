@@ -1,4 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using Favigon.Application.DTOs.Requests;
@@ -385,11 +385,6 @@ public class AuthService : IAuthService
     });
     _audit.OAuthProviderLinked(userId, provider);
   }
-
-
-
-
-
 
   private async Task<string> GenerateUniqueUsernameAsync(string candidate)
   {

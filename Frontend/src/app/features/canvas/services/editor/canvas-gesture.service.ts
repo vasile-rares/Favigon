@@ -80,13 +80,7 @@ export class CanvasGestureService {
   readonly draggingFlowChildId = signal<string | null>(null);
   readonly layoutDropTarget = signal<{ containerId: string; index: number } | null>(null);
   readonly autoOpenFillPopupElementId = signal<string | null>(null);
-  /**
-   * Stable (DOM-settled) overlay-scene bounds for the currently selected element,
-   * together with the element ID they belong to. Updated in markFlowBoundsCacheClean()
-   * after ngAfterViewChecked (DOM fully settled). Also used during the dirty phase to
-   * avoid the 1-frame teleport on property changes. The element ID guard prevents using
-   * stale bounds from a previously selected element after a selection change.
-   */
+  
   readonly stableSelectionBounds = signal<{ elementId: string; bounds: Bounds } | null>(null);
 
   private readonly _flowCacheVersion = signal(0);
@@ -94,12 +88,7 @@ export class CanvasGestureService {
     return this._flowCacheVersion.asReadonly();
   }
 
-  /**
-   * Bounds (canvas-space) captured the moment text editing begins, before Angular's CD
-   * collapses the canvas element (fit-content elements shrink to 0 once their
-   * .canvas-text-wrapper is removed by the @if guard). Used by getTextEditorDisplayBounds
-   * so the editor is sized and positioned correctly even for fit-content text.
-   */
+  
   private textEditorCapturedBounds: Bounds | null = null;
 
   // ── Private gesture state ─────────────────────────────────
@@ -1486,11 +1475,7 @@ export class CanvasGestureService {
 
   // ── Live bounds ───────────────────────────────────────────
 
-  /**
-   * Non-reactive snapshot of overlay-scene bounds from live DOM.
-   * Safe to call outside a reactive context (ngAfterViewChecked, gesture starters).
-   * Does NOT register a dependency on _flowCacheVersion.
-   */
+  
   private snapshotOverlaySceneBounds(el: CanvasElement): Bounds | null {
     const sceneEl = this.getCanvasElement()?.querySelector<HTMLElement>('.canvas-scene') ?? null;
     if (!sceneEl) return null;
@@ -1507,11 +1492,7 @@ export class CanvasGestureService {
     };
   }
 
-  /**
-   * Reads every rendered canvas element from the DOM and returns a map of
-   * element-id → scene-space bounds (zoom=1). Used by the thumbnail generator
-   * to get accurate positions for flow children whose model x/y is 0.
-   */
+  
   snapshotAllElementSceneBounds(): Map<string, Bounds> {
     const result = new Map<string, Bounds>();
     const sceneEl = this.getCanvasElement()?.querySelector<HTMLElement>('.canvas-scene') ?? null;
@@ -1753,7 +1734,7 @@ export class CanvasGestureService {
     // ngAfterViewChecked once Angular has rendered the @if block. Nothing to do here.
   }
 
-  /** Public so CanvasPage.ngAfterViewChecked can call it after setting textContent. */
+  
   placeTextEditorCaretAtEnd(editor: HTMLElement): void {
     const selection = window.getSelection();
     if (!selection) return;

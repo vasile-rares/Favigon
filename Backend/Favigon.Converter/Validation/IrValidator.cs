@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using Favigon.Converter.Models;
 
 namespace Favigon.Converter.Validation;
@@ -20,7 +20,6 @@ public static class IrValidator
     "Navbar", "Sidebar", "Modal", "Drawer", "Tooltip",
     "Tabs", "Accordion", "Breadcrumb", "Pagination", "Divider",
   ];
-
 
   private static readonly HashSet<string> ValidBreakpoints = ["xs", "sm", "md", "lg", "xl", "2xl"];
   private static readonly HashSet<int> ValidFontWeights = [100, 200, 300, 400, 500, 600, 700, 800, 900];

@@ -1,4 +1,4 @@
-﻿<!-- ===== Effects ===== -->
+
 <section
   class="properties-section properties-section--collapsible"
   [class.properties-section--compact]="!hasEffects(element())"
@@ -38,7 +38,6 @@
 
 @switch (effectPopupView(i)) {
 
-              <!-- Main view -->
               @case ('main') {
 
                 <div class="pp-effect-popup-section">
@@ -583,16 +582,12 @@
 
 }
 
-
-
 }
-
 
                 </div>
 
 }
 
-              <!-- Transition subview -->
               @case ('transition') {
 
                 <div class="pp-effect-popup-section pp-effect-popup-section--transition">
@@ -658,7 +653,6 @@
 
 }
 
-              <!-- Fill subview -->
               @case ('fill') {
 
                 <div class="pp-effect-popup-section pp-effect-popup-section--transition">
@@ -688,7 +682,6 @@
 
 }
 
-              <!-- Shadow subview -->
               @case ('shadow') {
 
                 <div class="pp-effect-popup-section pp-effect-popup-section--transition">

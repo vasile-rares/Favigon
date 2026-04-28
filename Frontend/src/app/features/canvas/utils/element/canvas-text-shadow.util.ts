@@ -68,10 +68,6 @@ function copyEditableTextShadow(shadow: EditableTextShadow): EditableTextShadow 
   return { ...shadow };
 }
 
-/**
- * Builds a CSS mask-image data URL for a squircle shape.
- * squircle is 0–100 (0 = no effect, 100 = maximum corner smoothing).
- */
 export function buildSquircleMaskImage(squircle: number): string {
   const s = Math.max(0, Math.min(100, squircle)) / 100;
   if (s <= 0) return '';

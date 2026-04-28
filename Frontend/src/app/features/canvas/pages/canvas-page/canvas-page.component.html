@@ -73,18 +73,18 @@
       (dragover)="onCanvasDragOver($event)"
       (dragleave)="onCanvasDragLeave($event)"
       (drop)="onCanvasDrop($event)">
-      <!-- DOM background grid -->
+
       <div class="dom-bg"
         [style.background-size]="viewport.canvasBackgroundSize()"
         [style.background-position]="viewport.canvasBackgroundPosition()"></div>
 
-      <!-- DOM world (pan transform) -->
+
       <div class="dom-world" [style.transform]="viewport.canvasViewportTransform()">
-        <!-- Scene (zoom transform) -->
+
         <div class="dom-scene canvas-scene" #canvasScene [style.transform]="viewport.canvasSceneTransform()">
           @for (pg of pages(); track pg.id) {
             @if (page.getPageLayoutById(pg.id); as pgLayout) {
-              <!-- Page background hit-area: sits BEHIND canvas elements so it only fires when blank page area is clicked -->
+
               <div class="dom-page-bg"
                 [class.dom-page-bg--active]="pg.id === currentPageId()"
                 [style.left.px]="pgLayout.x"
@@ -113,7 +113,7 @@
             }
           }
 
-          <!-- Rectangle draw preview -->
+
           @if (gesture.rectangleDrawPreview(); as preview) {
             @if (page.activePageLayout(); as previewLayout) {
               <div class="rect-draw-preview"
@@ -124,7 +124,7 @@
             }
           }
 
-          <!-- Flow drag ghost -->
+
           @if (flowDragState(); as fds) {
             @if (page.activePageLayout(); as pgLayout) {
               <div class="flow-drag-ghost"
@@ -136,17 +136,17 @@
           }
         </div>
 
-        <!-- Overlay (panned but NOT scaled) -->
+
         <div class="dom-overlay">
           @for (pg of pages(); track pg.id) {
-            <!-- Page shell border (visual only, no pointer-events) -->
+
             <div class="page-shell-bg"
               [class.page-shell-bg--active]="pg.id === currentPageId()"
               [ngStyle]="getPageShellStyle(pg.id)">
             </div>
 
             @if (viewport.zoomLevel() >= 0.3) {
-              <!-- Page header toolbar -->
+
               <div class="page-shell-header"
                 [class.page-shell-header--active]="pg.id === currentPageId()"
                 [class.page-shell-header--selected]="pg.id === page.selectedCanvasPageId()"
@@ -172,7 +172,7 @@
                 </button>
               </div>
 
-              <!-- Frame title labels -->
+
               @for (frame of getRootFrames(pg); track frame.id) {
                 <div class="frame-title"
                   [class.frame-title--active]="pg.id === currentPageId()"
@@ -184,7 +184,7 @@
             }
           }
 
-          <!-- Hover outline -->
+
           @if (hoveredOverlayBounds(); as hb) {
             <div class="hover-outline"
               [style.left.px]="hb.x * viewport.zoomLevel()"
@@ -195,7 +195,7 @@
               [style.transform-origin]="hoveredOutlineTransformOrigin()"></div>
           }
 
-          <!-- Multi-select outlines -->
+
           @for (mb of multiSelectOverlayBounds(); track $index) {
             <div class="multi-select-outline"
               [style.left.px]="mb.x * viewport.zoomLevel()"
@@ -204,7 +204,7 @@
               [style.height.px]="mb.height * viewport.zoomLevel()"></div>
           }
 
-          <!-- Synced selection outlines -->
+
           @for (sb of syncedSelectionOverlayBounds(); track $index) {
             <div class="synced-selection-outline"
               [style.left.px]="sb.x * viewport.zoomLevel()"
@@ -213,7 +213,7 @@
               [style.height.px]="sb.height * viewport.zoomLevel()"></div>
           }
 
-          <!-- Selection outline with handles -->
+
           @if (selectionOutlineDisplayBounds(); as sb) {
             <div class="selection-outline"
               [style.left.px]="sb.x * viewport.zoomLevel()"
@@ -227,7 +227,7 @@
               (contextmenu)="onElementContextMenu($event, selectedElementId()!)">
               @switch (selectionHandleMode()) {
                 @case ('text-fit-fit') {
-                  <!-- Both axes fit-content: single bottom-center handle — drag down/up to resize font size -->
+
                   <div class="sel-handle sel-handle-s" (pointerdown)="$event.stopPropagation(); onFontSizeResizeHandlePointerDown($event, selectedElementId()!)"></div>
                 }
                 @case ('all') {
@@ -251,7 +251,7 @@
                   }
                 }
                 @case ('ns') {
-                  <!-- widthMode=fill: only top-center and bottom-center handles -->
+
                   <div class="sel-handle sel-handle-n" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'n')"></div>
                   <div class="sel-handle sel-handle-s" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 's')"></div>
                   @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
@@ -262,7 +262,7 @@
                   }
                 }
                 @case ('ew') {
-                  <!-- heightMode=fill: only left-center and right-center handles -->
+
                   <div class="sel-handle sel-handle-e" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'e')"></div>
                   <div class="sel-handle sel-handle-w" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'w')"></div>
                   @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
@@ -276,7 +276,7 @@
             </div>
           }
 
-          <!-- Snap lines -->
+
           @for (line of gesture.snapLines(); track $index) {
             @if (page.activePageLayout(); as layout) {
               @if (line.type === 'vertical') {
@@ -291,7 +291,7 @@
         </div>
       </div>
 
-      <!-- Page name inline editor — appears when user double-clicks a page name in PixiJS -->
+
       @if (page.editingCanvasHeaderPageId(); as editingPageId) {
         <input
           class="page-name-editor"
@@ -308,7 +308,7 @@
           (dblclick)="$event.stopPropagation()" />
       }
 
-      <!-- Inline text editor overlay — positioned absolutely over the PixiJS canvas -->
+
       @if (getTextEditorElement(); as editEl) {
         <div
           class="text-inline-editor"
@@ -366,7 +366,7 @@
       (numberInputGestureCommitted)="onPropertyNumberGestureCommitted()"
       (elementPatch)="onSelectedElementPatch($event)"></app-properties-panel>
 
-    <!-- File drop overlay -->
+
     @if (isFileDragOver()) {
       <div class="svg-drop-overlay" aria-hidden="true">
         <div class="svg-drop-overlay__inner">
@@ -378,9 +378,9 @@
       </div>
     }
 
-    <!-- File import toast -->
+
     @if (fileImportToast(); as toast) {
-      <div class="file-import-toast glass-panel" [class.file-import-toast--error]="toast.state === 'error'" [class.file-import-toast--leaving]="isToastLeaving()" role="status" aria-live="polite">
+      <div class="file-import-toast glass-panel" [class.file-import-toast--error]="toast.state === 'error'" role="status" aria-live="polite">
         <div class="file-import-toast__icon">
           @if (toast.state === 'importing') {
             <div class="file-import-toast__spinner"></div>
@@ -401,6 +401,13 @@
       </div>
     }
   </div>
+
+  @if (isLoadingDesign()) {
+    <app-canvas-loading-overlay
+      [message]="loadingMessage()"
+      [percent]="loadingPercent()"
+      [fadingOut]="loadingFadingOut()" />
+  }
 </div>
 
 @if (contextMenu.isOpen()) {

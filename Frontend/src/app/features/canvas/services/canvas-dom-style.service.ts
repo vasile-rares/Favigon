@@ -278,11 +278,7 @@ export class CanvasDomStyleService {
     return style;
   }
 
-  /**
-   * Applies flex-grow / flex-shrink / align-self correctly based on the parent
-   * flex container's main axis, so fill mode is respected per-axis.
-   * Only relevant when the element is a flow child inside a flex parent.
-   */
+  
   private buildFlexChildStyle(
     element: CanvasElement,
     parent: CanvasElement | null | undefined,
@@ -340,10 +336,7 @@ export class CanvasDomStyleService {
     return style;
   }
 
-  /**
-   * Removes explicit fill dimensions for grid children so the browser's default
-   * align-self: stretch / justify-self: stretch can size the item to its grid cell.
-   */
+  
   private buildGridChildStyle(
     element: CanvasElement,
     parent: CanvasElement | null | undefined,
@@ -425,10 +418,7 @@ export class CanvasDomStyleService {
     };
   }
 
-  /**
-   * Stroke overlay is unused when border is rendered directly on the element.
-   * Returns an empty map for all elements.
-   */
+  
   buildStrokeOverlayStyle(_element: CanvasElement): DomStyleMap {
     return {};
   }

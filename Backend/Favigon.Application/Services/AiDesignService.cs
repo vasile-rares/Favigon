@@ -23,9 +23,6 @@ public partial class AiDesignService(IAiClient aiClient, ILogger<AiDesignService
   [GeneratedRegex(@"```(?:json)?\s*\n?([\s\S]*?)\n?\s*```")]
   private static partial Regex CodeFenceRegex();
 
-  /// <summary>
-  /// Strips markdown code fences and extracts the first JSON object from raw AI output.
-  /// </summary>
   private static string ExtractJson(string raw)
   {
     var trimmed = raw.Trim();

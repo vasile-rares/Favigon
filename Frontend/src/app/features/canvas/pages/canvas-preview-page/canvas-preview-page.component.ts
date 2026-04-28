@@ -70,7 +70,7 @@ export class CanvasPreviewPage {
   readonly generatedHtml = signal('');
   readonly generatedCss = signal('');
 
-  /** Manual resize overrides (null = use frame preset size). */
+  
   readonly resizeWidth = signal<number | null>(null);
   readonly resizeHeight = signal<number | null>(null);
   readonly isResizing = signal(false);
@@ -172,14 +172,7 @@ export class CanvasPreviewPage {
     return frame ? frame.height : 720;
   });
 
-  /**
-   * Build a self-contained HTML document string for the preview iframe.
-   *
-   * Security: the HTML/CSS is generated server-side by the Converter from the
-   * project's IR tree — it is NOT raw user input.  The iframe uses
-   * `sandbox=""` (most restrictive: no scripts, no same-origin, no popups),
-   * so even if malicious content were injected it cannot execute.
-   */
+  
   readonly iframeSrcdoc = computed<SafeHtml>(() => {
     const html = this.generatedHtml();
     const css = this.generatedCss();

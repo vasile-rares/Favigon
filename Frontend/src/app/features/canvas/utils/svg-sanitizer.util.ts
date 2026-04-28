@@ -1,10 +1,4 @@
-/**
- * Sanitizes an SVG string by removing potentially dangerous elements and
- * attributes, then returns safe markup suitable for [innerHTML] rendering.
- *
- * Uses the HTML parser (text/html) for maximum compatibility with real-world
- * SVG files that may contain HTML entities, encoding quirks, or non-strict XML.
- */
+
 export function sanitizeSvg(svgString: string): string {
   const parser = new DOMParser();
   // Use the HTML parser — much more lenient than 'image/svg+xml' and handles
@@ -49,10 +43,6 @@ export function sanitizeSvg(svgString: string): string {
   return rootSvg.outerHTML;
 }
 
-/**
- * Parses the natural dimensions of an SVG from its width/height attributes
- * or viewBox. Returns a safe size (capped at 800×600, min 24×24).
- */
 export function parseSvgDimensions(svgString: string): { width: number; height: number } {
   const parser = new DOMParser();
   const doc = parser.parseFromString(`<body>${svgString}</body>`, 'text/html');
