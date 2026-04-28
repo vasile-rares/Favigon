@@ -194,3 +194,8 @@
   left: auto;
   right: calc(100% + 0.75rem);
 }
+
+.context-menu__submenu--above {
+  top: auto;
+  bottom: -0.3rem;
+}

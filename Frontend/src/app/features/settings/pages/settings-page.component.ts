@@ -1,8 +1,17 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  AfterViewInit,
+  inject,
+  OnInit,
+  signal,
+  viewChild,
+} from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
+import gsap from 'gsap';
 import {
   AuthService,
   UserService,
@@ -43,12 +52,14 @@ const PROFILE_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/av
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
 })
-export class SettingsPage implements OnInit {
+export class SettingsPage implements OnInit, AfterViewInit {
   private readonly authService = inject(AuthService);
   private readonly userService = inject(UserService);
   private readonly currentUser = inject(CurrentUserService);
   private readonly router = inject(Router);
   private readonly fallbackAvatarUrl = FALLBACK_AVATAR_URL;
+
+  private readonly tabContentRef = viewChild<ElementRef<HTMLElement>>('tabContent');
 
   activeTab: 'account' | 'password' | 'linked-accounts' = 'account';
 
@@ -103,6 +114,25 @@ export class SettingsPage implements OnInit {
   setActiveTab(tab: 'account' | 'password' | 'linked-accounts') {
     this.activeTab = tab;
     this.statusMessage.set(null);
+    requestAnimationFrame(() => {
+      const el = this.tabContentRef()?.nativeElement;
+      if (el)
+        gsap.fromTo(
+          el,
+          { opacity: 0, y: 8 },
+          { opacity: 1, y: 0, duration: 0.25, ease: 'power3.out' },
+        );
+    });
+  }
+
+  ngAfterViewInit(): void {
+    const el = this.tabContentRef()?.nativeElement;
+    if (el)
+      gsap.fromTo(
+        el,
+        { opacity: 0, y: 8 },
+        { opacity: 1, y: 0, duration: 0.3, ease: 'power3.out' },
+      );
   }
 
   get accountAvatarUrl(): string {

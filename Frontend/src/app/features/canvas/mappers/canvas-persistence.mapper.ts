@@ -169,10 +169,6 @@ function normalizeCanvasCoordinate(value: unknown, fallback: number): number {
 
 // ── Data Migration: v2 (content-box) → v3 (border-box) ─────────────────
 
-/**
- * Migrates a document to the current version if needed.
- * v2 → v3: element.width/height stored as content-box → border-box (content + padding).
- */
 function migrateDocumentIfNeeded(doc: CanvasProjectDocument): CanvasProjectDocument {
   const version = parseFloat(doc.version) || 2.0;
   if (version >= 3.0) {
@@ -190,10 +186,6 @@ function migrateDocumentIfNeeded(doc: CanvasProjectDocument): CanvasProjectDocum
   };
 }
 
-/**
- * Converts a v2 element (content-box) to v3 (border-box) by adding padding
- * to width, height, and fixed constraints.
- */
 function migrateElementContentBoxToBorderBox(element: CanvasElement): CanvasElement {
   const paddingH = (element.padding?.left ?? 0) + (element.padding?.right ?? 0);
   const paddingV = (element.padding?.top ?? 0) + (element.padding?.bottom ?? 0);

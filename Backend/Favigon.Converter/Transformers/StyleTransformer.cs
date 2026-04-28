@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using Favigon.Converter.Models;
 
 namespace Favigon.Converter.Transformers;
@@ -39,6 +39,19 @@ public static class StyleTransformer
     if (style.FontFamily is not null) css["font-family"] = style.FontFamily;
     if (style.FontStyle is not null) css["font-style"] = style.FontStyle;
     if (style.TextAlign is not null) css["text-align"] = style.TextAlign;
+    if (style.TextShadow is not null) css["text-shadow"] = style.TextShadow;
+    if (style.TextTransform is not null) css["text-transform"] = style.TextTransform;
+    if (style.TextWrap is not null) css["text-wrap"] = style.TextWrap;
+    if (style.WhiteSpace is not null) css["white-space"] = style.WhiteSpace;
+    if (style.WordBreak is not null) css["word-break"] = style.WordBreak;
+    if (style.TextDecorationLine is not null)
+    {
+      css["text-decoration-line"] = style.TextDecorationLine;
+      if (style.TextDecorationColor is not null) css["text-decoration-color"] = style.TextDecorationColor;
+      if (style.TextDecorationStyle is not null) css["text-decoration-style"] = style.TextDecorationStyle;
+      if (style.TextDecorationThickness is not null) css["text-decoration-thickness"] = style.TextDecorationThickness;
+    }
+    if (style.BackgroundColor is not null) css["background-color"] = style.BackgroundColor;
     if (style.LineHeight is not null) css["line-height"] = style.LineHeight.ToString();
     if (style.LetterSpacing is not null) css["letter-spacing"] = style.LetterSpacing.ToString();
     if (style.Overflow is not null) css["overflow"] = style.Overflow.Value.ToString().ToLower();
@@ -52,12 +65,12 @@ public static class StyleTransformer
 
     if (style.Cursor is not null) css["cursor"] = style.Cursor;
 
-    if (style.Width is not null) css["width"] = style.Width.ToString();
-    if (style.Height is not null) css["height"] = style.Height.ToString();
-    if (style.MinWidth is not null) css["min-width"] = style.MinWidth.ToString();
-    if (style.MaxWidth is not null) css["max-width"] = style.MaxWidth.ToString();
-    if (style.MinHeight is not null) css["min-height"] = style.MinHeight.ToString();
-    if (style.MaxHeight is not null) css["max-height"] = style.MaxHeight.ToString();
+    if (style.Width is not null) css["width"] = FormatDimensionPx(style.Width);
+    if (style.Height is not null) css["height"] = FormatDimensionPx(style.Height);
+    if (style.MinWidth is not null) css["min-width"] = FormatDimensionPx(style.MinWidth);
+    if (style.MaxWidth is not null) css["max-width"] = FormatDimensionPx(style.MaxWidth);
+    if (style.MinHeight is not null) css["min-height"] = FormatDimensionPx(style.MinHeight);
+    if (style.MaxHeight is not null) css["max-height"] = FormatDimensionPx(style.MaxHeight);
 
     if (style.Padding is not null) ApplySpacing(css, "padding", style.Padding);
     if (style.Margin is not null) ApplySpacing(css, "margin", style.Margin);
@@ -184,4 +197,7 @@ public static class StyleTransformer
     Models.BorderStyle.Double => "double",
     _ => "solid"
   };
+
+  private static string FormatDimensionPx(IRLength len) =>
+    len.Unit == "px" ? $"{(int)Math.Round(len.Value)}px" : len.ToString();
 }

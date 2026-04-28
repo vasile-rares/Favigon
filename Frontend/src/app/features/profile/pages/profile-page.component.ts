@@ -1,6 +1,17 @@
 import { DatePipe } from '@angular/common';
-import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  OnInit,
+  computed,
+  effect,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import gsap from 'gsap';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -54,6 +65,28 @@ export class ProfilePage implements OnInit {
   private readonly currentUser = inject(CurrentUserService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+
+  private readonly projectsGridRef = viewChild<ElementRef<HTMLElement>>('projectsGrid');
+  private projectsAnimated = false;
+  private readonly _animateCards = effect(() => {
+    if (this.projects().length > 0 && !this.projectsAnimated) {
+      this.projectsAnimated = true;
+      requestAnimationFrame(() => {
+        const grid = this.projectsGridRef()?.nativeElement;
+        if (!grid) return;
+        const cards = Array.from(grid.querySelectorAll<HTMLElement>('app-project-card'));
+        if (cards.length > 0) {
+          gsap.from(cards, {
+            y: 20,
+            opacity: 0,
+            duration: 0.45,
+            stagger: 0.07,
+            ease: 'power3.out',
+          });
+        }
+      });
+    }
+  });
 
   readonly profile = signal<UserProfile | null>(null);
   readonly isOwnProfile = signal(false);

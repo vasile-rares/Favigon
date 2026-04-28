@@ -194,6 +194,38 @@
           <path d="M4.25 11.2L6.85 8.45C7.05 8.24 7.39 8.23 7.6 8.42L8.95 9.62C9.16 9.81 9.5 9.8 9.7 9.58L10.65 8.57C10.85 8.35 11.19 8.33 11.41 8.53L12 9.05V11.2H4.25Z" fill="currentColor" fill-opacity="0.82" />
         </svg>
 }
+        @if (option.icon === 'grow-auto-width') {
+<svg class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          
+          <rect x="5" y="5.5" width="6" height="1.5" rx="0.75" fill="currentColor"/>
+          <rect x="5" y="9" width="4.5" height="1.5" rx="0.75" fill="currentColor" fill-opacity="0.38"/>
+          
+          <path d="M3.25 6.25L1.5 7.75L3.25 9.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          
+          <path d="M12.75 6.25L14.5 7.75L12.75 9.25" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+}
+        @if (option.icon === 'grow-auto-height') {
+<svg class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          
+          <rect x="3" y="2.5" width="10" height="1.1" rx="0.55" fill="currentColor" fill-opacity="0.45"/>
+          
+          <rect x="3" y="5" width="10" height="1.5" rx="0.75" fill="currentColor"/>
+          <rect x="3" y="7.5" width="7.5" height="1.5" rx="0.75" fill="currentColor" fill-opacity="0.38"/>
+          
+          <path d="M8 10V12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M6 11L8 13L10 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+}
+        @if (option.icon === 'grow-fixed') {
+<svg class="toggle-group__icon-svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+          
+          <rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          
+          <rect x="4.5" y="5.5" width="7" height="1.5" rx="0.75" fill="currentColor"/>
+          <rect x="4.5" y="9" width="5.5" height="1.5" rx="0.75" fill="currentColor" fill-opacity="0.38"/>
+        </svg>
+}
       </span>
 }
       @if (option.label) {

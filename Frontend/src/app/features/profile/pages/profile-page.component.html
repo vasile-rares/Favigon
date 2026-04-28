@@ -184,7 +184,7 @@
                     }
                   </div>
                 } @else {
-                  <div class="projects-grid">
+                  <div #projectsGrid class="projects-grid">
                     @for (project of filteredProjects(); track project.id) {
                       <app-project-card
                         [project]="project"

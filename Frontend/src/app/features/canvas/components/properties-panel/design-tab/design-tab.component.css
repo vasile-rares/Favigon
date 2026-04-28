@@ -1,4 +1,4 @@
-﻿app-design-tab {
+app-design-tab {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -9,8 +9,8 @@ app-design-tab > * {
   min-width: 0;
 }
 
-app-dt-extras-section,
-app-dt-transforms-effects-section {
+app-dt-transforms-section,
+app-dt-effects-section {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -59,6 +59,10 @@ app-dt-transforms-effects-section {
     grid-template-columns: var(--pp-text-label-width) minmax(0, 1fr);
     align-items: center;
     gap: var(--pp-row-gap);
+  }
+
+  .pp-style-row--corner-radius {
+    align-items: start;
   }
 
   .pp-row-label {
@@ -422,6 +426,10 @@ app-dt-transforms-effects-section {
   align-items: center;
   gap: 0.35rem;
   width: 100%;
+}
+
+.pp-style-control--dimension.pp-style-control--dimension--full {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .pp-style-control--dimension > app-number-input {
@@ -974,6 +982,26 @@ app-dt-transforms-effects-section {
   font-size: var(--canvas-panel-font-size);
   color: var(--canvas-panel-section-muted-color);
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Removable controls (control + remove btn inline) ─────────── */
+.pp-style-control--removable {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.pp-style-control--removable > app-field-input,
+.pp-style-control--removable > app-toggle-group,
+.pp-style-control--removable > app-dropdown-select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pp-corner-radius-header--removable {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 22px;
 }
 
 /* ── Filter rows ─────────────────────────────────────────────── */

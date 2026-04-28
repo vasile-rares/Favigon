@@ -14,11 +14,22 @@ import {
 import { CanvasElement } from '@app/core';
 import { CanvasBorderWidths } from '@app/core';
 import { CanvasBorderSides } from '@app/core';
-import type { CanvasObjectFit } from '@app/core';
+import type {
+  CanvasObjectFit,
+  GradientFill,
+  CanvasTextDecorationLine,
+  CanvasTextDecorationStyle,
+} from '@app/core';
 import { resolveEditableCanvasShadow } from '../../../utils/element/canvas-shadow.util';
 import { DropdownMenuComponent } from '../dropdown-menu/dropdown-menu.component';
 
-type StylePopupFieldKind = 'fill' | 'stroke' | 'shadow' | 'effect';
+type StylePopupFieldKind =
+  | 'fill'
+  | 'stroke'
+  | 'shadow'
+  | 'effect'
+  | 'text-shadow'
+  | 'text-decoration';
 type PopoverElement = HTMLElement & {
   showPopover?: () => void;
   hidePopover?: () => void;
@@ -54,11 +65,20 @@ export class FieldInputComponent implements AfterViewInit, OnDestroy {
   readonly objectFit = input<CanvasObjectFit>('cover');
   readonly imageAltText = input('');
   readonly initialColorMode = input<'solid' | 'linear' | 'radial' | 'conic' | 'image'>('solid');
+  readonly gradient = input<GradientFill | null>(null);
   readonly popupTitleOverride = input('');
   readonly popupWidthOverride = input<number | null>(null);
   readonly inlineContentOnly = input(false);
   readonly activationPatch = input<Partial<CanvasElement> | null>(null);
   readonly clearPatch = input<Partial<CanvasElement> | null>(null);
+  readonly solidColorOnly = input(false);
+  readonly hideClearButton = input(false);
+  readonly textShadowValue = input<string | null>(null);
+  readonly textDecorationLine = input<CanvasTextDecorationLine | null>(null);
+  readonly textDecorationColor = input<string | null>(null);
+  readonly textDecorationStyle = input<CanvasTextDecorationStyle | null>(null);
+  readonly textDecorationThickness = input<number | null>(null);
+  readonly textDecorationThicknessUnit = input<'px' | 'em'>('px');
 
   readonly patchRequested = output<Partial<CanvasElement>>();
   readonly clearRequested = output<void>();
@@ -122,6 +142,10 @@ export class FieldInputComponent implements AfterViewInit, OnDestroy {
         return 'Shadow';
       case 'effect':
         return 'Effect';
+      case 'text-shadow':
+        return 'Text Shadow';
+      case 'text-decoration':
+        return 'Decoration';
       default:
         return '';
     }
@@ -145,6 +169,10 @@ export class FieldInputComponent implements AfterViewInit, OnDestroy {
         return 'Remove shadow';
       case 'effect':
         return 'Remove effect';
+      case 'text-shadow':
+        return 'Remove text shadow';
+      case 'text-decoration':
+        return 'Remove decoration';
       default:
         return 'Clear';
     }
@@ -229,6 +257,18 @@ export class FieldInputComponent implements AfterViewInit, OnDestroy {
 
   get isShadowSwatchTransparent(): boolean {
     return (parseCssColorAlpha(this.shadowSwatchColor) ?? 1) <= 0.001;
+  }
+
+  get textShadowSwatchColor(): string {
+    const val = this.textShadowValue();
+    if (!val) return 'rgba(0,0,0,0.4)';
+    // Parse last token as color (text-shadow format: x y blur color)
+    const parts = val.trim().split(/\s+/);
+    return parts.slice(3).join(' ') || 'rgba(0,0,0,0.4)';
+  }
+
+  get textDecorationSwatchColor(): string {
+    return this.textDecorationColor() ?? this.swatchColor() ?? '#000000';
   }
 
   private closePopup(): void {

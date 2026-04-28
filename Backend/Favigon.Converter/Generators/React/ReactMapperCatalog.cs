@@ -13,6 +13,7 @@ public static class ReactMapperCatalog
     new ReactFrameMapper(),
     new ReactContainerMapper(),
     new ReactTextMapper(),
-    new ReactImageMapper()
+    new ReactImageMapper(),
+    new ReactSvgMapper()
   ];
 }

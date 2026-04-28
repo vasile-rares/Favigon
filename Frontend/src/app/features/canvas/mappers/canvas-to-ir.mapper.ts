@@ -29,6 +29,7 @@ import {
   length,
   px,
 } from '@app/core';
+import { gradientToCss } from '../utils/gradient.utils';
 import {
   buildCanvasElementBackfaceVisibility,
   buildCanvasElementTransform,
@@ -233,7 +234,9 @@ function buildNodeLayout(element: CanvasElement): IRLayout | undefined {
     if (element.flexDirection) layout.direction = mapFlexDirection(element.flexDirection);
     if (element.flexWrap !== undefined) layout.wrap = element.flexWrap === 'wrap';
     if (element.justifyContent) layout.justify = mapJustifyContent(element.justifyContent);
-    if (element.alignItems) layout.align = mapAlignItems(element.alignItems);
+    // Always emit align: canvas default is 'flex-start', CSS default is 'stretch'.
+    // Without this, exported HTML would use stretch instead of what the canvas shows.
+    layout.align = mapAlignItems(element.alignItems ?? 'flex-start');
     if (typeof element.gap === 'number') layout.gap = px(element.gap);
   }
   if (element.display === 'grid') {
@@ -347,12 +350,22 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
   applyNodeConstraintStyle(style, element, 'minHeight');
   applyNodeConstraintStyle(style, element, 'maxHeight');
 
-  if (element.fill && element.fillMode !== 'image') {
+  if (element.fill && element.fillMode !== 'image' && element.fillMode !== 'gradient') {
     if (element.type === 'text') {
       style.color = element.fill;
     } else {
       style.background = element.fill;
     }
+  }
+
+  if (element.fillMode === 'gradient' && element.gradient) {
+    style.background = gradientToCss(element.gradient);
+    style.gradient = {
+      type: element.gradient.type,
+      angle:
+        'angle' in element.gradient ? (element.gradient as { angle: number }).angle : undefined,
+      stops: element.gradient.stops.map((s) => ({ color: s.color, position: s.position })),
+    };
   }
 
   if (element.fillMode === 'image' && element.backgroundImage) {
@@ -485,6 +498,37 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
     if (typeof element.letterSpacing === 'number') {
       style.letterSpacing = length(element.letterSpacing, element.letterSpacingUnit ?? 'px');
     }
+
+    if (element.backgroundColor) {
+      style.backgroundColor = element.backgroundColor;
+    }
+    if (element.textShadow) {
+      style.textShadow = element.textShadow;
+    }
+    if (element.textTransform && element.textTransform !== 'inherit') {
+      style.textTransform = element.textTransform;
+    }
+    if (element.textBalance === true) {
+      style.textWrap = 'balance';
+    }
+
+    // For fixed-width text, ensure the browser wraps long lines — mirrors canvas behaviour.
+    const widthMode = element.widthMode ?? 'fixed';
+    if (widthMode === 'fixed') {
+      style.whiteSpace = 'pre-wrap';
+      style.wordBreak = 'break-word';
+    } else {
+      style.whiteSpace = 'pre';
+    }
+    if (element.textDecorationLine) {
+      style.textDecorationLine = element.textDecorationLine;
+      if (element.textDecorationColor) style.textDecorationColor = element.textDecorationColor;
+      if (element.textDecorationStyle) style.textDecorationStyle = element.textDecorationStyle;
+      if (element.textDecorationThickness != null) {
+        const unit = element.textDecorationThicknessUnit ?? 'px';
+        style.textDecorationThickness = `${element.textDecorationThickness}${unit}`;
+      }
+    }
   }
 
   if (element.padding) style.padding = buildIRSpacing(element.padding);
@@ -529,10 +573,10 @@ function applyNodeDimensionStyle(
   }
 
   if (mode === 'fixed' || mode === 'fit-image') {
-    // Canvas stores border-box (content + padding); CSS border-box also includes stroke.
-    // Add only the stroke/border width for the CSS value.
+    // Canvas stores border-box (content + padding). CSS also uses border-box (with global
+    // box-sizing: border-box reset), so the border is inset — no adjustment needed.
     const base = axis === 'width' ? element.width : element.height;
-    style[axis] = px(base + getBorderBoxAdjustment(element, axis));
+    style[axis] = px(base);
     return;
   }
 
@@ -565,9 +609,9 @@ function applyNodeConstraintStyle(
     return;
   }
 
-  // Fixed constraints are border-box (content + padding) on canvas; add stroke for CSS.
-  const axis: 'width' | 'height' = field.toLowerCase().includes('width') ? 'width' : 'height';
-  style[field] = px((pixels as number) + getBorderBoxAdjustment(element, axis));
+  // Fixed constraints are border-box (content + padding) on canvas; CSS also uses border-box,
+  // so no stroke adjustment is needed.
+  style[field] = px(pixels as number);
 }
 
 function buildNodeProps(element: CanvasElement, primitiveType: string): Record<string, unknown> {
@@ -587,6 +631,10 @@ function buildNodeProps(element: CanvasElement, primitiveType: string): Record<s
 
   if (element.type === 'image') {
     props['src'] = element.imageUrl ?? '';
+  }
+
+  if (element.type === 'svg') {
+    props['svgContent'] = element.svgContent ?? '';
   }
 
   if (element.irMeta?.type && element.irMeta.type !== primitiveType) {
@@ -640,6 +688,8 @@ function mapElementType(type: CanvasElement['type']): IRNodeType {
       return 'Text';
     case 'image':
       return 'Image';
+    case 'svg':
+      return 'Svg';
     default:
       return 'Frame';
   }
@@ -804,18 +854,6 @@ function resolveCanvasBorderSideWidth(
   return typeof element.strokeWidth === 'number'
     ? Math.max(0, element.strokeWidth)
     : DEFAULT_STROKE_WIDTH;
-}
-
-/**
- * Returns the stroke/border width total for an axis.
- * Canvas stores border-box (content + padding); CSS border-box also includes stroke.
- * Only the stroke portion needs to be added for IR output.
- */
-function getBorderBoxAdjustment(element: CanvasElement, axis: 'width' | 'height'): number {
-  return axis === 'width'
-    ? resolveCanvasBorderSideWidth(element, 'left') + resolveCanvasBorderSideWidth(element, 'right')
-    : resolveCanvasBorderSideWidth(element, 'top') +
-        resolveCanvasBorderSideWidth(element, 'bottom');
 }
 
 function normalizeExternalLinkUrl(value: string | undefined): string | undefined {

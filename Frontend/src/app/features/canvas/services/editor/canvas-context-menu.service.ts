@@ -109,21 +109,6 @@ export class CanvasContextMenuService {
         })),
       },
 
-      // Transform group
-      {
-        id: 'flip-h',
-        label: 'Flip Horizontal',
-        disabled: !hasElement,
-        separator: true,
-        action: guardAction((id) => callbacks.flipHorizontal(id)),
-      },
-      {
-        id: 'flip-v',
-        label: 'Flip Vertical',
-        disabled: !hasElement,
-        action: guardAction((id) => callbacks.flipVertical(id)),
-      },
-
       // Element group
       {
         id: 'rename',

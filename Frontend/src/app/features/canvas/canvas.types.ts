@@ -63,6 +63,14 @@ export interface ResizeState {
   aspectRatio: number;
   elementId: string;
   handle: HandlePosition;
+  
+  parentAbsoluteBounds: Bounds | null;
+  
+  rotation: number;
+  
+  isFontSizeResize?: boolean;
+  
+  startFontSizePx?: number;
 }
 
 export interface RotateState {

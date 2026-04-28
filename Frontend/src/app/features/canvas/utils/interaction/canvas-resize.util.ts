@@ -3,6 +3,118 @@ import type { Bounds, Point, ResizeState } from '../../canvas.types';
 
 const MIN_RESIZE_SIZE = 1;
 
+function calculateRotatedResizedBounds(
+  start: ResizeState,
+  pointer: Point,
+  preserveAspectRatio: boolean,
+  scaleFromCenter: boolean,
+): Bounds {
+  const rad = (start.rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  // Local unit vectors in scene space (CSS clockwise rotation)
+  const ux = cos; // local X (rightward in element)
+  const uy = sin;
+  const vx = -sin; // local Y (downward in element)
+  const vy = cos;
+
+  const cx = start.centerX;
+  const cy = start.centerY;
+  const w = start.width;
+  const h = start.height;
+  const dx = pointer.x - start.pointerX;
+  const dy = pointer.y - start.pointerY;
+
+  const handle = start.handle;
+  const isEdgeHandle = handle === 'n' || handle === 's' || handle === 'e' || handle === 'w';
+  // Sign of the drag handle on each local axis (0 = not on that axis edge)
+  const hx = handle.includes('e') ? 1 : handle.includes('w') ? -1 : 0;
+  const hy = handle.includes('s') ? 1 : handle.includes('n') ? -1 : 0;
+
+  const minSize = MIN_RESIZE_SIZE;
+
+  if (scaleFromCenter) {
+    // Alt: resize from center – project delta onto local axes, apply symmetrically
+    const localDx = dx * ux + dy * uy;
+    const localDy = dx * vx + dy * vy;
+    let newW = Math.max(minSize, w + (hx !== 0 ? hx * localDx * 2 : 0));
+    let newH = Math.max(minSize, h + (hy !== 0 ? hy * localDy * 2 : 0));
+
+    if (preserveAspectRatio && !isEdgeHandle) {
+      const aspect = start.aspectRatio || 1;
+      const scaleX = newW / Math.max(w, 1);
+      const scaleY = newH / Math.max(h, 1);
+      const scale = Math.max(
+        minSize / Math.max(w, 1),
+        Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY,
+      );
+      newW = Math.max(minSize, w * scale);
+      newH = Math.max(minSize, newW / aspect);
+    }
+
+    return {
+      x: roundToTwoDecimals(cx - newW / 2),
+      y: roundToTwoDecimals(cy - newH / 2),
+      width: roundToTwoDecimals(newW),
+      height: roundToTwoDecimals(newH),
+    };
+  }
+
+  // Normal resize: anchor the opposite corner/edge center in scene space.
+  const anchorX = cx + ((-hx * w) / 2) * ux + ((-hy * h) / 2) * vx;
+  const anchorY = cy + ((-hx * w) / 2) * uy + ((-hy * h) / 2) * vy;
+
+  // Old handle position in scene space.
+  const oldHandleX = cx + ((hx * w) / 2) * ux + ((hy * h) / 2) * vx;
+  const oldHandleY = cy + ((hx * w) / 2) * uy + ((hy * h) / 2) * vy;
+
+  // New handle position after mouse moved.
+  const newHandleX = oldHandleX + dx;
+  const newHandleY = oldHandleY + dy;
+
+  // Diagonal vector from anchor to new handle.
+  const diagX = newHandleX - anchorX;
+  const diagY = newHandleY - anchorY;
+
+  // Project onto local axes to get new dimensions.
+  // The diagonal goes from anchor toward the handle; for handles in the -1 direction
+  // (NW, N, W etc.) the vector is in the negative local-axis direction, so we multiply
+  // by hx/hy to flip the sign and get the correct positive dimension.
+  let newW = hx * (diagX * ux + diagY * uy); // dot(diag, localX) × hx-sign
+  let newH = hy * (diagX * vx + diagY * vy); // dot(diag, localY) × hy-sign
+
+  // Edge handles: keep the orthogonal dimension unchanged.
+  if (hx === 0) newW = w;
+  if (hy === 0) newH = h;
+
+  if (preserveAspectRatio && !isEdgeHandle) {
+    const aspect = start.aspectRatio || 1;
+    const scaleX = newW / Math.max(w, 1);
+    const scaleY = newH / Math.max(h, 1);
+    const scale = Math.max(
+      minSize / Math.max(w, 1),
+      Math.abs(scaleX - 1) >= Math.abs(scaleY - 1) ? scaleX : scaleY,
+    );
+    newW = Math.max(minSize, w * scale);
+    newH = Math.max(minSize, newW / aspect);
+  }
+
+  newW = Math.max(minSize, newW);
+  newH = Math.max(minSize, newH);
+
+  // New element center: move the anchor to the midpoint between anchor and new handle.
+  const newCx = anchorX + ((hx * newW) / 2) * ux + ((hy * newH) / 2) * vx;
+  const newCy = anchorY + ((hx * newW) / 2) * uy + ((hy * newH) / 2) * vy;
+
+  // x/y = top-left of the *unrotated* bounding box (CSS left/top before transform).
+  return {
+    x: roundToTwoDecimals(newCx - newW / 2),
+    y: roundToTwoDecimals(newCy - newH / 2),
+    width: roundToTwoDecimals(newW),
+    height: roundToTwoDecimals(newH),
+  };
+}
+
 export function calculateResizedBounds(
   start: ResizeState,
   parentBounds: Bounds | null,
@@ -10,6 +122,11 @@ export function calculateResizedBounds(
   preserveAspectRatio: boolean,
   scaleFromCenter: boolean,
 ): Bounds {
+  // Delegate to the rotation-aware implementation for rotated elements.
+  if (start.rotation) {
+    return calculateRotatedResizedBounds(start, pointer, preserveAspectRatio, scaleFromCenter);
+  }
+
   const minSize = MIN_RESIZE_SIZE;
   const deltaX = pointer.x - start.pointerX;
   const deltaY = pointer.y - start.pointerY;

@@ -1,5 +1,5 @@
-﻿
-    <!-- Frame templates -->
+
+    
     @if (isFrameToolSelected()) {
       <section class="properties-section">
         <p class="properties-section-title">Frame presets</p>
@@ -18,7 +18,7 @@
       </section>
     }
 
-    <!-- Empty state -->
+    
     @if (!selectedElement() && !isFrameToolSelected()) {
       <div class="properties-empty-state">
         <div class="pp-empty-icon">
@@ -33,15 +33,18 @@
       </div>
     }
 
-    <!-- -- Element properties --------------------------- -->
+    
     @if (selectedElement(); as element) {
 
-      <app-dt-extras-section
+      <app-dt-link-section
         [element]="element"
         [pages]="pages()"
         [currentPageId]="currentPageId()"
-        (elementPatch)="elementPatch.emit($event)"></app-dt-extras-section>
+        (elementPatch)="elementPatch.emit($event)"></app-dt-link-section>
 
+      <app-dt-position-section
+        [element]="element"
+        (elementPatch)="elementPatch.emit($event)"></app-dt-position-section>
 
       <app-dt-dimensions-section
         [element]="element"
@@ -51,12 +54,17 @@
         (numberInputGestureStarted)="numberInputGestureStarted.emit()"
         (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-dimensions-section>
 
+      @if (element.type === 'frame' || element.type === 'rectangle') {
+        <app-dt-layout-section
+          [element]="element"
+          (elementPatch)="elementPatch.emit($event)"
+          (numberInputGestureStarted)="numberInputGestureStarted.emit()"
+          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-layout-section>
+      }
 
-      <app-dt-layout-section
+      <app-dt-cursor-section
         [element]="element"
-        (elementPatch)="elementPatch.emit($event)"
-        (numberInputGestureStarted)="numberInputGestureStarted.emit()"
-        (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-layout-section>
+        (elementPatch)="elementPatch.emit($event)"></app-dt-cursor-section>
 
       <app-dt-appearance-section
         [element]="element"
@@ -75,7 +83,7 @@
         (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-typography-section>
       }
 
-      <!-- -- Image -- -->
+      
       @if (isImage(element.type)) {
         <section class="properties-section">
         <p class="properties-section-title">Image</p>
@@ -88,10 +96,22 @@
         </section>
       }
 
-      <app-dt-transforms-effects-section
+      @if (element.type !== 'frame' && element.type !== 'svg') {
+        <app-dt-transforms-section
+          [element]="element"
+          (elementPatch)="elementPatch.emit($event)"
+          (numberInputGestureStarted)="numberInputGestureStarted.emit()"
+          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-transforms-section>
+
+        <app-dt-effects-section
+          [element]="element"
+          [projectId]="projectId()"
+          (elementPatch)="elementPatch.emit($event)"
+          (numberInputGestureStarted)="numberInputGestureStarted.emit()"
+          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-effects-section>
+      }
+
+      <app-dt-accessibility-section
         [element]="element"
-        [projectId]="projectId()"
-        (elementPatch)="elementPatch.emit($event)"
-        (numberInputGestureStarted)="numberInputGestureStarted.emit()"
-        (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-transforms-effects-section>
+        (elementPatch)="elementPatch.emit($event)"></app-dt-accessibility-section>
     }

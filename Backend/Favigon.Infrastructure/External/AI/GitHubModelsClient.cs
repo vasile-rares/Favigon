@@ -9,10 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Favigon.Infrastructure.External.AI;
 
-/// <summary>
-/// AI client targeting the GitHub Models inference endpoint (OpenAI-compatible).
-/// Authentication uses a GitHub Personal Access Token (PAT).
-/// </summary>
 public class GitHubModelsClient : IAiClient
 {
   private readonly HttpClient _httpClient;

@@ -17,7 +17,9 @@ import {
   CanvasSizeMode,
   CanvasSpacing,
   CanvasTextSpacingUnit,
+  GradientFill,
   IRBorder,
+  IRGradient,
   IRLayout,
   IRLength,
   IRNode,
@@ -49,6 +51,7 @@ const DEFAULT_ELEMENT_SIZE = {
 const MANAGED_PROP_KEYS = [
   'content',
   'src',
+  'svgContent',
   'name',
   'primitive',
   'sourceType',
@@ -74,7 +77,7 @@ export function buildCanvasElementsFromIR(root: IRNode | null | undefined): Canv
   flattened.push(rootElement);
 
   for (const child of root.children) {
-    flattenIRNode(child, root.id, flattened);
+    flattenIRNode(child, root.id, flattened, root);
   }
 
   return flattened;
@@ -89,11 +92,11 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
   const importedWidthMode = readSizeModeFromLength(node.style?.width);
   const importedHeightMode = readSizeModeFromLength(node.style?.height);
   const importedAriaLabel =
-    (mappedType === 'image' || isImageNode)
+    mappedType === 'image' || isImageNode
       ? (readOptionalStringProp(node.props, 'alt') ??
         readOptionalStringProp(node.props, 'ariaLabel'))
       : readOptionalStringProp(node.props, 'ariaLabel');
-  const defaultCornerRadius = (mappedType === 'image' || isImageNode) ? DEFAULT_IMAGE_RADIUS : 0;
+  const defaultCornerRadius = mappedType === 'image' || isImageNode ? DEFAULT_IMAGE_RADIUS : 0;
   const cornerRadius =
     mappedType !== 'text'
       ? resolveImportedCornerRadius(node.style, defaultCornerRadius)
@@ -105,12 +108,6 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
 
   const preservedProps = removeManagedProps(node.props);
   const transformFields = parseCanvasTransformStyle(node.style);
-
-  // Compute CSS border-box → canvas border-box adjustment per axis.
-  // IR values include padding + stroke; canvas stores content + padding (no stroke).
-  // Only the stroke portion needs subtracting.
-  const bbAdjW = getImportedBorderBoxAdjustment(node.style, 'width');
-  const bbAdjH = getImportedBorderBoxAdjustment(node.style, 'height');
 
   // Treat explicit zero width/height as fill (AI sometimes generates width:0 for flex children)
   const effectiveWidthMode =
@@ -129,14 +126,14 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     y: readLength(node.position?.top, DEFAULT_POSITION),
     width:
       effectiveWidthMode === 'fixed'
-        ? Math.max(1, readLength(node.style?.width, defaults.width + bbAdjW) - bbAdjW)
+        ? Math.max(1, readLength(node.style?.width, defaults.width))
         : defaults.width,
     widthMode: effectiveWidthMode === 'fixed' ? undefined : effectiveWidthMode,
     widthSizingValue: readImportedSizeValue(node.style?.width, effectiveWidthMode),
-    minWidth: subtractBorderBoxFromConstraint(node.style?.minWidth, bbAdjW),
+    minWidth: readOptionalLength(node.style?.minWidth),
     minWidthMode: readConstraintModeFromLength(node.style?.minWidth),
     minWidthSizingValue: readImportedConstraintValue(node.style?.minWidth),
-    maxWidth: subtractBorderBoxFromConstraint(node.style?.maxWidth, bbAdjW),
+    maxWidth: readOptionalLength(node.style?.maxWidth),
     maxWidthMode: readConstraintModeFromLength(node.style?.maxWidth),
     maxWidthSizingValue: readImportedConstraintValue(node.style?.maxWidth),
     height:
@@ -147,23 +144,25 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
               node.style?.height,
               readLength(
                 node.style?.minHeight?.unit === 'px' ? node.style?.minHeight : undefined,
-                defaults.height + bbAdjH,
+                defaults.height,
               ),
-            ) - bbAdjH,
+            ),
           )
         : defaults.height,
     heightMode: importedHeightMode === 'fixed' ? undefined : importedHeightMode,
     heightSizingValue: readImportedSizeValue(node.style?.height, importedHeightMode),
-    minHeight: subtractBorderBoxFromConstraint(node.style?.minHeight, bbAdjH),
+    minHeight: readOptionalLength(node.style?.minHeight),
     minHeightMode: readConstraintModeFromLength(node.style?.minHeight),
     minHeightSizingValue: readImportedConstraintValue(node.style?.minHeight),
-    maxHeight: subtractBorderBoxFromConstraint(node.style?.maxHeight, bbAdjH),
+    maxHeight: readOptionalLength(node.style?.maxHeight),
     maxHeightMode: readConstraintModeFromLength(node.style?.maxHeight),
     maxHeightSizingValue: readImportedConstraintValue(node.style?.maxHeight),
     visible: !(node.meta?.hidden ?? false),
     fill:
       mappedType !== 'text'
-        ? (node.style?.background ?? (mappedType === 'frame' ? DEFAULT_FRAME_FILL : DEFAULT_FILL))
+        ? (node.style?.gradient?.stops[0]?.color ??
+          node.style?.background ??
+          (mappedType === 'frame' ? DEFAULT_FRAME_FILL : DEFAULT_FILL))
         : (node.style?.color ?? '#000000'),
     stroke: node.style?.border?.color,
     strokeWidth:
@@ -181,7 +180,12 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
       mappedType === 'frame' || mappedType === 'rectangle'
         ? readOverflow(node.style?.overflow, 'clip')
         : undefined,
-    fillMode: (isImageNode || node.style?.backgroundImage) ? 'image' : undefined,
+    fillMode: node.style?.gradient
+      ? 'gradient'
+      : isImageNode || node.style?.backgroundImage
+        ? 'image'
+        : undefined,
+    gradient: node.style?.gradient ? mapIRGradientToCanvas(node.style.gradient) : undefined,
     backgroundImage: isImageNode
       ? readStringProp(node.props, 'src', '')
       : readBackgroundImageUrl(node.style?.backgroundImage),
@@ -195,9 +199,10 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
       ? (node.style?.backgroundRepeat ?? 'no-repeat')
       : node.style?.backgroundRepeat,
     objectFit: node.style?.objectFit as CanvasElement['objectFit'],
-    imageAltText: (isImageNode || node.style?.backgroundImage)
-      ? normalizeCanvasAccessibilityLabel(importedAriaLabel)
-      : undefined,
+    imageAltText:
+      isImageNode || node.style?.backgroundImage
+        ? normalizeCanvasAccessibilityLabel(importedAriaLabel)
+        : undefined,
     shadow: readShadow(node.style?.shadows),
     text:
       mappedType === 'text'
@@ -228,6 +233,7 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
         ? readLengthUnit<CanvasTextSpacingUnit>(node.style?.lineHeight, 'em', ['px', 'em'])
         : undefined,
     imageUrl: mappedType === 'image' ? readStringProp(node.props, 'src', '') : undefined,
+    svgContent: mappedType === 'svg' ? readStringProp(node.props, 'svgContent', '') : undefined,
     linkType,
     linkPageId: readOptionalStringProp(node.props, 'linkPageId') ?? undefined,
     linkUrl: readOptionalStringProp(node.props, 'href') ?? undefined,
@@ -269,14 +275,30 @@ function mapIRType(type: string): CanvasElement['type'] {
       return 'text';
     case 'Image':
       return 'rectangle'; // Images are rectangles with fill-image background
+    case 'Svg':
+      return 'svg';
     default:
       return 'rectangle';
   }
 }
 
-function flattenIRNode(node: IRNode, parentId: string | null, target: CanvasElement[]) {
+function flattenIRNode(
+  node: IRNode,
+  parentId: string | null,
+  target: CanvasElement[],
+  parentNode?: IRNode,
+) {
   const mapped = mapIRNodeToCanvasElement(node);
   mapped.parentId = parentId;
+
+  // canvas-to-ir.mapper subtracts the parent's border widths from left/top so that
+  // CSS position:absolute (which measures from the padding-box) renders correctly.
+  // Add them back here so element.x/y remain outer-edge-based in the canvas model.
+  if (parentNode?.style?.border) {
+    mapped.x += readImportedBorderSideWidth(parentNode.style.border, 'left');
+    mapped.y += readImportedBorderSideWidth(parentNode.style.border, 'top');
+  }
+
   target.push(mapped);
 
   if (!Array.isArray(node.children)) {
@@ -284,7 +306,7 @@ function flattenIRNode(node: IRNode, parentId: string | null, target: CanvasElem
   }
 
   for (const child of node.children) {
-    flattenIRNode(child, node.id, target);
+    flattenIRNode(child, node.id, target, node);
   }
 }
 
@@ -355,51 +377,6 @@ function readImportedConstraintValue(len: IRLength | undefined): number | undefi
   return Number.isFinite(len.value) ? len.value : undefined;
 }
 
-/**
- * For a fixed (px) constraint, subtract the stroke/border so the canvas
- * stores border-box (content + padding) without stroke.
- */
-function subtractBorderBoxFromConstraint(
-  len: IRLength | undefined,
-  adjustment: number,
-): number | undefined {
-  const raw = readOptionalLength(len);
-  if (raw === undefined) return undefined;
-  // Only adjust pixel-based (fixed) constraints
-  if (len?.unit !== 'px') return raw;
-  return Math.max(0, raw - adjustment);
-}
-
-/**
- * Compute the stroke/border width total for one axis from the IR style.
- * Canvas stores border-box (content + padding); CSS border-box also includes stroke.
- * Only the stroke portion needs subtracting when importing IR → canvas.
- */
-function getImportedBorderBoxAdjustment(
-  style: IRStyle | undefined,
-  axis: 'width' | 'height',
-): number {
-  if (!style) return 0;
-
-  const border = style.border;
-  if (!border) return 0;
-
-  const sides = readImportedBorderSides(border);
-  const widths = readImportedBorderWidths(border);
-  const uniformWidth = border.width ? readLength(border.width, 0) : 0;
-
-  if (axis === 'width') {
-    return (
-      ((sides?.left !== false) ? (widths?.left ?? uniformWidth) : 0) +
-      ((sides?.right !== false) ? (widths?.right ?? uniformWidth) : 0)
-    );
-  }
-  return (
-    ((sides?.top !== false) ? (widths?.top ?? uniformWidth) : 0) +
-    ((sides?.bottom !== false) ? (widths?.bottom ?? uniformWidth) : 0)
-  );
-}
-
 function readSizeModeFromLength(styleLength: IRLength | undefined): CanvasSizeMode {
   if (styleLength) {
     if (styleLength.unit === 'fit-content') return 'fit-content';
@@ -422,6 +399,17 @@ function readImportedSizeValue(
   }
 
   return Number.isFinite(len?.value ?? Number.NaN) ? len?.value : undefined;
+}
+
+function readImportedBorderSideWidth(
+  border: IRBorder,
+  side: 'top' | 'right' | 'bottom' | 'left',
+): number {
+  const specificWidth = border[`${side}Width` as keyof IRBorder] as IRLength | undefined;
+  if (specificWidth) return readLength(specificWidth, 0);
+  const uniform = border.width ? readLength(border.width, 0) : 0;
+  const enabled = border[side as keyof IRBorder] as boolean | undefined;
+  return enabled === false ? 0 : uniform;
 }
 
 function readImportedBorderWidths(border: IRBorder | undefined): CanvasBorderWidths | undefined {
@@ -663,6 +651,18 @@ function readBackgroundImageUrl(value: string | undefined): string | undefined {
   return match ? match[1] : value;
 }
 
+function mapIRGradientToCanvas(irGradient: IRGradient): GradientFill {
+  const stops = irGradient.stops.map((s) => ({ color: s.color, position: s.position }));
+  switch (irGradient.type) {
+    case 'linear':
+      return { type: 'linear', angle: irGradient.angle ?? 90, stops };
+    case 'radial':
+      return { type: 'radial', stops };
+    case 'conic':
+      return { type: 'conic', angle: irGradient.angle ?? 0, stops };
+  }
+}
+
 function readStringProp(
   props: Record<string, unknown> | undefined,
   key: string,
@@ -735,9 +735,22 @@ function readShadow(value: unknown): string | undefined {
 }
 
 const VALID_BLEND_MODES: ReadonlySet<string> = new Set([
-  'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
-  'color-dodge', 'color-burn', 'hard-light', 'soft-light',
-  'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity',
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'darken',
+  'lighten',
+  'color-dodge',
+  'color-burn',
+  'hard-light',
+  'soft-light',
+  'difference',
+  'exclusion',
+  'hue',
+  'saturation',
+  'color',
+  'luminosity',
 ]);
 
 function readBlendMode(value: unknown): CanvasBlendMode | undefined {

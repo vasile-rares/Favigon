@@ -14,7 +14,6 @@ public class AiDesignRequest
   [Range(320, 3840)]
   public int ViewportWidth { get; set; } = 1280;
 
-  /// <summary>Optional model override, e.g. "gemini-2.5-pro". Falls back to the configured default.</summary>
   [StringLength(100)]
   public string? Model { get; set; }
 }

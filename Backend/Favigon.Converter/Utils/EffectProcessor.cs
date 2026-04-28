@@ -3,7 +3,6 @@ using Favigon.Converter.Models;
 
 namespace Favigon.Converter.Utils;
 
-/// <summary>Applies IR effects (animations and state pseudo-classes) to a node's CSS props.</summary>
 internal static class EffectProcessor
 {
   internal static void Apply(

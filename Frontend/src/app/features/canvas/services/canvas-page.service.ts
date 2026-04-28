@@ -489,7 +489,7 @@ export class CanvasPageService {
     const targetId = pageId ?? this.editorState.currentPageId();
     this.deviceMenuTargetPageId.set(targetId);
     const targetPage = targetId ? this.getPageById(targetId) : null;
-    const rootFrames = targetPage?.elements.filter((e) => e.type === 'frame' && !e.parentId) ?? [];
+    const rootFrames = targetPage ? this.el.getRootFrames(targetPage.elements) : [];
     const hasMobile = rootFrames.some((f) => (f.name ?? '').toLowerCase().startsWith('mobile'));
     const hasTablet = rootFrames.some((f) => (f.name ?? '').toLowerCase().startsWith('tablet'));
     this.deviceMenuItems.set([
@@ -640,12 +640,10 @@ export class CanvasPageService {
 
   // ── Focus ─────────────────────────────────────────────────
 
-  focusPageSmooth(pageId: string, canvasElement: HTMLElement | null): void {
-    if (!canvasElement) {
-      return;
-    }
-
-    // Use shell bounds so all device frames are visible
+  private computePageFocusTarget(
+    pageId: string,
+    canvasElement: HTMLElement,
+  ): { zoom: number; offset: Point } | null {
     const layouts = this.pageLayouts();
     const shellLeft = this.layout.getPageShellLeft(pageId, layouts);
     const shellTop = this.layout.getPageShellTop(pageId, layouts) - PAGE_SHELL_HEADER_HEIGHT - 8;
@@ -654,13 +652,12 @@ export class CanvasPageService {
       this.layout.getPageShellHeight(pageId, layouts) + PAGE_SHELL_HEADER_HEIGHT + 8;
 
     if (!shellWidth || !shellHeight) {
-      return;
+      return null;
     }
 
-    // Insets for the overlapping panels so focused content is not hidden behind them
-    const leftInset = 316; // project-panel: 12 + 280 + 24 gap
-    const rightInset = 316; // properties-panel: 12 + 280 + 24 gap
-    const topInset = 84; // header: 60 + 24 margin
+    const leftInset = 316;
+    const rightInset = 316;
+    const topInset = 84;
     const bottomInset = 24;
 
     const safeWidth = canvasElement.clientWidth - leftInset - rightInset;
@@ -672,15 +669,32 @@ export class CanvasPageService {
     const minSize = 24;
     const horizontalZoom = (safeWidth - padding) / Math.max(shellWidth, minSize);
     const verticalZoom = (safeHeight - padding) / Math.max(shellHeight, minSize);
-    const targetZoom = clamp(
-      Math.min(horizontalZoom, verticalZoom),
-      CANVAS_MIN_ZOOM,
-      CANVAS_MAX_ZOOM,
-    );
-    const targetOffset: Point = {
-      x: roundToTwoDecimals(safeCenterX - (shellLeft + shellWidth / 2) * targetZoom),
-      y: roundToTwoDecimals(safeCenterY - (shellTop + shellHeight / 2) * targetZoom),
+    const zoom = clamp(Math.min(horizontalZoom, verticalZoom), CANVAS_MIN_ZOOM, CANVAS_MAX_ZOOM);
+    const offset: Point = {
+      x: roundToTwoDecimals(safeCenterX - (shellLeft + shellWidth / 2) * zoom),
+      y: roundToTwoDecimals(safeCenterY - (shellTop + shellHeight / 2) * zoom),
     };
+
+    return { zoom, offset };
+  }
+
+  focusPageInstant(pageId: string, canvasElement: HTMLElement | null): void {
+    if (!canvasElement) return;
+    const target = this.computePageFocusTarget(pageId, canvasElement);
+    if (!target) return;
+    this.viewport.zoomLevel.set(target.zoom);
+    this.viewport.viewportOffset.set(target.offset);
+  }
+
+  focusPageSmooth(pageId: string, canvasElement: HTMLElement | null): void {
+    if (!canvasElement) {
+      return;
+    }
+
+    const target = this.computePageFocusTarget(pageId, canvasElement);
+    if (!target) {
+      return;
+    }
 
     const startZoom = this.viewport.zoomLevel();
     const startOffset = this.viewport.viewportOffset();
@@ -691,9 +705,9 @@ export class CanvasPageService {
       const t = Math.min(1, (now - startTs) / durationMs);
       const eased = 1 - Math.pow(1 - t, 3);
 
-      const zoom = startZoom + (targetZoom - startZoom) * eased;
-      const x = startOffset.x + (targetOffset.x - startOffset.x) * eased;
-      const y = startOffset.y + (targetOffset.y - startOffset.y) * eased;
+      const zoom = startZoom + (target.zoom - startZoom) * eased;
+      const x = startOffset.x + (target.offset.x - startOffset.x) * eased;
+      const y = startOffset.y + (target.offset.y - startOffset.y) * eased;
 
       this.viewport.zoomLevel.set(roundToTwoDecimals(zoom));
       this.viewport.viewportOffset.set({
@@ -945,18 +959,12 @@ export class CanvasPageService {
       return null;
     }
 
-    return (
-      page.elements.find(
-        (element) =>
-          element.type === 'frame' && !element.parentId && getFrameTitle(element) === 'Desktop',
-      ) ??
-      page.elements.find((element) => element.type === 'frame' && !element.parentId) ??
-      null
-    );
+    const frames = this.el.getRootFrames(page.elements);
+    return frames.find((element) => getFrameTitle(element) === 'Desktop') ?? frames[0] ?? null;
   }
 
   private getPrimaryFrame(elements: CanvasElement[]): CanvasElement | null {
-    const rootFrames = elements.filter((el) => el.type === 'frame' && !el.parentId);
+    const rootFrames = this.el.getRootFrames(elements);
     return (
       rootFrames.find((el) => el.isPrimary) ??
       rootFrames.find((el) => el.name?.toLowerCase() === 'desktop') ??
@@ -1203,7 +1211,7 @@ export class CanvasPageService {
     };
   }
 
-  /** Used internally by applyPageSelection — requires canvas DOM reference. */
+  
   private getCanvasElement(): HTMLElement | null {
     // The canvas element reference is held by the component.
     // The service accesses it through focusPageSmooth's parameter.
@@ -1211,7 +1219,7 @@ export class CanvasPageService {
     return this._canvasElement;
   }
 
-  /** The component sets this so internal focus calls can reach the DOM. */
+  
   private _canvasElement: HTMLElement | null = null;
 
   setCanvasElement(el: HTMLElement | null): void {

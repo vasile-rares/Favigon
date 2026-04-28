@@ -1,13 +1,40 @@
 import { IRStyle } from './ir.models';
 
-export type CanvasElementType = 'frame' | 'rectangle' | 'text' | 'image';
+export type CanvasElementType = 'frame' | 'rectangle' | 'text' | 'image' | 'svg';
 export type CanvasTextAlign = 'left' | 'center' | 'right' | 'justify';
 export type CanvasTextVerticalAlign = 'top' | 'middle' | 'bottom';
 export type CanvasFontStyle = 'normal' | 'italic';
 export type CanvasFontSizeUnit = 'px' | 'rem';
 export type CanvasTextSpacingUnit = 'px' | 'em';
 export type CanvasOverflowMode = 'clip' | 'visible' | 'hidden' | 'scroll';
-export type CanvasFillMode = 'color' | 'image';
+export type CanvasFillMode = 'color' | 'image' | 'gradient';
+export type CanvasTextTransform = 'inherit' | 'capitalize' | 'uppercase' | 'lowercase';
+export type CanvasTextDecorationLine = 'underline' | 'line-through';
+export type CanvasTextDecorationStyle = 'solid' | 'double' | 'dotted' | 'dashed' | 'wavy';
+
+export interface GradientStop {
+  color: string;
+  position: number; // 0–100
+}
+
+export interface LinearGradientFill {
+  type: 'linear';
+  angle: number; // 0–360
+  stops: GradientStop[];
+}
+
+export interface RadialGradientFill {
+  type: 'radial';
+  stops: GradientStop[];
+}
+
+export interface ConicGradientFill {
+  type: 'conic';
+  angle: number; // 0–360
+  stops: GradientStop[];
+}
+
+export type GradientFill = LinearGradientFill | RadialGradientFill | ConicGradientFill;
 export type CanvasObjectFit = 'cover' | 'contain' | 'fill' | 'none' | 'scale-down';
 export type CanvasShadowPreset = 'none' | 'sm' | 'md' | 'lg' | 'xl';
 export type CanvasShadow = string;
@@ -238,6 +265,7 @@ export interface CanvasElement {
   visible?: boolean;
   fill?: string;
   fillMode?: CanvasFillMode;
+  gradient?: GradientFill;
   backgroundImage?: string;
   backgroundSize?: string;
   backgroundPosition?: string;
@@ -267,7 +295,18 @@ export interface CanvasElement {
   letterSpacingUnit?: CanvasTextSpacingUnit;
   lineHeight?: number;
   lineHeightUnit?: CanvasTextSpacingUnit;
+  textShadow?: string;
+  textTransform?: CanvasTextTransform;
+  textBalance?: boolean;
+  textDecorationLine?: CanvasTextDecorationLine;
+  textDecorationColor?: string;
+  textDecorationStyle?: CanvasTextDecorationStyle;
+  textDecorationThickness?: number;
+  textDecorationThicknessUnit?: 'px' | 'em';
+  backgroundColor?: string;
+  squircle?: number;
   imageUrl?: string;
+  svgContent?: string;
   linkType?: CanvasLinkType;
   linkPageId?: string | null;
   linkUrl?: string;
@@ -285,6 +324,7 @@ export interface CanvasElement {
   gridTemplateColumns?: string;
   gridTemplateRows?: string;
   padding?: CanvasSpacing;
+  paddingPerSide?: boolean;
   // Position (not for frame)
   position?: CanvasPositionMode;
   margin?: CanvasSpacing;

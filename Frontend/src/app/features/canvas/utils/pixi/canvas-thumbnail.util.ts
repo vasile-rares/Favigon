@@ -64,7 +64,13 @@ export function generateThumbnailFromCanvas(
   return canvas.toDataURL('image/jpeg', 0.86);
 }
 
-export function generateThumbnail(page: CanvasPageModel | null): string | null {
+export function generateThumbnail(
+  page: CanvasPageModel | null,
+  
+  domBounds?: Map<string, Bounds> | null,
+  pageLayoutX = 0,
+  pageLayoutY = 0,
+): string | null {
   if (!page || page.elements.length === 0) {
     return null;
   }
@@ -81,11 +87,13 @@ export function generateThumbnail(page: CanvasPageModel | null): string | null {
   let maxY = -Infinity;
 
   for (const el of visibleElements) {
-    const pos = getAbsolutePos(el, page.elements);
+    const pos = getElementPos(el, page.elements, domBounds, pageLayoutX, pageLayoutY);
+    const w = domBounds?.get(el.id)?.width ?? el.width;
+    const h = domBounds?.get(el.id)?.height ?? el.height;
     minX = Math.min(minX, pos.x);
     minY = Math.min(minY, pos.y);
-    maxX = Math.max(maxX, pos.x + el.width);
-    maxY = Math.max(maxY, pos.y + el.height);
+    maxX = Math.max(maxX, pos.x + w);
+    maxY = Math.max(maxY, pos.y + h);
   }
 
   const contentW = maxX - minX || 1;
@@ -113,7 +121,19 @@ export function generateThumbnail(page: CanvasPageModel | null): string | null {
 
   for (const el of page.elements) {
     if (!visibleElements.some((visibleElement) => visibleElement.id === el.id)) continue;
-    drawElement(ctx, el, page.elements, minX, minY, scale, offsetX, offsetY);
+    drawElement(
+      ctx,
+      el,
+      page.elements,
+      minX,
+      minY,
+      scale,
+      offsetX,
+      offsetY,
+      domBounds,
+      pageLayoutX,
+      pageLayoutY,
+    );
   }
 
   return canvas.toDataURL('image/jpeg', 0.75);
@@ -166,6 +186,21 @@ function isElementInSubtree(
   return false;
 }
 
+function getElementPos(
+  el: CanvasElement,
+  allElements: CanvasElement[],
+  domBounds: Map<string, Bounds> | null | undefined,
+  pageLayoutX: number,
+  pageLayoutY: number,
+): { x: number; y: number } {
+  const dom = domBounds?.get(el.id);
+  if (dom) {
+    // DOM scene-space → canvas space (subtract page layout offset)
+    return { x: dom.x - pageLayoutX, y: dom.y - pageLayoutY };
+  }
+  return getAbsolutePos(el, allElements);
+}
+
 function drawElement(
   ctx: CanvasRenderingContext2D,
   el: CanvasElement,
@@ -175,12 +210,19 @@ function drawElement(
   scale: number,
   offsetX: number,
   offsetY: number,
+  domBounds?: Map<string, Bounds> | null,
+  pageLayoutX = 0,
+  pageLayoutY = 0,
 ): void {
-  const absPos = getAbsolutePos(el, allElements);
+  const absPos = getElementPos(el, allElements, domBounds, pageLayoutX, pageLayoutY);
+  const dom = domBounds?.get(el.id);
+  // For flow children the DOM width/height reflects fill/relative sizing; use it when available.
+  const elW = dom?.width ?? el.width;
+  const elH = dom?.height ?? el.height;
   const x = (absPos.x - originX) * scale + offsetX;
   const y = (absPos.y - originY) * scale + offsetY;
-  const w = el.width * scale;
-  const h = el.height * scale;
+  const w = elW * scale;
+  const h = elH * scale;
   const opacity = el.opacity ?? 1;
 
   ctx.save();
@@ -239,7 +281,14 @@ function drawRect(
       ctx.stroke();
       ctx.beginPath();
       const inset = sw - lineW;
-      buildRoundedRectPath(ctx, x + inset, y + inset, w - inset * 2, h - inset * 2, getScaledCornerRadii(el, scale, w - inset * 2, h - inset * 2));
+      buildRoundedRectPath(
+        ctx,
+        x + inset,
+        y + inset,
+        w - inset * 2,
+        h - inset * 2,
+        getScaledCornerRadii(el, scale, w - inset * 2, h - inset * 2),
+      );
       ctx.stroke();
       ctx.setLineDash([]);
       return;

@@ -34,9 +34,21 @@ export interface IRPosition {
   left?: IRLength;
 }
 
+export interface IRGradientStop {
+  color: string;
+  position: number; // 0–100
+}
+
+export interface IRGradient {
+  type: 'linear' | 'radial' | 'conic';
+  angle?: number;
+  stops: IRGradientStop[];
+}
+
 export interface IRStyle {
   color?: string;
   background?: string;
+  gradient?: IRGradient;
   backgroundImage?: string;
   backgroundSize?: string;
   backgroundPosition?: string;
@@ -65,6 +77,18 @@ export interface IRStyle {
   letterSpacing?: IRLength;
 
   textAlign?: string;
+
+  textShadow?: string;
+  textTransform?: string;
+  textWrap?: string;
+  whiteSpace?: string;
+  wordBreak?: string;
+  textDecorationLine?: string;
+  textDecorationColor?: string;
+  textDecorationStyle?: string;
+  textDecorationThickness?: string;
+
+  backgroundColor?: string;
 
   borderRadius?: IRLength;
   borderTopLeftRadius?: IRLength;
@@ -113,13 +137,13 @@ export interface IRSpacing {
 export interface IRBorder {
   width?: IRLength;
   color?: string;
-  /** Defaults to 'Solid' */
+  
   style: BorderStyle;
   topWidth?: IRLength;
   rightWidth?: IRLength;
   bottomWidth?: IRLength;
   leftWidth?: IRLength;
-  /** Selective sides — if all are absent the border applies to all four sides */
+  
   top?: boolean;
   right?: boolean;
   bottom?: boolean;
@@ -161,7 +185,7 @@ export interface IRVariant {
 }
 
 // Must match C# enum names exactly (JsonStringEnumConverter uses PascalCase names)
-export type IRNodeType = 'Frame' | 'Container' | 'Text' | 'Image';
+export type IRNodeType = 'Frame' | 'Container' | 'Text' | 'Image' | 'Svg';
 export type OverflowMode = 'Clip' | 'Visible' | 'Hidden' | 'Scroll';
 export type LayoutMode = 'Block' | 'Flex' | 'Grid';
 export type PositionMode = 'Flow' | 'Relative' | 'Absolute' | 'Fixed' | 'Sticky';

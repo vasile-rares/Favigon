@@ -1,0 +1,38 @@
+@if (element().type !== 'svg') {
+<section
+  class="properties-section properties-section--collapsible"
+  [class.properties-section--compact]="!hasCursor(element())"
+  [class.properties-section--actionable]="!hasCursor(element())"
+  (click)="!hasCursor(element()) && onCursorSectionHeaderClick()">
+  <div class="properties-section-header properties-section-header--actionable" (click)="onCursorSectionHeaderClick()">
+    <p class="properties-section-title">Cursor</p>
+    <button
+      type="button"
+      class="pp-section-toggle"
+      [class.pp-section-toggle--minus]="hasCursor(element())"
+      [class.pp-section-toggle--plus]="!hasCursor(element())"
+      [attr.aria-label]="hasCursor(element()) ? 'Remove cursor override' : 'Add cursor override'"
+      [title]="hasCursor(element()) ? 'Remove cursor override' : 'Add cursor override'"
+      (click)="onCursorSectionToggleClick($event)">
+      <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+        <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+        <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+      </svg>
+    </button>
+  </div>
+
+  @if (hasCursor(element())) {
+    <div class="pp-style-row">
+      <span class="pp-row-label">Type</span>
+      <div class="pp-style-control pp-style-control--dropdown">
+        <app-dropdown-select
+          [enableSearch]="false"
+          [placeholder]="'Select cursor'"
+          [options]="cursorOptions"
+          [ngModel]="cursorValue(element())"
+          (ngModelChange)="onCursorChange($event)"></app-dropdown-select>
+      </div>
+    </div>
+  }
+</section>
+}

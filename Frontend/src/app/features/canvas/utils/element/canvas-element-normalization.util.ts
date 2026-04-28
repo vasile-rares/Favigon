@@ -151,7 +151,8 @@ export function getStrokeWidth(element: CanvasElement): number {
 }
 
 export function getStrokeWidths(element: CanvasElement): CanvasBorderWidths {
-  if (!element.stroke || element.type === 'text') {
+  const hasActiveStroke = element.stroke != null;
+  if (!hasActiveStroke || element.type === 'text') {
     return { top: 0, right: 0, bottom: 0, left: 0 };
   }
 
@@ -183,7 +184,6 @@ export function hasPerSideStrokeWidths(element: CanvasElement): boolean {
   return widths.top !== widths.right || widths.top !== widths.bottom || widths.top !== widths.left;
 }
 
-/** Mutates `element` in place to enforce minimum sizes, valid ranges, and frame constraints. */
 export function mutateNormalizeElement(element: CanvasElement, elements: CanvasElement[]): void {
   element.width = Math.max(MIN_SIZE, element.width);
   element.height = Math.max(MIN_SIZE, element.height);
@@ -265,8 +265,8 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
   const parent = element.parentId
     ? (elements.find((candidate) => candidate.id === element.parentId) ?? null)
     : null;
-  const widthMode = normalizeCanvasSizeMode(element.widthMode, element, parent);
-  const heightMode = normalizeCanvasSizeMode(element.heightMode, element, parent);
+  const widthMode = normalizeCanvasSizeMode(element.widthMode, element, parent, 'width');
+  const heightMode = normalizeCanvasSizeMode(element.heightMode, element, parent, 'height');
   const minWidthMode = normalizeCanvasConstraintMode(element.minWidthMode, element, parent);
   const maxWidthMode = normalizeCanvasConstraintMode(element.maxWidthMode, element, parent);
   const minHeightMode = normalizeCanvasConstraintMode(element.minHeightMode, element, parent);
@@ -516,5 +516,6 @@ function isFlowLayoutChild(
 }
 
 export function formatCanvasElementTypeLabel(type: CanvasElementType): string {
+  if (type === 'svg') return 'SVG';
   return `${type.charAt(0).toUpperCase()}${type.slice(1)}`;
 }

@@ -4,7 +4,7 @@
   <div class="settings-container">
     <div class="settings-content-wrapper">
 
-      <!-- Tabs Navigation -->
+
       <div class="settings-tabs-list">
         <button
           class="tab-trigger"
@@ -26,14 +26,14 @@
         </button>
       </div>
 
-      <!-- Tab Content Area -->
-      <div class="settings-tab-content">
 
-        <!-- Account Tab -->
+      <div #tabContent class="settings-tab-content">
+
+
         @if (activeTab === 'account') {
 <div class="tab-panel fade-in">
 
-          <!-- Details Card -->
+
           <div class="settings-card">
             <div class="card-header">
               <h3 class="card-title">Account Details</h3>
@@ -125,9 +125,9 @@
                 [(ngModel)]="bio"></app-text-input>
               <span class="char-count">{{ bio.length }}/300 characters</span>
             </div>
-          </div> <!-- Closes .card-body form-grid -->
+          </div>
 
-          <!-- Save Changes Button (Outside Grid) -->
+
           <div class="card-save-actions">
             <app-action-button
               variant="primary"
@@ -143,9 +143,9 @@
               {{ msg.text }}
             </div>
           }
-          </div> <!-- Closes .settings-card -->
+          </div>
 
-          <!-- Delete Card -->
+
           <div class="settings-card">
             <div class="card-header card-header--with-action border-bottom-none">
               <div class="card-header__info">
@@ -158,11 +158,11 @@
             </div>
           </div>
         </div>
-}<!-- end .tab-panel (account) -->
+}
 
-        <!-- Security/Password Tab -->
+
         @if (activeTab === 'password') {
-<div class="tab-panel fade-in">
+<div class="tab-panel">
           <div class="settings-card">
             <div class="card-header">
               <h3 class="card-title">Password</h3>
@@ -226,9 +226,9 @@
         </div>
 }
 
-        <!-- Linked Accounts Tab -->
+
         @if (activeTab === 'linked-accounts') {
-<div class="settings-card fade-in">
+<div class="settings-card">
           <div class="card-header">
             <h3 class="card-title">Linked Accounts</h3>
             <p class="card-description">Manage external platforms connected to your Favigon account.</p>
@@ -241,7 +241,7 @@
               </div>
             }
 
-            <!-- GitHub -->
+
             <div class="provider-row">
               <div class="provider-info">
                 <div class="provider-icon provider-icon--github">
@@ -273,7 +273,7 @@
               }
             </div>
 
-            <!-- Google -->
+
             <div class="provider-row">
               <div class="provider-info">
                 <div class="provider-icon provider-icon--google">
@@ -317,7 +317,6 @@
   </div>
 </div>
 
-<!-- Delete Account Confirmation Dialog -->
 @if (isDeleteDialogOpen()) {
   <app-dialog-box
     title="Delete Account"
@@ -331,7 +330,6 @@
   </app-dialog-box>
 }
 
-<!-- Change Password Dialog -->
 @if (isPasswordDialogOpen()) {
   <app-dialog-box
     [title]="passwordDialogTitle"

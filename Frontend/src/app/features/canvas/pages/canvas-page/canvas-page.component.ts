@@ -3,7 +3,6 @@ import {
   Component,
   ElementRef,
   HostListener,
-  NgZone,
   OnDestroy,
   viewChild,
   computed,
@@ -11,6 +10,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
+import { NgStyle } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   CanvasElement,
@@ -35,14 +35,17 @@ import type { ContextMenuItem } from '@app/shared';
 import { ToolbarComponent } from '../../components/toolbar/toolbar.component';
 import { ProjectPanelComponent } from '../../components/project-panel/project-panel.component';
 import { PropertiesPanelComponent } from '../../components/properties-panel/properties-panel.component';
+import { CanvasDomElementComponent } from '../../components/canvas-dom-element/canvas-dom-element.component';
+import { CanvasLoadingOverlayComponent } from '../../components/canvas-loading-overlay/canvas-loading-overlay.component';
 import { mutateNormalizeElement } from '../../utils/element/canvas-element-normalization.util';
 import { roundToTwoDecimals } from '../../utils/canvas-math.util';
-import { collectSubtreeIds, removeWithChildren } from '../../utils/canvas-tree.util';
+import { sanitizeSvg, parseSvgDimensions } from '../../utils/svg-sanitizer.util';
 import {
-  generateThumbnail,
-  generateThumbnailFromCanvas,
-} from '../../utils/pixi/canvas-thumbnail.util';
-
+  collectSubtreeIds,
+  removeWithChildren,
+  buildChildrenMap,
+} from '../../utils/canvas-tree.util';
+import { generateThumbnail } from '../../utils/pixi/canvas-thumbnail.util';
 import {
   getTextFontFamily,
   getTextFontWeight,
@@ -51,6 +54,7 @@ import {
   getTextLineHeight,
   getTextLetterSpacing,
   getTextAlignValue,
+  getFrameTitle,
 } from '../../utils/element/canvas-text.util';
 import { CanvasPersistenceService } from '../../services/canvas-persistence.service';
 import { CanvasGenerationService } from '../../services/canvas-generation.service';
@@ -80,14 +84,10 @@ import {
 import { CanvasEditorStateService } from '../../services/canvas-editor-state.service';
 import { CanvasPageService } from '../../services/canvas-page.service';
 import { CanvasPageGeometryService } from '../../services/canvas-page-geometry.service';
-import { CanvasPixiApplicationService } from '../../services/pixi/canvas-pixi-application.service';
-import { CanvasPixiRendererService } from '../../services/pixi/canvas-pixi-renderer.service';
-import { CanvasPixiOverlaysService } from '../../services/pixi/canvas-pixi-overlays.service';
-import { CanvasPixiGridService } from '../../services/pixi/canvas-pixi-grid.service';
-import { CanvasPixiPageShellService } from '../../services/pixi/canvas-pixi-page-shell.service';
-import { CanvasPixiLayoutService } from '../../services/pixi/canvas-pixi-layout.service';
 import { CanvasGestureService } from '../../services/editor/canvas-gesture.service';
+import { CanvasDomStyleService } from '../../services/canvas-dom-style.service';
 import { firstValueFrom } from 'rxjs';
+import gsap from 'gsap';
 
 const ROOT_FRAME_INSERT_GAP = 48;
 const ELEMENT_DRAG_START_THRESHOLD = 3;
@@ -115,6 +115,9 @@ interface RectangleDrawState {
     PropertiesPanelComponent,
     ContextMenuComponent,
     DialogBoxComponent,
+    CanvasDomElementComponent,
+    CanvasLoadingOverlayComponent,
+    NgStyle,
   ],
   providers: [
     CanvasEditorStateService,
@@ -128,26 +131,20 @@ interface RectangleDrawState {
     CanvasGenerationService,
     CanvasPageGeometryService,
     CanvasPageService,
-    CanvasPixiApplicationService,
-    CanvasPixiRendererService,
-    CanvasPixiOverlaysService,
-    CanvasPixiGridService,
-    CanvasPixiPageShellService,
-    CanvasPixiLayoutService,
+    CanvasDomStyleService,
     CanvasGestureService,
   ],
   templateUrl: './canvas-page.component.html',
   styleUrl: './canvas-page.component.css',
 })
 export class CanvasPage implements OnDestroy, AfterViewChecked {
+  private textEditorInitializedId: string | null = null;
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
   private readonly projectService = inject(ProjectService);
   private readonly currentUser = inject(CurrentUserService);
   readonly generation = inject(CanvasGenerationService);
-  private readonly zone = inject(NgZone);
-
   readonly viewport = inject(CanvasViewportService);
   private readonly history = inject(CanvasHistoryService);
   private readonly clipboard = inject(CanvasClipboardService);
@@ -158,17 +155,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly page = inject(CanvasPageService);
   readonly pageLayout = inject(CanvasPageGeometryService);
 
-  // ── PixiJS Services ───────────────────────────────────────
-  private readonly pixiApp = inject(CanvasPixiApplicationService);
-  private readonly pixiRenderer = inject(CanvasPixiRendererService);
-  private readonly pixiOverlays = inject(CanvasPixiOverlaysService);
-  private readonly pixiGrid = inject(CanvasPixiGridService);
-  private readonly pixiPageShells = inject(CanvasPixiPageShellService);
-  private readonly pixiLayout = inject(CanvasPixiLayoutService);
-  private readonly pendingProjectFlush = inject(PendingProjectFlushService);
   readonly gesture = inject(CanvasGestureService);
-  private readonly pixiSceneReady = signal(false);
-  private pixiInitPending = false;
+  private readonly pendingProjectFlush = inject(PendingProjectFlushService);
+  private readonly hostEl = inject(ElementRef<HTMLElement>);
 
   readonly canvasSceneRef = viewChild<ElementRef<HTMLElement>>('canvasScene');
 
@@ -185,6 +174,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly elements = this.editorState.elements;
   readonly selectedElement = this.editorState.selectedElement;
   readonly selectedElements = this.editorState.selectedElements;
+  readonly elementMap = this.editorState.elementMap;
 
   readonly visibleElements = computed<CanvasElement[]>(() =>
     this.elements().filter((element) =>
@@ -195,10 +185,298 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
   readonly projectPanelWidth = signal(DEFAULT_PROJECT_PANEL_WIDTH);
 
+  readonly pageChildrenMaps = computed<Map<string, Map<string | null, CanvasElement[]>>>(() => {
+    const result = new Map<string, Map<string | null, CanvasElement[]>>();
+    for (const pg of this.pages()) {
+      result.set(pg.id, buildChildrenMap(pg.elements));
+    }
+    return result;
+  });
+
+  readonly emptyChildrenMap = new Map<string | null, CanvasElement[]>();
+
+  // ── DOM Overlay Computed Signals ──────────────────────────
+
+  readonly flowDragState = computed<FlowDragRenderState | null>(() => {
+    const isDragging = this.gesture.isDraggingEl();
+    const draggingId = this.gesture.draggingFlowChildId();
+    const ghostBounds = this.gesture.flowDragPlaceholder();
+    const dropTarget = this.gesture.layoutDropTarget();
+    if (!isDragging || !draggingId || !ghostBounds) return null;
+    return {
+      draggingElementId: draggingId,
+      floatingBounds: ghostBounds.bounds,
+      placeholder: dropTarget
+        ? { containerId: dropTarget.containerId, dropIndex: dropTarget.index }
+        : null,
+    };
+  });
+
+  readonly selectionOverlayBounds = computed<Bounds | null>(() => {
+    const selected = this.selectedElement();
+    if (!selected || this.gesture.isDraggingEl() || this.editingTextElementId()) return null;
+    void this.gesture.flowCacheVersion(); // register reactive dependency
+
+    // Use stable bounds (captured after ngAfterViewChecked when DOM is fully settled) whenever
+    // they belong to the currently selected element. This covers two cases:
+    //
+    // • resize/rotate: model is updated every pointer-move frame. Live-DOM read during CD
+    //   is stale (child components haven't painted yet), causing the dirty/clean oscillation
+    //   that made the outline flicker/teleport for all element types.
+    //
+    // • dirty phase (e.g. property change from Design Tab): invalidateFlowBoundsCache fires,
+    //   dirty=true, getCachedOverlaySceneBounds uses model-based getAbsoluteBounds (wrong for
+    //   flow children where x=0). stableSelectionBounds still holds the last settled position,
+    //   so we use it to avoid the 1-frame teleport before markFlowBoundsCacheClean fires.
+    //
+    // The element ID guard prevents using stale bounds from a previously selected element.
+    const stable = this.gesture.stableSelectionBounds();
+    const stableBounds = stable?.elementId === selected.id ? stable.bounds : null;
+
+    if (this.gesture.isResizing() || this.gesture.isRotating()) {
+      return stableBounds ?? this.gesture.getCachedOverlaySceneBounds(selected);
+    }
+
+    if (this.gesture.isFlowBoundsDirty()) {
+      return stableBounds ?? this.gesture.getCachedOverlaySceneBounds(selected);
+    }
+    return (
+      this.gesture.getLiveOverlaySceneBounds(selected) ??
+      this.gesture.getCachedOverlaySceneBounds(selected)
+    );
+  });
+
+  readonly cornerRadiusHandleOffset = computed<number>(() => {
+    const s = this.selectedElement();
+    const zoom = this.viewport.zoomLevel();
+    const radius = s?.cornerRadius ?? 0;
+    // Clamp to half the shortest side so the handle never exits the element boundary
+    const maxRadius = s ? Math.min(s.width, s.height) / 2 : Infinity;
+    const clampedRadius = Math.min(radius, maxRadius);
+    // Enforce a minimum of 8px so the handle never overlaps the NW corner resize handle
+    // (which sits at left:-4px; top:-4px). At radius=0 the handle sits at left:4; top:4.
+    return Math.max(clampedRadius * zoom, 8);
+  });
+
+  private getRotatedElementOverlayBounds(
+    element: CanvasElement,
+    elements: CanvasElement[],
+    aabb: Bounds | null,
+  ): Bounds | null {
+    if (!aabb) return null;
+    // CSS transforms keep the transform-origin fixed; with default 50%/50%, AABB center
+    // equals the element center regardless of rotation, skew, or 3D transform.
+    const centerX = aabb.x + aabb.width / 2;
+    const centerY = aabb.y + aabb.height / 2;
+    // Model dimensions are correct (getAbsoluteBounds handles fill/relative sizing).
+    const absolute = this.element.getAbsoluteBounds(
+      element,
+      elements,
+      this.editorState.currentPage(),
+    );
+    return {
+      x: roundToTwoDecimals(centerX - absolute.width / 2),
+      y: roundToTwoDecimals(centerY - absolute.height / 2),
+      width: absolute.width,
+      height: absolute.height,
+    };
+  }
+
+  private hasNonTrivialTransform(el: CanvasElement): boolean {
+    return (
+      (el.rotation ?? 0) !== 0 ||
+      (el.skewX ?? 0) !== 0 ||
+      (el.skewY ?? 0) !== 0 ||
+      (el.scaleX ?? 1) !== 1 ||
+      (el.scaleY ?? 1) !== 1 ||
+      el.rotationMode === '3d' ||
+      (el.depth ?? 0) !== 0
+    );
+  }
+
+  private hasOnlyRotation(el: CanvasElement): boolean {
+    return (
+      (el.rotation ?? 0) !== 0 &&
+      (el.skewX ?? 0) === 0 &&
+      (el.skewY ?? 0) === 0 &&
+      (el.scaleX ?? 1) === 1 &&
+      (el.scaleY ?? 1) === 1 &&
+      el.rotationMode !== '3d' &&
+      (el.depth ?? 0) === 0
+    );
+  }
+
+  private buildOutlineTransform(el: CanvasElement): string | null {
+    if (!this.hasOnlyRotation(el)) return null;
+    return `rotate(${el.rotation}deg)`;
+  }
+
+  readonly selectionOutlineTransform = computed<string | null>(() => {
+    const el = this.selectedElement();
+    if (!el) return null;
+    return this.buildOutlineTransform(el);
+  });
+
+  readonly selectionOutlineTransformOrigin = computed<string | null>(() => {
+    const el = this.selectedElement();
+    if (!el || !this.hasOnlyRotation(el)) return null;
+    return `${el.transformOriginX ?? 50}% ${el.transformOriginY ?? 50}%`;
+  });
+
+  readonly selectionOutlineDisplayBounds = computed<Bounds | null>(() => {
+    const selected = this.selectedElement();
+    if (!selected) return null;
+
+    if (!this.hasNonTrivialTransform(selected)) {
+      // No visual transform – use live-DOM-tracking bounds (accurate for flow/flex children).
+      return this.selectionOverlayBounds();
+    }
+
+    // Transformed element: skip live DOM (gives AABB), derive center from AABB then place
+    // model dimensions around it. This is correct even for flow children (x/y = 0).
+    if (this.gesture.isDraggingEl() || this.editingTextElementId()) return null;
+
+    // Register reactive dependency so bounds update while isRotating() / isResizing().
+    void this.gesture.flowCacheVersion();
+
+    // Use the same stable/cached/live strategy as selectionOverlayBounds.
+    const stable = this.gesture.stableSelectionBounds();
+    const stableBounds = stable?.elementId === selected.id ? stable.bounds : null;
+
+    let aabb: Bounds | null;
+    if (
+      this.gesture.isResizing() ||
+      this.gesture.isRotating() ||
+      this.gesture.isFlowBoundsDirty()
+    ) {
+      aabb = stableBounds ?? this.gesture.getCachedOverlaySceneBounds(selected);
+    } else {
+      aabb =
+        this.gesture.getLiveOverlaySceneBounds(selected) ??
+        this.gesture.getCachedOverlaySceneBounds(selected);
+    }
+
+    // For pure 2D rotation: show model-sized rotated box (outline is rotated via CSS).
+    // For skew / 3D / scale: use the AABB directly so handles are never stretched/distorted.
+    if (this.hasOnlyRotation(selected)) {
+      return this.getRotatedElementOverlayBounds(selected, this.editorState.elements(), aabb);
+    }
+    return aabb;
+  });
+
+  readonly selectionHandleMode = computed<'all' | 'ns' | 'ew' | 'text-fit-fit' | 'none'>(() => {
+    const s = this.selectedElement();
+    if (!s || s.type === 'frame') return 'none';
+
+    if (s.type === 'text') {
+      const wMode = s.widthMode ?? 'fixed';
+      const hMode = s.heightMode ?? 'fixed';
+      if (wMode === 'fill' && hMode === 'fill') return 'none';
+      if (wMode === 'fit-content' && hMode === 'fit-content') return 'text-fit-fit';
+      // width is fit-content or fill → only height is manually sized
+      if (wMode === 'fit-content' || wMode === 'fill') return 'ns';
+      // height is fit-content or fill → only width is manually sized
+      if (hMode === 'fit-content' || hMode === 'fill') return 'ew';
+      return 'all';
+    }
+
+    const wFill = s.widthMode === 'fill';
+    const hFill = s.heightMode === 'fill';
+    if (!wFill && !hFill) return 'all';
+    if (wFill && !hFill) return 'ns';
+    if (!wFill && hFill) return 'ew';
+    return 'none'; // both axes fill
+  });
+
+  readonly hoveredOverlayBounds = computed<Bounds | null>(() => {
+    const hoveredId = this.gesture.hoveredElementId();
+    if (
+      !hoveredId ||
+      this.gesture.isDraggingEl() ||
+      this.gesture.isResizing() ||
+      this.gesture.isRotating() ||
+      this.selectedElementIds().includes(hoveredId)
+    ) {
+      return null;
+    }
+    void this.gesture.flowCacheVersion(); // register reactive dependency
+    const pageId = this.findPageIdByElementId(hoveredId);
+    if (!pageId) return null;
+    const elements = this.getPageElementsById(pageId);
+    const hovered = this.element.findElementById(hoveredId, elements);
+    if (!hovered || hovered.type === 'frame') return null;
+
+    // For transformed elements, live DOM gives the AABB.
+    // Pure 2D rotation: derive model-sized rotated box (outline rotated via CSS).
+    // Skew / 3D / scale: use AABB directly so the hover outline is never distorted.
+    if (this.hasNonTrivialTransform(hovered)) {
+      const aabb = this.gesture.isFlowBoundsDirty()
+        ? this.gesture.getCachedOverlaySceneBounds(hovered)
+        : (this.gesture.getLiveOverlaySceneBounds(hovered) ??
+          this.gesture.getCachedOverlaySceneBounds(hovered));
+      if (this.hasOnlyRotation(hovered)) {
+        return this.getRotatedElementOverlayBounds(hovered, elements, aabb);
+      }
+      return aabb;
+    }
+
+    // Same two-pass strategy as selectionOverlayBounds:
+    // dirty → cached bounds (avoids stale DOM); clean → live DOM (accurate after render).
+    if (this.gesture.isFlowBoundsDirty()) {
+      return this.gesture.getCachedOverlaySceneBounds(hovered);
+    }
+    return (
+      this.gesture.getLiveOverlaySceneBounds(hovered) ??
+      this.gesture.getCachedOverlaySceneBounds(hovered)
+    );
+  });
+
+  readonly hoveredOutlineTransform = computed<string | null>(() => {
+    const hoveredId = this.gesture.hoveredElementId();
+    if (!hoveredId) return null;
+    const pageId = this.findPageIdByElementId(hoveredId);
+    if (!pageId) return null;
+    const elements = this.getPageElementsById(pageId);
+    const el = this.element.findElementById(hoveredId, elements);
+    if (!el) return null;
+    return this.buildOutlineTransform(el);
+  });
+
+  readonly hoveredOutlineTransformOrigin = computed<string | null>(() => {
+    const hoveredId = this.gesture.hoveredElementId();
+    if (!hoveredId) return null;
+    const pageId = this.findPageIdByElementId(hoveredId);
+    if (!pageId) return null;
+    const elements = this.getPageElementsById(pageId);
+    const el = this.element.findElementById(hoveredId, elements);
+    if (!el || !this.hasOnlyRotation(el)) return null;
+    return `${el.transformOriginX ?? 50}% ${el.transformOriginY ?? 50}%`;
+  });
+
+  readonly multiSelectOverlayBounds = computed<Bounds[]>(() => {
+    const selectedElements = this.selectedElements();
+    if (selectedElements.length <= 1) return [];
+    void this.gesture.flowCacheVersion();
+    return selectedElements.map((el) => this.gesture.getCachedOverlaySceneBounds(el));
+  });
+
+  readonly syncedSelectionOverlayBounds = computed<Bounds[]>(() => {
+    const els = this.getSyncedSelectionHighlightElements(this.selectedElements(), this.elements());
+    if (els.length === 0) return [];
+    void this.gesture.flowCacheVersion();
+    return els.map((el) => this.gesture.getCachedOverlaySceneBounds(el));
+  });
+
+  // ── Exported template helpers ─────────────────────────────
+  readonly getFrameTitle = getFrameTitle;
+
   // ── API / Generation State ────────────────────────────────
 
   readonly apiError = this.page.apiError;
-  readonly isLoadingDesign = signal(false);
+  readonly isLoadingDesign = signal(true);
+  readonly loadingMessage = signal('Preparing the editor...');
+  readonly loadingPercent = signal(5);
+  readonly loadingFadingOut = signal(false);
   readonly isSavingDesign = signal(false);
   readonly lastSavedAt = signal<string | null>(null);
 
@@ -228,7 +506,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   constructor() {
     this.loadProjectDesign();
 
-    // Wire gesture service to canvas DOM + Pixi scene state
+    // Wire gesture service to canvas DOM
     this.gesture.setCanvasElementGetter(
       () => document.querySelector('.canvas-container') as HTMLElement | null,
     );
@@ -250,184 +528,32 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.gesture.invalidateFlowBoundsCache();
     });
 
-    // ── PixiJS Sync Effects ─────────────────────────────────
-
-    // Sync viewport (pan + zoom) to PixiJS containers
+    // Sync dot-grid CSS vars so the glow mask can align with the dots.
     effect(() => {
-      const offset = this.viewport.viewportOffset();
-      const zoom = this.viewport.zoomLevel();
-      this.pixiApp.syncViewport(offset.x, offset.y, zoom);
-      this.pixiGrid.syncGrid(offset.x, offset.y, zoom);
+      const s = this.hostEl.nativeElement.style;
+      s.setProperty('--dot-size', this.viewport.canvasBackgroundSize());
+      s.setProperty('--dot-pos', this.viewport.canvasBackgroundPosition());
     });
 
-    // Sync elements + page layouts → PixiJS renderer
+    // Animate toast in with GSAP when it first appears.
     effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const pages = this.pages();
-      const currentPageId = this.currentPageId();
-      const layouts = this.page.pageLayouts();
-      const editingTextId = this.editingTextElementId();
-      const zoom = this.viewport.zoomLevel();
-      const selectedPageId = this.page.selectedCanvasPageId();
-      const selectedElementIds = this.selectedElementIds();
-      const isElementDragging = this.gesture.isDraggingEl();
-      const selectedToolbarPageId =
-        !isElementDragging && selectedElementIds.length === 0 ? selectedPageId : null;
-
-      const pixiPages = pages.map((p) => {
-        const layout = layouts.find((l) => l.pageId === p.id);
-        return {
-          pageId: p.id,
-          elements: p.elements,
-          layout: layout ?? {
-            pageId: p.id,
-            x: 0,
-            y: 0,
-            width: p.viewportWidth ?? 1280,
-            height: p.viewportHeight ?? 720,
-          },
-        };
-      });
-
-      // Compute flow-drag render state from transient drag signals
-      this.pixiRenderer.setEditingTextElementId(editingTextId);
-      // Only activate when isDragging is true (after threshold exceeded),
-      // not on pointerdown — so the element stays at its yoga position
-      // and the selection outline remains correct until actual drag starts.
-      const draggingId = this.gesture.draggingFlowChildId();
-      const ghostBounds = this.gesture.flowDragPlaceholder();
-      const dropTarget = this.gesture.layoutDropTarget();
-      const isFlowDragInsideContainer = !!dropTarget;
-      const flowDragState: FlowDragRenderState | null =
-        isElementDragging && draggingId && ghostBounds
-          ? {
-              draggingElementId: draggingId,
-              floatingBounds: ghostBounds.bounds,
-              placeholder:
-                isFlowDragInsideContainer && dropTarget
-                  ? { containerId: dropTarget.containerId, dropIndex: dropTarget.index }
-                  : null,
-            }
-          : null;
-
-      this.pixiRenderer.syncPages(pixiPages, currentPageId, flowDragState, zoom);
-
-      // Sync page shells
-      const pageNames = new Map(pages.map((p) => [p.id, p.name]));
-      const editingPageId = this.page.editingCanvasHeaderPageId();
-      this.pixiPageShells.syncPageShells(
-        layouts,
-        currentPageId,
-        this.viewport.zoomLevel(),
-        pageNames,
-        selectedToolbarPageId,
-        editingPageId,
-      );
-    });
-
-    // Sync selection overlay
-    effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const selected = this.selectedElement();
-      const elements = this.elements();
-      const zoom = this.viewport.zoomLevel();
-      const layout = this.page.activePageLayout();
-      const isDragging = this.gesture.isDraggingEl();
-      const editingText = this.editingTextElementId();
-      const selectedElements = this.selectedElements();
-
-      if (isDragging || editingText) {
-        this.pixiOverlays.drawSelectionOutline(null, elements, zoom, layout, false);
-        this.pixiOverlays.drawSyncedSelectionOutlines([], elements, zoom, layout);
-        return;
+      const toast = this.fileImportToast();
+      if (toast && this.wasToastNull) {
+        this.wasToastNull = false;
+        requestAnimationFrame(() => {
+          const el = this.hostEl.nativeElement.querySelector(
+            '.file-import-toast',
+          ) as HTMLElement | null;
+          if (el) {
+            gsap.fromTo(
+              el,
+              { opacity: 0, y: 10 },
+              { opacity: 1, y: 0, duration: 0.22, ease: 'power3.out' },
+            );
+          }
+        });
       }
-
-      const showHandles =
-        !!selected &&
-        selected.type !== 'frame' &&
-        selected.type !== 'text' &&
-        selected.widthMode !== 'fill' &&
-        selected.heightMode !== 'fill';
-      this.pixiOverlays.drawSelectionOutline(selected, elements, zoom, layout, showHandles);
-      this.pixiOverlays.drawSyncedSelectionOutlines(
-        this.getSyncedSelectionHighlightElements(selectedElements, elements),
-        elements,
-        zoom,
-        layout,
-      );
-
-      // Multi-selection outlines
-      if (selectedElements.length > 1) {
-        this.pixiOverlays.drawMultiSelectionOutlines(selectedElements, elements, zoom, layout);
-      }
-    });
-
-    // Sync hover outline
-    effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const hoveredId = this.gesture.hoveredElementId();
-      const zoom = this.viewport.zoomLevel();
-      const isDragging = this.gesture.isDraggingEl();
-      const selectedIds = this.selectedElementIds();
-
-      if (!hoveredId || isDragging || selectedIds.includes(hoveredId)) {
-        this.pixiOverlays.drawHoverOutline(
-          null,
-          this.elements(),
-          zoom,
-          this.page.activePageLayout(),
-        );
-        return;
-      }
-
-      const hoveredPageId = this.findPageIdByElementId(hoveredId);
-      if (!hoveredPageId) {
-        this.pixiOverlays.drawHoverOutline(
-          null,
-          this.elements(),
-          zoom,
-          this.page.activePageLayout(),
-        );
-        return;
-      }
-
-      const hoveredElements = this.getPageElementsById(hoveredPageId);
-      const hoveredLayout = this.page.getPageLayoutById(hoveredPageId);
-      const hovered = this.element.findElementById(hoveredId, hoveredElements);
-      if (!hoveredLayout || hovered?.type === 'frame') {
-        this.pixiOverlays.drawHoverOutline(null, hoveredElements, zoom, hoveredLayout);
-        return;
-      }
-
-      this.pixiOverlays.drawHoverOutline(hovered, hoveredElements, zoom, hoveredLayout);
-    });
-
-    // Sync snap lines
-    effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const lines = this.gesture.snapLines();
-      const zoom = this.viewport.zoomLevel();
-      const layout = this.page.activePageLayout();
-      this.pixiOverlays.drawSnapLines(lines, zoom, layout);
-    });
-
-    // Sync rectangle draw preview
-    effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const preview = this.gesture.rectangleDrawPreview();
-      const layout = this.page.activePageLayout();
-      this.pixiOverlays.drawRectanglePreview(preview, layout);
-    });
-
-    // Sync page shell selection outline
-    effect(() => {
-      if (!this.pixiSceneReady()) return;
-      const isDragging = this.gesture.isDraggingEl();
-      const zoom = this.viewport.zoomLevel();
-
-      void isDragging;
-      void zoom;
-      this.pixiOverlays.drawPageShellSelectionOutline(null, 1);
+      if (!toast) this.wasToastNull = true;
     });
   }
 
@@ -435,45 +561,53 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.page.setCanvasElement(this.getCanvasElement());
     this.restorePendingInitialPageFocus();
 
-    // Initialize PixiJS once the canvas container DOM element is available
-    if (!this.pixiInitPending) {
-      const canvasHost = document.querySelector('.canvas-container') as HTMLElement | null;
-      if (canvasHost) {
-        this.pixiInitPending = true;
-        this.zone.runOutsideAngular(() => {
-          Promise.all([this.pixiApp.init(canvasHost), this.pixiLayout.init()]).then(() => {
-            this.pixiGrid.init();
-            this.pixiRenderer.init();
-            this.pixiOverlays.init();
-            this.pixiPageShells.init();
-            this.setupPixiEventListeners();
-            this.zone.run(() => {
-              this.pixiSceneReady.set(true);
-              this.gesture.setPixiSceneReady(true);
-            });
-          });
-        });
+    // Populate the inline text editor with the element's existing text on the
+    // first CD cycle after the @if block creates the contenteditable div.
+    // textContent is set synchronously so the browser paints it on the first frame.
+    // focus + caret are deferred to setTimeout(0) so they don't run inside the
+    // Angular CD cycle — calling focus() synchronously here can trigger Zone.js
+    // focus events mid-cycle, causing an extra CD pass that resets the editor view.
+    const editingId = this.editingTextElementId();
+    if (editingId && editingId !== this.textEditorInitializedId) {
+      const editor = document.querySelector(
+        `[data-text-editor-id="${editingId}"]`,
+      ) as HTMLElement | null;
+      if (editor) {
+        this.textEditorInitializedId = editingId;
+        const el = this.element.findElementById(editingId, this.editorState.elements());
+        const text = el?.text ?? '';
+        if (editor.textContent !== text) {
+          editor.textContent = text;
+        }
+        setTimeout(() => {
+          const activeEditor = document.querySelector(
+            `[data-text-editor-id="${editingId}"]`,
+          ) as HTMLElement | null;
+          if (!activeEditor) return;
+          if (document.activeElement !== activeEditor) {
+            activeEditor.focus();
+          }
+          this.gesture.placeTextEditorCaretAtEnd(activeEditor);
+        }, 0);
       }
+    } else if (!editingId) {
+      this.textEditorInitializedId = null;
     }
 
-    this.zone.runOutsideAngular(() => {
-      if (this.gesture.isFlowBoundsDirty()) {
-        this.gesture.updateFlowBoundsCache(this.canvasSceneRef()?.nativeElement ?? null);
-        this.gesture.markFlowBoundsCacheClean();
-      }
-    });
+    if (this.gesture.isFlowBoundsDirty()) {
+      this.gesture.updateFlowBoundsCache(this.canvasSceneRef()?.nativeElement ?? null);
+      // Defer the clean signal so it runs as a new zone.js macrotask. Writing
+      // _flowCacheVersion synchronously inside ngAfterViewChecked stays within the
+      // current CD cycle and zone.js never schedules a follow-up tick for it.
+      // With setTimeout(0) the callback is a fresh macrotask: zone.js detects its
+      // completion and triggers another CD cycle, causing selectionOverlayBounds to
+      // re-evaluate with dirty=false and read correct live DOM bounds.
+      setTimeout(() => this.gesture.markFlowBoundsCacheClean(), 0);
+    }
   }
 
   ngOnDestroy(): void {
-    this.pixiSceneReady.set(false);
-    this.gesture.setPixiSceneReady(false);
-
-    // Cleanup PixiJS
-    this.pixiRenderer.destroy();
-    this.pixiOverlays.destroy();
-    this.pixiGrid.destroy();
-    this.pixiPageShells.destroy();
-    this.pixiLayout.destroy();
+    // No pixi services to clean up
   }
 
   async flushPendingPersistence(): Promise<boolean> {
@@ -530,6 +664,160 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     this.selectTool(tool);
+  }
+
+  // ── File drag-and-drop ────────────────────────────────────
+
+  private readonly SUPPORTED_IMAGE_TYPES = new Set([
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/webp',
+    'image/avif',
+    'image/bmp',
+    'image/tiff',
+  ]);
+
+  private classifyDropFile(file: File): 'svg' | 'image' | 'unsupported' {
+    if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) return 'svg';
+    if (this.SUPPORTED_IMAGE_TYPES.has(file.type)) return 'image';
+    return 'unsupported';
+  }
+
+  readonly isFileDragOver = signal(false);
+  readonly fileImportToast = signal<{
+    state: 'importing' | 'done' | 'error';
+    message: string;
+  } | null>(null);
+  private wasToastNull = true;
+  private isToastLeaving = false;
+  private fileToastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private startToastLeave(): void {
+    if (this.isToastLeaving) return;
+    this.isToastLeaving = true;
+    const el = this.hostEl.nativeElement.querySelector('.file-import-toast') as HTMLElement | null;
+    if (!el) {
+      this.fileImportToast.set(null);
+      this.isToastLeaving = false;
+      return;
+    }
+    gsap.to(el, {
+      opacity: 0,
+      y: 8,
+      scale: 0.97,
+      duration: 0.2,
+      ease: 'power1.in',
+      overwrite: true,
+      onComplete: () => {
+        this.fileImportToast.set(null);
+        this.isToastLeaving = false;
+      },
+    });
+  }
+
+  private showFileToast(state: 'importing' | 'done' | 'error', message: string): void {
+    if (this.fileToastTimer) clearTimeout(this.fileToastTimer);
+    this.isToastLeaving = false;
+    if (this.fileImportToast()) {
+      const el = this.hostEl.nativeElement.querySelector(
+        '.file-import-toast',
+      ) as HTMLElement | null;
+      if (el) {
+        gsap.killTweensOf(el);
+        gsap.set(el, { opacity: 1, y: 0, scale: 1 });
+      }
+    }
+    this.fileImportToast.set({ state, message });
+    if (state !== 'importing') {
+      this.fileToastTimer = setTimeout(() => this.startToastLeave(), 2800);
+    }
+  }
+
+  dismissFileToast(): void {
+    if (this.fileToastTimer) clearTimeout(this.fileToastTimer);
+    this.startToastLeave();
+  }
+
+  onCanvasDragOver(event: DragEvent): void {
+    const hasFile = Array.from(event.dataTransfer?.items ?? []).some(
+      (item) => item.kind === 'file',
+    );
+    if (!hasFile) return;
+    event.preventDefault();
+    event.dataTransfer!.dropEffect = 'copy';
+    this.isFileDragOver.set(true);
+  }
+
+  onCanvasDragLeave(event: DragEvent): void {
+    const related = event.relatedTarget as HTMLElement | null;
+    const container = event.currentTarget as HTMLElement;
+    if (!related || !container.contains(related)) {
+      this.isFileDragOver.set(false);
+    }
+  }
+
+  onCanvasDrop(event: DragEvent): void {
+    this.isFileDragOver.set(false);
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    if (!files.length) return;
+    event.preventDefault();
+
+    const file = files[0];
+    const kind = this.classifyDropFile(file);
+
+    if (kind === 'unsupported') {
+      const ext = file.name.includes('.')
+        ? '.' + file.name.split('.').pop()!.toLowerCase()
+        : file.type || 'unknown';
+      this.showFileToast('error', `Cannot import ${ext} files`);
+      return;
+    }
+
+    if (kind === 'svg') {
+      this.showFileToast('importing', 'Importing SVG…');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const text = e.target?.result as string;
+        if (!text) {
+          this.showFileToast('error', 'Import failed');
+          return;
+        }
+        try {
+          const sanitized = sanitizeSvg(text);
+          const dims = parseSvgDimensions(text);
+          this.gesture.importSvgContent(sanitized, dims.width, dims.height);
+          this.showFileToast('done', 'SVG imported');
+        } catch {
+          this.showFileToast('error', 'Import failed');
+        }
+      };
+      reader.onerror = () => this.showFileToast('error', 'Import failed');
+      reader.readAsText(file);
+      return;
+    }
+
+    // kind === 'image'
+    if (!Number.isInteger(this.projectIdAsNumber)) {
+      this.showFileToast('error', 'Save the project first');
+      return;
+    }
+    this.showFileToast('importing', 'Uploading image…');
+    this.projectService.uploadImageAsset(this.projectIdAsNumber, file).subscribe({
+      next: ({ assetUrl }) => {
+        const img = new Image();
+        img.onload = () => {
+          this.gesture.importImageAsset(assetUrl, img.naturalWidth, img.naturalHeight);
+          this.showFileToast('done', 'Image imported');
+        };
+        img.onerror = () => {
+          this.gesture.importImageAsset(assetUrl, 400, 400);
+          this.showFileToast('done', 'Image imported');
+        };
+        img.src = assetUrl;
+      },
+      error: () => this.showFileToast('error', 'Upload failed'),
+    });
   }
 
   selectTool(tool: CanvasElementType | 'select'): void {
@@ -888,6 +1176,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.gesture.beginResize(event, id, handle);
   }
 
+  onFontSizeResizeHandlePointerDown(event: MouseEvent, id: string): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.gesture.setSuppressNextCanvasClick(true);
+    this.selectOnlyElement(id);
+    this.gesture.beginFontSizeResize(event, id);
+  }
+
   onCornerZonePointerDown(event: MouseEvent, id: string, _corner: CornerHandle): void {
     event.stopPropagation();
     event.preventDefault();
@@ -1177,24 +1473,33 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   // ── Global Pointer Events ─────────────────────────────────
 
+  @HostListener('document:dragleave', ['$event'])
+  onDocumentDragLeave(event: DragEvent): void {
+    // relatedTarget is null when cursor leaves the browser viewport
+    if (event.relatedTarget === null) {
+      this.isFileDragOver.set(false);
+    }
+  }
+
   @HostListener('window:pointermove', ['$event'])
   onPointerMove(event: MouseEvent): void {
-    const canvas = this.getCanvasElement();
-    if (canvas) {
-      const rect = canvas.getBoundingClientRect();
-      const insideCanvas =
-        event.clientX >= rect.left &&
-        event.clientX <= rect.right &&
-        event.clientY >= rect.top &&
-        event.clientY <= rect.bottom;
+    const s = this.hostEl.nativeElement.style;
+    s.setProperty('--cursor-x', `${event.clientX}px`);
+    s.setProperty('--cursor-y', `${event.clientY}px`);
 
-      if (insideCanvas) {
-        this.pixiGrid.updatePointerGlow(event.clientX - rect.left, event.clientY - rect.top);
-      } else {
-        this.pixiGrid.hideGlow();
+    // Skip hover tracking while a text element is being edited.
+    // Updating hoveredElementId triggers signal-driven CD cycles which can
+    // interfere with the contenteditable focus/caret state causing the text
+    // to momentarily disappear or the editor to lose focus.
+    if (!this.editingTextElementId()) {
+      const path = event.composedPath() as Element[];
+      const elementEl = path.find(
+        (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('data-element-id'),
+      );
+      const hoveredId = elementEl?.getAttribute('data-element-id') ?? null;
+      if (hoveredId !== this.gesture.hoveredElementId()) {
+        this.gesture.hoveredElementId.set(hoveredId);
       }
-    } else {
-      this.pixiGrid.hideGlow();
     }
 
     this.gesture.handlePointerMove(event);
@@ -1286,6 +1591,85 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   isPanReady(): boolean {
     return this.currentTool() === 'select' || this.viewport.isSpacePressed();
+  }
+
+  // ── DOM Scene Template Helpers ────────────────────────────
+
+  getTopLevelElements(pg: CanvasPageModel): CanvasElement[] {
+    const cm = this.pageChildrenMaps().get(pg.id) ?? this.emptyChildrenMap;
+    return (cm.get(null) ?? []).filter((el) => el.visible !== false);
+  }
+
+  getRootFrames(pg: CanvasPageModel): CanvasElement[] {
+    const cm = this.pageChildrenMaps().get(pg.id) ?? this.emptyChildrenMap;
+    return (cm.get(null) ?? []).filter((el) => el.type === 'frame');
+  }
+
+  getPageShellStyle(pageId: string): Record<string, string> {
+    const layouts = this.page.pageLayouts();
+    const zoom = this.viewport.zoomLevel();
+    return {
+      left: this.pageLayout.getPageShellLeft(pageId, layouts) * zoom + 'px',
+      top: this.pageLayout.getPageShellTop(pageId, layouts) * zoom + 'px',
+      width: this.pageLayout.getPageShellWidth(pageId, layouts) * zoom + 'px',
+      height: this.pageLayout.getPageShellHeight(pageId, layouts) * zoom + 'px',
+    };
+  }
+
+  getPageHeaderStyle(pageId: string): Record<string, string> {
+    const layouts = this.page.pageLayouts();
+    return {
+      left: this.pageLayout.getPageShellHeaderScreenLeft(pageId, layouts) + 'px',
+      top: this.pageLayout.getPageShellHeaderScreenTop(pageId, layouts) + 'px',
+      width: this.pageLayout.getPageShellHeaderScreenWidth(pageId, layouts) + 'px',
+    };
+  }
+
+  getFrameTitleStyle(pageId: string, frame: CanvasElement): Record<string, string> {
+    const layout = this.page.getPageLayoutById(pageId);
+    const zoom = this.viewport.zoomLevel();
+    if (!layout) return {};
+    return {
+      left: (layout.x + frame.x) * zoom + 'px',
+      top: (layout.y + frame.y) * zoom - 19 + 'px',
+    };
+  }
+
+  // ── Page header event handlers ────────────────────────────
+
+  onPageHeaderPointerDown(event: MouseEvent, pageId: string): void {
+    if (event.button !== 0) return;
+    this.selectPageFromToolbar(pageId);
+  }
+
+  onPageHeaderPlayClick(pageId: string): void {
+    this.selectPageFromToolbar(pageId);
+    this.page.openPreviewForPage(this.projectSlug, pageId);
+  }
+
+  onPageHeaderNameDblClick(pageId: string): void {
+    this.selectPageFromToolbar(pageId);
+    const syntheticEvent = { preventDefault: () => {}, stopPropagation: () => {} } as MouseEvent;
+    this.page.onCanvasHeaderPageNameDoubleClick(syntheticEvent, pageId);
+  }
+
+  onPageHeaderAddDeviceClick(event: MouseEvent, pageId: string): void {
+    const btn = event.currentTarget as HTMLElement | null;
+    const rect = btn?.getBoundingClientRect() ?? { left: 0, bottom: 0 };
+    this.suppressNextWindowMenuClose = true;
+    this.selectPageFromToolbar(pageId);
+    this.page.openDeviceFrameMenuAt(rect.left, rect.bottom, pageId);
+  }
+
+  onFrameTitlePointerDown(pageId: string, frameId: string): void {
+    if (this.currentPageId() !== pageId) {
+      this.currentPageId.set(pageId);
+    }
+    this.page.layersFocusedPageId.set(pageId);
+    this.page.selectedPageLayerId.set(null);
+    this.currentTool.set('select');
+    this.gesture.setSuppressNextCanvasClick(true);
+    this.selectOnlyElement(frameId);
   }
 
   // ── Page name editor positioning ──────────────────────────
@@ -1430,7 +1814,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     );
   }
 
-  /** Returns the element currently being text-edited, or null. */
   getTextEditorElement(): CanvasElement | null {
     return this.gesture.getTextEditorElement();
   }
@@ -1459,6 +1842,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly getTextLetterSpacing = getTextLetterSpacing;
   readonly getTextAlignValue = getTextAlignValue;
 
+  getTextEditorPadding(element: CanvasElement): string {
+    const p = element.padding;
+    if (!p) return '0';
+    return `${p.top}px ${p.right}px ${p.bottom}px ${p.left}px`;
+  }
+
   // ── Keyboard ──────────────────────────────────────────────
 
   @HostListener('window:keydown', ['$event'])
@@ -1475,7 +1864,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   handleWindowBlur(): void {
     this.viewport.isSpacePressed.set(false);
     this.viewport.endPan();
-    this.pixiGrid.hideGlow();
     this.gesture.cancelDragState();
     this.history.commitGestureHistory(() => this.createHistorySnapshot());
     this.gesture.finalizeTextEditing(this.editingTextElementId());
@@ -1517,12 +1905,29 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     this.isLoadingDesign.set(true);
+    this.loadingMessage.set('Fetching project details...');
+    this.loadingPercent.set(20);
     this.apiError.set(null);
     this.canPersistDesign = false;
+
+    const loadingStartedAt = Date.now();
+    const hideOverlay = () => {
+      const elapsed = Date.now() - loadingStartedAt;
+      const remaining = Math.max(0, 1000 - elapsed);
+      setTimeout(() => {
+        this.loadingFadingOut.set(true);
+        setTimeout(() => {
+          this.isLoadingDesign.set(false);
+          this.loadingFadingOut.set(false);
+        }, 380);
+      }, remaining);
+    };
 
     this.projectService.getBySlug(this.projectSlug).subscribe({
       next: (project) => {
         this.projectIdAsNumber = project.projectId;
+        this.loadingMessage.set('Loading design...');
+        this.loadingPercent.set(55);
         this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
           next: (response) => {
             const pages = response.pages;
@@ -1539,8 +1944,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
             this.pendingInitialPageFocusId = activePageId;
             this.lastSavedAt.set(response.updatedAt ?? null);
             this.history.resetHistory();
-            this.isLoadingDesign.set(false);
+            this.loadingMessage.set('Finishing up...');
+            this.loadingPercent.set(100);
             this.canPersistDesign = true;
+            hideOverlay();
           },
           error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
             this.apiError.set(extractApiErrorMessage(error, 'Failed to load project design.'));
@@ -1588,7 +1995,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    this.page.focusPageSmooth(pageId, canvasElement);
+    this.page.focusPageInstant(pageId, canvasElement);
     this.pendingInitialPageFocusId = null;
   }
 
@@ -1634,6 +2041,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.persistDesign();
   }
 
+  private generateThumbnailWithDomBounds(): string | null {
+    const domBounds = this.gesture.snapshotAllElementSceneBounds();
+    return generateThumbnail(this.currentPage(), domBounds.size > 0 ? domBounds : null);
+  }
+
   private persistThumbnailIfDue(precomputedThumbnail?: string | null): void {
     if (!Number.isInteger(this.projectIdAsNumber)) {
       return;
@@ -1642,7 +2054,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const thumbnail =
       precomputedThumbnail !== undefined
         ? precomputedThumbnail
-        : (this.captureRenderedThumbnail() ?? generateThumbnail(this.currentPage()));
+        : this.generateThumbnailWithDomBounds();
     if (!thumbnail) {
       return;
     }
@@ -1687,7 +2099,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.pendingProjectFlush.queueAndDispatch(
       this.projectIdAsNumber,
       this.buildCurrentPersistedDesignJson(),
-      this.captureRenderedThumbnail() ?? generateThumbnail(this.currentPage()),
+      this.generateThumbnailWithDomBounds(),
     );
     this.hasTriggeredBrowserExitFlush = true;
   }
@@ -1698,111 +2110,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   private buildCurrentPersistedDesignJson(): string {
     return JSON.stringify(buildPersistedCanvasDesign(this.buildCurrentProjectDocument()));
-  }
-
-  private captureRenderedThumbnail(): string | null {
-    const sourceCanvas = this.pixiApp.canvas;
-    const app = this.pixiApp.pixiApp as {
-      render?: () => void;
-      stage?: unknown;
-      renderer?: { render?: (target?: unknown) => void };
-    } | null;
-    const currentPage = this.currentPage();
-    const layout = this.page.activePageLayout();
-
-    if (!sourceCanvas || !app || !layout || !currentPage) {
-      return null;
-    }
-
-    const targetSceneBounds = this.resolveThumbnailSceneBounds(currentPage, layout);
-
-    const canvasWidth = sourceCanvas.clientWidth || sourceCanvas.width;
-    const canvasHeight = sourceCanvas.clientHeight || sourceCanvas.height;
-    if (
-      canvasWidth <= 0 ||
-      canvasHeight <= 0 ||
-      targetSceneBounds.width <= 0 ||
-      targetSceneBounds.height <= 0
-    ) {
-      return null;
-    }
-
-    const previousOffset = this.viewport.viewportOffset();
-    const previousZoom = this.viewport.zoomLevel();
-    const previousOverlayVisible = this.pixiApp.overlayContainer.visible;
-    const fitPadding = 32;
-    const availableWidth = Math.max(1, canvasWidth - fitPadding);
-    const availableHeight = Math.max(1, canvasHeight - fitPadding);
-    const captureZoom = Math.min(
-      availableWidth / targetSceneBounds.width,
-      availableHeight / targetSceneBounds.height,
-    );
-    const captureOffset = {
-      x: roundToTwoDecimals(
-        (canvasWidth - targetSceneBounds.width * captureZoom) / 2 -
-          targetSceneBounds.x * captureZoom,
-      ),
-      y: roundToTwoDecimals(
-        (canvasHeight - targetSceneBounds.height * captureZoom) / 2 -
-          targetSceneBounds.y * captureZoom,
-      ),
-    };
-
-    try {
-      this.pixiApp.overlayContainer.visible = false;
-      this.pixiGrid.setVisible(false);
-      this.pixiApp.syncViewport(captureOffset.x, captureOffset.y, captureZoom);
-      this.pixiGrid.syncGrid(captureOffset.x, captureOffset.y, captureZoom);
-      this.forcePixiRender(app);
-
-      return generateThumbnailFromCanvas(sourceCanvas, {
-        x: captureOffset.x + targetSceneBounds.x * captureZoom,
-        y: captureOffset.y + targetSceneBounds.y * captureZoom,
-        width: targetSceneBounds.width * captureZoom,
-        height: targetSceneBounds.height * captureZoom,
-      });
-    } finally {
-      this.pixiApp.syncViewport(previousOffset.x, previousOffset.y, previousZoom);
-      this.pixiGrid.setVisible(true);
-      this.pixiGrid.syncGrid(previousOffset.x, previousOffset.y, previousZoom);
-      this.pixiApp.overlayContainer.visible = previousOverlayVisible;
-      this.forcePixiRender(app);
-    }
-  }
-
-  private resolveThumbnailSceneBounds(page: CanvasPageModel, layout: CanvasPageLayout): Bounds {
-    const primaryFrame = this.gesture.getPrimaryFrameFromElements(page.elements);
-    if (!primaryFrame) {
-      return {
-        x: layout.x,
-        y: layout.y,
-        width: layout.width,
-        height: layout.height,
-      };
-    }
-
-    const primaryBounds = this.element.getAbsoluteBounds(primaryFrame, page.elements, page);
-    return {
-      x: roundToTwoDecimals(layout.x + primaryBounds.x),
-      y: roundToTwoDecimals(layout.y + primaryBounds.y),
-      width: primaryBounds.width,
-      height: primaryBounds.height,
-    };
-  }
-
-  private forcePixiRender(app: {
-    render?: () => void;
-    stage?: unknown;
-    renderer?: { render?: (target?: unknown) => void };
-  }): void {
-    if (typeof app.render === 'function') {
-      app.render();
-      return;
-    }
-
-    if (typeof app.renderer?.render === 'function') {
-      app.renderer.render(app.stage);
-    }
   }
 
   // ── Private: Helpers ──────────────────────────────────────
@@ -1852,260 +2159,31 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return document.querySelector('.canvas-container') as HTMLElement | null;
   }
 
-  /** Set up PixiJS stage event listeners to forward interactions to existing handlers. */
-  private setupPixiEventListeners(): void {
-    const app = this.pixiApp.pixiApp;
-    if (!app) return;
-
-    // ── Element interactions (pointerdown, hover, dblclick, contextmenu) ──
-    // Listen on the scene container to catch all element events via bubbling.
-    const sceneContainer = this.pixiApp.sceneContainer;
-
-    sceneContainer.eventMode = 'static';
-    sceneContainer.on('pointerdown', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      const native = e.nativeEvent as MouseEvent;
-      // Prevent the canvas-container DOM handler from also firing
-      native.stopPropagation();
-      this.zone.run(() => this.onElementPointerDown(native, elId));
-    });
-
-    // Stop the native click from bubbling to .canvas-container when a PixiJS element
-    // was clicked — otherwise onCanvasClick() would fire and clear the selection.
-    sceneContainer.on('click', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      (e.nativeEvent as MouseEvent).stopPropagation();
-    });
-
-    sceneContainer.on('pointerover', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      this.zone.run(() => this.gesture.hoveredElementId.set(elId));
-    });
-
-    sceneContainer.on('pointerout', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      this.zone.run(() => {
-        if (this.gesture.hoveredElementId() === elId) {
-          this.gesture.hoveredElementId.set(null);
-        }
-      });
-    });
-
-    sceneContainer.on('rightclick', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      const native = e.nativeEvent as MouseEvent;
-      native.stopPropagation();
-      native.preventDefault();
-      this.zone.run(() => this.onElementContextMenu(native, elId));
-    });
-
-    // Double-click for text editing
-    let lastPointerDownTime = 0;
-    let lastPointerDownId: string | null = null;
-    sceneContainer.on('pointerdown', (e) => {
-      const elId = this.pixiRenderer.getElementIdFromTarget(e.target as any);
-      if (!elId) return;
-      const now = Date.now();
-      if (elId === lastPointerDownId && now - lastPointerDownTime < 400) {
-        const native = e.nativeEvent as MouseEvent;
-        this.zone.run(() => this.onElementDoubleClick(native, elId));
-        lastPointerDownId = null;
-        lastPointerDownTime = 0;
-      } else {
-        lastPointerDownId = elId;
-        lastPointerDownTime = now;
-      }
-    });
-
-    // ── Page shell interactions ──
-    this.pixiPageShells.onShellPointerDown((pageId, pixiEvent) => {
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      native.stopPropagation();
-      this.zone.run(() => this.onPageShellPointerDown(native, pageId));
-    });
-
-    this.pixiPageShells.onShellClick((pageId) => {
-      this.zone.run(() => {
-        if (pageId === this.currentPageId()) {
-          this.onActivePageShellClick(pageId);
-        } else {
-          this.onInactivePageShellClick(pageId);
-        }
-      });
-    });
-
-    // ── Page header interactions ──
-    this.pixiPageShells.onHeaderPointerDown((pageId, pixiEvent) => {
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      native.stopPropagation();
-      this.zone.run(() => {
-        if (native.button !== 0) {
-          return;
-        }
-
-        this.selectPageFromToolbar(pageId);
-      });
-    });
-
-    this.pixiPageShells.onHeaderPlayClick((pageId) => {
-      this.zone.run(() => {
-        this.selectPageFromToolbar(pageId);
-        this.page.openPreviewForPage(this.projectSlug, pageId);
-      });
-    });
-
-    this.pixiPageShells.onHeaderNamePointerDown((pageId, pixiEvent) => {
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      native.stopPropagation();
-      this.zone.run(() => this.onPageNamePointerDown(native, pageId));
-    });
-
-    this.pixiPageShells.onHeaderNameDblClick((pageId) => {
-      this.zone.run(() => {
-        this.selectPageFromToolbar(pageId);
-        const syntheticEvent = {
-          preventDefault: () => {},
-          stopPropagation: () => {},
-        } as MouseEvent;
-        this.page.onCanvasHeaderPageNameDoubleClick(syntheticEvent, pageId);
-      });
-    });
-
-    this.pixiPageShells.onHeaderAddDeviceClick((pageId) => {
-      const canvasEl = this.getCanvasElement();
-      const layouts = this.page.pageLayouts();
-      const offset = this.viewport.viewportOffset();
-      const canvasRect = canvasEl?.getBoundingClientRect() ?? { left: 0, top: 0 };
-      const headerLeft =
-        canvasRect.left + offset.x + this.pageLayout.getPageShellHeaderScreenLeft(pageId, layouts);
-      const headerTop =
-        canvasRect.top + offset.y + this.pageLayout.getPageShellHeaderScreenTop(pageId, layouts);
-      const headerWidth = this.getPageShellToolbarWidth(pageId);
-      const btnLeft = headerLeft + headerWidth - 38;
-      const btnBottom = headerTop + 36;
-      this.suppressNextWindowMenuClose = true;
-      this.zone.run(() => {
-        this.selectPageFromToolbar(pageId);
-        this.page.openDeviceFrameMenuAt(btnLeft, btnBottom, pageId);
-      });
-    });
-
-    this.pixiPageShells.onFrameTitlePointerDown((pageId, frameId) => {
-      this.zone.run(() => {
-        if (this.currentPageId() !== pageId) {
-          this.currentPageId.set(pageId);
-        }
-        this.page.layersFocusedPageId.set(pageId);
-        this.page.selectedPageLayerId.set(null);
-        this.currentTool.set('select');
-        this.gesture.setSuppressNextCanvasClick(true);
-        this.selectOnlyElement(frameId);
-      });
-    });
-
-    // ── Selection overlay handle events ──
-    this.pixiOverlays.onHandlePointerDown((handle, pixiEvent) => {
-      const selEl = this.selectedElement();
-      if (!selEl) return;
-      const nativeEvent = pixiEvent.nativeEvent as MouseEvent;
-      nativeEvent.stopPropagation();
-      nativeEvent.preventDefault();
-      this.zone.run(() => {
-        this.onResizeHandlePointerDown(nativeEvent, selEl.id, handle);
-      });
-    });
-
-    this.pixiOverlays.onCornerRadiusHandlePointerDown((pixiEvent) => {
-      const selEl = this.selectedElement();
-      if (!selEl) return;
-      const nativeEvent = pixiEvent.nativeEvent as MouseEvent;
-      nativeEvent.stopPropagation();
-      nativeEvent.preventDefault();
-      this.zone.run(() => {
-        this.onCornerRadiusHandlePointerDown(nativeEvent, selEl.id);
-      });
-    });
-
-    // ── Selection outline pointerdown (interior click-through + edge resize) ──
-    this.pixiOverlays.onSelectionOutlinePointerDown((pixiEvent) => {
-      const selEl = this.selectedElement();
-      if (!selEl) return;
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      native.stopPropagation();
-      this.zone.run(() => this.onSelectionOutlinePointerDown(native, selEl.id));
-    });
-
-    // ── Selection outline double-click for text editing ──
-    this.pixiOverlays.onSelectionOutlineDoubleClick((pixiEvent) => {
-      const selEl = this.selectedElement();
-      if (!selEl) return;
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      this.zone.run(() => this.onElementDoubleClick(native, selEl.id));
-    });
-
-    // ── Selection outline context menu ──
-    this.pixiOverlays.onSelectionOutlineContextMenu((pixiEvent) => {
-      const selEl = this.selectedElement();
-      if (!selEl) return;
-      const native = pixiEvent.nativeEvent as MouseEvent;
-      native.preventDefault();
-      native.stopPropagation();
-      this.zone.run(() => this.onElementContextMenu(native, selEl.id));
-    });
-  }
-
-  /** Returns the id of the topmost non-frame element whose bounds contain (x, y)
-   *  in active-page coordinates, preferring deeper nested children over parents. */
   private getTopElementIdAtPoint(x: number, y: number): string | null {
     const elements = this.visibleElements();
     let bestId: string | null = null;
     let bestDepth = -1;
 
-    for (let i = 0; i < elements.length; i++) {
-      const el = elements[i];
+    for (const el of elements) {
       if (el.type === 'frame') continue;
-      const b = this.getElementHitTestBounds(el);
+      const live = this.gesture.getLiveElementCanvasBounds(el);
+      const b = live ?? this.element.getAbsoluteBounds(el, elements, this.currentPage());
       if (x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height) {
-        const depth = this.getElementNestingDepth(el, elements);
+        let depth = 0;
+        let parentId = el.parentId ?? null;
+        while (parentId) {
+          const parent = this.element.findElementById(parentId, elements);
+          if (!parent) break;
+          depth++;
+          parentId = parent.parentId ?? null;
+        }
         if (depth > bestDepth) {
           bestId = el.id;
           bestDepth = depth;
         }
       }
     }
-
     return bestId;
-  }
-
-  private getElementHitTestBounds(element: CanvasElement): Bounds {
-    const live = this.gesture.getLiveElementCanvasBounds(element);
-    if (live) {
-      return live;
-    }
-
-    return this.element.getAbsoluteBounds(element, this.elements(), this.currentPage());
-  }
-
-  private getElementNestingDepth(element: CanvasElement, elements: CanvasElement[]): number {
-    let depth = 0;
-    let currentParentId = element.parentId ?? null;
-
-    while (currentParentId) {
-      const parent = this.element.findElementById(currentParentId, elements);
-      if (!parent) {
-        break;
-      }
-
-      depth += 1;
-      currentParentId = parent.parentId ?? null;
-    }
-
-    return depth;
   }
 
   // ── Private: History Shortcuts ────────────────────────────
@@ -2189,7 +2267,26 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) => {
-        return selectedIds.reduce((nextElements, selectedId) => {
+        // Before removing, record the current rendered height of any parent frame that has
+        // heightMode:'fit-content' and whose last child is about to be deleted. When the
+        // deletion leaves the frame empty, CSS fit-content collapses to 0px; we freeze the
+        // frame at its pre-deletion rendered height instead.
+        const page = this.currentPage();
+        const fitContentFrameHeights = new Map<string, number>();
+        for (const selectedId of selectedIds) {
+          const el = elements.find((e) => e.id === selectedId);
+          if (!el?.parentId) continue;
+          const parent = elements.find((e) => e.id === el.parentId);
+          if (!parent || parent.type !== 'frame' || parent.heightMode !== 'fit-content') continue;
+          if (!fitContentFrameHeights.has(parent.id)) {
+            fitContentFrameHeights.set(
+              parent.id,
+              this.element.getRenderedHeight(parent, elements, page),
+            );
+          }
+        }
+
+        const afterRemoval = selectedIds.reduce((nextElements, selectedId) => {
           const withoutElement = removeWithChildren(nextElements, selectedId);
           return this.gesture.removeSyncedCopiesForSourceSubtree(
             selectedId,
@@ -2197,6 +2294,16 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
             nextElements,
           );
         }, elements);
+
+        if (fitContentFrameHeights.size === 0) return afterRemoval;
+
+        return afterRemoval.map((el) => {
+          const frozenH = fitContentFrameHeights.get(el.id);
+          if (frozenH === undefined) return el;
+          const stillHasChildren = afterRemoval.some((e) => e.parentId === el.id);
+          if (stillHasChildren) return el;
+          return { ...el, height: Math.max(1, frozenH), heightMode: undefined };
+        });
       });
       this.clearElementSelection();
     });
@@ -2329,7 +2436,23 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
         this.gesture.runWithHistory(() => {
           this.updateCurrentPageElements((elements) => {
-            return targetIds.reduce((nextElements, targetId) => {
+            const page = this.currentPage();
+            const fitContentFrameHeights = new Map<string, number>();
+            for (const targetId of targetIds) {
+              const el = elements.find((e) => e.id === targetId);
+              if (!el?.parentId) continue;
+              const parent = elements.find((e) => e.id === el.parentId);
+              if (!parent || parent.type !== 'frame' || parent.heightMode !== 'fit-content')
+                continue;
+              if (!fitContentFrameHeights.has(parent.id)) {
+                fitContentFrameHeights.set(
+                  parent.id,
+                  this.element.getRenderedHeight(parent, elements, page),
+                );
+              }
+            }
+
+            const afterRemoval = targetIds.reduce((nextElements, targetId) => {
               const withoutElement = removeWithChildren(nextElements, targetId);
               return this.gesture.removeSyncedCopiesForSourceSubtree(
                 targetId,
@@ -2337,6 +2460,16 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
                 nextElements,
               );
             }, elements);
+
+            if (fitContentFrameHeights.size === 0) return afterRemoval;
+
+            return afterRemoval.map((el) => {
+              const frozenH = fitContentFrameHeights.get(el.id);
+              if (frozenH === undefined) return el;
+              const stillHasChildren = afterRemoval.some((e) => e.parentId === el.id);
+              if (stillHasChildren) return el;
+              return { ...el, height: Math.max(1, frozenH), heightMode: undefined };
+            });
           });
           this.clearElementSelection();
         });

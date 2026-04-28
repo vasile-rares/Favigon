@@ -65,13 +65,233 @@
       class="canvas-container"
       [class.pan-ready]="isPanReady()"
       [class.panning]="viewport.isPanning()"
+      [class.svg-drag-over]="isFileDragOver()"
       (pointerdown)="onCanvasPointerDown($event)"
       (click)="onCanvasClick($event)"
       (wheel)="onCanvasWheel($event)"
-      (contextmenu)="onCanvasContextMenu($event)">
-      <!-- PixiJS canvas is mounted into .canvas-container by CanvasPixiApplicationService -->
+      (contextmenu)="onCanvasContextMenu($event)"
+      (dragover)="onCanvasDragOver($event)"
+      (dragleave)="onCanvasDragLeave($event)"
+      (drop)="onCanvasDrop($event)">
 
-      <!-- Page name inline editor — appears when user double-clicks a page name in PixiJS -->
+      <div class="dom-bg"
+        [style.background-size]="viewport.canvasBackgroundSize()"
+        [style.background-position]="viewport.canvasBackgroundPosition()"></div>
+
+
+      <div class="dom-world" [style.transform]="viewport.canvasViewportTransform()">
+
+        <div class="dom-scene canvas-scene" #canvasScene [style.transform]="viewport.canvasSceneTransform()">
+          @for (pg of pages(); track pg.id) {
+            @if (page.getPageLayoutById(pg.id); as pgLayout) {
+
+              <div class="dom-page-bg"
+                [class.dom-page-bg--active]="pg.id === currentPageId()"
+                [style.left.px]="pgLayout.x"
+                [style.top.px]="pgLayout.y"
+                [style.width.px]="pgLayout.width"
+                [style.height.px]="pgLayout.height"
+                (pointerdown)="onPageShellPointerDown($event, pg.id)"
+                (click)="pg.id === currentPageId() ? onActivePageShellClick(pg.id) : onInactivePageShellClick(pg.id)">
+              </div>
+              <div class="dom-page" [style.left.px]="pgLayout.x" [style.top.px]="pgLayout.y">
+                @for (el of getTopLevelElements(pg); track el.id) {
+                  <app-canvas-dom-element
+                    [element]="el"
+                    [allElements]="pg.elements"
+                    [childrenMap]="pageChildrenMaps().get(pg.id) ?? emptyChildrenMap"
+                    [elementMap]="elementMap()"
+                    [page]="pg"
+                    [editingTextId]="editingTextElementId()"
+                    [draggingElementId]="gesture.draggingFlowChildId()"
+                    [flowDragState]="flowDragState()"
+                    (elementPointerDown)="onElementPointerDown($event.event, $event.id)"
+                    (elementDblClick)="onElementDoubleClick($event.event, $event.id)"
+                    (elementContextMenu)="onElementContextMenu($event.event, $event.id)" />
+                }
+              </div>
+            }
+          }
+
+
+          @if (gesture.rectangleDrawPreview(); as preview) {
+            @if (page.activePageLayout(); as previewLayout) {
+              <div class="rect-draw-preview"
+                [style.left.px]="previewLayout.x + preview.x"
+                [style.top.px]="previewLayout.y + preview.y"
+                [style.width.px]="preview.width"
+                [style.height.px]="preview.height"></div>
+            }
+          }
+
+
+          @if (flowDragState(); as fds) {
+            @if (page.activePageLayout(); as pgLayout) {
+              <div class="flow-drag-ghost"
+                [style.left.px]="pgLayout.x + fds.floatingBounds.x"
+                [style.top.px]="pgLayout.y + fds.floatingBounds.y"
+                [style.width.px]="fds.floatingBounds.width"
+                [style.height.px]="fds.floatingBounds.height"></div>
+            }
+          }
+        </div>
+
+
+        <div class="dom-overlay">
+          @for (pg of pages(); track pg.id) {
+
+            <div class="page-shell-bg"
+              [class.page-shell-bg--active]="pg.id === currentPageId()"
+              [ngStyle]="getPageShellStyle(pg.id)">
+            </div>
+
+            @if (viewport.zoomLevel() >= 0.3) {
+
+              <div class="page-shell-header"
+                [class.page-shell-header--active]="pg.id === currentPageId()"
+                [class.page-shell-header--selected]="pg.id === page.selectedCanvasPageId()"
+                [ngStyle]="getPageHeaderStyle(pg.id)"
+                (pointerdown)="onPageHeaderPointerDown($event, pg.id)">
+                <button type="button" class="page-shell-play-btn"
+                  (click)="$event.stopPropagation(); onPageHeaderPlayClick(pg.id)">
+                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
+                    <polygon points="6,4 20,12 6,20" />
+                  </svg>
+                </button>
+                @if (page.editingCanvasHeaderPageId() !== pg.id) {
+                  <div class="page-shell-info"
+                    (pointerdown)="$event.stopPropagation(); onPageNamePointerDown($event, pg.id)"
+                    (dblclick)="$event.stopPropagation(); onPageHeaderNameDblClick(pg.id)">
+                    <div class="page-shell-name">{{ pg.name }}</div>
+                    <div class="page-shell-device-count">{{ getRootFrames(pg).length }} Device{{ getRootFrames(pg).length !== 1 ? 's' : '' }}</div>
+                  </div>
+                }
+                <button type="button" class="page-shell-add-btn"
+                  (click)="$event.stopPropagation(); onPageHeaderAddDeviceClick($event, pg.id)">
+                  +
+                </button>
+              </div>
+
+
+              @for (frame of getRootFrames(pg); track frame.id) {
+                <div class="frame-title"
+                  [class.frame-title--active]="pg.id === currentPageId()"
+                  [ngStyle]="getFrameTitleStyle(pg.id, frame)"
+                  (pointerdown)="$event.stopPropagation(); onFrameTitlePointerDown(pg.id, frame.id)">
+                  {{ getFrameTitle(frame) }}
+                </div>
+              }
+            }
+          }
+
+
+          @if (hoveredOverlayBounds(); as hb) {
+            <div class="hover-outline"
+              [style.left.px]="hb.x * viewport.zoomLevel()"
+              [style.top.px]="hb.y * viewport.zoomLevel()"
+              [style.width.px]="hb.width * viewport.zoomLevel()"
+              [style.height.px]="hb.height * viewport.zoomLevel()"
+              [style.transform]="hoveredOutlineTransform()"
+              [style.transform-origin]="hoveredOutlineTransformOrigin()"></div>
+          }
+
+
+          @for (mb of multiSelectOverlayBounds(); track $index) {
+            <div class="multi-select-outline"
+              [style.left.px]="mb.x * viewport.zoomLevel()"
+              [style.top.px]="mb.y * viewport.zoomLevel()"
+              [style.width.px]="mb.width * viewport.zoomLevel()"
+              [style.height.px]="mb.height * viewport.zoomLevel()"></div>
+          }
+
+
+          @for (sb of syncedSelectionOverlayBounds(); track $index) {
+            <div class="synced-selection-outline"
+              [style.left.px]="sb.x * viewport.zoomLevel()"
+              [style.top.px]="sb.y * viewport.zoomLevel()"
+              [style.width.px]="sb.width * viewport.zoomLevel()"
+              [style.height.px]="sb.height * viewport.zoomLevel()"></div>
+          }
+
+
+          @if (selectionOutlineDisplayBounds(); as sb) {
+            <div class="selection-outline"
+              [style.left.px]="sb.x * viewport.zoomLevel()"
+              [style.top.px]="sb.y * viewport.zoomLevel()"
+              [style.width.px]="sb.width * viewport.zoomLevel()"
+              [style.height.px]="sb.height * viewport.zoomLevel()"
+              [style.transform]="selectionOutlineTransform()"
+              [style.transform-origin]="selectionOutlineTransformOrigin()"
+              (pointerdown)="onSelectionOutlinePointerDown($event, selectedElementId()!)"
+              (dblclick)="onElementDoubleClick($event, selectedElementId()!)"
+              (contextmenu)="onElementContextMenu($event, selectedElementId()!)">
+              @switch (selectionHandleMode()) {
+                @case ('text-fit-fit') {
+
+                  <div class="sel-handle sel-handle-s" (pointerdown)="$event.stopPropagation(); onFontSizeResizeHandlePointerDown($event, selectedElementId()!)"></div>
+                }
+                @case ('all') {
+                  <div class="sel-handle sel-handle-nw" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'nw')"></div>
+                  <div class="sel-handle sel-handle-ne" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'ne')"></div>
+                  <div class="sel-handle sel-handle-sw" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'sw')"></div>
+                  <div class="sel-handle sel-handle-se" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'se')"></div>
+                  <div class="sel-edge-hit sel-edge-n" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'n')"></div>
+                  <div class="sel-edge-hit sel-edge-s" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 's')"></div>
+                  <div class="sel-edge-hit sel-edge-e" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'e')"></div>
+                  <div class="sel-edge-hit sel-edge-w" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'w')"></div>
+                  <div class="sel-corner-zone sel-corner-nw" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'nw')"></div>
+                  <div class="sel-corner-zone sel-corner-ne" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'ne')"></div>
+                  <div class="sel-corner-zone sel-corner-sw" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'sw')"></div>
+                  <div class="sel-corner-zone sel-corner-se" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'se')"></div>
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
+                    <div class="corner-radius-handle"
+                      [style.left.px]="cornerRadiusHandleOffset() - 4"
+                      [style.top.px]="cornerRadiusHandleOffset() - 4"
+                      (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
+                  }
+                }
+                @case ('ns') {
+
+                  <div class="sel-handle sel-handle-n" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'n')"></div>
+                  <div class="sel-handle sel-handle-s" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 's')"></div>
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
+                    <div class="corner-radius-handle"
+                      [style.left.px]="cornerRadiusHandleOffset() - 4"
+                      [style.top.px]="cornerRadiusHandleOffset() - 4"
+                      (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
+                  }
+                }
+                @case ('ew') {
+
+                  <div class="sel-handle sel-handle-e" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'e')"></div>
+                  <div class="sel-handle sel-handle-w" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'w')"></div>
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
+                    <div class="corner-radius-handle"
+                      [style.left.px]="cornerRadiusHandleOffset() - 4"
+                      [style.top.px]="cornerRadiusHandleOffset() - 4"
+                      (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
+                  }
+                }
+              }
+            </div>
+          }
+
+
+          @for (line of gesture.snapLines(); track $index) {
+            @if (page.activePageLayout(); as layout) {
+              @if (line.type === 'vertical') {
+                <div class="snap-line snap-line-v"
+                  [style.left.px]="(layout.x + line.position) * viewport.zoomLevel()"></div>
+              } @else {
+                <div class="snap-line snap-line-h"
+                  [style.top.px]="(layout.y + line.position) * viewport.zoomLevel()"></div>
+              }
+            }
+          }
+        </div>
+      </div>
+
+
       @if (page.editingCanvasHeaderPageId(); as editingPageId) {
         <input
           class="page-name-editor"
@@ -88,7 +308,7 @@
           (dblclick)="$event.stopPropagation()" />
       }
 
-      <!-- Inline text editor overlay — positioned absolutely over the PixiJS canvas -->
+
       @if (getTextEditorElement(); as editEl) {
         <div
           class="text-inline-editor"
@@ -101,6 +321,8 @@
           [style.top.px]="getTextEditorScreenTop()"
           [style.width.px]="getTextEditorScreenWidth()"
           [style.height.px]="getTextEditorScreenHeight()"
+          [style.box-sizing]="'border-box'"
+          [style.padding]="getTextEditorPadding(editEl)"
           [style.font-size]="getTextFontSize(editEl)"
           [style.font-family]="getTextFontFamily(editEl)"
           [style.font-weight]="getTextFontWeight(editEl)"
@@ -108,7 +330,9 @@
           [style.line-height]="getTextLineHeight(editEl)"
           [style.letter-spacing]="getTextLetterSpacing(editEl)"
           [style.text-align]="getTextAlignValue(editEl)"
+          [style.word-break]="(editEl.widthMode ?? 'fixed') === 'fixed' ? 'break-word' : null"
           [style.color]="editEl.fill"
+          [style.white-space]="(editEl.widthMode ?? 'fixed') === 'fixed' ? 'pre-wrap' : 'pre'"
           [style.transform]="'scale(' + viewport.zoomLevel() + ')'"
           [style.transform-origin]="'0 0'"
           (pointerdown)="onTextEditorPointerDown($event)"
@@ -141,7 +365,49 @@
       (numberInputGestureStarted)="onPropertyNumberGestureStarted()"
       (numberInputGestureCommitted)="onPropertyNumberGestureCommitted()"
       (elementPatch)="onSelectedElementPatch($event)"></app-properties-panel>
+
+
+    @if (isFileDragOver()) {
+      <div class="svg-drop-overlay" aria-hidden="true">
+        <div class="svg-drop-overlay__inner">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          <span>Drop file to import</span>
+        </div>
+      </div>
+    }
+
+
+    @if (fileImportToast(); as toast) {
+      <div class="file-import-toast glass-panel" [class.file-import-toast--error]="toast.state === 'error'" role="status" aria-live="polite">
+        <div class="file-import-toast__icon">
+          @if (toast.state === 'importing') {
+            <div class="file-import-toast__spinner"></div>
+          }
+          @if (toast.state === 'done') {
+            <svg class="file-import-toast__icon--success" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          }
+          @if (toast.state === 'error') {
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          }
+        </div>
+        <span class="file-import-toast__message">{{ toast.message }}</span>
+        @if (toast.state !== 'importing') {
+          <button class="file-import-toast__dismiss" [class.file-import-toast__dismiss--error]="toast.state === 'error'" (click)="dismissFileToast()" type="button" aria-label="Dismiss">
+            Dismiss
+          </button>
+        }
+      </div>
+    }
   </div>
+
+  @if (isLoadingDesign()) {
+    <app-canvas-loading-overlay
+      [message]="loadingMessage()"
+      [percent]="loadingPercent()"
+      [fadingOut]="loadingFadingOut()" />
+  }
 </div>
 
 @if (contextMenu.isOpen()) {

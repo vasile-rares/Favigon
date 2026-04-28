@@ -15,7 +15,6 @@ namespace Favigon.Infrastructure.Migrations
     [Migration("20260315120000_AddThumbnailDataUrl")]
     partial class AddThumbnailDataUrl
     {
-        /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618

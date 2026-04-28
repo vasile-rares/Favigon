@@ -3,11 +3,6 @@ using Favigon.Converter.Utils;
 
 namespace Favigon.Converter.Generators;
 
-/// <summary>
-/// Framework-agnostic mapper implementations.
-/// Framework-specific behaviour (class attribute name, link href format, image src syntax)
-/// is injected via delegates so the same logic runs for HTML, Angular, and React.
-/// </summary>
 internal static class MapperLogic
 {
   internal static string EmitText(
@@ -20,6 +15,12 @@ internal static class MapperLogic
     var href = IrProps.GetString(node, "href");
     var inline = IrProps.GetBool(node, "inline");
     var tag = IrProps.ResolveTag(node, inline ? "span" : "p", "div", "p", "span", "label");
+
+    // Wrap content in an inner <span> so background-color only covers text width,
+    // not the full block width of the outer element.
+    var bgColor = node.Style?.BackgroundColor;
+    if (!string.IsNullOrEmpty(bgColor))
+      content = $"<span style=\"background-color: {bgColor}\">{content}</span>";
 
     if (!string.IsNullOrWhiteSpace(href))
       return FrameworkMapperBase.Paired("a", buildLinkAttrs(node, href), content, ctx.Indent, inlineContent: true);
@@ -88,5 +89,17 @@ internal static class MapperLogic
     var attrs = FrameworkMapperBase.AppendAriaLabel(node, nodeClass(node));
     attrs += FrameworkMapperBase.FocusAttr(node);
     return FrameworkMapperBase.Paired(tag, attrs, FrameworkMapperBase.EmitChildren(node, ctx), ctx.Indent);
+  }
+
+  internal static string EmitSvg(
+    IRNode node,
+    EmitContext ctx,
+    Func<IRNode, string> nodeClass)
+  {
+    var svgContent = IrProps.GetString(node, "svgContent");
+    var attrs = nodeClass(node);
+    // Inline the raw SVG markup as the element's content.
+    // The wrapper div carries the sizing/positioning CSS class.
+    return FrameworkMapperBase.Paired("div", attrs, svgContent, ctx.Indent, inlineContent: true);
   }
 }

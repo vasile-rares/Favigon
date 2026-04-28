@@ -1,0 +1,96 @@
+:host {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  background: var(--color-bg-page);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* ── Panel ─────────────────────────────────────────────────── */
+.loading-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.6rem;
+  width: 280px;
+}
+
+/* ── Logo ──────────────────────────────────────────────────── */
+.loading-logo {
+  height: 40px;
+  opacity: 0.9;
+  user-select: none;
+  pointer-events: none;
+  filter: drop-shadow(0 0 18px rgba(13, 153, 255, 0.25));
+}
+
+/* ── Progress bar ──────────────────────────────────────────── */
+.loading-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.loading-fill {
+  position: relative;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    #0d99ff 0%,
+    #38bdf8 18%,
+    #a78bfa 38%,
+    #f472b6 58%,
+    #38bdf8 78%,
+    #0d99ff 100%
+  );
+  background-size: 250% 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  animation: prism-flow 3s linear infinite;
+}
+
+.loading-fill::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.35) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.loading-shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.55) 50%,
+    transparent 100%
+  );
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+@keyframes prism-flow {
+  from {
+    background-position: 0% 50%;
+  }
+  to {
+    background-position: 250% 50%;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(200%);
+  }
+}

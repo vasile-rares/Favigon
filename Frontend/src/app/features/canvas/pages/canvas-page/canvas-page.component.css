@@ -117,20 +117,534 @@
   position: absolute;
   z-index: 20;
   display: block;
-  box-sizing: content-box;
   min-width: 24px;
   min-height: 4px;
   margin: 0;
-  padding: 0;
   overflow: hidden;
   border: none;
-  outline: none;
+  outline: 1px solid rgba(0, 0, 0, 0.8);
+  outline-offset: 1px;
   background: transparent;
   color: inherit;
   font: inherit;
-  white-space: pre-wrap;
+  white-space: pre; /* overridden inline for fixed-width text elements */
   overflow-wrap: normal;
   text-indent: 0;
   caret-color: currentColor;
   cursor: text;
+}
+
+/* -- DOM Viewport -------------------------------------------- */
+
+.dom-bg {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.18) 1px, transparent 1px);
+  pointer-events: none;
+}
+
+.dom-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle 220px at var(--cursor-x, -9999px) var(--cursor-y, -9999px),
+    rgba(255, 255, 255, 0.65) 0%,
+    transparent 70%
+  );
+  mask-image: radial-gradient(circle, black 1px, transparent 1px);
+  mask-size: var(--dot-size, 20px 20px);
+  mask-position: var(--dot-pos, 0 0);
+  -webkit-mask-image: radial-gradient(circle, black 1px, transparent 1px);
+  -webkit-mask-size: var(--dot-size, 20px 20px);
+  -webkit-mask-position: var(--dot-pos, 0 0);
+  pointer-events: none;
+}
+
+.dom-world {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dom-scene {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: auto;
+}
+
+.dom-page-bg {
+  position: absolute;
+  pointer-events: auto;
+  cursor: default;
+}
+
+.dom-page {
+  position: absolute;
+}
+
+.dom-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* -- Page shells -------------------------------------------- */
+
+.page-shell-bg {
+  position: absolute;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.page-shell-bg--active {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.page-shell-header {
+  position: absolute;
+  height: auto;
+  min-height: 36px;
+  background: rgba(30, 30, 36, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  pointer-events: auto;
+  cursor: default;
+  white-space: nowrap;
+  overflow: hidden;
+  min-width: 0;
+}
+.page-shell-header--active {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+.page-shell-header--selected {
+  border-color: #3b82f6;
+}
+
+.page-shell-play-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.page-shell-play-btn:hover {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.page-shell-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+  cursor: pointer;
+}
+.page-shell-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.75);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: Inter, system-ui, sans-serif;
+}
+.page-shell-header--active .page-shell-name {
+  color: rgba(255, 255, 255, 0.95);
+}
+.page-shell-device-count {
+  font-size: 10px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: Inter, system-ui, sans-serif;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.page-shell-header--active .page-shell-device-count {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.page-shell-add-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 4px 6px;
+  font-size: 16px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.page-shell-add-btn:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.frame-title {
+  position: absolute;
+  font-size: 13px;
+  font-weight: 500;
+  color: #888888;
+  font-family: Inter, system-ui, sans-serif;
+  pointer-events: auto;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1;
+}
+.frame-title--active {
+  color: #ffffff;
+}
+
+/* -- Overlays ------------------------------------------------ */
+
+.hover-outline {
+  position: absolute;
+  outline: 1px solid #3b82f6;
+  pointer-events: none;
+  transform-origin: center center;
+}
+
+.multi-select-outline {
+  position: absolute;
+  outline: 1px solid rgba(59, 130, 246, 0.5);
+  pointer-events: none;
+}
+
+.synced-selection-outline {
+  position: absolute;
+  outline: 1px solid rgba(59, 130, 246, 0.28);
+  pointer-events: none;
+}
+
+.selection-outline {
+  position: absolute;
+  outline: 1px solid #3b82f6;
+  pointer-events: auto;
+  cursor: default;
+  transform-origin: center center;
+}
+
+.sel-handle {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  background: white;
+  border: 1px solid #3b82f6;
+  border-radius: 50%;
+  pointer-events: auto;
+  z-index: 1;
+}
+.sel-handle-nw {
+  left: -4px;
+  top: -4px;
+  cursor:
+    url('/cursor-resize-nwse.svg') 12 12,
+    nw-resize !important;
+}
+.sel-handle-ne {
+  right: -4px;
+  top: -4px;
+  cursor:
+    url('/cursor-resize-nesw.svg') 12 12,
+    ne-resize !important;
+}
+.sel-handle-sw {
+  left: -4px;
+  bottom: -4px;
+  cursor:
+    url('/cursor-resize-nesw.svg') 12 12,
+    sw-resize !important;
+}
+.sel-handle-se {
+  right: -4px;
+  bottom: -4px;
+  cursor:
+    url('/cursor-resize-nwse.svg') 12 12,
+    se-resize !important;
+}
+.sel-handle-n {
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor:
+    url('/cursor-resize-ns.svg') 12 12,
+    n-resize !important;
+}
+.sel-handle-s {
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor:
+    url('/cursor-resize-ns.svg') 12 12,
+    s-resize !important;
+}
+.sel-handle-e {
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor:
+    url('/cursor-resize-ew.svg') 12 12,
+    e-resize !important;
+}
+.sel-handle-w {
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor:
+    url('/cursor-resize-ew.svg') 12 12,
+    w-resize !important;
+}
+
+.sel-edge-hit {
+  position: absolute;
+  pointer-events: auto;
+  opacity: 0;
+}
+.sel-edge-n {
+  top: -4px;
+  left: 8px;
+  right: 8px;
+  height: 8px;
+  cursor:
+    url('/cursor-resize-ns.svg') 12 12,
+    n-resize !important;
+}
+.sel-edge-s {
+  bottom: -4px;
+  left: 8px;
+  right: 8px;
+  height: 8px;
+  cursor:
+    url('/cursor-resize-ns.svg') 12 12,
+    s-resize !important;
+}
+.sel-edge-e {
+  right: -4px;
+  top: 8px;
+  bottom: 8px;
+  width: 8px;
+  cursor:
+    url('/cursor-resize-ew.svg') 12 12,
+    e-resize !important;
+}
+.sel-edge-w {
+  left: -4px;
+  top: 8px;
+  bottom: 8px;
+  width: 8px;
+  cursor:
+    url('/cursor-resize-ew.svg') 12 12,
+    w-resize !important;
+}
+
+.sel-corner-zone {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: auto;
+  cursor:
+    url('/cursor-rotate.svg') 12 12,
+    grab !important;
+}
+.sel-corner-nw {
+  left: -16px;
+  top: -16px;
+}
+.sel-corner-ne {
+  right: -16px;
+  top: -16px;
+}
+.sel-corner-sw {
+  left: -16px;
+  bottom: -16px;
+}
+.sel-corner-se {
+  right: -16px;
+  bottom: -16px;
+}
+
+.corner-radius-handle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: white;
+  border: 1.5px solid #3b82f6;
+  border-radius: 50%;
+  /* left/top are set dynamically via [style] binding = cornerRadius * zoom - 4 */
+  pointer-events: auto;
+  cursor:
+    url('/cursor-canvas.svg') 4 2,
+    auto !important;
+}
+
+/* -- SVG drag-and-drop ---------------------------------------- */
+
+.canvas-container.svg-drag-over {
+  outline: 2px dashed rgba(139, 92, 246, 0.7);
+  outline-offset: -3px;
+}
+
+.svg-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 10, 15, 0.55);
+  backdrop-filter: blur(2px);
+  pointer-events: none;
+}
+
+.svg-drop-overlay__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.svg-drop-overlay__inner svg {
+  opacity: 0.75;
+}
+
+/* -- File import toast ---------------------------------------- */
+
+.file-import-toast {
+  position: absolute;
+  bottom: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.3rem 0.3rem 0.3rem 14px;
+  border-radius: 16px;
+  color: var(--color-text-light);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.file-import-toast--error .file-import-toast__icon {
+  color: #f87171;
+}
+
+.file-import-toast__icon--success {
+  color: #4ade80;
+}
+
+.file-import-toast__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.file-import-toast__message {
+  flex: 1;
+  color: var(--color-text-light);
+}
+
+.file-import-toast__spinner {
+  width: 14px;
+  height: 14px;
+  border: 1.75px solid rgba(255, 255, 255, 0.18);
+  border-top-color: rgba(255, 255, 255, 0.88);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+.file-import-toast__dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.1rem;
+  padding: 0 12px;
+  border: none;
+  outline: none;
+  border-radius: calc(16px - 0.2rem);
+  background: transparent;
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.5));
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  vertical-align: middle;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-text-light);
+  }
+}
+
+.file-import-toast__dismiss--error {
+  color: #f87171;
+
+  &:hover {
+    background: rgba(239, 68, 68, 0.12);
+    color: #fca5a5;
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* -- Snap lines -------------------------------------------- */
+
+.snap-line {
+  position: absolute;
+  background: #ea47ff;
+  pointer-events: none;
+}
+.snap-line-v {
+  top: -10000px;
+  bottom: -10000px;
+  width: 1px;
+}
+.snap-line-h {
+  left: -10000px;
+  right: -10000px;
+  height: 1px;
+}
+
+/* -- Draw / drag previews ---------------------------------- */
+
+.rect-draw-preview {
+  position: absolute;
+  background: rgba(224, 224, 224, 0.5);
+  border: 1px solid #3b82f6;
+  pointer-events: none;
+}
+
+.flow-drag-ghost {
+  position: absolute;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px dashed #3b82f6;
+  border-radius: 4px;
+  pointer-events: none;
 }

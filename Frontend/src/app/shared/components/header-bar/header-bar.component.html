@@ -2,7 +2,7 @@
   class="header-bar"
   [class.header-bar--canvas]="appearance() === 'canvas' || appearance() === 'preview'"
   [class.header-bar--preview]="appearance() === 'preview'">
-  <!-- Left: Brand -->
+  
   <div class="header-section header-section--left">
     <nav class="breadcrumb-nav" aria-label="Context breadcrumb">
       <img src="/favigon-text.svg" alt="Favigon" class="header-brand-logo" />
@@ -50,7 +50,7 @@
     </div>
   }
 
-  <!-- Right: Search + Actions + User menu -->
+  
   <div class="header-section header-section--right">
     @if (!isProjectContext) {
       <app-project-search #projectSearch></app-project-search>

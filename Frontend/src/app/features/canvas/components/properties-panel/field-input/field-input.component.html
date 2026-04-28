@@ -21,6 +21,14 @@
     [objectFit]="objectFit()"
     [imageAltText]="imageAltText()"
     [initialColorMode]="initialColorMode()"
+    [gradient]="gradient()"
+    [solidColorOnly]="solidColorOnly()"
+    [textShadowValue]="textShadowValue()"
+    [textDecorationLine]="textDecorationLine()"
+    [textDecorationColor]="textDecorationColor()"
+    [textDecorationStyle]="textDecorationStyle()"
+    [textDecorationThickness]="textDecorationThickness()"
+    [textDecorationThicknessUnit]="textDecorationThicknessUnit()"
     [effectTemplate]="effectSlot"
     (patchRequested)="patchRequested.emit($event)"
     (numberGestureStarted)="numberGestureStarted.emit()"
@@ -69,11 +77,23 @@
             </svg>
           </span>
 }
+          @case ('text-shadow') {
+<span
+            class="field-input__color-swatch"
+            [style.background]="textShadowSwatchColor">
+          </span>
+}
+          @case ('text-decoration') {
+<span
+            class="field-input__color-swatch"
+            [style.background]="textDecorationSwatchColor">
+          </span>
+}
         }
 
         <span class="field-input__trigger-text">{{ triggerText() }}</span>
       </button>
-      @if (showClearButton) {
+      @if (showClearButton && !hideClearButton()) {
 <button
 
         type="button"
@@ -85,8 +105,6 @@
     </div>
 
 }
-
-
 
   <div
     #popupPanel
@@ -120,6 +138,14 @@
       [objectFit]="objectFit()"
       [imageAltText]="imageAltText()"
       [initialColorMode]="initialColorMode()"
+      [gradient]="gradient()"
+      [solidColorOnly]="solidColorOnly()"
+      [textShadowValue]="textShadowValue()"
+      [textDecorationLine]="textDecorationLine()"
+      [textDecorationColor]="textDecorationColor()"
+      [textDecorationStyle]="textDecorationStyle()"
+      [textDecorationThickness]="textDecorationThickness()"
+      [textDecorationThicknessUnit]="textDecorationThicknessUnit()"
       [effectTemplate]="effectSlot"
       (patchRequested)="patchRequested.emit($event)"
       (numberGestureStarted)="numberGestureStarted.emit()"

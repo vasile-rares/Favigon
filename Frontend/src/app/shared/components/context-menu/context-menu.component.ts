@@ -18,7 +18,7 @@ export interface ContextMenuItem {
   shortcut?: string;
   variant?: 'danger';
   disabled?: boolean;
-  /** Render a separator line before this item */
+  
   separator?: boolean;
   children?: ContextMenuItem[];
   action?: () => void;
@@ -45,6 +45,7 @@ export class ContextMenuComponent implements OnInit, OnDestroy {
   adjustedX = 0;
   adjustedY = 0;
   openSubmenuId: string | null = null;
+  submenuFlipAbove = false;
   isClosing = false;
   private closeTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -62,6 +63,10 @@ export class ContextMenuComponent implements OnInit, OnDestroy {
       const _y = this.y();
       const _items = this.items();
       const _dir = this.verticalDirection();
+      if (this.closeTimeout) {
+        clearTimeout(this.closeTimeout);
+        this.closeTimeout = null;
+      }
       this.isClosing = false;
       this.openSubmenuId = null;
       this.adjustPosition();
@@ -100,6 +105,15 @@ export class ContextMenuComponent implements OnInit, OnDestroy {
         this.adjustedY = Math.max(0, this.y() - rect.height);
       }
     });
+  }
+
+  onSubmenuMouseEnter(item: ContextMenuItem, event: MouseEvent): void {
+    if (item.disabled) return;
+    const itemEl = event.currentTarget as HTMLElement;
+    const rect = itemEl.getBoundingClientRect();
+    const estimatedHeight = (item.children?.length ?? 0) * 30 + 10;
+    this.submenuFlipAbove = rect.bottom + estimatedHeight > window.innerHeight - 8;
+    this.openSubmenuId = item.id;
   }
 
   onItemClick(item: ContextMenuItem): void {
