@@ -9,7 +9,7 @@
     (dblclick)="onDblClick($event)"
     (contextmenu)="onContextMenu($event)">
 
-    @if (element().type === 'text' && editingTextId() !== element().id) {
+    @if (element().type === 'text') {
       <div class="canvas-text-wrapper" [ngStyle]="textWrapperStyle()">
         <span class="canvas-text-content" [ngStyle]="textContentStyle()">{{ element().text }}</span>
       </div>

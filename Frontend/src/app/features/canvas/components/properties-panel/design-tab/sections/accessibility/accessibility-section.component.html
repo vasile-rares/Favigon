@@ -1,0 +1,68 @@
+@if (element().type !== 'frame' && element().type !== 'svg') {
+<section
+  class="properties-section properties-section--collapsible"
+  [class.properties-section--compact]="!hasAccessibilityFields(element())"
+  [class.properties-section--actionable]="!hasAccessibilityFields(element())"
+  (click)="!hasAccessibilityFields(element()) && onAccessibilitySectionHeaderClick($event)">
+  <div
+    class="properties-section-header properties-section-header--menu properties-section-header--actionable"
+    (click)="onAccessibilitySectionHeaderClick($event)">
+    <p class="properties-section-title">Accessibility</p>
+    <button
+      type="button"
+      class="pp-section-toggle pp-section-toggle--plus"
+      aria-label="Accessibility options"
+      title="Accessibility options"
+      (click)="onAccessibilitySectionToggleClick($event)">
+      <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+        <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+        <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+      </svg>
+    </button>
+  </div>
+
+  @if (hasAccessibilityField(element(), 'tag') && supportsAccessibilityTag(element())) {
+    <div class="pp-style-row">
+      <span class="pp-row-label">Tag</span>
+      <div class="pp-style-control pp-style-control--dropdown">
+        <app-dropdown-select
+          [disabled]="isAccessibilityTagLocked(element())"
+          [enableSearch]="false"
+          [placeholder]="accessibilityTagPlaceholder(element())"
+          [options]="accessibilityTagOptions(element())"
+          [ngModel]="accessibilityTagValue(element())"
+          (ngModelChange)="onAccessibilityTagChange($event)"></app-dropdown-select>
+      </div>
+    </div>
+  }
+
+  @if (hasAccessibilityField(element(), 'ariaLabel')) {
+    <div class="pp-style-row">
+      <span class="pp-row-label">Aria Label</span>
+      <div class="pp-style-control pp-style-control--dropdown">
+        <input
+          type="text"
+          class="pp-text-input pp-text-input--boxed"
+          [value]="accessibilityLabelValue(element())"
+          (input)="onAccessibilityLabelChange($event)"
+          [placeholder]="accessibilityLabelPlaceholder(element())" />
+      </div>
+    </div>
+  }
+
+  @if (element().type === 'image') {
+    <p class="properties-section-hint">
+      Image labels are exported as alt text.
+    </p>
+  }
+</section>
+}
+
+@if (accessibilityMenuItems.length > 0) {
+<app-context-menu
+  [x]="accessibilityMenuX"
+  [y]="accessibilityMenuY"
+  [verticalDirection]="'below'"
+  [items]="accessibilityMenuItems"
+  (closed)="closeAccessibilityMenu()"></app-context-menu>
+}

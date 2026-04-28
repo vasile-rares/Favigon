@@ -72,6 +72,21 @@
       </div>
     </div>
 
+    @if (element().type === 'text') {
+    <div class="pp-style-row">
+      <span class="pp-row-label">Grow</span>
+      <div class="pp-style-control">
+        <app-toggle-group
+          ariaLabel="Text grow mode"
+          [options]="textGrowOptions"
+          [value]="textGrowValue(element())"
+          [stretch]="true"
+          [minWidth]="null"
+          (valueChange)="onTextGrowChange($event)"></app-toggle-group>
+      </div>
+    </div>
+    }
+
     @if (hasDimensionConstraintField(element(), 'minWidth') && element().type !== 'svg') {
 <div class="pp-style-row pp-style-row--metric">
       <span class="pp-row-label">Min W</span>
@@ -180,7 +195,7 @@
 
 @if (dimensionMenuItems.length > 0) {
 <app-context-menu
- 
+
   [x]="dimensionMenuX"
   [y]="dimensionMenuY"
   [verticalDirection]="'below'"

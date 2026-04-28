@@ -36,11 +36,15 @@
     <!-- -- Element properties --------------------------- -->
     @if (selectedElement(); as element) {
 
-      <app-dt-extras-section
+      <app-dt-link-section
         [element]="element"
         [pages]="pages()"
         [currentPageId]="currentPageId()"
-        (elementPatch)="elementPatch.emit($event)"></app-dt-extras-section>
+        (elementPatch)="elementPatch.emit($event)"></app-dt-link-section>
+
+      <app-dt-position-section
+        [element]="element"
+        (elementPatch)="elementPatch.emit($event)"></app-dt-position-section>
 
 
       <app-dt-dimensions-section
@@ -52,13 +56,17 @@
         (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-dimensions-section>
 
 
-      @if (element.type !== 'svg') {
+      @if (element.type === 'frame' || element.type === 'rectangle') {
         <app-dt-layout-section
           [element]="element"
           (elementPatch)="elementPatch.emit($event)"
           (numberInputGestureStarted)="numberInputGestureStarted.emit()"
           (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-layout-section>
       }
+
+      <app-dt-cursor-section
+        [element]="element"
+        (elementPatch)="elementPatch.emit($event)"></app-dt-cursor-section>
 
       <app-dt-appearance-section
         [element]="element"
@@ -91,11 +99,21 @@
       }
 
       @if (element.type !== 'frame' && element.type !== 'svg') {
-        <app-dt-transforms-effects-section
+        <app-dt-transforms-section
+          [element]="element"
+          (elementPatch)="elementPatch.emit($event)"
+          (numberInputGestureStarted)="numberInputGestureStarted.emit()"
+          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-transforms-section>
+
+        <app-dt-effects-section
           [element]="element"
           [projectId]="projectId()"
           (elementPatch)="elementPatch.emit($event)"
           (numberInputGestureStarted)="numberInputGestureStarted.emit()"
-          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-transforms-effects-section>
+          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-effects-section>
       }
+
+      <app-dt-accessibility-section
+        [element]="element"
+        (elementPatch)="elementPatch.emit($event)"></app-dt-accessibility-section>
     }

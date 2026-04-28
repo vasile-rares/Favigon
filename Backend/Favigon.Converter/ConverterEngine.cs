@@ -367,9 +367,11 @@ public sealed class ConverterEngine : IConverterEngine
       s.Margin = source.Margin;
     }
 
-    // Always override dimensions to responsive values
+    // Always override dimensions to responsive values.
+    // Use min-height (not height) so content taller than the viewport can scroll
+    // inside the iframe instead of overflowing the outer preview stage.
     s.Width = new IRLength { Value = 100, Unit = "%" };
-    s.Height = new IRLength { Value = 100, Unit = "vh" };
+    s.MinHeight = new IRLength { Value = 100, Unit = "vh" };
 
     return s;
   }

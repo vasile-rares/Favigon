@@ -24,7 +24,10 @@ export type ToggleGroupIcon =
   | 'paint-linear'
   | 'paint-radial'
   | 'paint-conic'
-  | 'paint-image';
+  | 'paint-image'
+  | 'grow-auto-width'
+  | 'grow-auto-height'
+  | 'grow-fixed';
 
 export interface ToggleGroupOption {
   label: string;

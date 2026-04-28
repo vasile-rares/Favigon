@@ -42,6 +42,8 @@ public static class StyleTransformer
     if (style.TextShadow is not null) css["text-shadow"] = style.TextShadow;
     if (style.TextTransform is not null) css["text-transform"] = style.TextTransform;
     if (style.TextWrap is not null) css["text-wrap"] = style.TextWrap;
+    if (style.WhiteSpace is not null) css["white-space"] = style.WhiteSpace;
+    if (style.WordBreak is not null) css["word-break"] = style.WordBreak;
     if (style.TextDecorationLine is not null)
     {
       css["text-decoration-line"] = style.TextDecorationLine;

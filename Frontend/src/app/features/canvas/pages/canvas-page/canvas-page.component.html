@@ -226,6 +226,10 @@
               (dblclick)="onElementDoubleClick($event, selectedElementId()!)"
               (contextmenu)="onElementContextMenu($event, selectedElementId()!)">
               @switch (selectionHandleMode()) {
+                @case ('text-fit-fit') {
+                  <!-- Both axes fit-content: single bottom-center handle — drag down/up to resize font size -->
+                  <div class="sel-handle sel-handle-s" (pointerdown)="$event.stopPropagation(); onFontSizeResizeHandlePointerDown($event, selectedElementId()!)"></div>
+                }
                 @case ('all') {
                   <div class="sel-handle sel-handle-nw" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'nw')"></div>
                   <div class="sel-handle sel-handle-ne" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'ne')"></div>
@@ -239,7 +243,7 @@
                   <div class="sel-corner-zone sel-corner-ne" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'ne')"></div>
                   <div class="sel-corner-zone sel-corner-sw" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'sw')"></div>
                   <div class="sel-corner-zone sel-corner-se" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'se')"></div>
-                  @if (selectedElement()?.type !== 'svg') {
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
                     <div class="corner-radius-handle"
                       [style.left.px]="cornerRadiusHandleOffset() - 4"
                       [style.top.px]="cornerRadiusHandleOffset() - 4"
@@ -250,7 +254,7 @@
                   <!-- widthMode=fill: only top-center and bottom-center handles -->
                   <div class="sel-handle sel-handle-n" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'n')"></div>
                   <div class="sel-handle sel-handle-s" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 's')"></div>
-                  @if (selectedElement()?.type !== 'svg') {
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
                     <div class="corner-radius-handle"
                       [style.left.px]="cornerRadiusHandleOffset() - 4"
                       [style.top.px]="cornerRadiusHandleOffset() - 4"
@@ -261,7 +265,7 @@
                   <!-- heightMode=fill: only left-center and right-center handles -->
                   <div class="sel-handle sel-handle-e" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'e')"></div>
                   <div class="sel-handle sel-handle-w" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'w')"></div>
-                  @if (selectedElement()?.type !== 'svg') {
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
                     <div class="corner-radius-handle"
                       [style.left.px]="cornerRadiusHandleOffset() - 4"
                       [style.top.px]="cornerRadiusHandleOffset() - 4"
@@ -317,6 +321,8 @@
           [style.top.px]="getTextEditorScreenTop()"
           [style.width.px]="getTextEditorScreenWidth()"
           [style.height.px]="getTextEditorScreenHeight()"
+          [style.box-sizing]="'border-box'"
+          [style.padding]="getTextEditorPadding(editEl)"
           [style.font-size]="getTextFontSize(editEl)"
           [style.font-family]="getTextFontFamily(editEl)"
           [style.font-weight]="getTextFontWeight(editEl)"
@@ -324,6 +330,7 @@
           [style.line-height]="getTextLineHeight(editEl)"
           [style.letter-spacing]="getTextLetterSpacing(editEl)"
           [style.text-align]="getTextAlignValue(editEl)"
+          [style.word-break]="(editEl.widthMode ?? 'fixed') === 'fixed' ? 'break-word' : null"
           [style.color]="editEl.fill"
           [style.white-space]="(editEl.widthMode ?? 'fixed') === 'fixed' ? 'pre-wrap' : 'pre'"
           [style.transform]="'scale(' + viewport.zoomLevel() + ')'"

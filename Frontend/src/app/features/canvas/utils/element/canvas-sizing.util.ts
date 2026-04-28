@@ -60,9 +60,15 @@ export function supportsCanvasSizeMode(
   element: Pick<CanvasElement, 'type' | 'parentId' | 'position' | 'fillMode' | 'backgroundImage'>,
   parent: Pick<CanvasElement, 'id'> | null,
   hasChildren = true,
+  axis?: CanvasSizeAxis,
 ): boolean {
-  // Frames only support fixed sizing — they are top-level artboards with explicit dimensions.
-  if (element.type === 'frame') return mode === 'fixed';
+  // Frames only support fixed sizing on width (they are artboards with explicit width).
+  // On height, frames additionally support fit-content so they can grow with their content.
+  if (element.type === 'frame') {
+    if (mode === 'fixed') return true;
+    if (mode === 'fit-content') return axis === 'height' && hasChildren;
+    return false;
+  }
 
   switch (mode) {
     case 'fixed':
@@ -88,6 +94,7 @@ export function normalizeCanvasSizeMode(
   mode: string | null | undefined,
   element: Pick<CanvasElement, 'type' | 'parentId' | 'position' | 'fillMode' | 'backgroundImage'>,
   parent: Pick<CanvasElement, 'id'> | null,
+  axis?: CanvasSizeAxis,
 ): CanvasSizeMode {
   if (
     mode === 'fixed' ||
@@ -97,7 +104,7 @@ export function normalizeCanvasSizeMode(
     mode === 'viewport' ||
     mode === 'fit-image'
   ) {
-    return supportsCanvasSizeMode(mode, element, parent) ? mode : 'fixed';
+    return supportsCanvasSizeMode(mode, element, parent, true, axis) ? mode : 'fixed';
   }
 
   return 'fixed';

@@ -5,23 +5,31 @@ import {
   CanvasPageModel,
 } from '@app/core';
 import { FrameTemplateSelection } from '../../../canvas.types';
-import { ExtrasSectionComponent } from './sections/extras-section.component';
-import { DimensionsSectionComponent } from './sections/dimensions-section.component';
-import { LayoutSectionComponent } from './sections/layout-section.component';
-import { AppearanceSectionComponent } from './sections/appearance-section.component';
-import { TypographySectionComponent } from './sections/typography-section.component';
-import { TransformsEffectsSectionComponent } from './sections/transforms-effects-section.component';
+import { LinkSectionComponent } from './sections/link/link-section.component';
+import { PositionSectionComponent } from './sections/position/position-section.component';
+import { DimensionsSectionComponent } from './sections/dimensions/dimensions-section.component';
+import { LayoutSectionComponent } from './sections/layout/layout-section.component';
+import { AppearanceSectionComponent } from './sections/appearance/appearance-section.component';
+import { TypographySectionComponent } from './sections/typography/typography-section.component';
+import { TransformsSectionComponent } from './sections/transforms/transforms-section.component';
+import { EffectsSectionComponent } from './sections/effects/effects-section.component';
+import { CursorSectionComponent } from './sections/cursor/cursor-section.component';
+import { AccessibilitySectionComponent } from './sections/accessibility/accessibility-section.component';
 
 @Component({
   selector: 'app-design-tab',
   standalone: true,
   imports: [
-    ExtrasSectionComponent,
+    LinkSectionComponent,
+    PositionSectionComponent,
     DimensionsSectionComponent,
     LayoutSectionComponent,
     AppearanceSectionComponent,
     TypographySectionComponent,
-    TransformsEffectsSectionComponent,
+    TransformsSectionComponent,
+    EffectsSectionComponent,
+    CursorSectionComponent,
+    AccessibilitySectionComponent,
   ],
   templateUrl: './design-tab.component.html',
   styleUrl: './design-tab.component.css',

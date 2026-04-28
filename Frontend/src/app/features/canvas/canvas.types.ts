@@ -67,6 +67,10 @@ export interface ResizeState {
   parentAbsoluteBounds: Bounds | null;
   /** Rotation of the element in degrees at gesture start (0 if not rotated). */
   rotation: number;
+  /** When true, this gesture changes font-size rather than element dimensions. */
+  isFontSizeResize?: boolean;
+  /** Starting font size in px, valid when isFontSizeResize is true. */
+  startFontSizePx?: number;
 }
 
 export interface RotateState {

@@ -266,8 +266,8 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
   const parent = element.parentId
     ? (elements.find((candidate) => candidate.id === element.parentId) ?? null)
     : null;
-  const widthMode = normalizeCanvasSizeMode(element.widthMode, element, parent);
-  const heightMode = normalizeCanvasSizeMode(element.heightMode, element, parent);
+  const widthMode = normalizeCanvasSizeMode(element.widthMode, element, parent, 'width');
+  const heightMode = normalizeCanvasSizeMode(element.heightMode, element, parent, 'height');
   const minWidthMode = normalizeCanvasConstraintMode(element.minWidthMode, element, parent);
   const maxWidthMode = normalizeCanvasConstraintMode(element.maxWidthMode, element, parent);
   const minHeightMode = normalizeCanvasConstraintMode(element.minHeightMode, element, parent);

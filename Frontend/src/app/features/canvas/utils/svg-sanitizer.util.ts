@@ -32,7 +32,10 @@ export function sanitizeSvg(svgString: string): string {
         continue;
       }
       // Remove javascript: hrefs and xlink:hrefs
-      if ((name === 'href' || name === 'xlink:href') && attr.value.trim().toLowerCase().startsWith('javascript:')) {
+      if (
+        (name === 'href' || name === 'xlink:href') &&
+        attr.value.trim().toLowerCase().startsWith('javascript:')
+      ) {
         el.removeAttribute(attr.name);
       }
     }

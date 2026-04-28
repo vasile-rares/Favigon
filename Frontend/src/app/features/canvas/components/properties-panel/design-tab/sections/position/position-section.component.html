@@ -1,0 +1,16 @@
+@if (supportsPosition(element().type)) {
+<section class="properties-section">
+  <p class="properties-section-title">Position</p>
+  <div class="pp-style-row">
+    <span class="pp-row-label">Type</span>
+    <div class="pp-style-control pp-style-control--dropdown">
+      <app-dropdown-select
+        [enableSearch]="false"
+        [placeholder]="'Select position type'"
+        [options]="positionOptionsForElement(element())"
+        [ngModel]="positionValue(element())"
+        (ngModelChange)="onPositionChange($event)"></app-dropdown-select>
+    </div>
+  </div>
+</section>
+}

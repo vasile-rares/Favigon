@@ -1,9 +1,9 @@
 ﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
-import { DropdownSelectComponent, ContextMenuComponent } from '@app/shared';
-import { NumberInputComponent } from '../../number-input/number-input.component';
-import type { DropdownSelectOption, ContextMenuItem } from '@app/shared';
+import { DropdownSelectComponent, ContextMenuComponent, ToggleGroupComponent } from '@app/shared';
+import { NumberInputComponent } from '../../../number-input/number-input.component';
+import type { DropdownSelectOption, ContextMenuItem, ToggleGroupOption } from '@app/shared';
 import {
   CanvasConstraintSizeMode,
   CanvasElement,
@@ -37,8 +37,8 @@ import {
   shouldDisableCanvasSizeInput,
   supportsCanvasConstraintSizeMode,
   supportsCanvasSizeMode,
-} from '../../../../utils/element/canvas-sizing.util';
-import { roundToTwoDecimals } from '../../../../utils/canvas-math.util';
+} from '../../../../../utils/element/canvas-sizing.util';
+import { roundToTwoDecimals } from '../../../../../utils/canvas-math.util';
 
 type DimensionConstraintField = 'minWidth' | 'maxWidth' | 'minHeight' | 'maxHeight';
 
@@ -81,7 +81,7 @@ const DIMENSION_CONSTRAINT_FIELD_DEFINITIONS: readonly DimensionConstraintFieldD
 @Component({
   selector: 'app-dt-dimensions-section',
   standalone: true,
-  imports: [FormsModule, DropdownSelectComponent, NumberInputComponent, ContextMenuComponent],
+  imports: [FormsModule, DropdownSelectComponent, NumberInputComponent, ContextMenuComponent, ToggleGroupComponent],
   templateUrl: './dimensions-section.component.html',
   encapsulation: ViewEncapsulation.None,
 })
@@ -105,6 +105,51 @@ export class DimensionsSectionComponent {
 
   readonly dimensionModeDefinitions = DIMENSION_MODE_DEFINITIONS;
   readonly dimensionConstraintModeDefinitions = DIMENSION_CONSTRAINT_MODE_DEFINITIONS;
+
+  readonly textGrowOptions: readonly ToggleGroupOption[] = [
+    { label: '', value: 'auto-width',  icon: 'grow-auto-width',  title: 'Auto Width' },
+    { label: '', value: 'auto-height', icon: 'grow-auto-height', title: 'Auto Height' },
+    { label: '', value: 'fixed',       icon: 'grow-fixed',       title: 'Fixed Size' },
+  ];
+
+  textGrowValue(element: CanvasElement): string {
+    const wMode = element.widthMode ?? 'fixed';
+    const hMode = element.heightMode ?? 'fixed';
+    if (wMode === 'fit-content' && hMode === 'fit-content') return 'auto-width';
+    if ((wMode === 'fixed' || !element.widthMode) && hMode === 'fit-content') return 'auto-height';
+    return 'fixed';
+  }
+
+  onTextGrowChange(value: string | number | boolean): void {
+    if (typeof value !== 'string') return;
+    const element = this.element();
+    const parent = this.parentElement(element);
+    const page = this.currentPageModel();
+
+    if (value === 'auto-width') {
+      this.elementPatch.emit({ widthMode: 'fit-content', heightMode: 'fit-content' });
+    } else if (value === 'auto-height') {
+      this.elementPatch.emit({
+        widthMode: undefined,
+        widthSizingValue: undefined,
+        heightMode: 'fit-content',
+      });
+    } else {
+      // 'fixed' — preserve current pixel sizes for both axes
+      const wFixed = getCanvasFixedSize(element, 'width');
+      const hFixed = getCanvasFixedSize(element, 'height');
+      const wPixels = resolveCanvasPixelsFromMode('fixed', wFixed, 'width', undefined, parent, page);
+      const hPixels = resolveCanvasPixelsFromMode('fixed', hFixed, 'height', undefined, parent, page);
+      this.elementPatch.emit({
+        widthMode: undefined,
+        heightMode: undefined,
+        width: wPixels,
+        height: hPixels,
+        widthSizingValue: undefined,
+        heightSizingValue: undefined,
+      });
+    }
+  }
 
   onNumberInputGestureStarted(): void {
     this.numberInputGestureStarted.emit();
@@ -132,6 +177,7 @@ export class DimensionsSectionComponent {
       getCanvasSizeMode(element, axis),
       element,
       this.parentElement(element),
+      axis,
     );
   }
 
@@ -144,7 +190,7 @@ export class DimensionsSectionComponent {
       label: definition.label,
       triggerLabel: this.getDimensionModeTriggerLabel(definition.mode),
       value: definition.mode,
-      disabled: !supportsCanvasSizeMode(definition.mode, element, parent, hasChildren),
+      disabled: !supportsCanvasSizeMode(definition.mode, element, parent, hasChildren, axis),
     }));
   }
 
@@ -213,7 +259,7 @@ export class DimensionsSectionComponent {
 
     const element = this.element();
     const parent = this.parentElement(element);
-    const nextMode = normalizeCanvasSizeMode(value, element, parent);
+    const nextMode = normalizeCanvasSizeMode(value, element, parent, axis);
 
     if (nextMode === 'fit-image') {
       void this.applyFitImageSize(axis, element);

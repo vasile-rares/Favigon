@@ -1,0 +1,72 @@
+@if (element().type !== 'frame' && element().type !== 'svg') {
+<section
+  class="properties-section properties-section--collapsible"
+  [class.properties-section--compact]="!hasLink(element())"
+  [class.properties-section--actionable]="!hasLink(element())"
+  (click)="!hasLink(element()) && onLinkSectionHeaderClick()">
+  <div class="properties-section-header properties-section-header--actionable" (click)="onLinkSectionHeaderClick()">
+    <p class="properties-section-title">Link</p>
+    <button
+      type="button"
+      class="pp-section-toggle"
+      [class.pp-section-toggle--minus]="hasLink(element())"
+      [class.pp-section-toggle--plus]="!hasLink(element())"
+      [attr.aria-label]="hasLink(element()) ? 'Remove link' : 'Add link'"
+      [title]="hasLink(element()) ? 'Remove link' : 'Add link'"
+      (click)="onLinkSectionToggleClick($event)">
+      <svg class="pp-section-toggle__icon" viewBox="0 0 16 16" aria-hidden="true">
+        <path class="pp-section-toggle__icon-line" d="M3 8H13" />
+        <path class="pp-section-toggle__icon-line pp-section-toggle__icon-line--vertical" d="M8 3V13" />
+      </svg>
+    </button>
+  </div>
+
+  @if (hasLink(element())) {
+    <div class="pp-style-row">
+      <span class="pp-row-label">Type</span>
+      <div class="pp-style-control">
+        <app-toggle-group
+          [ariaLabel]="'Link type'"
+          [options]="linkTypeOptions"
+          [value]="linkTypeValue(element())"
+          [stretch]="true"
+          [minWidth]="null"
+          (valueChange)="onLinkTypeChange($event)"></app-toggle-group>
+      </div>
+    </div>
+
+    @switch (linkTypeValue(element())) {
+      @case ('page') {
+        @if (linkPageOptions(element()).length > 0) {
+          <div class="pp-style-row">
+            <span class="pp-row-label">Page</span>
+            <div class="pp-style-control pp-style-control--dropdown">
+              <app-dropdown-select
+                [enableSearch]="false"
+                [placeholder]="'Select page'"
+                [options]="linkPageOptions(element())"
+                [ngModel]="linkPageValue(element())"
+                (ngModelChange)="onLinkPageChange($event)"></app-dropdown-select>
+            </div>
+          </div>
+        } @else {
+          <p class="properties-section-hint">Add another page to create an internal navigation target.</p>
+        }
+      }
+      @case ('url') {
+        <div class="pp-style-row">
+          <span class="pp-row-label">URL</span>
+          <div class="pp-style-control pp-style-control--dropdown">
+            <input
+              type="url"
+              class="pp-text-input pp-text-input--boxed"
+              [value]="linkUrlValue(element())"
+              (input)="onLinkUrlChange($event)"
+              placeholder="https://example.com" />
+          </div>
+        </div>
+      }
+    }
+  }
+</section>
+}

@@ -21,6 +21,12 @@ internal static class MapperLogic
     var inline = IrProps.GetBool(node, "inline");
     var tag = IrProps.ResolveTag(node, inline ? "span" : "p", "div", "p", "span", "label");
 
+    // Wrap content in an inner <span> so background-color only covers text width,
+    // not the full block width of the outer element.
+    var bgColor = node.Style?.BackgroundColor;
+    if (!string.IsNullOrEmpty(bgColor))
+      content = $"<span style=\"background-color: {bgColor}\">{content}</span>";
+
     if (!string.IsNullOrWhiteSpace(href))
       return FrameworkMapperBase.Paired("a", buildLinkAttrs(node, href), content, ctx.Indent, inlineContent: true);
 

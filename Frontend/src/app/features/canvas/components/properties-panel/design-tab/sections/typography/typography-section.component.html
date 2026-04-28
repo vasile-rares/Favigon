@@ -159,6 +159,21 @@
     </div>
   </div>
 
+  @if (isTextFixedSize(element())) {
+  <div class="pp-style-row">
+    <span class="pp-row-label"></span>
+    <div class="pp-style-control pp-style-control--text-align">
+      <app-toggle-group
+        [ariaLabel]="'Text vertical alignment'"
+        [options]="textVerticalAlignOptions"
+        [value]="textVerticalAlignValue(element())"
+        [stretch]="true"
+        [minWidth]="null"
+        (valueChange)="onTextVerticalAlignChange($event)"></app-toggle-group>
+    </div>
+  </div>
+  }
+
   @for (opt of activeOptionals(element()); track opt.id) {
     @switch (opt.id) {
       @case ('fill') {

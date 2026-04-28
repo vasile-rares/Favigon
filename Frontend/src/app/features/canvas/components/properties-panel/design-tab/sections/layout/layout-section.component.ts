@@ -2,7 +2,7 @@
 
 import { FormsModule } from '@angular/forms';
 import { DropdownSelectComponent, ToggleGroupComponent } from '@app/shared';
-import { NumberInputComponent } from '../../number-input/number-input.component';
+import { NumberInputComponent } from '../../../number-input/number-input.component';
 import type { DropdownSelectOption, ToggleGroupOption } from '@app/shared';
 import {
   CanvasAlignItems,
@@ -12,7 +12,7 @@ import {
   CanvasSpacing,
 } from '@app/core';
 
-import { roundToTwoDecimals } from '../../../../utils/canvas-math.util';
+import { roundToTwoDecimals } from '../../../../../utils/canvas-math.util';
 
 type PaddingMode = 'full' | 'per-side';
 

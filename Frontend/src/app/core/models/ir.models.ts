@@ -81,6 +81,8 @@ export interface IRStyle {
   textShadow?: string;
   textTransform?: string;
   textWrap?: string;
+  whiteSpace?: string;
+  wordBreak?: string;
   textDecorationLine?: string;
   textDecorationColor?: string;
   textDecorationStyle?: string;

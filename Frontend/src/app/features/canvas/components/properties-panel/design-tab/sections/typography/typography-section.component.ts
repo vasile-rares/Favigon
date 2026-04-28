@@ -2,8 +2,8 @@
 
 import { FormsModule } from '@angular/forms';
 import { DropdownSelectComponent, ToggleGroupComponent, ContextMenuComponent } from '@app/shared';
-import { NumberInputComponent } from '../../number-input/number-input.component';
-import { FieldInputComponent } from '../../field-input/field-input.component';
+import { NumberInputComponent } from '../../../number-input/number-input.component';
+import { FieldInputComponent } from '../../../field-input/field-input.component';
 import type { DropdownSelectOption, ToggleGroupOption, ContextMenuItem } from '@app/shared';
 import {
   CanvasCornerRadii,
@@ -16,22 +16,23 @@ import {
   CanvasTextDecorationStyle,
   CanvasTextSpacingUnit,
   CanvasTextTransform,
+  CanvasTextVerticalAlign,
 } from '@app/core';
 
-import { roundToTwoDecimals } from '../../../../utils/canvas-math.util';
-import { GoogleFontsService } from '../../../../services/google-fonts.service';
+import { roundToTwoDecimals } from '../../../../../utils/canvas-math.util';
+import { GoogleFontsService } from '../../../../../services/google-fonts.service';
 import {
   getDefaultCornerRadius,
   getResolvedCornerRadii,
   hasPerCornerRadius,
-} from '../../../../utils/element/canvas-element-normalization.util';
+} from '../../../../../utils/element/canvas-element-normalization.util';
 import {
   buildTextShadowCss,
   DEFAULT_EDITABLE_TEXT_SHADOW,
   hasTextShadow,
   normalizeTextShadowValue,
   resolveEditableTextShadow,
-} from '../../../../utils/element/canvas-text-shadow.util';
+} from '../../../../../utils/element/canvas-text-shadow.util';
 
 type EditableTypographyField =
   | 'fontFamily'
@@ -231,6 +232,30 @@ export class TypographySectionComponent implements OnInit {
       title: 'Justify',
     },
   ];
+
+  readonly textVerticalAlignOptions: readonly ToggleGroupOption[] = [
+    { label: '', value: 'top',    icon: 'align-vertical-start',  ariaLabel: 'Align top',    title: 'Top' },
+    { label: '', value: 'middle', icon: 'align-vertical-center', ariaLabel: 'Align middle', title: 'Middle' },
+    { label: '', value: 'bottom', icon: 'align-vertical-end',    ariaLabel: 'Align bottom', title: 'Bottom' },
+  ];
+
+  isTextFixedSize(element: CanvasElement): boolean {
+    return (
+      element.type === 'text' &&
+      (!element.widthMode || element.widthMode === 'fixed') &&
+      (!element.heightMode || element.heightMode === 'fixed')
+    );
+  }
+
+  textVerticalAlignValue(element: CanvasElement): CanvasTextVerticalAlign {
+    return element.textVerticalAlign ?? 'middle';
+  }
+
+  onTextVerticalAlignChange(value: string | number | boolean | null): void {
+    if (value === 'top' || value === 'middle' || value === 'bottom') {
+      this.elementPatch.emit({ textVerticalAlign: value as CanvasTextVerticalAlign });
+    }
+  }
 
   onNumberInputGestureStarted(): void {
     this.numberInputGestureStarted.emit();

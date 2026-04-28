@@ -85,7 +85,11 @@ export class CanvasElementService {
     const isImageFillPreset = tool === 'image';
     const isSvg = tool === 'svg';
 
-    let x = roundToTwoDecimals(pointer.x - defaultWidth / 2);
+    // For fit-content text, don't center around the 150px default width — the actual
+    // rendered width is near-zero (empty element). Place the left edge at the cursor.
+    let x = roundToTwoDecimals(
+      createdType === 'text' ? pointer.x : pointer.x - defaultWidth / 2,
+    );
     let y = roundToTwoDecimals(pointer.y - defaultHeight / 2);
     let parentId: string | null = null;
 
@@ -122,7 +126,8 @@ export class CanvasElementService {
         };
       }
 
-      x = clamp(pointer.x - containerBounds.x - defaultWidth / 2, 0, containerWidth - defaultWidth);
+      const xHalfOffset = createdType === 'text' ? 0 : defaultWidth / 2;
+      x = clamp(pointer.x - containerBounds.x - xHalfOffset, 0, containerWidth - xHalfOffset * 2);
       y = clamp(
         pointer.y - containerBounds.y - defaultHeight / 2,
         0,
@@ -141,14 +146,13 @@ export class CanvasElementService {
         width: defaultWidth,
         height: defaultHeight,
         visible: true,
-        fill:
-          isSvg
-            ? undefined
-            : createdType === 'frame'
-              ? DEFAULT_FRAME_FILL
-              : createdType === 'text'
-                ? '#000000'
-                : DEFAULT_ELEMENT_FILL,
+        fill: isSvg
+          ? undefined
+          : createdType === 'frame'
+            ? DEFAULT_FRAME_FILL
+            : createdType === 'text'
+              ? '#000000'
+              : DEFAULT_ELEMENT_FILL,
         fillMode: isImageFillPreset ? 'image' : undefined,
         backgroundSize: isImageFillPreset ? 'cover' : undefined,
         backgroundPosition: isImageFillPreset ? 'center' : undefined,

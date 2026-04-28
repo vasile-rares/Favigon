@@ -1,9 +1,9 @@
-import { Component, input, output, ViewEncapsulation } from '@angular/core';
+﻿import { Component, input, output, ViewEncapsulation } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { ToggleGroupComponent, ContextMenuComponent } from '@app/shared';
-import { NumberInputComponent } from '../../number-input/number-input.component';
-import { FieldInputComponent } from '../../field-input/field-input.component';
+import { NumberInputComponent } from '../../../number-input/number-input.component';
+import { FieldInputComponent } from '../../../field-input/field-input.component';
 import type { ToggleGroupOption, ContextMenuItem } from '@app/shared';
 import {
   CanvasBorderSides,
@@ -14,21 +14,21 @@ import {
   CanvasOverflowMode,
   GradientFill,
 } from '@app/core';
-import { gradientToCss } from '../../../../utils/gradient.utils';
+import { gradientToCss } from '../../../../../utils/gradient.utils';
 
 import {
   getDefaultCornerRadius,
   getResolvedCornerRadii,
   hasPerCornerRadius,
-} from '../../../../utils/element/canvas-element-normalization.util';
-import { roundToTwoDecimals } from '../../../../utils/canvas-math.util';
+} from '../../../../../utils/element/canvas-element-normalization.util';
+import { roundToTwoDecimals } from '../../../../../utils/canvas-math.util';
 import {
   buildCanvasShadowCss,
   DEFAULT_EDITABLE_CANVAS_SHADOW,
   hasCanvasShadow,
   normalizeCanvasShadowValue,
   resolveEditableCanvasShadow,
-} from '../../../../utils/element/canvas-shadow.util';
+} from '../../../../../utils/element/canvas-shadow.util';
 import { DropdownSelectComponent } from '@app/shared';
 import type { DropdownSelectOption } from '@app/shared';
 

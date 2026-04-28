@@ -32,6 +32,7 @@ import {
   getTextFontWeight,
   getTextFontStyle,
   getTextFontSize,
+  getTextFontSizeInPx,
   getTextLineHeight,
   getTextLetterSpacing,
 } from '../../utils/element/canvas-text.util';
@@ -92,6 +93,14 @@ export class CanvasGestureService {
   get flowCacheVersion() {
     return this._flowCacheVersion.asReadonly();
   }
+
+  /**
+   * Bounds (canvas-space) captured the moment text editing begins, before Angular's CD
+   * collapses the canvas element (fit-content elements shrink to 0 once their
+   * .canvas-text-wrapper is removed by the @if guard). Used by getTextEditorDisplayBounds
+   * so the editor is sized and positioned correctly even for fit-content text.
+   */
+  private textEditorCapturedBounds: Bounds | null = null;
 
   // ── Private gesture state ─────────────────────────────────
 
@@ -265,6 +274,43 @@ export class CanvasGestureService {
       handle,
       parentAbsoluteBounds,
       rotation,
+    };
+  }
+
+  beginFontSizeResize(event: MouseEvent, id: string): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.suppressNextCanvasClick = true;
+
+    const el = this.element.findElementById(id, this.editorState.elements());
+    if (!el) return;
+
+    const pointer = this.getActivePageCanvasPoint(event);
+    if (!pointer) return;
+
+    this.editorState.selectOnlyElement(id);
+    this.beginGestureHistory();
+    this.isDragging = false;
+    this.isResizing.set(true);
+    // Do not freeze stable bounds — the element's rendered size changes as font size updates.
+    this.stableSelectionBounds.set(null);
+
+    this.resizeStart = {
+      pointerX: pointer.x,
+      pointerY: pointer.y,
+      width: 0,
+      height: 0,
+      absoluteX: 0,
+      absoluteY: 0,
+      centerX: 0,
+      centerY: 0,
+      aspectRatio: 1,
+      elementId: id,
+      handle: 's',
+      parentAbsoluteBounds: null,
+      rotation: 0,
+      isFontSizeResize: true,
+      startFontSizePx: getTextFontSizeInPx(el),
     };
   }
 
@@ -857,12 +903,30 @@ export class CanvasGestureService {
     );
   }
 
+  private handleFontSizeResizePointerMove(pointer: { x: number; y: number }): void {
+    const start = this.resizeStart;
+    const deltaY = pointer.y - start.pointerY;
+    const newFontSizePx = Math.max(1, Math.round((start.startFontSizePx ?? 16) + deltaY));
+
+    this.editorState.updateCurrentPageElements((els) =>
+      els.map((el) => {
+        if (el.id !== start.elementId) return el;
+        return { ...el, fontSize: newFontSizePx, fontSizeUnit: 'px' as const };
+      }),
+    );
+  }
+
   private handleResizePointerMove(event: MouseEvent): void {
     const start = this.resizeStart;
     if (!start.elementId) return;
 
     const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) return;
+
+    if (start.isFontSizeResize) {
+      this.handleFontSizeResizePointerMove(pointer);
+      return;
+    }
 
     this.editorState.updateCurrentPageElements((els) => {
       const resizedElements = els.map((el) => {
@@ -1221,7 +1285,6 @@ export class CanvasGestureService {
     const parentBounds =
       this.getLiveElementCanvasBounds(parent) ??
       this.element.getAbsoluteBounds(parent, elements, this.editorState.currentPage());
-    const layout = this.page.activePageLayout();
     const currentPreview = this.flowDragPlaceholder();
     const previewWidth =
       currentPreview?.elementId === dragged.id
@@ -1234,8 +1297,8 @@ export class CanvasGestureService {
     this.flowDragPlaceholder.set({
       elementId: dragged.id,
       bounds: {
-        x: roundToTwoDecimals(absoluteX + (layout?.x ?? 0)),
-        y: roundToTwoDecimals(absoluteY + (layout?.y ?? 0)),
+        x: roundToTwoDecimals(absoluteX),
+        y: roundToTwoDecimals(absoluteY),
         width: roundToTwoDecimals(previewWidth),
         height: roundToTwoDecimals(previewHeight),
       },
@@ -1540,11 +1603,29 @@ export class CanvasGestureService {
     const el = this.getTextEditorElement();
     if (!el) return null;
 
+    // Use bounds captured at beginTextEdit() time. The live DOM is not reliable here
+    // because fit-content elements collapse to 0×0 once Angular removes their
+    // .canvas-text-wrapper in the first editing-mode CD cycle.
     const bounds =
-      this.getLiveElementCanvasBounds(el) ??
+      this.textEditorCapturedBounds ??
       this.element.getAbsoluteBounds(el, this.editorState.elements());
     const draft = this.editingTextDraft();
-    if (!draft || draft === (el.text ?? '')) return bounds;
+    if (!draft || draft === (el.text ?? '')) {
+      // For a brand-new empty fit-content element the DOM was collapsed when bounds were
+      // captured (no text → near-zero size). Measure with a space to get at least one
+      // line-height worth of dimensions so the editor overlay doesn't appear as a tiny box.
+      if (!draft && this.canAutoSizeTextAxis(el, 'width')) {
+        const widthConstraint = this.canAutoSizeTextAxis(el, 'width') ? undefined : bounds.width;
+        const size = this.measureTextSize({ ...el, text: ' ' }, widthConstraint);
+        const nextBounds: Bounds = { ...bounds };
+        const centerX = bounds.x + bounds.width / 2;
+        nextBounds.x = roundToTwoDecimals(centerX - size.width / 2);
+        nextBounds.width = size.width;
+        nextBounds.height = size.height;
+        return nextBounds;
+      }
+      return bounds;
+    }
 
     const widthConstraint = this.canAutoSizeTextAxis(el, 'width') ? undefined : bounds.width;
     const size = this.measureTextSize({ ...el, text: draft }, widthConstraint);
@@ -1593,6 +1674,14 @@ export class CanvasGestureService {
     const el = this.element.findElementById(elementId, this.editorState.elements());
     if (el?.type !== 'text') return;
 
+    // Capture live bounds NOW — before editingTextElementId is set and Angular's CD
+    // removes .canvas-text-wrapper, which causes fit-content elements to collapse to 0.
+    // getLiveElementCanvasBounds reads getBoundingClientRect() while the element still
+    // has its content; fall back to model-based getAbsoluteBounds for off-screen elements.
+    this.textEditorCapturedBounds =
+      this.getLiveElementCanvasBounds(el) ??
+      this.element.getAbsoluteBounds(el, this.editorState.elements());
+
     this.editingTextDraft.set(el.text ?? '');
     this.editorState.editingTextElementId.set(elementId);
     this.focusInlineTextEditor(elementId);
@@ -1601,6 +1690,7 @@ export class CanvasGestureService {
   private stopTextEditing(): void {
     this.editorState.editingTextElementId.set(null);
     this.editingTextDraft.set('');
+    this.textEditorCapturedBounds = null;
   }
 
   commitActiveTextEdit(): void {
@@ -1658,22 +1748,13 @@ export class CanvasGestureService {
     });
   }
 
-  private focusInlineTextEditor(elementId: string): void {
-    setTimeout(() => {
-      const editor = document.querySelector(
-        `[data-text-editor-id="${elementId}"]`,
-      ) as HTMLElement | null;
-      if (!editor) return;
-
-      if (editor.textContent !== this.editingTextDraft()) {
-        editor.textContent = this.editingTextDraft();
-      }
-      editor.focus();
-      this.placeInlineTextEditorCaretAtEnd(editor);
-    }, 0);
+  private focusInlineTextEditor(_elementId: string): void {
+    // Initialization (textContent + focus + caret) is handled by the component's
+    // ngAfterViewChecked once Angular has rendered the @if block. Nothing to do here.
   }
 
-  private placeInlineTextEditorCaretAtEnd(editor: HTMLElement): void {
+  /** Public so CanvasPage.ngAfterViewChecked can call it after setting textContent. */
+  placeTextEditorCaretAtEnd(editor: HTMLElement): void {
     const selection = window.getSelection();
     if (!selection) return;
 
@@ -1877,7 +1958,19 @@ export class CanvasGestureService {
     });
 
     if (newElement.type === 'text') {
-      this.beginTextEdit(newElement.id);
+      // Flow-child text elements (position: 'relative' inside a layout container) are
+      // positioned by the parent flex/grid — their stored x/y is irrelevant for rendering.
+      // Defer beginTextEdit with setTimeout(0) so Angular completes its CD pass and updates
+      // the DOM first; getLiveElementCanvasBounds can then read the actual flex position and
+      // the inline editor overlay appears at the right place instead of the cursor position.
+      const isFlowChild = newElement.position === 'relative' && !!newElement.parentId;
+      if (isFlowChild) {
+        setTimeout(() => {
+          this.beginTextEdit(newElement.id);
+        }, 0);
+      } else {
+        this.beginTextEdit(newElement.id);
+      }
     }
 
     return newElement;
@@ -2843,12 +2936,15 @@ export class CanvasGestureService {
   }
 
   private setFlowDragPlaceholder(el: CanvasElement, cachedBounds: Bounds | null): void {
+    const layout = this.page.activePageLayout();
     if (cachedBounds) {
+      // cachedBounds / liveSceneBounds are scene-relative (include layout.x/y);
+      // floatingBounds must be page-relative so the template can add pgLayout.x/y correctly.
       this.flowDragPlaceholder.set({
         elementId: el.id,
         bounds: {
-          x: cachedBounds.x,
-          y: cachedBounds.y,
+          x: cachedBounds.x - (layout?.x ?? 0),
+          y: cachedBounds.y - (layout?.y ?? 0),
           width: cachedBounds.width,
           height: cachedBounds.height,
         },
@@ -2861,12 +2957,11 @@ export class CanvasGestureService {
       this.editorState.elements(),
       this.editorState.currentPage(),
     );
-    const layout = this.page.activePageLayout();
     this.flowDragPlaceholder.set({
       elementId: el.id,
       bounds: {
-        x: absoluteBounds.x + (layout?.x ?? 0),
-        y: absoluteBounds.y + (layout?.y ?? 0),
+        x: absoluteBounds.x,
+        y: absoluteBounds.y,
         width: absoluteBounds.width,
         height: absoluteBounds.height,
       },

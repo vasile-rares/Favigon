@@ -117,14 +117,13 @@
   position: absolute;
   z-index: 20;
   display: block;
-  box-sizing: content-box;
   min-width: 24px;
   min-height: 4px;
   margin: 0;
-  padding: 0;
   overflow: hidden;
   border: none;
-  outline: none;
+  outline: 1px solid rgba(0, 0, 0, 0.8);
+  outline-offset: 1px;
   background: transparent;
   color: inherit;
   font: inherit;
@@ -309,26 +308,26 @@
 
 .hover-outline {
   position: absolute;
-  outline: 2px solid #3b82f6;
+  outline: 1px solid #3b82f6;
   pointer-events: none;
   transform-origin: center center;
 }
 
 .multi-select-outline {
   position: absolute;
-  outline: 2px solid rgba(59, 130, 246, 0.5);
+  outline: 1px solid rgba(59, 130, 246, 0.5);
   pointer-events: none;
 }
 
 .synced-selection-outline {
   position: absolute;
-  outline: 2px solid rgba(59, 130, 246, 0.28);
+  outline: 1px solid rgba(59, 130, 246, 0.28);
   pointer-events: none;
 }
 
 .selection-outline {
   position: absolute;
-  outline: 2px solid #3b82f6;
+  outline: 1px solid #3b82f6;
   pointer-events: auto;
   cursor: default;
   transform-origin: center center;
@@ -336,10 +335,10 @@
 
 .sel-handle {
   position: absolute;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   background: white;
-  border: 1.5px solid #3b82f6;
+  border: 1px solid #3b82f6;
   border-radius: 50%;
   pointer-events: auto;
   z-index: 1;
@@ -347,46 +346,62 @@
 .sel-handle-nw {
   left: -4px;
   top: -4px;
-  cursor: url('/cursor-resize-nwse.svg') 12 12, nw-resize !important;
+  cursor:
+    url('/cursor-resize-nwse.svg') 12 12,
+    nw-resize !important;
 }
 .sel-handle-ne {
   right: -4px;
   top: -4px;
-  cursor: url('/cursor-resize-nesw.svg') 12 12, ne-resize !important;
+  cursor:
+    url('/cursor-resize-nesw.svg') 12 12,
+    ne-resize !important;
 }
 .sel-handle-sw {
   left: -4px;
   bottom: -4px;
-  cursor: url('/cursor-resize-nesw.svg') 12 12, sw-resize !important;
+  cursor:
+    url('/cursor-resize-nesw.svg') 12 12,
+    sw-resize !important;
 }
 .sel-handle-se {
   right: -4px;
   bottom: -4px;
-  cursor: url('/cursor-resize-nwse.svg') 12 12, se-resize !important;
+  cursor:
+    url('/cursor-resize-nwse.svg') 12 12,
+    se-resize !important;
 }
 .sel-handle-n {
   top: -4px;
   left: 50%;
   transform: translateX(-50%);
-  cursor: url('/cursor-resize-ns.svg') 12 12, n-resize !important;
+  cursor:
+    url('/cursor-resize-ns.svg') 12 12,
+    n-resize !important;
 }
 .sel-handle-s {
   bottom: -4px;
   left: 50%;
   transform: translateX(-50%);
-  cursor: url('/cursor-resize-ns.svg') 12 12, s-resize !important;
+  cursor:
+    url('/cursor-resize-ns.svg') 12 12,
+    s-resize !important;
 }
 .sel-handle-e {
   right: -4px;
   top: 50%;
   transform: translateY(-50%);
-  cursor: url('/cursor-resize-ew.svg') 12 12, e-resize !important;
+  cursor:
+    url('/cursor-resize-ew.svg') 12 12,
+    e-resize !important;
 }
 .sel-handle-w {
   left: -4px;
   top: 50%;
   transform: translateY(-50%);
-  cursor: url('/cursor-resize-ew.svg') 12 12, w-resize !important;
+  cursor:
+    url('/cursor-resize-ew.svg') 12 12,
+    w-resize !important;
 }
 
 .sel-edge-hit {
@@ -399,28 +414,36 @@
   left: 8px;
   right: 8px;
   height: 8px;
-  cursor: url('/cursor-resize-ns.svg') 12 12, n-resize !important;
+  cursor:
+    url('/cursor-resize-ns.svg') 12 12,
+    n-resize !important;
 }
 .sel-edge-s {
   bottom: -4px;
   left: 8px;
   right: 8px;
   height: 8px;
-  cursor: url('/cursor-resize-ns.svg') 12 12, s-resize !important;
+  cursor:
+    url('/cursor-resize-ns.svg') 12 12,
+    s-resize !important;
 }
 .sel-edge-e {
   right: -4px;
   top: 8px;
   bottom: 8px;
   width: 8px;
-  cursor: url('/cursor-resize-ew.svg') 12 12, e-resize !important;
+  cursor:
+    url('/cursor-resize-ew.svg') 12 12,
+    e-resize !important;
 }
 .sel-edge-w {
   left: -4px;
   top: 8px;
   bottom: 8px;
   width: 8px;
-  cursor: url('/cursor-resize-ew.svg') 12 12, w-resize !important;
+  cursor:
+    url('/cursor-resize-ew.svg') 12 12,
+    w-resize !important;
 }
 
 .sel-corner-zone {
@@ -428,7 +451,9 @@
   width: 16px;
   height: 16px;
   pointer-events: auto;
-  cursor: url('/cursor-rotate.svg') 12 12, grab !important;
+  cursor:
+    url('/cursor-rotate.svg') 12 12,
+    grab !important;
 }
 .sel-corner-nw {
   left: -16px;
@@ -456,7 +481,9 @@
   border-radius: 50%;
   /* left/top are set dynamically via [style] binding = cornerRadius * zoom - 4 */
   pointer-events: auto;
-  cursor: url('/cursor-canvas.svg') 4 2, auto !important;
+  cursor:
+    url('/cursor-canvas.svg') 4 2,
+    auto !important;
 }
 
 /* -- SVG drag-and-drop ---------------------------------------- */
@@ -555,12 +582,14 @@
   outline: none;
   border-radius: calc(16px - 0.2rem);
   background: transparent;
-  color: var(--color-text-muted, rgba(255,255,255,0.5));
+  color: var(--color-text-muted, rgba(255, 255, 255, 0.5));
   font-size: 0.8125rem;
   font-weight: 500;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   white-space: nowrap;
   flex-shrink: 0;
   vertical-align: middle;
@@ -585,17 +614,31 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes toast-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.97); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1); }
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
 }
 
 @keyframes toast-out {
-  from { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1); }
-  to   { opacity: 0; transform: translateX(-50%) translateY(8px)  scale(0.97); }
+  from {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px) scale(0.97);
+  }
 }
 
 /* -- Snap lines -------------------------------------------- */

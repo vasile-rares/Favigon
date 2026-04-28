@@ -229,11 +229,6 @@ export class CanvasDomStyleService {
       style['color'] = element.fill;
     }
 
-    // ── Text container background ──────────────────────────
-    if (element.type === 'text' && element.backgroundColor) {
-      style['background-color'] = element.backgroundColor;
-    }
-
     // ── Text shadow ───────────────────────────────────────
     if (element.type === 'text' && element.textShadow) {
       style['text-shadow'] = element.textShadow;
@@ -420,6 +415,13 @@ export class CanvasDomStyleService {
       // For fixed-width text, pre-wrap is correct: text wraps within the explicit width.
       'white-space': (element.widthMode ?? 'fixed') === 'fixed' ? 'pre-wrap' : 'pre',
       'word-break': (element.widthMode ?? 'fixed') === 'fixed' ? 'break-word' : null,
+      // Constrain wrapping text to the container width so pre-wrap still breaks lines.
+      // Without this, align-items:flex-start lets the span expand to max-content,
+      // preventing wrapping for multi-line fixed-width text.
+      'max-width': (element.widthMode ?? 'fixed') === 'fixed' ? '100%' : null,
+      // Background fill applied here so it covers only the text content area,
+      // not any empty space below when the container is taller than the text.
+      'background-color': element.backgroundColor ?? null,
     };
   }
 
@@ -434,10 +436,15 @@ export class CanvasDomStyleService {
   buildTextVerticalAlignStyle(element: CanvasElement): DomStyleMap {
     const va = element.textVerticalAlign ?? 'top';
     const justifyContent = va === 'middle' ? 'center' : va === 'bottom' ? 'flex-end' : 'flex-start';
+    // Map textAlign → cross-axis alignment so the span shrinks to its content width
+    // instead of stretching full-width. This lets background-color on the span cover
+    // only the actual text characters rather than the whole element box.
+    const ta = element.textAlign ?? 'left';
+    const alignItems = ta === 'center' ? 'center' : ta === 'right' ? 'flex-end' : 'flex-start';
     return {
       display: 'flex',
       'flex-direction': 'column',
-      'align-items': 'stretch',
+      'align-items': alignItems,
       'justify-content': justifyContent,
       width: '100%',
       height: '100%',

@@ -32,7 +32,7 @@ export function getTextLetterSpacing(element: CanvasElement): string {
 }
 
 export function getTextAlignValue(element: CanvasElement): string {
-  return element.textAlign ?? 'center';
+  return element.textAlign ?? 'left';
 }
 
 /** Returns font size always in px (converts rem → px using the 16px root). */

@@ -135,6 +135,8 @@ interface RectangleDrawState {
   styleUrl: './canvas-page.component.css',
 })
 export class CanvasPage implements OnDestroy, AfterViewChecked {
+  /** Tracks the element id for which the text editor has already been populated. */
+  private textEditorInitializedId: string | null = null;
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
@@ -398,9 +400,22 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return aabb;
   });
 
-  readonly selectionHandleMode = computed<'all' | 'ns' | 'ew' | 'none'>(() => {
+  readonly selectionHandleMode = computed<'all' | 'ns' | 'ew' | 'text-fit-fit' | 'none'>(() => {
     const s = this.selectedElement();
-    if (!s || s.type === 'frame' || s.type === 'text') return 'none';
+    if (!s || s.type === 'frame') return 'none';
+
+    if (s.type === 'text') {
+      const wMode = s.widthMode ?? 'fixed';
+      const hMode = s.heightMode ?? 'fixed';
+      if (wMode === 'fill' && hMode === 'fill') return 'none';
+      if (wMode === 'fit-content' && hMode === 'fit-content') return 'text-fit-fit';
+      // width is fit-content or fill → only height is manually sized
+      if (wMode === 'fit-content' || wMode === 'fill') return 'ns';
+      // height is fit-content or fill → only width is manually sized
+      if (hMode === 'fit-content' || hMode === 'fill') return 'ew';
+      return 'all';
+    }
+
     const wFill = s.widthMode === 'fill';
     const hFill = s.heightMode === 'fill';
     if (!wFill && !hFill) return 'all';
@@ -563,6 +578,39 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.page.setCanvasElement(this.getCanvasElement());
     this.restorePendingInitialPageFocus();
 
+    // Populate the inline text editor with the element's existing text on the
+    // first CD cycle after the @if block creates the contenteditable div.
+    // textContent is set synchronously so the browser paints it on the first frame.
+    // focus + caret are deferred to setTimeout(0) so they don't run inside the
+    // Angular CD cycle — calling focus() synchronously here can trigger Zone.js
+    // focus events mid-cycle, causing an extra CD pass that resets the editor view.
+    const editingId = this.editingTextElementId();
+    if (editingId && editingId !== this.textEditorInitializedId) {
+      const editor = document.querySelector(
+        `[data-text-editor-id="${editingId}"]`,
+      ) as HTMLElement | null;
+      if (editor) {
+        this.textEditorInitializedId = editingId;
+        const el = this.element.findElementById(editingId, this.editorState.elements());
+        const text = el?.text ?? '';
+        if (editor.textContent !== text) {
+          editor.textContent = text;
+        }
+        setTimeout(() => {
+          const activeEditor = document.querySelector(
+            `[data-text-editor-id="${editingId}"]`,
+          ) as HTMLElement | null;
+          if (!activeEditor) return;
+          if (document.activeElement !== activeEditor) {
+            activeEditor.focus();
+          }
+          this.gesture.placeTextEditorCaretAtEnd(activeEditor);
+        }, 0);
+      }
+    } else if (!editingId) {
+      this.textEditorInitializedId = null;
+    }
+
     if (this.gesture.isFlowBoundsDirty()) {
       this.gesture.updateFlowBoundsCache(this.canvasSceneRef()?.nativeElement ?? null);
       // Defer the clean signal so it runs as a new zone.js macrotask. Writing
@@ -638,8 +686,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   // ── File drag-and-drop ────────────────────────────────────
 
   private readonly SUPPORTED_IMAGE_TYPES = new Set([
-    'image/png', 'image/jpeg', 'image/gif', 'image/webp',
-    'image/avif', 'image/bmp', 'image/tiff',
+    'image/png',
+    'image/jpeg',
+    'image/gif',
+    'image/webp',
+    'image/avif',
+    'image/bmp',
+    'image/tiff',
   ]);
 
   private classifyDropFile(file: File): 'svg' | 'image' | 'unsupported' {
@@ -649,7 +702,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   readonly isFileDragOver = signal(false);
-  readonly fileImportToast = signal<{ state: 'importing' | 'done' | 'error'; message: string } | null>(null);
+  readonly fileImportToast = signal<{
+    state: 'importing' | 'done' | 'error';
+    message: string;
+  } | null>(null);
   readonly isToastLeaving = signal(false);
   private fileToastTimer: ReturnType<typeof setTimeout> | null = null;
   private toastLeaveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -706,7 +762,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const kind = this.classifyDropFile(file);
 
     if (kind === 'unsupported') {
-      const ext = file.name.includes('.') ? '.' + file.name.split('.').pop()!.toLowerCase() : file.type || 'unknown';
+      const ext = file.name.includes('.')
+        ? '.' + file.name.split('.').pop()!.toLowerCase()
+        : file.type || 'unknown';
       this.showFileToast('error', `Cannot import ${ext} files`);
       return;
     }
@@ -716,7 +774,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result as string;
-        if (!text) { this.showFileToast('error', 'Import failed'); return; }
+        if (!text) {
+          this.showFileToast('error', 'Import failed');
+          return;
+        }
         try {
           const sanitized = sanitizeSvg(text);
           const dims = parseSvgDimensions(text);
@@ -1110,6 +1171,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.gesture.beginResize(event, id, handle);
   }
 
+  onFontSizeResizeHandlePointerDown(event: MouseEvent, id: string): void {
+    event.stopPropagation();
+    event.preventDefault();
+    this.gesture.setSuppressNextCanvasClick(true);
+    this.selectOnlyElement(id);
+    this.gesture.beginFontSizeResize(event, id);
+  }
+
   onCornerZonePointerDown(event: MouseEvent, id: string, _corner: CornerHandle): void {
     event.stopPropagation();
     event.preventDefault();
@@ -1413,14 +1482,19 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     s.setProperty('--cursor-x', `${event.clientX}px`);
     s.setProperty('--cursor-y', `${event.clientY}px`);
 
-    // Update hover from DOM
-    const path = event.composedPath() as Element[];
-    const elementEl = path.find(
-      (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('data-element-id'),
-    );
-    const hoveredId = elementEl?.getAttribute('data-element-id') ?? null;
-    if (hoveredId !== this.gesture.hoveredElementId()) {
-      this.gesture.hoveredElementId.set(hoveredId);
+    // Skip hover tracking while a text element is being edited.
+    // Updating hoveredElementId triggers signal-driven CD cycles which can
+    // interfere with the contenteditable focus/caret state causing the text
+    // to momentarily disappear or the editor to lose focus.
+    if (!this.editingTextElementId()) {
+      const path = event.composedPath() as Element[];
+      const elementEl = path.find(
+        (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('data-element-id'),
+      );
+      const hoveredId = elementEl?.getAttribute('data-element-id') ?? null;
+      if (hoveredId !== this.gesture.hoveredElementId()) {
+        this.gesture.hoveredElementId.set(hoveredId);
+      }
     }
 
     this.gesture.handlePointerMove(event);
@@ -1764,6 +1838,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly getTextLetterSpacing = getTextLetterSpacing;
   readonly getTextAlignValue = getTextAlignValue;
 
+  getTextEditorPadding(element: CanvasElement): string {
+    const p = element.padding;
+    if (!p) return '0';
+    return `${p.top}px ${p.right}px ${p.bottom}px ${p.left}px`;
+  }
+
   // ── Keyboard ──────────────────────────────────────────────
 
   @HostListener('window:keydown', ['$event'])
@@ -1892,7 +1972,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    this.page.focusPageSmooth(pageId, canvasElement);
+    this.page.focusPageInstant(pageId, canvasElement);
     this.pendingInitialPageFocusId = null;
   }
 
@@ -2165,7 +2245,26 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     this.runWithHistory(() => {
       this.updateCurrentPageElements((elements) => {
-        return selectedIds.reduce((nextElements, selectedId) => {
+        // Before removing, record the current rendered height of any parent frame that has
+        // heightMode:'fit-content' and whose last child is about to be deleted. When the
+        // deletion leaves the frame empty, CSS fit-content collapses to 0px; we freeze the
+        // frame at its pre-deletion rendered height instead.
+        const page = this.currentPage();
+        const fitContentFrameHeights = new Map<string, number>();
+        for (const selectedId of selectedIds) {
+          const el = elements.find((e) => e.id === selectedId);
+          if (!el?.parentId) continue;
+          const parent = elements.find((e) => e.id === el.parentId);
+          if (!parent || parent.type !== 'frame' || parent.heightMode !== 'fit-content') continue;
+          if (!fitContentFrameHeights.has(parent.id)) {
+            fitContentFrameHeights.set(
+              parent.id,
+              this.element.getRenderedHeight(parent, elements, page),
+            );
+          }
+        }
+
+        const afterRemoval = selectedIds.reduce((nextElements, selectedId) => {
           const withoutElement = removeWithChildren(nextElements, selectedId);
           return this.gesture.removeSyncedCopiesForSourceSubtree(
             selectedId,
@@ -2173,6 +2272,16 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
             nextElements,
           );
         }, elements);
+
+        if (fitContentFrameHeights.size === 0) return afterRemoval;
+
+        return afterRemoval.map((el) => {
+          const frozenH = fitContentFrameHeights.get(el.id);
+          if (frozenH === undefined) return el;
+          const stillHasChildren = afterRemoval.some((e) => e.parentId === el.id);
+          if (stillHasChildren) return el;
+          return { ...el, height: Math.max(1, frozenH), heightMode: undefined };
+        });
       });
       this.clearElementSelection();
     });
@@ -2305,7 +2414,22 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
         this.gesture.runWithHistory(() => {
           this.updateCurrentPageElements((elements) => {
-            return targetIds.reduce((nextElements, targetId) => {
+            const page = this.currentPage();
+            const fitContentFrameHeights = new Map<string, number>();
+            for (const targetId of targetIds) {
+              const el = elements.find((e) => e.id === targetId);
+              if (!el?.parentId) continue;
+              const parent = elements.find((e) => e.id === el.parentId);
+              if (!parent || parent.type !== 'frame' || parent.heightMode !== 'fit-content') continue;
+              if (!fitContentFrameHeights.has(parent.id)) {
+                fitContentFrameHeights.set(
+                  parent.id,
+                  this.element.getRenderedHeight(parent, elements, page),
+                );
+              }
+            }
+
+            const afterRemoval = targetIds.reduce((nextElements, targetId) => {
               const withoutElement = removeWithChildren(nextElements, targetId);
               return this.gesture.removeSyncedCopiesForSourceSubtree(
                 targetId,
@@ -2313,6 +2437,16 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
                 nextElements,
               );
             }, elements);
+
+            if (fitContentFrameHeights.size === 0) return afterRemoval;
+
+            return afterRemoval.map((el) => {
+              const frozenH = fitContentFrameHeights.get(el.id);
+              if (frozenH === undefined) return el;
+              const stillHasChildren = afterRemoval.some((e) => e.parentId === el.id);
+              if (stillHasChildren) return el;
+              return { ...el, height: Math.max(1, frozenH), heightMode: undefined };
+            });
           });
           this.clearElementSelection();
         });

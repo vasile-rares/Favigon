@@ -122,6 +122,8 @@ public class IRStyle
   public string? TextShadow { get; set; }
   public string? TextTransform { get; set; }
   public string? TextWrap { get; set; }
+  public string? WhiteSpace { get; set; }
+  public string? WordBreak { get; set; }
   public string? TextDecorationLine { get; set; }
   public string? TextDecorationColor { get; set; }
   public string? TextDecorationStyle { get; set; }

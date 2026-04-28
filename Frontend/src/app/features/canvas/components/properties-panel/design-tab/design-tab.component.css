@@ -1,4 +1,4 @@
-﻿app-design-tab {
+app-design-tab {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
@@ -9,8 +9,8 @@ app-design-tab > * {
   min-width: 0;
 }
 
-app-dt-extras-section,
-app-dt-transforms-effects-section {
+app-dt-transforms-section,
+app-dt-effects-section {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
