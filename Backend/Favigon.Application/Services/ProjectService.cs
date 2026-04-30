@@ -272,7 +272,7 @@ public class ProjectService : IProjectService
       throw new ArgumentException("Design JSON does not contain a valid IR root node.");
     }
 
-    var validationErrors = IrValidator.GetValidationErrors(irRoot);
+    var validationErrors = IrValidator.GetValidationErrors(irRoot, skipLayoutMath: true);
     if (validationErrors.Count > 0)
     {
       var details = string.Join(" ", validationErrors.Take(3));

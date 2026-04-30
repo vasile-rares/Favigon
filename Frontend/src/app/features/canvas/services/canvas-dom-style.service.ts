@@ -107,6 +107,11 @@ export class CanvasDomStyleService {
       style['opacity'] = String(element.opacity);
     }
 
+    // ── Z-Index ───────────────────────────────────────────
+    if (typeof element.zIndex === 'number') {
+      style['z-index'] = String(element.zIndex);
+    }
+
     // ── Blend Mode ────────────────────────────────────────
     if (element.blendMode && element.blendMode !== 'normal') {
       style['mix-blend-mode'] = element.blendMode;
@@ -403,15 +408,16 @@ export class CanvasDomStyleService {
       'text-align': element.textAlign ?? 'left',
       'line-height': lineHeightValue,
       'letter-spacing': letterSpacingValue,
-      // For non-fixed text (fit-content / fill etc.), use white-space:pre so the browser
-      // never soft-wraps the content — the element always sizes to the text's natural width.
-      // For fixed-width text, pre-wrap is correct: text wraps within the explicit width.
-      'white-space': (element.widthMode ?? 'fixed') === 'fixed' ? 'pre-wrap' : 'pre',
-      'word-break': (element.widthMode ?? 'fixed') === 'fixed' ? 'break-word' : null,
+      // For fit-content text, use white-space:pre so the browser never soft-wraps and the
+      // element always sizes to the text's natural width. For all other modes (fixed, fill,
+      // relative etc.) the width is constrained externally, so pre-wrap is correct and the
+      // text should break onto new lines.
+      'white-space': (element.widthMode ?? 'fixed') === 'fit-content' ? 'pre' : 'pre-wrap',
+      'word-break': (element.widthMode ?? 'fixed') === 'fit-content' ? null : 'break-word',
       // Constrain wrapping text to the container width so pre-wrap still breaks lines.
       // Without this, align-items:flex-start lets the span expand to max-content,
-      // preventing wrapping for multi-line fixed-width text.
-      'max-width': (element.widthMode ?? 'fixed') === 'fixed' ? '100%' : null,
+      // preventing wrapping for multi-line text with a bounded width.
+      'max-width': (element.widthMode ?? 'fixed') === 'fit-content' ? null : '100%',
       // Background fill applied here so it covers only the text content area,
       // not any empty space below when the container is taller than the text.
       'background-color': element.backgroundColor ?? null,

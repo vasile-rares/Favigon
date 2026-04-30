@@ -12,5 +12,6 @@ public interface IConverterEngine
   string GenerateDiffCss(IRNode primary, IRNode breakpoint, string framework, int maxWidth, string label);
   (string Html, string Css) GenerateResponsiveOutput(IReadOnlyList<(IRNode Ir, int ViewportWidth, string Label)> sortedDescending, string framework);
   bool Validate(IRNode root);
+  IReadOnlyList<string> GetValidationErrors(IRNode root, bool skipLayoutMath = false);
   IRNode ParseCanvas(string canvasJson);
 }

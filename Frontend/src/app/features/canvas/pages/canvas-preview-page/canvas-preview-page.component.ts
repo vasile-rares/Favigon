@@ -70,7 +70,6 @@ export class CanvasPreviewPage {
   readonly generatedHtml = signal('');
   readonly generatedCss = signal('');
 
-  
   readonly resizeWidth = signal<number | null>(null);
   readonly resizeHeight = signal<number | null>(null);
   readonly isResizing = signal(false);
@@ -172,7 +171,6 @@ export class CanvasPreviewPage {
     return frame ? frame.height : 720;
   });
 
-  
   readonly iframeSrcdoc = computed<SafeHtml>(() => {
     const html = this.generatedHtml();
     const css = this.generatedCss();
@@ -224,7 +222,7 @@ ${html}
   }
 
   goBack(): void {
-    void this.router.navigate(['/project', this.projectSlug]);
+    void this.router.navigate(['/project', this.projectSlug], { state: { fromPreview: true } });
   }
 
   onFrameSizeChange(index: number | string | boolean | null): void {

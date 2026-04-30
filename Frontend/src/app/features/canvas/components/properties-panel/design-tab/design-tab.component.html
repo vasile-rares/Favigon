@@ -1,5 +1,5 @@
 
-    
+
     @if (isFrameToolSelected()) {
       <section class="properties-section">
         <p class="properties-section-title">Frame presets</p>
@@ -18,7 +18,7 @@
       </section>
     }
 
-    
+
     @if (!selectedElement() && !isFrameToolSelected()) {
       <div class="properties-empty-state">
         <div class="pp-empty-icon">
@@ -33,7 +33,7 @@
       </div>
     }
 
-    
+
     @if (selectedElement(); as element) {
 
       <app-dt-link-section
@@ -48,6 +48,7 @@
 
       <app-dt-dimensions-section
         [element]="element"
+        [liveSize]="liveSize()"
         [pages]="pages()"
         [currentPageId]="currentPageId()"
         (elementPatch)="elementPatch.emit($event)"
@@ -83,7 +84,7 @@
         (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-typography-section>
       }
 
-      
+
       @if (isImage(element.type)) {
         <section class="properties-section">
         <p class="properties-section-title">Image</p>

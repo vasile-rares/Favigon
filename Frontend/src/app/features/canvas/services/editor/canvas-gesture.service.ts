@@ -80,7 +80,7 @@ export class CanvasGestureService {
   readonly draggingFlowChildId = signal<string | null>(null);
   readonly layoutDropTarget = signal<{ containerId: string; index: number } | null>(null);
   readonly autoOpenFillPopupElementId = signal<string | null>(null);
-  
+
   readonly stableSelectionBounds = signal<{ elementId: string; bounds: Bounds } | null>(null);
 
   private readonly _flowCacheVersion = signal(0);
@@ -88,13 +88,15 @@ export class CanvasGestureService {
     return this._flowCacheVersion.asReadonly();
   }
 
-  
   private textEditorCapturedBounds: Bounds | null = null;
 
   // ── Private gesture state ─────────────────────────────────
 
   private flowBoundsCache = new Map<string, Bounds>();
   private flowBoundsDirty = true;
+  private _flowBoundsRafId: number | null = null;
+
+  private _lastKnownSceneBounds = new Map<string, Bounds>();
 
   private dragOffset: Point = { x: 0, y: 0 };
   private dragStartAbsolute: Point = { x: 0, y: 0 };
@@ -116,6 +118,7 @@ export class CanvasGestureService {
   private rectangleDrawState: RectangleDrawState | null = null;
   private isFlowDragInsideContainer = false;
   readonly isResizing = signal(false);
+  readonly isFontSizeResizing = signal(false);
   readonly isRotating = signal(false);
   private isAdjustingCornerRadius = false;
   private isDraggingPage = false;
@@ -301,6 +304,7 @@ export class CanvasGestureService {
       isFontSizeResize: true,
       startFontSizePx: getTextFontSizeInPx(el),
     };
+    this.isFontSizeResizing.set(true);
   }
 
   beginRotate(event: MouseEvent, id: string, _corner: CornerHandle): void {
@@ -744,6 +748,7 @@ export class CanvasGestureService {
     this.isElementDragPrimed = false;
     this.isDragging = false;
     this.isResizing.set(false);
+    this.isFontSizeResizing.set(false);
     this.isRotating.set(false);
     this.isAdjustingCornerRadius = false;
     this.isDraggingPage = false;
@@ -900,7 +905,12 @@ export class CanvasGestureService {
     this.editorState.updateCurrentPageElements((els) =>
       els.map((el) => {
         if (el.id !== start.elementId) return el;
-        return { ...el, fontSize: newFontSizePx, fontSizeUnit: 'px' as const };
+        const unit = el.fontSizeUnit ?? 'px';
+        const newFontSizeValue =
+          unit === 'rem'
+            ? Math.max(0.0625, Math.round((newFontSizePx / 16) * 1000) / 1000)
+            : newFontSizePx;
+        return { ...el, fontSize: newFontSizeValue, fontSizeUnit: unit };
       }),
     );
   }
@@ -1210,7 +1220,8 @@ export class CanvasGestureService {
 
   // ── Flow child drag ───────────────────────────────────────
 
-  updateFlowBoundsCache(sceneEl: HTMLElement | null): void {
+  private updateFlowBoundsCache(): void {
+    const sceneEl = this.getCanvasElement()?.querySelector<HTMLElement>('.canvas-scene') ?? null;
     if (!sceneEl) return;
     const zoom = this.viewport.zoomLevel();
     const sceneRect = sceneEl.getBoundingClientRect();
@@ -1232,33 +1243,43 @@ export class CanvasGestureService {
 
   invalidateFlowBoundsCache(): void {
     this.flowBoundsDirty = true;
+    // Keep the version bump immediate so computed signals (selectionOverlayBounds etc.)
+    // switch to dirty-phase logic in the same CD cycle.
     this._flowCacheVersion.update((v) => v + 1);
+    // Throttle the expensive DOM work (querySelectorAll + N×getBoundingClientRect) to at
+    // most once per animation frame — regardless of how many pointermove events arrive.
+    if (this._flowBoundsRafId !== null) return;
+    this._flowBoundsRafId = requestAnimationFrame(() => {
+      this._flowBoundsRafId = null;
+      this.updateFlowBoundsCache();
+      this.markFlowBoundsCacheClean();
+    });
   }
 
   isFlowBoundsDirty(): boolean {
     return this.flowBoundsDirty;
   }
 
-  markFlowBoundsCacheClean(): void {
+  private markFlowBoundsCacheClean(): void {
     this.flowBoundsDirty = false;
-    // Capture stable selection bounds from live DOM — DOM is fully settled at this point
-    // (called via setTimeout after ngAfterViewChecked, so all child components have painted).
-    // Works correctly for all element types: flow children (x=0 stored), deeply-nested
-    // absolutes, rotated elements. Stored in stableSelectionBounds so selectionOverlayBounds
-    // can use them during resize/rotate AND during the dirty phase (e.g. property changes)
-    // without reading a stale DOM during the CD pass.
-    const selectedId = this.editorState.selectedElementId();
-    if (selectedId) {
-      const el = this.element.findElementById(selectedId, this.editorState.elements());
-      const snapshot = el ? this.snapshotOverlaySceneBounds(el) : null;
-      this.stableSelectionBounds.set(snapshot ? { elementId: selectedId, bounds: snapshot } : null);
-    } else {
-      this.stableSelectionBounds.set(null);
+    // Skip stableSelectionBounds update while a gesture is active. Each gesture seeds the
+    // stable snapshot at gesture-start (beginResize / beginRotate) and owns it for the
+    // gesture lifetime. Overwriting it here with a RAF snapshot taken between a model write
+    // and Angular's next paint causes a 1-frame teleport: the outline jumps to an intermediate
+    // DOM state → the "ghost" flicker the user reported.
+    if (!this.isResizing() && !this.isRotating()) {
+      const selectedId = this.editorState.selectedElementId();
+      if (selectedId) {
+        const el = this.element.findElementById(selectedId, this.editorState.elements());
+        const snapshot = el ? this.snapshotOverlaySceneBounds(el) : null;
+        this.stableSelectionBounds.set(
+          snapshot ? { elementId: selectedId, bounds: snapshot } : null,
+        );
+      } else {
+        this.stableSelectionBounds.set(null);
+      }
     }
-    // Bump the version so overlay computeds (selectionOverlayBounds, hoveredOverlayBounds, etc.)
-    // re-evaluate AFTER the DOM has been updated by Angular's render phase.
-    // Without this, they read live bounds from the stale DOM (before child components paint)
-    // and get stuck at the wrong position until the next interaction.
+    // Bump the version so overlay computeds re-evaluate after DOM has settled.
     this._flowCacheVersion.update((v) => v + 1);
   }
 
@@ -1475,7 +1496,6 @@ export class CanvasGestureService {
 
   // ── Live bounds ───────────────────────────────────────────
 
-  
   private snapshotOverlaySceneBounds(el: CanvasElement): Bounds | null {
     const sceneEl = this.getCanvasElement()?.querySelector<HTMLElement>('.canvas-scene') ?? null;
     if (!sceneEl) return null;
@@ -1492,7 +1512,6 @@ export class CanvasGestureService {
     };
   }
 
-  
   snapshotAllElementSceneBounds(): Map<string, Bounds> {
     const result = new Map<string, Bounds>();
     const sceneEl = this.getCanvasElement()?.querySelector<HTMLElement>('.canvas-scene') ?? null;
@@ -1514,7 +1533,14 @@ export class CanvasGestureService {
         height: roundToTwoDecimals(rect.height / zoom),
       });
     }
+    if (result.size > 0) {
+      this._lastKnownSceneBounds = result;
+    }
     return result;
+  }
+
+  getLastKnownSceneBounds(): Map<string, Bounds> {
+    return this._lastKnownSceneBounds;
   }
 
   getLiveOverlaySceneBounds(el: CanvasElement): Bounds | null {
@@ -1542,9 +1568,27 @@ export class CanvasGestureService {
   getCachedOverlaySceneBounds(el: CanvasElement): Bounds {
     void this._flowCacheVersion(); // track for overlay reactivity
 
-    const cached = this.flowBoundsDirty ? undefined : this.flowBoundsCache.get(el.id);
+    // Prefer stale DOM cache over model-based getAbsoluteBounds fallback — stale real DOM
+    // coordinates are far more accurate than the model for flow/flex children (which store
+    // x=0, y=0 and are actually positioned by CSS). This is safe because the cache is seeded
+    // from real DOM on load and after every RAF update.
+    const cached = this.flowBoundsCache.get(el.id);
     if (cached) return cached;
 
+    return this.getModelBasedOverlaySceneBounds(el);
+  }
+
+  /**
+   * Computes scene-space overlay bounds purely from the element model (no DOM, no cache).
+   *
+   * Use this for elements with CSS transforms (rotate / skew / scale / 3D) during resize:
+   * the DOM AABB cache lags 1 RAF behind each model update, so using it causes the outline
+   * to teleport once per frame. Model bounds are always synchronised with the model write.
+   *
+   * For pure rotation the element center equals the CSS transform-origin center (50%/50%),
+   * so positioning the outline with these bounds + `transform: rotate(Ndeg)` is exact.
+   */
+  getModelBasedOverlaySceneBounds(el: CanvasElement): Bounds {
     const layout = this.page.activePageLayout();
     const absolute = this.element.getAbsoluteBounds(
       el,
@@ -1734,7 +1778,6 @@ export class CanvasGestureService {
     // ngAfterViewChecked once Angular has rendered the @if block. Nothing to do here.
   }
 
-  
   placeTextEditorCaretAtEnd(editor: HTMLElement): void {
     const selection = window.getSelection();
     if (!selection) return;
@@ -2853,11 +2896,11 @@ export class CanvasGestureService {
       };
     }
 
-    const parentBounds = this.element.getAbsoluteBounds(
-      parent,
-      elements,
-      this.editorState.currentPage(),
-    );
+    // Prefer live DOM bounds for parent — model getAbsoluteBounds is wrong when any ancestor
+    // is a flow child (model x=0,y=0, CSS-positioned). Live bounds are always accurate.
+    const parentBounds =
+      this.getLiveElementCanvasBounds(parent) ??
+      this.element.getAbsoluteBounds(parent, elements, this.editorState.currentPage());
     const elementRenderedWidth = this.element.getRenderedWidth(
       el,
       elements,

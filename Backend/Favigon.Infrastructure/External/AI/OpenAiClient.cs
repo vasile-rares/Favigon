@@ -24,25 +24,26 @@ public class OpenAiClient : IAiClient
     if (string.IsNullOrWhiteSpace(apiKey))
       throw new InvalidOperationException("OpenAi:ApiKey is not configured.");
 
-    _model = configuration["OpenAi:Model"] ?? "gpt-4o";
+    _model = configuration["OpenAi:Model"] ?? "gpt-5.4-mini";
 
     _httpClient.BaseAddress = new Uri("https://api.openai.com/");
     _httpClient.DefaultRequestHeaders.Authorization =
         new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
   }
 
-  public async Task<string> ChatCompletionAsync(string systemPrompt, string userMessage, string? modelOverride = null, CancellationToken ct = default)
+  public async Task<string> ChatCompletionAsync(string systemPrompt, string userMessage, string? modelOverride = null, string? jsonSchema = null, CancellationToken ct = default)
   {
     var payload = new OpenAiChatRequest
     {
       Model = string.IsNullOrWhiteSpace(modelOverride) ? _model : modelOverride,
-      ResponseFormat = new ResponseFormat { Type = "json_object" },
+      ResponseFormat = BuildResponseFormat(jsonSchema),
       Messages =
       [
         new ChatMessage { Role = "system", Content = systemPrompt },
         new ChatMessage { Role = "user", Content = userMessage }
       ],
-      Temperature = 0.7
+      Temperature = 0.7,
+      MaxCompletionTokens = 12000
     };
 
     var response = await _httpClient.PostAsJsonAsync("v1/chat/completions", payload, ct);
@@ -67,18 +68,20 @@ public class OpenAiClient : IAiClient
       string systemPrompt,
       string userMessage,
       string? modelOverride = null,
+      string? jsonSchema = null,
       [EnumeratorCancellation] CancellationToken ct = default)
   {
     var payload = new OpenAiChatRequest
     {
       Model = string.IsNullOrWhiteSpace(modelOverride) ? _model : modelOverride,
-      ResponseFormat = new ResponseFormat { Type = "json_object" },
+      ResponseFormat = BuildResponseFormat(jsonSchema),
       Messages =
       [
         new ChatMessage { Role = "system", Content = systemPrompt },
         new ChatMessage { Role = "user", Content = userMessage }
       ],
       Temperature = 0.7,
+      MaxCompletionTokens = 12000,
       Stream = true
     };
 
@@ -125,6 +128,22 @@ public class OpenAiClient : IAiClient
     }
   }
 
+  private static ResponseFormat BuildResponseFormat(string? jsonSchema)
+  {
+    if (string.IsNullOrEmpty(jsonSchema))
+      return new ResponseFormat { Type = "json_object" };
+
+    JsonElement schemaElement;
+    using (var doc = JsonDocument.Parse(jsonSchema))
+      schemaElement = doc.RootElement.Clone();
+
+    return new ResponseFormat
+    {
+      Type = "json_schema",
+      JsonSchema = new JsonSchemaWrapper { Schema = schemaElement }
+    };
+  }
+
   // --- internal DTOs for OpenAI API ---
 
   private class OpenAiChatRequest
@@ -141,6 +160,10 @@ public class OpenAiClient : IAiClient
     [JsonPropertyName("temperature")]
     public double Temperature { get; set; } = 0.7;
 
+    [JsonPropertyName("max_completion_tokens")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaxCompletionTokens { get; set; }
+
     [JsonPropertyName("stream")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Stream { get; set; }
@@ -150,6 +173,22 @@ public class OpenAiClient : IAiClient
   {
     [JsonPropertyName("type")]
     public string Type { get; set; } = "json_object";
+
+    [JsonPropertyName("json_schema")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public JsonSchemaWrapper? JsonSchema { get; set; }
+  }
+
+  private class JsonSchemaWrapper
+  {
+    [JsonPropertyName("name")]
+    public string Name { get; set; } = "ir_node";
+
+    [JsonPropertyName("strict")]
+    public bool Strict { get; set; } = false;
+
+    [JsonPropertyName("schema")]
+    public JsonElement Schema { get; set; }
   }
 
   private class ChatMessage

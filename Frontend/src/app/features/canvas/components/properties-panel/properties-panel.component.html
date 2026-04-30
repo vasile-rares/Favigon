@@ -13,11 +13,12 @@
 
   <div class="properties-panel-content">
 
-    
+
     @if (isTabActive('design')) {
 
       <app-design-tab
         [selectedElement]="selectedElement()"
+        [liveSize]="liveSize()"
         [projectId]="projectId()"
         [autoOpenFillPopupElementId]="autoOpenFillPopupElementId()"
         [pages]="pages()"
@@ -47,7 +48,7 @@
 
 }
 
-    
+
 
   </div>
 </aside>

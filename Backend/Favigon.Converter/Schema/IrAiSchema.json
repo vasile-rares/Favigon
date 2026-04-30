@@ -1,0 +1,171 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IRNode",
+  "type": "object",
+  "required": ["id", "type", "props", "children", "meta"],
+  "properties": {
+    "id": { "type": "string" },
+    "type": { "type": "string", "enum": ["Frame", "Container", "Text"] },
+    "props": { "type": "object" },
+    "layout": { "$ref": "#/$defs/IRLayout" },
+    "style": { "$ref": "#/$defs/IRStyle" },
+    "position": { "$ref": "#/$defs/IRPosition" },
+    "children": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/IRNode" }
+    },
+    "meta": { "$ref": "#/$defs/IRMeta" }
+  },
+  "$defs": {
+    "IRNode": {
+      "type": "object",
+      "required": ["id", "type", "props", "children", "meta"],
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["Frame", "Container", "Text"] },
+        "props": { "type": "object" },
+        "layout": { "$ref": "#/$defs/IRLayout" },
+        "style": { "$ref": "#/$defs/IRStyle" },
+        "position": { "$ref": "#/$defs/IRPosition" },
+        "children": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/IRNode" }
+        },
+        "meta": { "$ref": "#/$defs/IRMeta" }
+      }
+    },
+    "IRLayout": {
+      "type": "object",
+      "properties": {
+        "mode": { "type": "string", "enum": ["flex", "grid", "block"] },
+        "direction": { "type": "string", "enum": ["row", "column", "rowReverse", "columnReverse"] },
+        "align": { "type": "string", "enum": ["start", "center", "end", "stretch", "baseline"] },
+        "justify": { "type": "string", "enum": ["start", "center", "end", "spaceBetween", "spaceAround", "spaceEvenly"] },
+        "gap": { "$ref": "#/$defs/IRLength" },
+        "rowGap": { "$ref": "#/$defs/IRLength" },
+        "columnGap": { "$ref": "#/$defs/IRLength" },
+        "wrap": { "type": "boolean" },
+        "columns": { "type": "integer" },
+        "rows": { "type": "integer" },
+        "gridTemplateColumns": { "type": "string" },
+        "gridTemplateRows": { "type": "string" }
+      }
+    },
+    "IRStyle": {
+      "type": "object",
+      "properties": {
+        "color": { "type": "string" },
+        "background": { "type": "string" },
+        "backgroundImage": { "type": "string" },
+        "backgroundSize": { "type": "string" },
+        "backgroundPosition": { "type": "string" },
+        "backgroundRepeat": { "type": "string" },
+        "objectFit": { "type": "string" },
+        "transform": { "type": "string" },
+        "transformOrigin": { "type": "string" },
+        "backfaceVisibility": { "type": "string" },
+        "transformStyle": { "type": "string" },
+        "width": { "$ref": "#/$defs/IRLength" },
+        "height": { "$ref": "#/$defs/IRLength" },
+        "minWidth": { "$ref": "#/$defs/IRLength" },
+        "maxWidth": { "$ref": "#/$defs/IRLength" },
+        "minHeight": { "$ref": "#/$defs/IRLength" },
+        "maxHeight": { "$ref": "#/$defs/IRLength" },
+        "fontSize": { "$ref": "#/$defs/IRLength" },
+        "fontWeight": { "type": "integer" },
+        "fontFamily": { "type": "string" },
+        "fontStyle": { "type": "string" },
+        "lineHeight": { "$ref": "#/$defs/IRLength" },
+        "letterSpacing": { "$ref": "#/$defs/IRLength" },
+        "textAlign": { "type": "string", "enum": ["left", "center", "right", "justify"] },
+        "textTransform": { "type": "string" },
+        "textWrap": { "type": "string" },
+        "whiteSpace": { "type": "string" },
+        "wordBreak": { "type": "string" },
+        "textDecorationLine": { "type": "string" },
+        "textDecorationColor": { "type": "string" },
+        "textDecorationStyle": { "type": "string" },
+        "textDecorationThickness": { "type": "string" },
+        "textShadow": { "type": "string" },
+        "borderRadius": { "$ref": "#/$defs/IRLength" },
+        "borderTopLeftRadius": { "$ref": "#/$defs/IRLength" },
+        "borderTopRightRadius": { "$ref": "#/$defs/IRLength" },
+        "borderBottomRightRadius": { "$ref": "#/$defs/IRLength" },
+        "borderBottomLeftRadius": { "$ref": "#/$defs/IRLength" },
+        "border": { "$ref": "#/$defs/IRBorder" },
+        "overflow": { "type": "string", "enum": ["visible", "hidden", "scroll", "clip"] },
+        "shadows": { "type": "array", "items": { "$ref": "#/$defs/IRShadow" } },
+        "opacity": { "type": "number" },
+        "mixBlendMode": { "type": "string" },
+        "cursor": { "type": "string" },
+        "filter": { "type": "string" },
+        "backdropFilter": { "type": "string" },
+        "padding": { "$ref": "#/$defs/IRSpacing" },
+        "margin": { "$ref": "#/$defs/IRSpacing" }
+      }
+    },
+    "IRPosition": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["flow", "relative", "absolute", "fixed", "sticky"] },
+        "top": { "$ref": "#/$defs/IRLength" },
+        "right": { "$ref": "#/$defs/IRLength" },
+        "bottom": { "$ref": "#/$defs/IRLength" },
+        "left": { "$ref": "#/$defs/IRLength" }
+      }
+    },
+    "IRLength": {
+      "type": "object",
+      "required": ["value", "unit"],
+      "properties": {
+        "value": { "type": "number" },
+        "unit": {
+          "type": "string",
+          "enum": ["px", "%", "rem", "em", "vw", "vh", "fit-content", "auto", "max-content", "min-content"]
+        }
+      }
+    },
+    "IRSpacing": {
+      "type": "object",
+      "properties": {
+        "top": { "$ref": "#/$defs/IRLength" },
+        "right": { "$ref": "#/$defs/IRLength" },
+        "bottom": { "$ref": "#/$defs/IRLength" },
+        "left": { "$ref": "#/$defs/IRLength" }
+      }
+    },
+    "IRBorder": {
+      "type": "object",
+      "properties": {
+        "width": { "$ref": "#/$defs/IRLength" },
+        "color": { "type": "string" },
+        "style": { "type": "string", "enum": ["solid", "dashed", "dotted", "double", "none"] },
+        "topWidth": { "$ref": "#/$defs/IRLength" },
+        "rightWidth": { "$ref": "#/$defs/IRLength" },
+        "bottomWidth": { "$ref": "#/$defs/IRLength" },
+        "leftWidth": { "$ref": "#/$defs/IRLength" }
+      }
+    },
+    "IRShadow": {
+      "type": "object",
+      "required": ["inset", "x", "y", "blur", "spread", "color"],
+      "properties": {
+        "inset": { "type": "boolean" },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "blur": { "type": "number" },
+        "spread": { "type": "number" },
+        "color": { "type": "string" }
+      }
+    },
+    "IRMeta": {
+      "type": "object",
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "hidden": { "type": "boolean" }
+      }
+    }
+  }
+}

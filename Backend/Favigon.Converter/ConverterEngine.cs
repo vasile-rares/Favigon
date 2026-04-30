@@ -46,9 +46,6 @@ public sealed class ConverterEngine : IConverterEngine
 
   private GeneratedPageArtifacts GeneratePageArtifacts(IRNode root, string framework)
   {
-    if (!Validate(root))
-      throw new InvalidOperationException("IR validation failed.");
-
     var exportRoot = NormalizeExportRoot(root);
     var cssClassMap = CssClassNameResolver.Build(exportRoot);
 
@@ -71,6 +68,7 @@ public sealed class ConverterEngine : IConverterEngine
   }
 
   public bool Validate(IRNode root) => IrValidator.Validate(root);
+  public IReadOnlyList<string> GetValidationErrors(IRNode root, bool skipLayoutMath = false) => IrValidator.GetValidationErrors(root, skipLayoutMath);
 
   public List<GeneratedFile> GenerateMultiPage(
     IEnumerable<(string PageName, int ViewportWidth, IRNode Ir)> pages,

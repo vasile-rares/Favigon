@@ -45,7 +45,10 @@ import {
   removeWithChildren,
   buildChildrenMap,
 } from '../../utils/canvas-tree.util';
-import { generateThumbnail } from '../../utils/pixi/canvas-thumbnail.util';
+import {
+  generateThumbnail,
+  generateThumbnailHtml2Canvas,
+} from '../../utils/pixi/canvas-thumbnail.util';
 import {
   getTextFontFamily,
   getTextFontWeight,
@@ -176,6 +179,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly selectedElements = this.editorState.selectedElements;
   readonly elementMap = this.editorState.elementMap;
 
+  readonly selectedElementLiveBounds = computed(() => {
+    const el = this.selectedElement();
+    if (!el) return null;
+    return this.gesture.getLiveElementCanvasBounds(el);
+  });
+
   readonly visibleElements = computed<CanvasElement[]>(() =>
     this.elements().filter((element) =>
       this.element.isElementEffectivelyVisible(element.id, this.elements()),
@@ -233,8 +242,17 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const stable = this.gesture.stableSelectionBounds();
     const stableBounds = stable?.elementId === selected.id ? stable.bounds : null;
 
-    if (this.gesture.isResizing() || this.gesture.isRotating()) {
+    if (this.gesture.isRotating()) {
+      // Rotate: keep the pre-gesture AABB stable so the outline doesn't jump while the
+      // element visually spins (the CSS transform handles the visible rotation).
       return stableBounds ?? this.gesture.getCachedOverlaySceneBounds(selected);
+    }
+
+    if (this.gesture.isResizing()) {
+      // Resize: use the flow-bounds cache directly. With getCachedOverlaySceneBounds now
+      // always preferring real DOM cache over the model-based fallback (x=0 for flow
+      // children), this gives accurate bounds every frame without teleporting.
+      return this.gesture.getCachedOverlaySceneBounds(selected);
     }
 
     if (this.gesture.isFlowBoundsDirty()) {
@@ -344,12 +362,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const stableBounds = stable?.elementId === selected.id ? stable.bounds : null;
 
     let aabb: Bounds | null;
-    if (
-      this.gesture.isResizing() ||
-      this.gesture.isRotating() ||
-      this.gesture.isFlowBoundsDirty()
-    ) {
+    if (this.gesture.isRotating() || this.gesture.isFlowBoundsDirty()) {
       aabb = stableBounds ?? this.gesture.getCachedOverlaySceneBounds(selected);
+    } else if (this.gesture.isResizing()) {
+      // Transformed elements: DOM AABB cache lags 1 RAF behind each model write → teleport.
+      // Model-based bounds are always synchronised with the current model state.
+      // • Pure rotation: model center = CSS transform-origin center (50%/50%) → exact.
+      // • Skew / scale / 3D: un-skewed rect at the correct model position → no teleport.
+      aabb = this.gesture.getModelBasedOverlaySceneBounds(selected);
     } else {
       aabb =
         this.gesture.getLiveOverlaySceneBounds(selected) ??
@@ -373,6 +393,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       const hMode = s.heightMode ?? 'fixed';
       if (wMode === 'fill' && hMode === 'fill') return 'none';
       if (wMode === 'fit-content' && hMode === 'fit-content') return 'text-fit-fit';
+      // mixed fill + fit → no free axis to resize
+      if (
+        (wMode === 'fill' && hMode === 'fit-content') ||
+        (wMode === 'fit-content' && hMode === 'fill')
+      )
+        return 'none';
       // width is fit-content or fill → only height is manually sized
       if (wMode === 'fit-content' || wMode === 'fill') return 'ns';
       // height is fit-content or fill → only width is manually sized
@@ -380,12 +406,18 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return 'all';
     }
 
-    const wFill = s.widthMode === 'fill';
-    const hFill = s.heightMode === 'fill';
-    if (!wFill && !hFill) return 'all';
-    if (wFill && !hFill) return 'ns';
-    if (!wFill && hFill) return 'ew';
-    return 'none'; // both axes fill
+    const wMode = s.widthMode ?? 'fixed';
+    const hMode = s.heightMode ?? 'fixed';
+    const wFill = wMode === 'fill';
+    const hFill = hMode === 'fill';
+    const wFit = wMode === 'fit-content' || wMode === 'fit-image';
+    const hFit = hMode === 'fit-content' || hMode === 'fit-image';
+
+    if (wFill && hFill) return 'none';
+    if ((wFill && hFit) || (wFit && hFill)) return 'none';
+    if (wFill) return 'ns';
+    if (hFill) return 'ew';
+    return 'all';
   });
 
   readonly hoveredOverlayBounds = computed<Bounds | null>(() => {
@@ -405,6 +437,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const elements = this.getPageElementsById(pageId);
     const hovered = this.element.findElementById(hoveredId, elements);
     if (!hovered || hovered.type === 'frame') return null;
+
+    // Suppress hover outline on direct parent containers of any selected element.
+    // Without this, the parent layout container (type 'rectangle') renders its hover
+    // outline on top of the selected child — visible as a ghost rectangle after rotate.
+    if (this.selectedElements().some((sel) => sel.parentId === hoveredId)) return null;
 
     // For transformed elements, live DOM gives the AABB.
     // Pure 2D rotation: derive model-sized rotated box (outline rotated via CSS).
@@ -451,6 +488,21 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const el = this.element.findElementById(hoveredId, elements);
     if (!el || !this.hasOnlyRotation(el)) return null;
     return `${el.transformOriginX ?? 50}% ${el.transformOriginY ?? 50}%`;
+  });
+
+  readonly resizeTooltip = computed<
+    { kind: 'size'; w: number; h: number } | { kind: 'font'; value: number; unit: string } | null
+  >(() => {
+    if (!this.gesture.isResizing()) return null;
+    const el = this.selectedElement();
+    if (!el) return null;
+    if (this.gesture.isFontSizeResizing()) {
+      const value = Number.isFinite(el.fontSize ?? Number.NaN) ? (el.fontSize as number) : 16;
+      return { kind: 'font', value, unit: el.fontSizeUnit ?? 'px' };
+    }
+    const live = this.gesture.getLiveElementCanvasBounds(el);
+    if (live) return { kind: 'size', w: Math.round(live.width), h: Math.round(live.height) };
+    return { kind: 'size', w: Math.round(el.width), h: Math.round(el.height) };
   });
 
   readonly multiSelectOverlayBounds = computed<Bounds[]>(() => {
@@ -502,6 +554,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private pendingThumbnailDataUrl: string | null = null;
   private pendingInitialPageFocusId: string | null = null;
   private suppressNextWindowMenuClose = false;
+  private _idleThumbnailTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  private _lastPointerEventTime = 0;
+  private _isPointerDown = false;
 
   constructor() {
     this.loadProjectDesign();
@@ -594,20 +649,15 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.textEditorInitializedId = null;
     }
 
-    if (this.gesture.isFlowBoundsDirty()) {
-      this.gesture.updateFlowBoundsCache(this.canvasSceneRef()?.nativeElement ?? null);
-      // Defer the clean signal so it runs as a new zone.js macrotask. Writing
-      // _flowCacheVersion synchronously inside ngAfterViewChecked stays within the
-      // current CD cycle and zone.js never schedules a follow-up tick for it.
-      // With setTimeout(0) the callback is a fresh macrotask: zone.js detects its
-      // completion and triggers another CD cycle, causing selectionOverlayBounds to
-      // re-evaluate with dirty=false and read correct live DOM bounds.
-      setTimeout(() => this.gesture.markFlowBoundsCacheClean(), 0);
-    }
+    // Flow bounds cache is now refreshed in requestAnimationFrame inside
+    // invalidateFlowBoundsCache() (canvas-gesture.service.ts), so no work is
+    // needed here. The rAF fires after Angular paints, giving the same settled-DOM
+    // guarantee as the previous setTimeout(0) + ngAfterViewChecked approach but
+    // throttled to ≤60 refreshes/s regardless of pointermove frequency.
   }
 
   ngOnDestroy(): void {
-    // No pixi services to clean up
+    this.cancelIdleThumbnail();
   }
 
   async flushPendingPersistence(): Promise<boolean> {
@@ -638,19 +688,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       });
     }
 
-    if (!this.pendingThumbnailDataUrl) {
-      this.persistThumbnailIfDue();
-    }
-
-    while (Date.now() < deadline) {
-      if (!this.pendingThumbnailDataUrl) {
-        return true;
-      }
-
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, PERSIST_FLUSH_POLL_MS);
-      });
-    }
+    // Cancel any pending entry thumbnail — it already saved on entry or hasn't run yet.
+    this.cancelIdleThumbnail();
 
     return true;
   }
@@ -932,6 +971,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   // ── Canvas Events ─────────────────────────────────────────
 
   onCanvasPointerDown(event: MouseEvent): void {
+    this._isPointerDown = true;
+    this._lastPointerEventTime = Date.now();
     const target = event.target as HTMLElement;
     if (this.isCanvasBackgroundTarget(target)) {
       this.page.clearSelectedPageLayer();
@@ -1073,7 +1114,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    let bounds = this.element.getAbsoluteBounds(element, this.elements(), this.currentPage());
+    // Prefer live DOM bounds — getAbsoluteBounds is incorrect for elements whose ancestors
+    // are flow children (model x=0,y=0). Live DOM bounds are always correct regardless of
+    // nesting depth. Fallback covers off-screen elements where DOM read is unavailable.
+    let bounds =
+      this.gesture.getLiveElementCanvasBounds(element) ??
+      this.element.getAbsoluteBounds(element, this.elements(), this.currentPage());
     this.gesture.captureDragSelection(id);
     const isGroupDrag = this.gesture.getDragSelectionCount() > 1;
 
@@ -1353,34 +1399,78 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   onLayerMoved(change: {
     pageId: string;
-    draggedId: string;
+    draggedIds: string[];
     targetId: string | null;
     position: 'before' | 'after' | 'inside';
   }): void {
     this.gesture.runWithHistory(() => {
       this.updatePageElements(change.pageId, (elements) => {
-        const dragged = this.element.findElementById(change.draggedId, elements);
-        const draggedBounds = dragged
-          ? (this.gesture.getLiveElementCanvasBounds(dragged) ??
-            this.element.getAbsoluteBounds(dragged, elements, this.currentPage()))
-          : null;
-        const reordered = this.element.reorderLayerElements(
-          elements,
-          change.draggedId,
+        if (change.draggedIds.length === 0) return elements;
+
+        // Keep only root-level dragged elements; children of dragged parents move with their subtree
+        const draggedSet = new Set(change.draggedIds);
+        const rootDraggedIds = change.draggedIds.filter((id) => {
+          const el = this.element.findElementById(id, elements);
+          return !el?.parentId || !draggedSet.has(el.parentId);
+        });
+
+        // Sort by document order so relative ordering is preserved
+        const sorted = rootDraggedIds.sort(
+          (a, b) => elements.findIndex((e) => e.id === a) - elements.findIndex((e) => e.id === b),
+        );
+        if (sorted.length === 0) return elements;
+
+        // Capture bounds for all dragged elements before any moves happen
+        const boundsMap = new Map(
+          sorted.map((id) => {
+            const el = this.element.findElementById(id, elements);
+            const bounds = el
+              ? (this.gesture.getLiveElementCanvasBounds(el) ??
+                this.element.getAbsoluteBounds(el, elements, this.currentPage()))
+              : null;
+            return [id, bounds] as [string, typeof bounds];
+          }),
+        );
+
+        // Move first element to the drop target position
+        let current = elements;
+        const firstId = sorted[0];
+        const prevFirst = current;
+        current = this.element.reorderLayerElements(
+          current,
+          firstId,
           change.targetId,
           change.position,
         );
-
-        if (!draggedBounds) {
-          return reordered;
+        const firstBounds = boundsMap.get(firstId);
+        if (firstBounds) {
+          current = this.gesture.normalizeDraggedElementAfterLayerMove(
+            prevFirst,
+            current,
+            firstId,
+            firstBounds,
+          );
         }
 
-        return this.gesture.normalizeDraggedElementAfterLayerMove(
-          elements,
-          reordered,
-          change.draggedId,
-          draggedBounds,
-        );
+        // Place remaining elements after the previous one, preserving relative order
+        let prevId = firstId;
+        for (let i = 1; i < sorted.length; i++) {
+          const id = sorted[i];
+          const prevCurrent = current;
+          current = this.element.reorderLayerElements(current, id, prevId, 'after');
+          const bounds = boundsMap.get(id);
+          if (bounds) {
+            current = this.gesture.normalizeDraggedElementAfterLayerMove(
+              prevCurrent,
+              current,
+              id,
+              bounds,
+            );
+          }
+          prevId = id;
+        }
+
+        return current;
       });
     });
   }
@@ -1483,6 +1573,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   @HostListener('window:pointermove', ['$event'])
   onPointerMove(event: MouseEvent): void {
+    this._lastPointerEventTime = Date.now();
     const s = this.hostEl.nativeElement.style;
     s.setProperty('--cursor-x', `${event.clientX}px`);
     s.setProperty('--cursor-y', `${event.clientY}px`);
@@ -1530,6 +1621,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   @HostListener('window:pointerup', ['$event'])
   onPointerUp(event: MouseEvent): void {
+    this._isPointerDown = false;
+    this._lastPointerEventTime = Date.now();
     this.gesture.handlePointerUp(event);
   }
 
@@ -1904,9 +1997,16 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    this.isLoadingDesign.set(true);
-    this.loadingMessage.set('Fetching project details...');
-    this.loadingPercent.set(20);
+    const navState = this.router.getCurrentNavigation()?.extras.state ?? history.state;
+    const fromPreview = navState?.['fromPreview'] === true;
+
+    if (fromPreview) {
+      this.isLoadingDesign.set(false);
+    } else {
+      this.isLoadingDesign.set(true);
+      this.loadingMessage.set('Fetching project details...');
+      this.loadingPercent.set(20);
+    }
     this.apiError.set(null);
     this.canPersistDesign = false;
 
@@ -1914,12 +2014,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const hideOverlay = () => {
       const elapsed = Date.now() - loadingStartedAt;
       const remaining = Math.max(0, 1000 - elapsed);
+      // Wait for the minimum display time, then run html2canvas while the
+      // overlay is still fully visible. Only after the thumbnail is saved
+      // (or fails) do we start the fade-out animation.
       setTimeout(() => {
-        this.loadingFadingOut.set(true);
-        setTimeout(() => {
-          this.isLoadingDesign.set(false);
-          this.loadingFadingOut.set(false);
-        }, 380);
+        requestAnimationFrame(() => {
+          this.captureAndPersistThumbnailThenHide();
+        });
       }, remaining);
     };
 
@@ -2041,10 +2142,72 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.persistDesign();
   }
 
+  /**
+   * Runs html2canvas while the loading overlay is fully visible, saves the
+   * thumbnail, then starts the fade-out animation. This way the animation
+   * never starts before the thumbnail work is done.
+   */
+  private captureAndPersistThumbnailThenHide(): void {
+    const startFade = () => {
+      this.loadingFadingOut.set(true);
+      setTimeout(() => {
+        this.isLoadingDesign.set(false);
+        this.loadingFadingOut.set(false);
+      }, 380);
+    };
+
+    const page = this.currentPage();
+    if (!page || !Number.isInteger(this.projectIdAsNumber)) {
+      startFade();
+      return;
+    }
+
+    generateThumbnailHtml2Canvas(page)
+      .then((thumbnail) => {
+        if (thumbnail) this.persistThumbnailIfDue(thumbnail);
+      })
+      .catch(() => {})
+      .finally(() => startFade());
+  }
+
+  /**
+   * Called only in the rare case where the idle-thumbnail needs to be
+   * rescheduled (e.g. pointer was down during entry capture).
+   */
+  private scheduleIdleThumbnail(): void {
+    if (!Number.isInteger(this.projectIdAsNumber)) return;
+    this.cancelIdleThumbnail();
+    const tryCapture = () => {
+      this._idleThumbnailTimeoutId = null;
+      if (this._isPointerDown) {
+        this._idleThumbnailTimeoutId = setTimeout(tryCapture, 500);
+        return;
+      }
+      const page = this.currentPage();
+      if (!page) return;
+      generateThumbnailHtml2Canvas(page)
+        .then((thumbnail) => {
+          if (thumbnail) this.persistThumbnailIfDue(thumbnail);
+        })
+        .catch(() => {});
+    };
+    this._idleThumbnailTimeoutId = setTimeout(() => requestAnimationFrame(tryCapture), 50);
+  }
+
+  private cancelIdleThumbnail(): void {
+    if (this._idleThumbnailTimeoutId === null) return;
+    clearTimeout(this._idleThumbnailTimeoutId);
+    this._idleThumbnailTimeoutId = null;
+  }
+
   private generateThumbnailWithDomBounds(): string | null {
     const domBounds = this.gesture.snapshotAllElementSceneBounds();
-    return generateThumbnail(this.currentPage(), domBounds.size > 0 ? domBounds : null);
+    const bounds = domBounds.size > 0 ? domBounds : this.gesture.getLastKnownSceneBounds();
+    return generateThumbnail(this.currentPage(), bounds.size > 0 ? bounds : null);
   }
+
+  /** On exit: no thumbnail operation — thumbnail is saved on entry. */
+  private persistThumbnailAsync(): void {}
 
   private persistThumbnailIfDue(precomputedThumbnail?: string | null): void {
     if (!Number.isInteger(this.projectIdAsNumber)) {

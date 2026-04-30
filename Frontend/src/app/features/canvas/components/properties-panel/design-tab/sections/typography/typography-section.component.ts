@@ -627,7 +627,7 @@ export class TypographySectionComponent implements OnInit {
   }
 
   textAlignValue(element: CanvasElement): CanvasTextAlign {
-    return element.textAlign ?? 'center';
+    return element.textAlign ?? 'left';
   }
 
   fillLabel(element: CanvasElement): string {

@@ -414,6 +414,15 @@ export class AppearanceSectionComponent {
     } as Partial<CanvasElement>);
   }
 
+  onZIndexChange(value: number): void {
+    if (!Number.isFinite(value)) return;
+    this.elementPatch.emit({ zIndex: Math.round(Math.min(10, Math.max(-1, value))) });
+  }
+
+  onZIndexRemove(): void {
+    this.elementPatch.emit({ zIndex: undefined });
+  }
+
   removeFilter(filterId: CanvasFilterType): void {
     const element = this.element();
     const next = (element.cssFilterOptions ?? []).filter((o) => o !== filterId);
@@ -449,20 +458,31 @@ export class AppearanceSectionComponent {
   }
 
   private buildStyleMenuItems(): ContextMenuItem[] {
-    return [
-      {
-        id: 'filters',
-        label: 'Filters',
-        children: FILTER_DEFINITIONS.map((def) => ({
-          id: def.id,
-          label: def.label,
-          action: () => {
-            this.addFilter(def.id);
-            this.closeStyleMenu();
-          },
-        })),
-      },
-    ];
+    const element = this.element();
+    const items: ContextMenuItem[] = [];
+    if (element.zIndex === undefined) {
+      items.push({
+        id: 'zIndex',
+        label: 'Z Index',
+        action: () => {
+          this.elementPatch.emit({ zIndex: 0 });
+          this.closeStyleMenu();
+        },
+      });
+    }
+    items.push({
+      id: 'filters',
+      label: 'Filters',
+      children: FILTER_DEFINITIONS.map((def) => ({
+        id: def.id,
+        label: def.label,
+        action: () => {
+          this.addFilter(def.id);
+          this.closeStyleMenu();
+        },
+      })),
+    });
+    return items;
   }
 
   private addFilter(filterId: CanvasFilterType): void {

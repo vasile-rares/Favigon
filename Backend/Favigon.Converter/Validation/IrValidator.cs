@@ -37,11 +37,15 @@ public static class IrValidator
 
   public static bool Validate(IRNode node) => GetValidationErrors(node).Count == 0;
 
-  public static IReadOnlyList<string> GetValidationErrors(IRNode node)
+  /// <param name="skipLayoutMath">
+  /// When true, skips the flex-row overflow check. Use this on the save path so users
+  /// can save in-progress designs freely; the math check only matters for code export.
+  /// </param>
+  public static IReadOnlyList<string> GetValidationErrors(IRNode node, bool skipLayoutMath = false)
   {
     var errors = new List<string>();
     var seenIds = new HashSet<string>();
-    ValidateNode(node, path: "root", seenIds, errors);
+    ValidateNode(node, path: "root", seenIds, errors, skipLayoutMath);
     return errors;
   }
 
@@ -49,7 +53,8 @@ public static class IrValidator
       IRNode node,
       string path,
       HashSet<string> seenIds,
-      List<string> errors)
+      List<string> errors,
+      bool skipLayoutMath = false)
   {
     if (string.IsNullOrWhiteSpace(node.Id))
       errors.Add(Error(path, "id", "Id is required."));
@@ -81,8 +86,57 @@ public static class IrValidator
         ValidateStyle(variant.Style, $"{variantPath}.style", errors);
     }
 
+    // Phase 2: layout math — check for overflow in flex-row containers with known px widths
+    if (!skipLayoutMath)
+      ValidateFlexRowMath(node, path, errors);
+
     for (var i = 0; i < node.Children.Count; i++)
-      ValidateNode(node.Children[i], $"{path}.children[{i}]", seenIds, errors);
+      ValidateNode(node.Children[i], $"{path}.children[{i}]", seenIds, errors, skipLayoutMath);
+  }
+
+  /// <summary>
+  /// For a flex-row node whose width is a fixed px value, checks that the sum of all
+  /// children's px widths + gaps does not exceed the available inner width.
+  /// Only fires when ALL children have explicit px widths so the check is unambiguous.
+  /// </summary>
+  private static void ValidateFlexRowMath(IRNode node, string path, List<string> errors)
+  {
+    if (node.Layout?.Mode != LayoutMode.Flex) return;
+    if (node.Layout.Direction is not (FlexDirection.Row or null)) return; // default is row
+
+    // Parent must have a known fixed px width
+    var parentWidth = node.Style?.Width;
+    if (parentWidth is null || parentWidth.Unit != "px") return;
+
+    // Collect children widths — only proceed when every child has an explicit px width
+    var childWidthsPx = new List<double>();
+    foreach (var child in node.Children)
+    {
+      var w = child.Style?.Width;
+      if (w is null || w.Unit != "px") return; // bail — non-px child, can't evaluate
+      childWidthsPx.Add(w.Value);
+    }
+
+    if (childWidthsPx.Count == 0) return;
+
+    // Horizontal padding
+    var paddingLeft = node.Style?.Padding?.Left?.Unit == "px" ? node.Style.Padding.Left.Value : 0;
+    var paddingRight = node.Style?.Padding?.Right?.Unit == "px" ? node.Style.Padding.Right.Value : 0;
+
+    // Gap (column-gap takes priority over gap in row direction)
+    var gapLen = node.Layout.ColumnGap ?? node.Layout.Gap;
+    var gapPx = gapLen?.Unit == "px" ? gapLen.Value : 0;
+
+    var totalChildWidth = childWidthsPx.Sum() + gapPx * (childWidthsPx.Count - 1);
+    var availableWidth = parentWidth.Value - paddingLeft - paddingRight;
+
+    if (totalChildWidth > availableWidth + 0.5) // 0.5px tolerance for rounding
+    {
+      errors.Add(Error(path, "layout",
+        $"Flex-row overflow: children sum {totalChildWidth}px > available {availableWidth}px " +
+        $"(parent {parentWidth.Value}px − padding {paddingLeft + paddingRight}px). " +
+        $"Adjust child widths so they sum to {availableWidth}px with {gapPx}px gap."));
+    }
   }
 
   private static void ValidateLayout(IRLayout layout, string path, List<string> errors)

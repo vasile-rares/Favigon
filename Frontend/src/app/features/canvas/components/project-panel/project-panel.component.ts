@@ -103,7 +103,7 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   readonly layerVisibilityToggled = output<{ pageId: string; id: string }>();
   readonly layerMoved = output<{
     pageId: string;
-    draggedId: string;
+    draggedIds: string[];
     targetId: string | null;
     position: LayerDropPosition;
   }>();
@@ -122,15 +122,12 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   readonly aiMessages = signal<AiChatMessage[]>([]);
   readonly aiUserInput = signal('');
   readonly aiIsLoading = signal(false);
-  readonly aiSelectedModel = signal('gpt-4o');
+  readonly aiSelectedModel = signal('gpt-5.4-mini');
   readonly aiModelDropdownOpen = signal(false);
 
   readonly AI_MODELS: readonly { id: string; label: string }[] = [
-    { id: 'gpt-4o',                       label: 'GPT-4o' },
-    { id: 'gpt-4o-mini',                  label: 'GPT-4o mini' },
-    { id: 'o4-mini',                      label: 'o4-mini' },
-    { id: 'claude-3.7-sonnet',            label: 'Claude 3.7 Sonnet' },
-    { id: 'meta-llama-3.1-405b-instruct', label: 'Llama 3.1 405B' },
+    { id: 'gpt-5.4-mini', label: 'GPT-5.4 mini' },
+    { id: 'gpt-5.4', label: 'GPT-5.4' },
   ];
 
   // ── Private State ─────────────────────────────────────────
@@ -138,6 +135,7 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   private cachedLayerEntriesByPage = new Map<string, LayerEntry[]>();
   private draggedLayerId: string | null = null;
   private draggedLayerPageId: string | null = null;
+  private draggedLayerIds: string[] = [];
   private dragOverLayerId: string | null = null;
   private dragOverLayerPageId: string | null = null;
   private dragOverPosition: LayerDropPosition = 'before';
@@ -261,7 +259,12 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     this.aiMessages.update((msgs) => [...msgs, streamingMsg]);
 
     this.aiStreamAbort = new AbortController();
-    const request = { prompt, existingIr, viewportWidth: this.viewportWidth(), model: this.aiSelectedModel() };
+    const request = {
+      prompt,
+      existingIr,
+      viewportWidth: this.viewportWidth(),
+      model: this.aiSelectedModel(),
+    };
 
     this.aiDesignService.generateDesignStream(
       request,
@@ -555,7 +558,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
 
   onLayerSelected(pageId: string, id: string, event?: MouseEvent): void {
     this.closePageMenu();
-    this.layerSelected.emit({ pageId, id, additive: !!event?.shiftKey });
+    const additive = !!(event?.shiftKey || event?.ctrlKey || event?.metaKey);
+    this.layerSelected.emit({ pageId, id, additive });
   }
 
   onLayerNameInput(event: Event): void {
@@ -565,7 +569,11 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   onLayerNameClick(pageId: string, id: string, event: MouseEvent): void {
     event.stopPropagation();
     if (this.editingLayerId !== id) {
-      this.layerSelected.emit({ pageId, id, additive: event.shiftKey });
+      this.layerSelected.emit({
+        pageId,
+        id,
+        additive: event.shiftKey || event.ctrlKey || event.metaKey,
+      });
     }
   }
 
@@ -660,6 +668,15 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   onLayerDragStart(pageId: string, id: string, event: DragEvent): void {
     this.draggedLayerId = id;
     this.draggedLayerPageId = pageId;
+
+    const selectedIds = this.selectedElementIds();
+    if (selectedIds.includes(id) && selectedIds.length > 1) {
+      const pageLayerIds = new Set(this.getLayerEntriesForPage(pageId).map((entry) => entry.id));
+      this.draggedLayerIds = selectedIds.filter((sid) => pageLayerIds.has(sid));
+    } else {
+      this.draggedLayerIds = [id];
+    }
+
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('text/plain', id);
@@ -728,7 +745,7 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
 
     this.layerMoved.emit({
       pageId,
-      draggedId: this.draggedLayerId,
+      draggedIds: this.draggedLayerIds.filter((did) => did !== layer.id),
       targetId: layer.id,
       position: this.dragOverPosition,
     });
@@ -761,7 +778,7 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
 
     this.layerMoved.emit({
       pageId,
-      draggedId: this.draggedLayerId,
+      draggedIds: this.draggedLayerIds,
       targetId: null,
       position: 'inside',
     });
@@ -1003,6 +1020,7 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   private clearDragState(): void {
     this.draggedLayerId = null;
     this.draggedLayerPageId = null;
+    this.draggedLayerIds = [];
     this.dragOverLayerId = null;
     this.dragOverLayerPageId = null;
     this.dragOverPosition = 'before';

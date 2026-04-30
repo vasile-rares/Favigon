@@ -340,10 +340,21 @@
           (blur)="onTextEditorBlur(editEl.id)"
             (keydown)="onTextEditorKeyDown($event, editEl.id)"></div>
       }
+
+      @if (resizeTooltip(); as rt) {
+        <div class="resize-tooltip">
+          @if (rt.kind === 'font') {
+            {{ rt.value }}{{ rt.unit }}
+          } @else {
+            {{ rt.w }} × {{ rt.h }}
+          }
+        </div>
+      }
     </main>
 
     <app-properties-panel
       [selectedElement]="selectedElement()"
+      [liveSize]="selectedElementLiveBounds()"
       [projectId]="projectIdAsNumber"
       [autoOpenFillPopupElementId]="gesture.autoOpenFillPopupElementId()"
       [pages]="pages()"

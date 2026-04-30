@@ -222,7 +222,7 @@ function mapCanvasElementToIR(element: CanvasElement, parent?: CanvasElement): I
 
 function buildNodeLayout(element: CanvasElement): IRLayout | undefined {
   const isText = element.type === 'text';
-  const textVA = isText ? (element.textVerticalAlign ?? 'middle') : null;
+  const textVA = isText ? (element.textVerticalAlign ?? 'top') : null;
   const needsFlexForVA = textVA !== null && textVA !== 'top';
 
   if (!element.display && !needsFlexForVA) return undefined;
@@ -475,9 +475,7 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
       style.fontSize = length(element.fontSize, element.fontSizeUnit ?? 'px');
     }
 
-    if (element.fontFamily) {
-      style.fontFamily = element.fontFamily;
-    }
+    style.fontFamily = element.fontFamily || 'Inter';
 
     if (typeof element.fontWeight === 'number') {
       style.fontWeight = element.fontWeight;

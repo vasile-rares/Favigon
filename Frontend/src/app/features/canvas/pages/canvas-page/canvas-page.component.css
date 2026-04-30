@@ -648,3 +648,22 @@
   border-radius: 4px;
   pointer-events: none;
 }
+
+/* -- Resize size tooltip ----------------------------------- */
+
+.resize-tooltip {
+  position: fixed;
+  left: calc(var(--cursor-x, -9999px) + 14px);
+  top: calc(var(--cursor-y, -9999px) + 14px);
+  background: #1a1a2e;
+  color: #fff;
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10000;
+  user-select: none;
+}

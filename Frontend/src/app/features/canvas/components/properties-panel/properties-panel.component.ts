@@ -23,6 +23,7 @@ type PropertiesTab = 'design' | 'generation';
 })
 export class PropertiesPanelComponent {
   readonly selectedElement = input<CanvasElement | null>(null);
+  readonly liveSize = input<{ width: number; height: number } | null>(null);
   readonly projectId = input<number | null>(null);
   readonly autoOpenFillPopupElementId = input<string | null>(null);
   readonly pages = input<readonly CanvasPageModel[]>([]);

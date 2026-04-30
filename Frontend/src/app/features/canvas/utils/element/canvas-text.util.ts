@@ -45,7 +45,7 @@ export function getTextFontSizeInPx(element: CanvasElement): number {
 export function getFrameTitle(element: CanvasElement): string {
   const name = element.name?.trim() || 'Frame';
   const primary = element.isPrimary ? ' · Primary' : '';
-  return `${name}${primary}  ${Math.round(element.width)} × ${Math.round(element.height)}`;
+  return `${name}${primary}  ${Math.round(element.width)}`;
 }
 
 function formatTextMetricValue(

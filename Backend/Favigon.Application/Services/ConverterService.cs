@@ -10,8 +10,10 @@ public class ConverterService(IConverterEngine converterEngine) : IConverterServ
 {
   public ConverterResponse Generate(IRNode root, string framework)
   {
-    if (!converterEngine.Validate(root))
-      throw new InvalidOperationException("IR validation failed.");
+    // Skip flex-row math check for user-initiated exports — it is only a gate for AI generation.
+    var errors = converterEngine.GetValidationErrors(root, skipLayoutMath: true);
+    if (errors.Count > 0)
+      throw new InvalidOperationException($"IR validation failed:\n{string.Join("\n", errors)}");
 
     var output = converterEngine.GenerateSinglePage(root, framework);
     return new ConverterResponse
@@ -31,8 +33,11 @@ public class ConverterService(IConverterEngine converterEngine) : IConverterServ
     var sorted = pages.OrderByDescending(p => p.ViewportWidth).ToList();
 
     foreach (var page in sorted)
-      if (!converterEngine.Validate(page.Ir))
-        throw new InvalidOperationException($"IR validation failed for page '{page.PageName}'.");
+    {
+      var pageErrors = converterEngine.GetValidationErrors(page.Ir, skipLayoutMath: true);
+      if (pageErrors.Count > 0)
+        throw new InvalidOperationException($"IR validation failed for page '{page.PageName}':\n{string.Join("\n", pageErrors)}");
+    }
 
     var sortedInput = sorted
       .Select(p => (p.Ir, p.ViewportWidth, string.IsNullOrWhiteSpace(p.PageName) ? $"{p.ViewportWidth}px" : $"{p.PageName} \u2013 {p.ViewportWidth}px"))
@@ -43,7 +48,7 @@ public class ConverterService(IConverterEngine converterEngine) : IConverterServ
     return new ConverterResponse { Framework = framework, IsValid = true, Html = html, Css = css };
   }
 
-  public bool Validate(IRNode root) => converterEngine.Validate(root);
+  public bool Validate(IRNode root) => converterEngine.GetValidationErrors(root, skipLayoutMath: true).Count == 0;
 
   public MultiPageConverterResponse GenerateMultiPage(List<ConverterPageInput> pages, string framework)
   {
@@ -51,8 +56,11 @@ public class ConverterService(IConverterEngine converterEngine) : IConverterServ
       throw new ArgumentException("At least one page is required.");
 
     foreach (var page in pages)
-      if (!converterEngine.Validate(page.Ir))
-        throw new InvalidOperationException($"IR validation failed for page '{page.PageName}'.");
+    {
+      var pageErrors = converterEngine.GetValidationErrors(page.Ir, skipLayoutMath: true);
+      if (pageErrors.Count > 0)
+        throw new InvalidOperationException($"IR validation failed for page '{page.PageName}':\n{string.Join("\n", pageErrors)}");
+    }
 
     var entries = pages.Select(p => (p.PageName, p.ViewportWidth, p.Ir));
     var files = converterEngine.GenerateMultiPage(entries, framework);

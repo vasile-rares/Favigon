@@ -278,6 +278,7 @@ export interface CanvasElement {
   strokeSides?: CanvasBorderSides;
   strokeWidths?: CanvasBorderWidths;
   opacity?: number;
+  zIndex?: number;
   blendMode?: CanvasBlendMode;
   cornerRadius?: number;
   cornerRadii?: CanvasCornerRadii;

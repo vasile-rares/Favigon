@@ -1,9 +1,5 @@
 ﻿import { Component, ViewEncapsulation, input, output } from '@angular/core';
-import {
-  CanvasElement,
-  CanvasElementType,
-  CanvasPageModel,
-} from '@app/core';
+import { CanvasElement, CanvasElementType, CanvasPageModel } from '@app/core';
 import { FrameTemplateSelection } from '../../../canvas.types';
 import { LinkSectionComponent } from './sections/link/link-section.component';
 import { PositionSectionComponent } from './sections/position/position-section.component';
@@ -37,6 +33,7 @@ import { AccessibilitySectionComponent } from './sections/accessibility/accessib
 })
 export class DesignTabComponent {
   readonly selectedElement = input<CanvasElement | null>(null);
+  readonly liveSize = input<{ width: number; height: number } | null>(null);
   readonly projectId = input<number | null>(null);
   readonly autoOpenFillPopupElementId = input<string | null>(null);
   readonly pages = input<readonly CanvasPageModel[]>([]);

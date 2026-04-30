@@ -38,7 +38,10 @@ public static class ServiceCollectionExtensions
     services.AddHttpClient<IGoogleOAuthClient, GoogleOAuthClient>();
     services.AddScoped<IEmailSender, SmtpEmailSender>();
 
-    services.AddHttpClient<IAiClient, GitHubModelsClient>();
+    services.AddHttpClient<IAiClient, OpenAiClient>(client =>
+    {
+      client.Timeout = TimeSpan.FromSeconds(120);
+    });
 
     return services;
   }

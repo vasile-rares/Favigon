@@ -7,6 +7,7 @@ const THUMB_W = 300;
 const THUMB_H = 168;
 const PADDING = 16;
 const THUMBNAIL_BACKGROUND = '#111213';
+const THUMBNAIL_SCALE = 2; // physical pixels per logical pixel (retina/high-DPI)
 
 export function generateThumbnailFromCanvas(
   sourceCanvas: HTMLCanvasElement | null,
@@ -36,13 +37,15 @@ export function generateThumbnailFromCanvas(
   );
 
   const canvas = document.createElement('canvas');
-  canvas.width = THUMB_W;
-  canvas.height = THUMB_H;
+  canvas.width = THUMB_W * THUMBNAIL_SCALE;
+  canvas.height = THUMB_H * THUMBNAIL_SCALE;
 
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     return null;
   }
+
+  ctx.scale(THUMBNAIL_SCALE, THUMBNAIL_SCALE);
 
   const availableWidth = THUMB_W - PADDING * 2;
   const availableHeight = THUMB_H - PADDING * 2;
@@ -61,7 +64,7 @@ export function generateThumbnailFromCanvas(
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(sourceCanvas, sx, sy, sw, sh, dx, dy, targetWidth, targetHeight);
 
-  return canvas.toDataURL('image/jpeg', 0.86);
+  return canvas.toDataURL('image/jpeg', 0.9);
 }
 
 export function generateThumbnail(
@@ -108,14 +111,15 @@ export function generateThumbnail(
   const offsetY = (THUMB_H - scaledH) / 2;
 
   const canvas = document.createElement('canvas');
-  canvas.width = THUMB_W;
-  canvas.height = THUMB_H;
+  canvas.width = THUMB_W * THUMBNAIL_SCALE;
+  canvas.height = THUMB_H * THUMBNAIL_SCALE;
 
   const ctx = canvas.getContext('2d');
   if (!ctx) {
     return null;
   }
 
+  ctx.scale(THUMBNAIL_SCALE, THUMBNAIL_SCALE);
   ctx.fillStyle = THUMBNAIL_BACKGROUND;
   ctx.fillRect(0, 0, THUMB_W, THUMB_H);
 
@@ -136,7 +140,7 @@ export function generateThumbnail(
     );
   }
 
-  return canvas.toDataURL('image/jpeg', 0.75);
+  return canvas.toDataURL('image/jpeg', 0.9);
 }
 
 function getThumbnailElements(
@@ -153,7 +157,7 @@ function getThumbnailElements(
   );
 }
 
-function getPrimaryRootFrame(page: CanvasPageModel): CanvasElement | null {
+export function getPrimaryRootFrame(page: CanvasPageModel): CanvasElement | null {
   const rootFrames = page.elements.filter(
     (element) => element.type === 'frame' && !element.parentId,
   );
@@ -239,7 +243,7 @@ function drawElement(
       drawText(ctx, el, x, y, w, h, scale);
       break;
     case 'image':
-      drawImagePlaceholder(ctx, el, x, y, w, h, scale);
+      drawImageElement(ctx, el, x, y, w, h, scale);
       break;
     default:
       drawRect(ctx, el, x, y, w, h, scale);
@@ -317,16 +321,49 @@ function drawText(
 
   ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.fillStyle = el.fill ?? '#ffffff';
-  ctx.textBaseline = 'middle';
+  ctx.textBaseline = 'top';
   ctx.textAlign = el.textAlign === 'center' || el.textAlign === 'right' ? el.textAlign : 'left';
 
+  const lineHeight = fontSize * (el.lineHeight ?? 1.4);
+  const fitContent = (el.widthMode ?? 'fixed') === 'fit-content';
   const textX = el.textAlign === 'center' ? x + w / 2 : el.textAlign === 'right' ? x + w : x;
-  const textY = y + h / 2;
+
+  // Split on explicit newlines then word-wrap each paragraph
+  const lines: string[] = [];
+  for (const para of el.text.split('\n')) {
+    if (fitContent || w <= 0) {
+      lines.push(para);
+      continue;
+    }
+    const words = para.split(' ');
+    let current = '';
+    for (const word of words) {
+      const test = current ? `${current} ${word}` : word;
+      if (ctx.measureText(test).width <= w) {
+        current = test;
+      } else {
+        if (current) lines.push(current);
+        current = word;
+      }
+    }
+    lines.push(current);
+  }
+
+  const totalH = lines.length * lineHeight;
+  let startY = y;
+  const vAlign = el.textVerticalAlign ?? 'top';
+  if (vAlign === 'middle') startY = y + (h - totalH) / 2;
+  else if (vAlign === 'bottom') startY = y + h - totalH;
 
   ctx.save();
+  ctx.beginPath();
   ctx.rect(x, y, w, h);
   ctx.clip();
-  ctx.fillText(el.text, textX, textY, w);
+  for (let i = 0; i < lines.length; i++) {
+    const ly = startY + i * lineHeight;
+    if (ly > y + h) break;
+    ctx.fillText(lines[i], textX, ly);
+  }
   ctx.restore();
 }
 
@@ -335,7 +372,7 @@ function resolveTextFontSizeInPixels(el: CanvasElement): number {
   return (el.fontSizeUnit ?? 'px') === 'rem' ? fontSize * 16 : fontSize;
 }
 
-function drawImagePlaceholder(
+function drawImageElement(
   ctx: CanvasRenderingContext2D,
   el: CanvasElement,
   x: number,
@@ -350,33 +387,40 @@ function drawImagePlaceholder(
   ctx.beginPath();
   buildRoundedRectPath(ctx, x, y, w, h, radii);
   ctx.clip();
-  ctx.fillStyle = '#2a2b2e';
-  ctx.fillRect(x, y, w, h);
 
-  const iconSize = Math.min(w, h) * 0.3;
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  ctx.strokeStyle = '#666';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.rect(cx - iconSize / 2, cy - iconSize / 2, iconSize, iconSize);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(cx - iconSize * 0.1, cy - iconSize * 0.1, iconSize * 0.12, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(cx - iconSize / 2, cy + iconSize * 0.2);
-  ctx.lineTo(cx - iconSize * 0.1, cy - iconSize * 0.1);
-  ctx.lineTo(cx + iconSize * 0.2, cy + iconSize * 0.1);
-  ctx.lineTo(cx + iconSize / 2, cy - iconSize * 0.2);
-  ctx.stroke();
+  // Try to draw the actual image already loaded in the DOM
+  const domImg = document.querySelector<HTMLImageElement>(
+    `.canvas-scene [data-element-id="${el.id}"] img`,
+  );
+  if (domImg && domImg.complete && domImg.naturalWidth > 0) {
+    ctx.drawImage(domImg, x, y, w, h);
+  } else {
+    // Fallback: subtle placeholder
+    ctx.fillStyle = '#2a2b2e';
+    ctx.fillRect(x, y, w, h);
+    const iconSize = Math.min(w, h) * 0.25;
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.rect(cx - iconSize / 2, cy - iconSize / 2, iconSize, iconSize);
+    ctx.stroke();
+  }
+
   ctx.restore();
+}
 
-  ctx.beginPath();
-  buildRoundedRectPath(ctx, x, y, w, h, radii);
-  ctx.strokeStyle = '#444';
-  ctx.lineWidth = 1;
-  ctx.stroke();
+function drawImagePlaceholder(
+  ctx: CanvasRenderingContext2D,
+  el: CanvasElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  scale: number,
+): void {
+  drawImageElement(ctx, el, x, y, w, h, scale);
 }
 
 function getScaledCornerRadii(
@@ -421,4 +465,90 @@ function buildRoundedRectPath(
   ctx.lineTo(x, y + topLeft);
   ctx.quadraticCurveTo(x, y, x + topLeft, y);
   ctx.closePath();
+}
+
+/**
+ * Captures the primary frame directly from the DOM using html2canvas.
+ * Returns a pixel-accurate JPEG thumbnail data URL, or null if capture fails.
+ * Falls back gracefully so the caller can use the custom renderer as a backup.
+ */
+export async function generateThumbnailHtml2Canvas(
+  page: CanvasPageModel,
+): Promise<string | null> {
+  const primaryFrame = getPrimaryRootFrame(page);
+  if (!primaryFrame) return null;
+
+  const frameEl = document.querySelector<HTMLElement>(
+    `.canvas-scene [data-element-id="${primaryFrame.id}"]`,
+  );
+  if (!frameEl) return null;
+
+  // Clamp the captured height to the thumbnail's aspect ratio ("above the fold").
+  // A SaaS landing page can be 5000px+ tall; rendering it all at scale:1 would
+  // cost 6M+ pixels. By capping to the 16:9 viewport slice we cut pixel count
+  // by ~7× and then halving scale cuts it another 4× → ~28× faster total.
+  const captureW = frameEl.offsetWidth || THUMB_W;
+  const captureH = Math.min(
+    frameEl.offsetHeight || THUMB_H,
+    Math.round(captureW * (THUMB_H / THUMB_W)), // same 16:9 ratio as thumbnail
+  );
+
+  let captured: HTMLCanvasElement;
+  try {
+    // Dynamic import keeps html2canvas out of the main bundle.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod = await import('html2canvas' as any);
+    const html2canvas = (mod.default ?? mod) as (
+      el: HTMLElement,
+      opts?: Record<string, unknown>,
+    ) => Promise<HTMLCanvasElement>;
+    captured = await html2canvas(frameEl, {
+      scale: 0.5,       // render at half resolution — 4× fewer pixels vs scale:1
+      width: captureW,
+      height: captureH, // clip to "above the fold"
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      backgroundColor: null,
+      // html2canvas v1.4 cannot correctly handle CSS transform:scale() on ancestor
+      // elements (the canvas-scene applies transform:scale(zoomLevel)).
+      // Fix: in the cloned document, detach the frame from the canvas hierarchy
+      // and render it in isolation directly on body — no transforms, no overflow clips.
+      onclone: (clonedDoc: Document, cloned: HTMLElement) => {
+        const body = clonedDoc.body;
+        body.style.cssText = 'margin:0;padding:0;overflow:visible;background:transparent;';
+        cloned.style.position = 'relative';
+        cloned.style.left = '0';
+        cloned.style.top = '0';
+        body.innerHTML = '';
+        body.appendChild(cloned);
+      },
+    });
+  } catch {
+    return null;
+  }
+
+  if (!captured || captured.width === 0 || captured.height === 0) return null;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = THUMB_W * THUMBNAIL_SCALE;
+  canvas.height = THUMB_H * THUMBNAIL_SCALE;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.scale(THUMBNAIL_SCALE, THUMBNAIL_SCALE);
+
+  // Cover: scale so the captured image fills the entire card, then center-crop.
+  // This eliminates black bars — the design always fills the thumbnail edge-to-edge.
+  const coverScale = Math.max(THUMB_W / captured.width, THUMB_H / captured.height);
+  const drawW = captured.width * coverScale;
+  const drawH = captured.height * coverScale;
+  const dx = (THUMB_W - drawW) / 2;
+  const dy = (THUMB_H - drawH) / 2;
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(captured, dx, dy, drawW, drawH);
+
+  return canvas.toDataURL('image/jpeg', 0.9);
 }

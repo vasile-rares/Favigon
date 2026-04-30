@@ -81,12 +81,19 @@ const DIMENSION_CONSTRAINT_FIELD_DEFINITIONS: readonly DimensionConstraintFieldD
 @Component({
   selector: 'app-dt-dimensions-section',
   standalone: true,
-  imports: [FormsModule, DropdownSelectComponent, NumberInputComponent, ContextMenuComponent, ToggleGroupComponent],
+  imports: [
+    FormsModule,
+    DropdownSelectComponent,
+    NumberInputComponent,
+    ContextMenuComponent,
+    ToggleGroupComponent,
+  ],
   templateUrl: './dimensions-section.component.html',
   encapsulation: ViewEncapsulation.None,
 })
 export class DimensionsSectionComponent {
   readonly element = input.required<CanvasElement>();
+  readonly liveSize = input<{ width: number; height: number } | null>(null);
   readonly pages = input<readonly CanvasPageModel[]>([]);
   readonly currentPageId = input<string | null>(null);
 
@@ -107,9 +114,9 @@ export class DimensionsSectionComponent {
   readonly dimensionConstraintModeDefinitions = DIMENSION_CONSTRAINT_MODE_DEFINITIONS;
 
   readonly textGrowOptions: readonly ToggleGroupOption[] = [
-    { label: '', value: 'auto-width',  icon: 'grow-auto-width',  title: 'Auto Width' },
+    { label: '', value: 'auto-width', icon: 'grow-auto-width', title: 'Auto Width' },
     { label: '', value: 'auto-height', icon: 'grow-auto-height', title: 'Auto Height' },
-    { label: '', value: 'fixed',       icon: 'grow-fixed',       title: 'Fixed Size' },
+    { label: '', value: 'fixed', icon: 'grow-fixed', title: 'Fixed Size' },
   ];
 
   textGrowValue(element: CanvasElement): string {
@@ -138,8 +145,22 @@ export class DimensionsSectionComponent {
       // 'fixed' — preserve current pixel sizes for both axes
       const wFixed = getCanvasFixedSize(element, 'width');
       const hFixed = getCanvasFixedSize(element, 'height');
-      const wPixels = resolveCanvasPixelsFromMode('fixed', wFixed, 'width', undefined, parent, page);
-      const hPixels = resolveCanvasPixelsFromMode('fixed', hFixed, 'height', undefined, parent, page);
+      const wPixels = resolveCanvasPixelsFromMode(
+        'fixed',
+        wFixed,
+        'width',
+        undefined,
+        parent,
+        page,
+      );
+      const hPixels = resolveCanvasPixelsFromMode(
+        'fixed',
+        hFixed,
+        'height',
+        undefined,
+        parent,
+        page,
+      );
       this.elementPatch.emit({
         widthMode: undefined,
         heightMode: undefined,
@@ -201,7 +222,15 @@ export class DimensionsSectionComponent {
     const fixedPixels = getCanvasFixedSize(element, axis);
     const sizingValue = getCanvasSizingValue(element, axis);
 
-    if (mode === 'fixed' || mode === 'fit-content' || mode === 'fit-image') {
+    if (mode === 'fit-content' || mode === 'fit-image') {
+      const live = this.liveSize();
+      return live
+        ? axis === 'width'
+          ? Math.round(live.width)
+          : Math.round(live.height)
+        : fixedPixels;
+    }
+    if (mode === 'fixed') {
       return fixedPixels;
     }
     if (mode === 'fill') {

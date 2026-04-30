@@ -37,7 +37,7 @@ public class ExceptionHandlerMiddleware
   {
     var statusCode = exception switch
     {
-      InvalidOperationException => (int)HttpStatusCode.Conflict,
+      InvalidOperationException => 422, // Unprocessable Entity (validation / business rule failure)
       ArgumentException => (int)HttpStatusCode.BadRequest,
       _ => (int)HttpStatusCode.InternalServerError
     };

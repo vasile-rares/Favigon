@@ -279,6 +279,33 @@
     </div>
     }
   }
+  @if (element().zIndex !== undefined) {
+    <div class="pp-style-row">
+      <span class="pp-row-label">Z Index</span>
+      <div class="pp-style-control pp-style-control--filter">
+        <app-number-input
+          appearance="compact"
+          ariaLabel="Z Index"
+          [value]="element().zIndex ?? 0"
+          [min]="-1"
+          [max]="10"
+          [step]="1"
+          (gestureStarted)="onNumberInputGestureStarted()"
+          (gestureCommitted)="onNumberInputGestureCommitted()"
+          (valueChange)="onZIndexChange($event)"></app-number-input>
+        <button
+          type="button"
+          class="pp-row-remove-btn"
+          aria-label="Remove Z Index"
+          title="Remove Z Index"
+          (click)="onZIndexRemove()">
+          <svg viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M2 2L8 8M8 2L2 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  }
 
 </section>
 
