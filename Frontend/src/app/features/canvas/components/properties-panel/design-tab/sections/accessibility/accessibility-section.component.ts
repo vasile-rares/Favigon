@@ -27,7 +27,7 @@ const ACCESSIBILITY_FIELD_DEFINITIONS: readonly AccessibilityFieldDefinition[] =
 ] as const;
 
 @Component({
-  selector: 'app-dt-accessibility-section',
+  selector: 'app-design-tab-accessibility-section',
   standalone: true,
   imports: [FormsModule, DropdownSelectComponent, ContextMenuComponent],
   templateUrl: './accessibility-section.component.html',

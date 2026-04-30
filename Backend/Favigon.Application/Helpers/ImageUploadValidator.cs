@@ -2,29 +2,21 @@ namespace Favigon.Application.Helpers;
 
 public static class ImageUploadValidator
 {
-  public static void Validate(
-    Stream content,
-    string? fileName,
-    string? contentType,
-    long length,
-    long maxBytes,
-    IReadOnlySet<string> allowedTypes,
-    string assetLabel,
-    string unsupportedFormatMessage)
+  public static void Validate(ImageUploadRequest request)
   {
-    if (length <= 0)
-      throw new ArgumentException($"{assetLabel} is empty.");
+    if (request.Length <= 0)
+      throw new ArgumentException($"{request.AssetLabel} is empty.");
 
-    if (length > maxBytes)
-      throw new ArgumentException($"{assetLabel} exceeds the {maxBytes / 1024 / 1024} MB limit.");
+    if (request.Length > request.MaxBytes)
+      throw new ArgumentException($"{request.AssetLabel} exceeds the {request.MaxBytes / 1024 / 1024} MB limit.");
 
-    if (string.IsNullOrWhiteSpace(fileName))
-      throw new ArgumentException($"{assetLabel} name is required.");
+    if (string.IsNullOrWhiteSpace(request.FileName))
+      throw new ArgumentException($"{request.AssetLabel} name is required.");
 
-    if (content == Stream.Null || !content.CanRead)
-      throw new ArgumentException($"{assetLabel} content is not readable.");
+    if (request.Content == Stream.Null || !request.Content.CanRead)
+      throw new ArgumentException($"{request.AssetLabel} content is not readable.");
 
-    if (string.IsNullOrWhiteSpace(contentType) || !allowedTypes.Contains(contentType))
-      throw new ArgumentException(unsupportedFormatMessage);
+    if (string.IsNullOrWhiteSpace(request.ContentType) || !request.AllowedTypes.Contains(request.ContentType))
+      throw new ArgumentException(request.UnsupportedFormatMessage);
   }
 }

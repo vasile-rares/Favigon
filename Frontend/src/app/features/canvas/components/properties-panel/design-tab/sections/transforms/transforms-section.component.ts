@@ -33,7 +33,7 @@ const TRANSFORM_PERSPECTIVE_MIN = 100;
 const TRANSFORM_PERSPECTIVE_MAX = 3000;
 
 @Component({
-  selector: 'app-dt-transforms-section',
+  selector: 'app-design-tab-transforms-section',
   standalone: true,
   imports: [ToggleGroupComponent, NumberInputComponent, ContextMenuComponent],
   templateUrl: './transforms-section.component.html',

@@ -40,15 +40,15 @@ public class ProjectAssetService : IProjectAssetService
       return null;
     }
 
-    ImageUploadValidator.Validate(
-      request.Content,
-      request.FileName,
-      request.ContentType,
-      request.Length,
-      MaxImageSizeBytes,
-      AllowedContentTypes,
-      "Image file",
-      "Only PNG, JPEG, WebP, GIF, and AVIF images are supported.");
+    ImageUploadValidator.Validate(new ImageUploadRequest(
+      Content: request.Content,
+      FileName: request.FileName,
+      ContentType: request.ContentType,
+      Length: request.Length,
+      MaxBytes: MaxImageSizeBytes,
+      AllowedTypes: AllowedContentTypes,
+      AssetLabel: "Image file",
+      UnsupportedFormatMessage: "Only PNG, JPEG, WebP, GIF, and AVIF images are supported."));
 
     return await _projectAssetStorage.SaveImageAsync(
       userId,

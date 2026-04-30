@@ -38,7 +38,7 @@ const EFFECT_PREVIEW_HOVER_IDLE_MS = 1180;
 const EFFECT_PREVIEW_CLICK_IDLE_MS = 1080;
 
 @Component({
-  selector: 'app-dt-effects-section',
+  selector: 'app-design-tab-effects-section',
   standalone: true,
   imports: [
     NgStyle,

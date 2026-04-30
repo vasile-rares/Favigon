@@ -202,6 +202,17 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return result;
   });
 
+  /** O(1) element-id → page-id index. Rebuilt only when pages/elements change. */
+  private readonly elementPageIdMap = computed<ReadonlyMap<string, string>>(() => {
+    const map = new Map<string, string>();
+    for (const pg of this.pages()) {
+      for (const el of pg.elements) {
+        map.set(el.id, pg.id);
+      }
+    }
+    return map;
+  });
+
   readonly emptyChildrenMap = new Map<string | null, CanvasElement[]>();
 
   // ── DOM Overlay Computed Signals ──────────────────────────
@@ -1817,14 +1828,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   private findPageIdByElementId(elementId: string): string | null {
-    const pages = this.pages();
-    for (const page of pages) {
-      if (page.elements.some((element) => element.id === elementId)) {
-        return page.id;
-      }
-    }
-
-    return null;
+    return this.elementPageIdMap().get(elementId) ?? null;
   }
 
   private getPageElementsById(pageId: string): CanvasElement[] {

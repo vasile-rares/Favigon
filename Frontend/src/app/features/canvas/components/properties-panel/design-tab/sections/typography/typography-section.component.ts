@@ -87,7 +87,7 @@ const TYPOGRAPHY_OPTIONAL_DEFS: readonly TypographyOptionalDef[] = [
 ];
 
 @Component({
-  selector: 'app-dt-typography-section',
+  selector: 'app-design-tab-typography-section',
   standalone: true,
   imports: [
     FormsModule,
@@ -234,9 +234,21 @@ export class TypographySectionComponent implements OnInit {
   ];
 
   readonly textVerticalAlignOptions: readonly ToggleGroupOption[] = [
-    { label: '', value: 'top',    icon: 'align-vertical-start',  ariaLabel: 'Align top',    title: 'Top' },
-    { label: '', value: 'middle', icon: 'align-vertical-center', ariaLabel: 'Align middle', title: 'Middle' },
-    { label: '', value: 'bottom', icon: 'align-vertical-end',    ariaLabel: 'Align bottom', title: 'Bottom' },
+    { label: '', value: 'top', icon: 'align-vertical-start', ariaLabel: 'Align top', title: 'Top' },
+    {
+      label: '',
+      value: 'middle',
+      icon: 'align-vertical-center',
+      ariaLabel: 'Align middle',
+      title: 'Middle',
+    },
+    {
+      label: '',
+      value: 'bottom',
+      icon: 'align-vertical-end',
+      ariaLabel: 'Align bottom',
+      title: 'Bottom',
+    },
   ];
 
   isTextFixedSize(element: CanvasElement): boolean {

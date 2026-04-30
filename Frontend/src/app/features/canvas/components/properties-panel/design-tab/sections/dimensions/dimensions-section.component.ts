@@ -79,7 +79,7 @@ const DIMENSION_CONSTRAINT_FIELD_DEFINITIONS: readonly DimensionConstraintFieldD
 ] as const;
 
 @Component({
-  selector: 'app-dt-dimensions-section',
+  selector: 'app-design-tab-dimensions-section',
   standalone: true,
   imports: [
     FormsModule,

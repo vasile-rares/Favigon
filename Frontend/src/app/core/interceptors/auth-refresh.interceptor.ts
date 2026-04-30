@@ -5,13 +5,11 @@ import { catchError, switchMap, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
 import { environment } from '../../../environments/environment';
 
+const SKIP_REFRESH_PATHS = ['/account/refresh', '/account/login', '/account/oauth2'] as const;
+
 export const authRefreshInterceptor: HttpInterceptorFn = (request, next) => {
-  // Skip the refresh endpoint itself to avoid infinite loops
-  if (
-    request.url.includes('/account/refresh') ||
-    request.url.includes('/account/login') ||
-    request.url.includes('/account/oauth2')
-  ) {
+  // Skip auth endpoints to avoid infinite loops
+  if (SKIP_REFRESH_PATHS.some((path) => request.url.includes(path))) {
     return next(request);
   }
 

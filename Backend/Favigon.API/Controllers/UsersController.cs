@@ -4,11 +4,12 @@ using Favigon.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Favigon.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/users")]
 [Authorize]
 public class UsersController : ControllerBase
 {
@@ -139,6 +140,7 @@ public class UsersController : ControllerBase
   }
 
   [HttpGet("search")]
+  [EnableRateLimiting("users")]
   public async Task<IActionResult> Search([FromQuery] string q)
   {
     if (string.IsNullOrWhiteSpace(q) || q.Length < 2)

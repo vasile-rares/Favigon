@@ -15,7 +15,7 @@ import { ProjectService } from '@app/core';
 import { TextInputComponent } from '../../text-input/text-input.component';
 import { ToggleGroupComponent, ToggleGroupOption } from '../../toggle-group/toggle-group.component';
 import { ActionButtonComponent } from '../../action-button/action-button.component';
-import { extractApiErrorMessage } from '../../../../core/utils/api-error.util';
+import { extractApiErrorMessage } from '@app/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 const PROJECT_MENU_ANIMATION_MS = 120;

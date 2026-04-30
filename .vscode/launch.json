@@ -63,29 +63,6 @@
             "command": "docker compose ps",
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "docker: compose up (detached, build)"
-        },
-        {
-            "name": "Docker: Refresh Self-Hosting Stack",
-            "type": "node-terminal",
-            "request": "launch",
-            "command": "docker compose ps",
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "docker: refresh (pull + recreate)"
-        },
-        {
-            "name": "Docker: Stop Self-Hosting Stack",
-            "type": "node-terminal",
-            "request": "launch",
-            "command": "docker compose ps --all",
-            "cwd": "${workspaceFolder}",
-            "preLaunchTask": "docker: compose down"
-        },
-        {
-            "name": "Docker: Tail Compose Logs",
-            "type": "node-terminal",
-            "request": "launch",
-            "command": "docker compose logs -f --tail 200",
-            "cwd": "${workspaceFolder}"
         }
     ],
     "compounds": [

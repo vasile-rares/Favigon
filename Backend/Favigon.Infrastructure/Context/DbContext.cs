@@ -28,8 +28,7 @@ public class FavigonDbContext : Microsoft.EntityFrameworkCore.DbContext
 
         modelBuilder.Entity<User>()
             .Property(u => u.CreatedAt)
-            .HasDefaultValueSql("NOW()")
-            .ValueGeneratedOnAdd();
+            .ValueGeneratedNever();
 
         modelBuilder.Entity<User>()
             .Property(u => u.HasPassword)
@@ -104,21 +103,18 @@ public class FavigonDbContext : Microsoft.EntityFrameworkCore.DbContext
 
         modelBuilder.Entity<LinkedAccount>()
             .Property(la => la.CreatedAt)
-            .HasDefaultValueSql("NOW()")
-            .ValueGeneratedOnAdd();
+            .ValueGeneratedNever();
 
         modelBuilder.Entity<Project>()
             .ToTable("projects");
 
         modelBuilder.Entity<Project>()
             .Property(p => p.CreatedAt)
-            .HasDefaultValueSql("NOW()")
-            .ValueGeneratedOnAdd();
+            .ValueGeneratedNever();
 
         modelBuilder.Entity<Project>()
             .Property(p => p.UpdatedAt)
-            .HasDefaultValueSql("NOW()")
-            .ValueGeneratedOnAddOrUpdate();
+            .ValueGeneratedNever();
 
         modelBuilder.Entity<Project>()
             .Property(p => p.DesignJson)

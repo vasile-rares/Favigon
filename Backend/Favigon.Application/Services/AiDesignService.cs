@@ -24,7 +24,7 @@ public partial class AiDesignService(IAiClient aiClient, IConfiguration configur
 
   private static string BuildCacheKey(AiDesignRequest r)
   {
-    var raw = $"design|{r.Prompt}|{r.ViewportWidth}|{r.Model ?? ""}"; 
+    var raw = $"design|{r.Prompt}|{r.ViewportWidth}|{r.Model ?? ""}";
     return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(raw)));
   }
 

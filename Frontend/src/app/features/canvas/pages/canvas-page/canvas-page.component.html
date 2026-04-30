@@ -26,32 +26,34 @@
   </app-header-bar>
 
   <div class="workspace">
-    <app-project-panel
-      [pages]="pages()"
-      [currentPageId]="currentPageId()"
-      [focusedPageId]="page.layersFocusedPageId()"
-      [selectedPageLayerId]="page.selectedPageLayerId()"
-      [canPastePage]="page.hasCopiedPage()"
-      [elements]="elements()"
-      [selectedElementId]="selectedElementId()"
-      [selectedElementIds]="selectedElementIds()"
-      [currentIr]="irPreview()"
-      [viewportWidth]="currentPage()?.viewportWidth ?? 1280"
-      (panelWidthChanged)="onProjectPanelWidthChanged($event)"
-      (designApplied)="onAiDesignApplied($event)"
-      (pageSelected)="page.selectPage($event)"
-      (pageLayerSelected)="page.selectPageWithoutFocus($event)"
-      (pageCreateRequested)="page.addPage()"
-      (pageCopyRequested)="page.copyPage($event)"
-      (pagePasteRequested)="page.pastePage($event)"
-      (pageDuplicateRequested)="page.duplicatePage($event)"
-      (pageDeleteRequested)="page.deletePage($event)"
-      (layerSelected)="onLayerSelected($event)"
-      (layerNameChanged)="onLayerNameChanged($event)"
-      (layerMoved)="onLayerMoved($event)"
-      (layerVisibilityToggled)="onLayerVisibilityToggled($event)"
-      (layerContextMenuRequested)="onLayerContextMenuRequested($event)"
-      (pageNameChanged)="page.onPageNameChanged($event)"></app-project-panel>
+    @defer (prefetch on immediate; on idle) {
+      <app-project-panel
+        [pages]="pages()"
+        [currentPageId]="currentPageId()"
+        [focusedPageId]="page.layersFocusedPageId()"
+        [selectedPageLayerId]="page.selectedPageLayerId()"
+        [canPastePage]="page.hasCopiedPage()"
+        [elements]="elements()"
+        [selectedElementId]="selectedElementId()"
+        [selectedElementIds]="selectedElementIds()"
+        [currentIr]="irPreview()"
+        [viewportWidth]="currentPage()?.viewportWidth ?? 1280"
+        (panelWidthChanged)="onProjectPanelWidthChanged($event)"
+        (designApplied)="onAiDesignApplied($event)"
+        (pageSelected)="page.selectPage($event)"
+        (pageLayerSelected)="page.selectPageWithoutFocus($event)"
+        (pageCreateRequested)="page.addPage()"
+        (pageCopyRequested)="page.copyPage($event)"
+        (pagePasteRequested)="page.pastePage($event)"
+        (pageDuplicateRequested)="page.duplicatePage($event)"
+        (pageDeleteRequested)="page.deletePage($event)"
+        (layerSelected)="onLayerSelected($event)"
+        (layerNameChanged)="onLayerNameChanged($event)"
+        (layerMoved)="onLayerMoved($event)"
+        (layerVisibilityToggled)="onLayerVisibilityToggled($event)"
+        (layerContextMenuRequested)="onLayerContextMenuRequested($event)"
+        (pageNameChanged)="page.onPageNameChanged($event)"></app-project-panel>
+    }
 
     <app-toolbar
       [activeTool]="currentTool()"
@@ -352,30 +354,32 @@
       }
     </main>
 
-    <app-properties-panel
-      [selectedElement]="selectedElement()"
-      [liveSize]="selectedElementLiveBounds()"
-      [projectId]="projectIdAsNumber"
-      [autoOpenFillPopupElementId]="gesture.autoOpenFillPopupElementId()"
-      [pages]="pages()"
-      [currentPageId]="currentPageId()"
-      [currentTool]="currentTool()"
-      [selectedFramework]="generation.selectedFramework()"
-      [validationResult]="generation.validationResult()"
-      [apiError]="apiError() || generation.error()"
-      [isValidating]="generation.isValidating()"
-      [isGenerating]="generation.isGenerating()"
-      [generatedHtml]="generation.generatedHtml()"
-      [generatedCss]="generation.generatedCss()"
-      [generatedFiles]="generation.generatedFiles()"
-      [irPreview]="irPreview()"
-      (frameworkChanged)="setFramework($event)"
-      (validateRequested)="validateIR()"
-      (generateRequested)="generateCode()"
-      (frameTemplateSelected)="onFrameTemplateSelected($event)"
-      (numberInputGestureStarted)="onPropertyNumberGestureStarted()"
-      (numberInputGestureCommitted)="onPropertyNumberGestureCommitted()"
-      (elementPatch)="onSelectedElementPatch($event)"></app-properties-panel>
+    @defer (prefetch on immediate; on idle) {
+      <app-properties-panel
+        [selectedElement]="selectedElement()"
+        [liveSize]="selectedElementLiveBounds()"
+        [projectId]="projectIdAsNumber"
+        [autoOpenFillPopupElementId]="gesture.autoOpenFillPopupElementId()"
+        [pages]="pages()"
+        [currentPageId]="currentPageId()"
+        [currentTool]="currentTool()"
+        [selectedFramework]="generation.selectedFramework()"
+        [validationResult]="generation.validationResult()"
+        [apiError]="apiError() || generation.error()"
+        [isValidating]="generation.isValidating()"
+        [isGenerating]="generation.isGenerating()"
+        [generatedHtml]="generation.generatedHtml()"
+        [generatedCss]="generation.generatedCss()"
+        [generatedFiles]="generation.generatedFiles()"
+        [irPreview]="irPreview()"
+        (frameworkChanged)="setFramework($event)"
+        (validateRequested)="validateIR()"
+        (generateRequested)="generateCode()"
+        (frameTemplateSelected)="onFrameTemplateSelected($event)"
+        (numberInputGestureStarted)="onPropertyNumberGestureStarted()"
+        (numberInputGestureCommitted)="onPropertyNumberGestureCommitted()"
+        (elementPatch)="onSelectedElementPatch($event)"></app-properties-panel>
+    }
 
 
     @if (isFileDragOver()) {
@@ -413,38 +417,46 @@
     }
   </div>
 
-  @if (isLoadingDesign()) {
-    <app-canvas-loading-overlay
-      [message]="loadingMessage()"
-      [percent]="loadingPercent()"
-      [fadingOut]="loadingFadingOut()" />
+  @defer (prefetch on idle; when isLoadingDesign()) {
+    @if (isLoadingDesign()) {
+      <app-canvas-loading-overlay
+        [message]="loadingMessage()"
+        [percent]="loadingPercent()"
+        [fadingOut]="loadingFadingOut()" />
+    }
   }
 </div>
 
-@if (contextMenu.isOpen()) {
-  <app-context-menu
-    [x]="contextMenu.positionX()"
-    [y]="contextMenu.positionY()"
-    [items]="contextMenu.items()"
-    (closed)="closeContextMenu()"></app-context-menu>
+@defer (prefetch on idle; when contextMenu.isOpen()) {
+  @if (contextMenu.isOpen()) {
+    <app-context-menu
+      [x]="contextMenu.positionX()"
+      [y]="contextMenu.positionY()"
+      [items]="contextMenu.items()"
+      (closed)="closeContextMenu()"></app-context-menu>
+  }
 }
 
-@if (page.isDeviceMenuOpen()) {
-  <app-context-menu
-    [x]="page.deviceMenuX()"
-    [y]="page.deviceMenuY()"
-    [items]="page.deviceMenuItems()"
-    (closed)="page.closeDeviceFrameMenu()"></app-context-menu>
+@defer (prefetch on idle; when page.isDeviceMenuOpen()) {
+  @if (page.isDeviceMenuOpen()) {
+    <app-context-menu
+      [x]="page.deviceMenuX()"
+      [y]="page.deviceMenuY()"
+      [items]="page.deviceMenuItems()"
+      (closed)="page.closeDeviceFrameMenu()"></app-context-menu>
+  }
 }
 
-@if (page.isCustomFrameDialogOpen()) {
-  <app-dialog-box
-    title="Custom Frame"
-    description="Set custom width and height for the new frame."
-    [fields]="page.customFrameDialogFields()"
-    [primaryAction]="{ label: 'Add Frame', variant: 'primary' }"
-    [secondaryAction]="{ label: 'Cancel', variant: 'outline' }"
-    (primaryClicked)="page.onCustomFrameDialogPrimary($event)"
-    (secondaryClicked)="page.closeCustomFrameDialog()"
-    (closed)="page.closeCustomFrameDialog()"></app-dialog-box>
+@defer (prefetch on idle; when page.isCustomFrameDialogOpen()) {
+  @if (page.isCustomFrameDialogOpen()) {
+    <app-dialog-box
+      title="Custom Frame"
+      description="Set custom width and height for the new frame."
+      [fields]="page.customFrameDialogFields()"
+      [primaryAction]="{ label: 'Add Frame', variant: 'primary' }"
+      [secondaryAction]="{ label: 'Cancel', variant: 'outline' }"
+      (primaryClicked)="page.onCustomFrameDialogPrimary($event)"
+      (secondaryClicked)="page.closeCustomFrameDialog()"
+      (closed)="page.closeCustomFrameDialog()"></app-dialog-box>
+  }
 }

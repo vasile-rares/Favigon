@@ -7,7 +7,7 @@ import { CanvasElement, CanvasLinkType, CanvasPageModel } from '@app/core';
 import { hasCanvasElementLink } from '../../../../../utils/element/canvas-accessibility.util';
 
 @Component({
-  selector: 'app-dt-link-section',
+  selector: 'app-design-tab-link-section',
   standalone: true,
   imports: [FormsModule, DropdownSelectComponent, ToggleGroupComponent],
   templateUrl: './link-section.component.html',

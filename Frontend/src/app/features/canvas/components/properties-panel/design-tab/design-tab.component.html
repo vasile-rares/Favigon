@@ -36,52 +36,52 @@
 
     @if (selectedElement(); as element) {
 
-      <app-dt-link-section
+      <app-design-tab-link-section
         [element]="element"
         [pages]="pages()"
         [currentPageId]="currentPageId()"
-        (elementPatch)="elementPatch.emit($event)"></app-dt-link-section>
+        (elementPatch)="elementPatch.emit($event)"></app-design-tab-link-section>
 
-      <app-dt-position-section
+      <app-design-tab-position-section
         [element]="element"
-        (elementPatch)="elementPatch.emit($event)"></app-dt-position-section>
+        (elementPatch)="elementPatch.emit($event)"></app-design-tab-position-section>
 
-      <app-dt-dimensions-section
+      <app-design-tab-dimensions-section
         [element]="element"
         [liveSize]="liveSize()"
         [pages]="pages()"
         [currentPageId]="currentPageId()"
         (elementPatch)="elementPatch.emit($event)"
         (numberInputGestureStarted)="numberInputGestureStarted.emit()"
-        (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-dimensions-section>
+        (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-design-tab-dimensions-section>
 
       @if (element.type === 'frame' || element.type === 'rectangle') {
-        <app-dt-layout-section
+        <app-design-tab-layout-section
           [element]="element"
           (elementPatch)="elementPatch.emit($event)"
           (numberInputGestureStarted)="numberInputGestureStarted.emit()"
-          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-layout-section>
+          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-design-tab-layout-section>
       }
 
-      <app-dt-cursor-section
+      <app-design-tab-cursor-section
         [element]="element"
-        (elementPatch)="elementPatch.emit($event)"></app-dt-cursor-section>
+        (elementPatch)="elementPatch.emit($event)"></app-design-tab-cursor-section>
 
-      <app-dt-appearance-section
+      <app-design-tab-appearance-section
         [element]="element"
         [projectId]="projectId()"
         [autoOpenFillPopupElementId]="autoOpenFillPopupElementId()"
         (elementPatch)="elementPatch.emit($event)"
         (numberInputGestureStarted)="numberInputGestureStarted.emit()"
-        (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-appearance-section>
+        (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-design-tab-appearance-section>
 
       @if (isText(element.type)) {
-        <app-dt-typography-section
+        <app-design-tab-typography-section
         [element]="element"
         [projectId]="projectId()"
         (elementPatch)="elementPatch.emit($event)"
         (numberInputGestureStarted)="numberInputGestureStarted.emit()"
-        (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-typography-section>
+        (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-design-tab-typography-section>
       }
 
 
@@ -98,21 +98,21 @@
       }
 
       @if (element.type !== 'frame' && element.type !== 'svg') {
-        <app-dt-transforms-section
+        <app-design-tab-transforms-section
           [element]="element"
           (elementPatch)="elementPatch.emit($event)"
           (numberInputGestureStarted)="numberInputGestureStarted.emit()"
-          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-transforms-section>
+          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-design-tab-transforms-section>
 
-        <app-dt-effects-section
+        <app-design-tab-effects-section
           [element]="element"
           [projectId]="projectId()"
           (elementPatch)="elementPatch.emit($event)"
           (numberInputGestureStarted)="numberInputGestureStarted.emit()"
-          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-dt-effects-section>
+          (numberInputGestureCommitted)="numberInputGestureCommitted.emit()"></app-design-tab-effects-section>
       }
 
-      <app-dt-accessibility-section
+      <app-design-tab-accessibility-section
         [element]="element"
-        (elementPatch)="elementPatch.emit($event)"></app-dt-accessibility-section>
+        (elementPatch)="elementPatch.emit($event)"></app-design-tab-accessibility-section>
     }

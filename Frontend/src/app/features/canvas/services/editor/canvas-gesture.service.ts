@@ -610,23 +610,40 @@ export class CanvasGestureService {
       return;
     }
 
-    const { xCandidates, yCandidates } = buildSnapCandidates(
-      selectedId,
-      elements,
-      (el, els) =>
-        // Use live DOM bounds when available — essential for flow children whose stored x/y is 0
-        // (position is CSS-determined by the parent flex container). Model-based getAbsoluteBounds
-        // would return the parent's origin for all flow children, generating false snap candidates.
-        this.getLiveElementCanvasBounds(el) ??
-        this.element.getAbsoluteBounds(el, els, this.editorState.currentPage()),
-    );
+    // Build snap candidates from the flow bounds cache (O(1) Map lookup per element) instead
+    // of live DOM reads (querySelector + getBoundingClientRect per element = O(n) DOM work on
+    // every pointer-move event). The cache holds scene-space bounds; we convert to canvas-space
+    // by subtracting the active page layout offset — same conversion as getLiveElementCanvasBounds.
+    // For elements not yet in the cache (e.g. off-screen) we fall back to getAbsoluteBounds.
+    const snapLayout = this.page.activePageLayout();
+    const snapLayoutX = snapLayout?.x ?? 0;
+    const snapLayoutY = snapLayout?.y ?? 0;
+    const { xCandidates, yCandidates } = buildSnapCandidates(selectedId, elements, (el, els) => {
+      const cached = this.flowBoundsCache.get(el.id);
+      if (cached) {
+        return {
+          x: cached.x - snapLayoutX,
+          y: cached.y - snapLayoutY,
+          width: cached.width,
+          height: cached.height,
+        };
+      }
+      return this.element.getAbsoluteBounds(el, els, this.editorState.currentPage());
+    });
     const pageWidth = this.page.currentViewportWidth();
     const pageHeight = this.page.currentViewportHeight();
     xCandidates.push(0, pageWidth / 2, pageWidth);
     yCandidates.push(0, pageHeight / 2, pageHeight);
-    const draggedBounds =
-      this.getLiveElementCanvasBounds(dragged) ??
-      this.element.getAbsoluteBounds(dragged, elements, this.editorState.currentPage());
+    const draggedCached = this.flowBoundsCache.get(dragged.id);
+    const draggedBounds: Bounds = draggedCached
+      ? {
+          x: draggedCached.x - snapLayoutX,
+          y: draggedCached.y - snapLayoutY,
+          width: draggedCached.width,
+          height: draggedCached.height,
+        }
+      : (this.getLiveElementCanvasBounds(dragged) ??
+        this.element.getAbsoluteBounds(dragged, elements, this.editorState.currentPage()));
     const snap = computeSnappedPosition(
       absoluteX,
       absoluteY,

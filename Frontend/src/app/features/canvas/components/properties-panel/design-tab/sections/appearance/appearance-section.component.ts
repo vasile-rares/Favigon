@@ -103,7 +103,7 @@ const CORNER_RADIUS_FIELD_DEFINITIONS: readonly CornerRadiusFieldDefinition[] = 
 ] as const;
 
 @Component({
-  selector: 'app-dt-appearance-section',
+  selector: 'app-design-tab-appearance-section',
   standalone: true,
   imports: [
     FormsModule,

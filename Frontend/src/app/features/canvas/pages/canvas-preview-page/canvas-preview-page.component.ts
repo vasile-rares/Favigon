@@ -18,9 +18,9 @@ import {
   ProjectService,
   extractApiErrorMessage,
 } from '@app/core';
-import { DropdownSelectComponent } from '../../../../shared/components/dropdown-select/dropdown-select.component';
-import type { DropdownSelectOption } from '../../../../shared/components/dropdown-select/dropdown-select.component';
-import { HeaderBarComponent } from '../../../../shared/components/header-bar/header-bar.component';
+import { DropdownSelectComponent } from '@app/shared';
+import type { DropdownSelectOption } from '@app/shared';
+import { HeaderBarComponent } from '@app/shared';
 import { CanvasPersistenceService } from '../../services/canvas-persistence.service';
 import { buildCanvasIRPages } from '../../mappers/canvas-to-ir.mapper';
 import { VIEWPORT_PRESET_OPTIONS } from '../../canvas.types';

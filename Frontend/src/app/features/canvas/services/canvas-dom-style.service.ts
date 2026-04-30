@@ -283,7 +283,6 @@ export class CanvasDomStyleService {
     return style;
   }
 
-  
   private buildFlexChildStyle(
     element: CanvasElement,
     parent: CanvasElement | null | undefined,
@@ -341,7 +340,6 @@ export class CanvasDomStyleService {
     return style;
   }
 
-  
   private buildGridChildStyle(
     element: CanvasElement,
     parent: CanvasElement | null | undefined,
@@ -424,7 +422,6 @@ export class CanvasDomStyleService {
     };
   }
 
-  
   buildStrokeOverlayStyle(_element: CanvasElement): DomStyleMap {
     return {};
   }

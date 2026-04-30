@@ -457,9 +457,7 @@ public class AuthService : IAuthService
 
   public async Task<AuthResponse> RefreshAsync(string refreshToken)
   {
-    var key = _configuration["JwtSettings:Key"] ?? "";
-    var issuer = _configuration["JwtSettings:Issuer"];
-    var audience = _configuration["JwtSettings:Audience"];
+    var (key, issuer, audience) = GetJwtSettings();
     var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
 
     ClaimsPrincipal principal;
@@ -579,9 +577,7 @@ public class AuthService : IAuthService
 
   private (int UserId, string Purpose) ValidateTwoFactorPendingToken(string pendingToken)
   {
-    var key = _configuration["JwtSettings:Key"] ?? "";
-    var issuer = _configuration["JwtSettings:Issuer"];
-    var audience = _configuration["JwtSettings:Audience"];
+    var (key, issuer, audience) = GetJwtSettings();
     var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
 
     ClaimsPrincipal principal;
@@ -622,9 +618,7 @@ public class AuthService : IAuthService
 
   private string GenerateTwoFactorPendingToken(User user, string purpose)
   {
-    var key = _configuration["JwtSettings:Key"] ?? "";
-    var issuer = _configuration["JwtSettings:Issuer"];
-    var audience = _configuration["JwtSettings:Audience"];
+    var (key, issuer, audience) = GetJwtSettings();
     var expiresAt = DateTime.UtcNow.AddMinutes(GetTwoFactorCodeLifetimeMinutes());
 
     var claims = new[]
@@ -676,10 +670,7 @@ public class AuthService : IAuthService
 
   private (string Token, DateTime ExpiresAt) GenerateJwtToken(User user)
   {
-    var key = _configuration["JwtSettings:Key"]
-      ?? throw new InvalidOperationException("JwtSettings:Key is not configured.");
-    var issuer = _configuration["JwtSettings:Issuer"];
-    var audience = _configuration["JwtSettings:Audience"];
+    var (key, issuer, audience) = GetJwtSettings();
     var expirationMinutes = _configuration.GetValue<int>("JwtSettings:AccessTokenMinutes");
     var expiresAt = DateTime.UtcNow.AddMinutes(expirationMinutes);
 
@@ -708,9 +699,7 @@ public class AuthService : IAuthService
 
   private (string Token, DateTime ExpiresAt) GenerateRefreshToken(User user)
   {
-    var key = _configuration["JwtSettings:Key"] ?? "";
-    var issuer = _configuration["JwtSettings:Issuer"];
-    var audience = _configuration["JwtSettings:Audience"];
+    var (key, issuer, audience) = GetJwtSettings();
     var expirationDays = _configuration.GetValue<int>("JwtSettings:RefreshTokenDays", 30);
     var expiresAt = DateTime.UtcNow.AddDays(expirationDays);
 
@@ -732,5 +721,12 @@ public class AuthService : IAuthService
         signingCredentials: credentials);
 
     return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+  }
+
+  private (string Key, string? Issuer, string? Audience) GetJwtSettings()
+  {
+    var key = _configuration["JwtSettings:Key"]
+      ?? throw new InvalidOperationException("JwtSettings:Key is not configured.");
+    return (key, _configuration["JwtSettings:Issuer"], _configuration["JwtSettings:Audience"]);
   }
 }

@@ -35,7 +35,7 @@ public class ExceptionHandlerMiddlewareTests
   }
 
   [Fact]
-  public async Task Invoke_WhenInvalidOperationException_Returns409Conflict()
+  public async Task Invoke_WhenInvalidOperationException_Returns422UnprocessableEntity()
   {
     // Arrange
     var (middleware, ctx) = Build(new InvalidOperationException("already exists"));
@@ -44,7 +44,7 @@ public class ExceptionHandlerMiddlewareTests
     await middleware.InvokeAsync(ctx);
 
     // Assert
-    Assert.Equal(409, ctx.Response.StatusCode);
+    Assert.Equal(422, ctx.Response.StatusCode);
   }
 
   [Fact]

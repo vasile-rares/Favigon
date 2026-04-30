@@ -46,7 +46,7 @@
       type="button"
       class="toolbar__button toolbar__zoom-level"
       title="Reset zoom"
-      aria-label="Reset zoom"
+      [attr.aria-label]="zoomLevel() + '% — Reset zoom'"
       (click)="zoomResetRequested.emit()">
       {{ zoomLevel() }}%
     </button>

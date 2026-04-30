@@ -250,7 +250,7 @@ export class AuthPage implements OnInit {
 
       this.handleRememberMe(email.trim(), rememberMe);
       await this.handleLoginResponse(response, 'Login successful.');
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.handleError(error, 'Could not log in.');
     } finally {
       this.isSubmitting.set(false);
@@ -284,7 +284,7 @@ export class AuthPage implements OnInit {
       // Auto-switch to login and pre-fill email
       this.switchMode('login');
       this.loginForm.patchValue({ email: email.trim() });
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.handleError(error, 'Could not create account.');
     } finally {
       this.isSubmitting.set(false);
@@ -338,7 +338,6 @@ export class AuthPage implements OnInit {
 
   // --- Private Helpers ---
 
-  
   private passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
     const password = group.get('password')?.value;
     const confirmControl = group.get('confirmPassword');
@@ -399,7 +398,7 @@ export class AuthPage implements OnInit {
           await firstValueFrom(this.authService.linkWithGithub({ code }));
         }
         await this.router.navigate(['/settings']);
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.handleError(
           error,
           state === 'google-link'
@@ -427,7 +426,7 @@ export class AuthPage implements OnInit {
           ? 'Google authentication successful.'
           : 'GitHub authentication successful.',
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.handleError(
         error,
         state === 'google'
@@ -440,7 +439,7 @@ export class AuthPage implements OnInit {
     }
   }
 
-  private handleError(error: any, defaultMsg: string) {
+  private handleError(error: unknown, defaultMsg: string) {
     this.statusMessage.set({ type: 'error', text: extractApiErrorMessage(error, defaultMsg) });
   }
 

@@ -69,7 +69,7 @@ export function generateThumbnailFromCanvas(
 
 export function generateThumbnail(
   page: CanvasPageModel | null,
-  
+
   domBounds?: Map<string, Bounds> | null,
   pageLayoutX = 0,
   pageLayoutY = 0,
@@ -472,9 +472,7 @@ function buildRoundedRectPath(
  * Returns a pixel-accurate JPEG thumbnail data URL, or null if capture fails.
  * Falls back gracefully so the caller can use the custom renderer as a backup.
  */
-export async function generateThumbnailHtml2Canvas(
-  page: CanvasPageModel,
-): Promise<string | null> {
+export async function generateThumbnailHtml2Canvas(page: CanvasPageModel): Promise<string | null> {
   const primaryFrame = getPrimaryRootFrame(page);
   if (!primaryFrame) return null;
 
@@ -503,7 +501,7 @@ export async function generateThumbnailHtml2Canvas(
       opts?: Record<string, unknown>,
     ) => Promise<HTMLCanvasElement>;
     captured = await html2canvas(frameEl, {
-      scale: 0.5,       // render at half resolution — 4× fewer pixels vs scale:1
+      scale: 0.5, // render at half resolution — 4× fewer pixels vs scale:1
       width: captureW,
       height: captureH, // clip to "above the fold"
       useCORS: true,

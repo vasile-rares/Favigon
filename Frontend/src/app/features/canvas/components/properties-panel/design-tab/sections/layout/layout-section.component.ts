@@ -30,7 +30,7 @@ const PADDING_FIELD_DEFINITIONS: readonly PaddingFieldDefinition[] = [
 ] as const;
 
 @Component({
-  selector: 'app-dt-layout-section',
+  selector: 'app-design-tab-layout-section',
   standalone: true,
   imports: [FormsModule, DropdownSelectComponent, ToggleGroupComponent, NumberInputComponent],
   templateUrl: './layout-section.component.html',

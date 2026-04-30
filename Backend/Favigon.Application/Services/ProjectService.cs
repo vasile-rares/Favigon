@@ -207,15 +207,15 @@ public class ProjectService : IProjectService
 
   private static void ValidateThumbnailUploadRequest(ProjectImageUploadRequest request)
   {
-    ImageUploadValidator.Validate(
-      request.Content,
-      request.FileName,
-      request.ContentType,
-      request.Length,
-      MaxThumbnailSizeBytes,
-      AllowedThumbnailContentTypes,
-      "Thumbnail file",
-      "Only JPEG, PNG, and WebP thumbnails are supported.");
+    ImageUploadValidator.Validate(new ImageUploadRequest(
+      Content: request.Content,
+      FileName: request.FileName,
+      ContentType: request.ContentType,
+      Length: request.Length,
+      MaxBytes: MaxThumbnailSizeBytes,
+      AllowedTypes: AllowedThumbnailContentTypes,
+      AssetLabel: "Thumbnail file",
+      UnsupportedFormatMessage: "Only JPEG, PNG, and WebP thumbnails are supported."));
   }
 
   private string NormalizeAndValidateDesignJson(string? designJson)

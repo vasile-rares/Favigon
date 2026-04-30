@@ -2,10 +2,10 @@
   class="header-bar"
   [class.header-bar--canvas]="appearance() === 'canvas' || appearance() === 'preview'"
   [class.header-bar--preview]="appearance() === 'preview'">
-  
+
   <div class="header-section header-section--left">
     <nav class="breadcrumb-nav" aria-label="Context breadcrumb">
-      <img src="/favigon-text.svg" alt="Favigon" class="header-brand-logo" />
+      <img src="/favigon-text.svg" alt="Favigon" class="header-brand-logo" width="92" height="27" />
     </nav>
     <ng-content select="[header-left-extra]"></ng-content>
   </div>
@@ -20,13 +20,14 @@
         [attr.aria-expanded]="projectMenu?.isOpen()"
         aria-haspopup="dialog"
         [attr.title]="projectMenu?.updateError() || 'Edit project settings'"
-        aria-label="Edit project settings">
+        [attr.aria-label]="'Edit settings for ' + currentProjectName">
         <span class="breadcrumb-text">{{ currentProjectName }}</span>
       </button>
 
       @if (currentProjectIsPublic !== null) {
         <span
           class="header-project-status-dot"
+          role="img"
           [class.header-project-status-dot--public]="currentProjectIsPublic"
           [class.header-project-status-dot--private]="!currentProjectIsPublic"
           [attr.title]="currentProjectIsPublic ? 'Public project' : 'Private project'"
@@ -50,7 +51,7 @@
     </div>
   }
 
-  
+
   <div class="header-section header-section--right">
     @if (!isProjectContext) {
       <app-project-search #projectSearch></app-project-search>

@@ -6,7 +6,7 @@ import type { DropdownSelectOption } from '@app/shared';
 import { CanvasElement, CanvasPositionMode } from '@app/core';
 
 @Component({
-  selector: 'app-dt-position-section',
+  selector: 'app-design-tab-position-section',
   standalone: true,
   imports: [FormsModule, DropdownSelectComponent],
   templateUrl: './position-section.component.html',

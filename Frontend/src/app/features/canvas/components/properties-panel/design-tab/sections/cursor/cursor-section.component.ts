@@ -6,7 +6,7 @@ import type { DropdownSelectOption } from '@app/shared';
 import { CanvasCursorType, CanvasElement } from '@app/core';
 
 @Component({
-  selector: 'app-dt-cursor-section',
+  selector: 'app-design-tab-cursor-section',
   standalone: true,
   imports: [FormsModule, DropdownSelectComponent],
   templateUrl: './cursor-section.component.html',

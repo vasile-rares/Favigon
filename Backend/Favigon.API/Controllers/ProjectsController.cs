@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Favigon.API.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/projects")]
 [Authorize]
 public class ProjectsController : ControllerBase
 {

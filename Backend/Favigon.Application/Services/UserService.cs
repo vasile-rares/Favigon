@@ -257,15 +257,15 @@ public class UserService : IUserService
 
   private static void ValidateProfileImageUploadRequest(UserProfileImageUploadRequest request)
   {
-    ImageUploadValidator.Validate(
-      request.Content,
-      request.FileName,
-      request.ContentType,
-      request.Length,
-      MaxProfileImageSizeBytes,
-      AllowedProfileImageContentTypes,
-      "Image file",
-      "Only PNG, JPEG, WebP, GIF, and AVIF images are supported.");
+    ImageUploadValidator.Validate(new ImageUploadRequest(
+      Content: request.Content,
+      FileName: request.FileName,
+      ContentType: request.ContentType,
+      Length: request.Length,
+      MaxBytes: MaxProfileImageSizeBytes,
+      AllowedTypes: AllowedProfileImageContentTypes,
+      AssetLabel: "Image file",
+      UnsupportedFormatMessage: "Only PNG, JPEG, WebP, GIF, and AVIF images are supported."));
   }
 
   private static string BuildAbsoluteAssetUrl(string publicBaseUrl, string assetPath)

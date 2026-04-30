@@ -9,7 +9,6 @@ import {
 } from '@angular/core';
 import { GeneratedFile, IRNode } from '@app/core';
 import { SupportedFramework } from '../../../canvas.types';
-import JSZip from 'jszip';
 
 type CopyKind = 'current' | 'ir';
 
@@ -232,6 +231,9 @@ export class GenerationTabComponent implements OnDestroy {
   async exportAsZip(): Promise<void> {
     if (this.generatedFiles().length === 0) return;
 
+    // Dynamic import — jszip (~100 KiB) is only needed when the user clicks
+    // "Export ZIP", so we keep it out of the initial canvas page chunk.
+    const { default: JSZip } = await import('jszip');
     const zip = new JSZip();
     for (const file of this.generatedFiles()) {
       zip.file(file.path, file.content);
