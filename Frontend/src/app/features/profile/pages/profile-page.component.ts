@@ -36,6 +36,10 @@ import {
   ProjectCardComponent,
   ProjectCardViewModel,
 } from '../components/project-card/project-card.component';
+import {
+  FollowListModalComponent,
+  FollowListType,
+} from '../components/follow-list-modal/follow-list-modal.component';
 
 type ProjectTypeFilter = 'all' | 'public' | 'private' | 'forks';
 type ProjectSortOption = 'updated' | 'created';
@@ -53,6 +57,7 @@ type ProjectSortOption = 'updated' | 'created';
     TextInputComponent,
     DropdownSelectComponent,
     ProjectCardComponent,
+    FollowListModalComponent,
   ],
   templateUrl: './profile-page.component.html',
   styleUrl: './profile-page.component.css',
@@ -90,6 +95,11 @@ export class ProfilePage implements OnInit {
 
   readonly profile = signal<UserProfile | null>(null);
   readonly isOwnProfile = signal(false);
+  readonly isFollowing = signal(false);
+  readonly followerCount = signal(0);
+  readonly followingCount = signal(0);
+  readonly isTogglingFollow = signal(false);
+  readonly openFollowList = signal<FollowListType | null>(null);
   readonly projects = signal<ProjectCardViewModel[]>([]);
   readonly projectSearchQuery = signal('');
   readonly projectTypeFilter = signal<ProjectTypeFilter>('all');
@@ -230,6 +240,9 @@ export class ProfilePage implements OnInit {
           this.profile.set(profileUser);
           const ownProfile = currentUser !== null && currentUser.username === profileUser.username;
           this.isOwnProfile.set(ownProfile);
+          this.isFollowing.set(profileUser.isFollowedByCurrentUser ?? false);
+          this.followerCount.set(profileUser.followerCount ?? 0);
+          this.followingCount.set(profileUser.followingCount ?? 0);
           this.loadProjects(profileUser, ownProfile);
         },
         error: () => {
@@ -279,6 +292,69 @@ export class ProfilePage implements OnInit {
 
   goToSettings(): void {
     void this.router.navigate(['/settings']);
+  }
+
+  toggleFollow(): void {
+    const profileData = this.profile();
+    if (!profileData || this.isTogglingFollow()) return;
+
+    this.isTogglingFollow.set(true);
+    const wasFollowing = this.isFollowing();
+    // Optimistic update
+    this.isFollowing.set(!wasFollowing);
+    this.followerCount.update((c) => (wasFollowing ? c - 1 : c + 1));
+
+    const request$ = wasFollowing
+      ? this.userService.unfollowUser(profileData.username)
+      : this.userService.followUser(profileData.username);
+
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => this.isTogglingFollow.set(false),
+      error: () => {
+        // Rollback on error
+        this.isFollowing.set(wasFollowing);
+        this.followerCount.update((c) => (wasFollowing ? c + 1 : c - 1));
+        this.isTogglingFollow.set(false);
+      },
+    });
+  }
+
+  toggleProjectStar(project: ProjectCardViewModel): void {
+    const wasStarred = project.isStarredByCurrentUser;
+
+    // Optimistic update
+    this.projects.update((list) =>
+      list.map((p) =>
+        p.id === project.id
+          ? {
+              ...p,
+              isStarredByCurrentUser: !wasStarred,
+              starCount: wasStarred ? p.starCount - 1 : p.starCount + 1,
+            }
+          : p,
+      ),
+    );
+
+    const request$ = wasStarred
+      ? this.projectService.unstarProject(project.id)
+      : this.projectService.starProject(project.id);
+
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      error: () => {
+        // Rollback on error
+        this.projects.update((list) =>
+          list.map((p) =>
+            p.id === project.id
+              ? {
+                  ...p,
+                  isStarredByCurrentUser: wasStarred,
+                  starCount: wasStarred ? p.starCount + 1 : p.starCount - 1,
+                }
+              : p,
+          ),
+        );
+      },
+    });
   }
 
   openCreateProjectDialog(): void {
@@ -490,6 +566,8 @@ export class ProfilePage implements OnInit {
       createdAt: new Date(project.createdAt),
       lastEdited: new Date(project.updatedAt),
       thumbnailDataUrl: project.thumbnailDataUrl ?? null,
+      starCount: project.starCount ?? 0,
+      isStarredByCurrentUser: project.isStarredByCurrentUser ?? false,
     };
   }
 
@@ -557,6 +635,11 @@ export class ProfilePage implements OnInit {
     this.isCreateDialogOpen.set(false);
     this.isCreatingProject.set(false);
     this.busyProjectIds.set([]);
+    this.isFollowing.set(false);
+    this.followerCount.set(0);
+    this.followingCount.set(0);
+    this.isTogglingFollow.set(false);
+    this.openFollowList.set(null);
     this.activeRenameProject.set(null);
     this.isRenameDialogOpen.set(false);
     this.isRenamingProject.set(false);

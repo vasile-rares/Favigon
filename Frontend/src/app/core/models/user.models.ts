@@ -7,9 +7,19 @@ export interface UserProfile {
   profilePictureUrl: string | null;
   bio: string | null;
   createdAt: string;
+  followerCount: number;
+  followingCount: number;
+  isFollowedByCurrentUser: boolean;
 }
 
 export interface UserSearchResult {
+  userId: number;
+  displayName: string;
+  username: string;
+  profilePictureUrl: string | null;
+}
+
+export interface UserFollowItem {
   userId: number;
   displayName: string;
   username: string;

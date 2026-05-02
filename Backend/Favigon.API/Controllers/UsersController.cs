@@ -14,10 +14,17 @@ namespace Favigon.API.Controllers;
 public class UsersController : ControllerBase
 {
   private readonly IUserService _userService;
+  private readonly IFollowService _followService;
+  private readonly IBookmarkService _bookmarkService;
 
-  public UsersController(IUserService userService)
+  public UsersController(
+    IUserService userService,
+    IFollowService followService,
+    IBookmarkService bookmarkService)
   {
     _userService = userService;
+    _followService = followService;
+    _bookmarkService = bookmarkService;
   }
 
   [HttpGet]
@@ -167,6 +174,14 @@ public class UsersController : ControllerBase
       return NotFound();
     }
 
+    User.TryGetUserId(out var viewerUserId);
+
+    var followerCount = await _followService.GetFollowerCountAsync(user.Id);
+    var followingCount = await _followService.GetFollowingCountAsync(user.Id);
+    var isFollowedByCurrentUser = viewerUserId > 0
+      ? await _followService.IsFollowingAsync(viewerUserId, user.Id)
+      : false;
+
     return Ok(new
     {
       userId = user.Id,
@@ -174,8 +189,84 @@ public class UsersController : ControllerBase
       user.Username,
       user.ProfilePictureUrl,
       user.Bio,
-      user.CreatedAt
+      user.CreatedAt,
+      followerCount,
+      followingCount,
+      isFollowedByCurrentUser
     });
+  }
+
+  [HttpPost("{username}/follow")]
+  public async Task<IActionResult> Follow(string username)
+  {
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
+
+    try
+    {
+      await _followService.FollowAsync(userId, username);
+      return Ok();
+    }
+    catch (InvalidOperationException ex)
+    {
+      return BadRequest(new { message = ex.Message });
+    }
+  }
+
+  [HttpDelete("{username}/follow")]
+  public async Task<IActionResult> Unfollow(string username)
+  {
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
+
+    try
+    {
+      await _followService.UnfollowAsync(userId, username);
+      return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+      return BadRequest(new { message = ex.Message });
+    }
+  }
+
+  [HttpGet("{username}/followers")]
+  public async Task<IActionResult> GetFollowers(string username)
+  {
+    var user = await _userService.GetByUsernameAsync(username);
+    if (user == null) return NotFound();
+
+    var followers = await _followService.GetFollowersAsync(user.Id);
+    return Ok(followers.Select(u => new
+    {
+      userId = u.Id,
+      u.DisplayName,
+      u.Username,
+      u.ProfilePictureUrl
+    }));
+  }
+
+  [HttpGet("{username}/following")]
+  public async Task<IActionResult> GetFollowing(string username)
+  {
+    var user = await _userService.GetByUsernameAsync(username);
+    if (user == null) return NotFound();
+
+    var following = await _followService.GetFollowingAsync(user.Id);
+    return Ok(following.Select(u => new
+    {
+      userId = u.Id,
+      u.DisplayName,
+      u.Username,
+      u.ProfilePictureUrl
+    }));
+  }
+
+  [HttpGet("me/stars")]
+  public async Task<IActionResult> GetMyStars()
+  {
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
+
+    var bookmarks = await _bookmarkService.GetMyBookmarksAsync(userId);
+    return Ok(bookmarks);
   }
 
   [HttpDelete("{id:int}")]

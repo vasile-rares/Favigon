@@ -265,6 +265,27 @@ app-header-bar.page-header {
   color: var(--color-text-light);
 }
 
+.profile-detail-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: 0.76rem;
+  color: var(--color-text-light);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition:
+    color 0.15s ease,
+    text-decoration-color 0.15s ease;
+}
+
+.profile-detail-btn:hover {
+  color: var(--color-text-primary);
+  text-decoration-color: currentColor;
+}
+
 .profile-main-column {
   min-width: 0;
   display: flex;

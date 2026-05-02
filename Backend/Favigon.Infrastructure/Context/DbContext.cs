@@ -14,6 +14,8 @@ public class FavigonDbContext : Microsoft.EntityFrameworkCore.DbContext
     public DbSet<User> Users { get; set; }
     public DbSet<LinkedAccount> LinkedAccounts { get; set; }
     public DbSet<Project> Projects { get; set; }
+    public DbSet<UserFollow> UserFollows { get; set; }
+    public DbSet<ProjectBookmark> ProjectBookmarks { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -120,6 +122,38 @@ public class FavigonDbContext : Microsoft.EntityFrameworkCore.DbContext
             .Property(p => p.DesignJson)
             .HasColumnType("jsonb")
             .HasDefaultValue("{}");
+
+        modelBuilder.Entity<UserFollow>()
+            .ToTable("user_follows")
+            .HasKey(f => new { f.FollowerId, f.FolloweeId });
+
+        modelBuilder.Entity<UserFollow>()
+            .HasOne(f => f.Follower)
+            .WithMany(u => u.Following)
+            .HasForeignKey(f => f.FollowerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserFollow>()
+            .HasOne(f => f.Followee)
+            .WithMany(u => u.Followers)
+            .HasForeignKey(f => f.FolloweeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProjectBookmark>()
+            .ToTable("project_bookmarks")
+            .HasKey(b => new { b.UserId, b.ProjectId });
+
+        modelBuilder.Entity<ProjectBookmark>()
+            .HasOne(b => b.User)
+            .WithMany(u => u.Bookmarks)
+            .HasForeignKey(b => b.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProjectBookmark>()
+            .HasOne(b => b.Project)
+            .WithMany(p => p.Bookmarks)
+            .HasForeignKey(b => b.ProjectId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 
     public override int SaveChanges()

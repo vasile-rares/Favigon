@@ -37,12 +37,46 @@
                     Edit profile
                   </app-action-button>
                 </div>
+              } @else {
+                <div class="profile-side-rail__action-row">
+                  <app-action-button
+                    [variant]="isFollowing() ? 'outline' : 'primary'"
+                    [fullWidth]="false"
+                    [disabled]="isTogglingFollow()"
+                    (clicked)="toggleFollow()">
+                    {{ isFollowing() ? 'Unfollow' : 'Follow' }}
+                  </app-action-button>
+                </div>
               }
 
               <dl class="profile-side-rail__details">
                 <div class="profile-detail-item">
                   <dt>Joined</dt>
                   <dd>{{ profileData.createdAt | date:'MMMM y' }}</dd>
+                </div>
+
+                <div class="profile-detail-item">
+                  <dt>Followers</dt>
+                  <dd>
+                    <button
+                      type="button"
+                      class="profile-detail-btn"
+                      (click)="openFollowList.set('followers')">
+                      {{ followerCount() }}
+                    </button>
+                  </dd>
+                </div>
+
+                <div class="profile-detail-item">
+                  <dt>Following</dt>
+                  <dd>
+                    <button
+                      type="button"
+                      class="profile-detail-btn"
+                      (click)="openFollowList.set('following')">
+                      {{ followingCount() }}
+                    </button>
+                  </dd>
                 </div>
 
                 <div class="profile-detail-item">
@@ -193,7 +227,8 @@
                         [openMode]="isOwnProfile() ? 'editor' : 'preview'"
                         (renameRequested)="openRenameProjectDialog($event)"
                         (deleteRequested)="openDeleteProjectDialog($event)"
-                        (visibilityToggleRequested)="toggleProjectVisibility($event)"></app-project-card>
+                        (visibilityToggleRequested)="toggleProjectVisibility($event)"
+                        (starToggleRequested)="toggleProjectStar($event)"></app-project-card>
                     }
                   </div>
                 }
@@ -314,6 +349,14 @@
         (primaryClicked)="confirmDeleteProject()"
         (secondaryClicked)="closeDeleteProjectDialog()">
       </app-dialog-box>
+    }
+
+    @if (openFollowList() !== null && profile() !== null) {
+      <app-follow-list-modal
+        [username]="profile()!.username"
+        [listType]="openFollowList()!"
+        (closed)="openFollowList.set(null)">
+      </app-follow-list-modal>
     }
   </div>
 </div>

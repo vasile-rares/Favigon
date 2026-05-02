@@ -30,4 +30,6 @@ public class Project
     public DateTime CreatedAt { get; set; }
 
     public DateTime UpdatedAt { get; set; }
+
+    public ICollection<ProjectBookmark> Bookmarks { get; set; } = new List<ProjectBookmark>();
 }

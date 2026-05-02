@@ -27,6 +27,11 @@ public class ProjectRepository : IProjectRepository
     return _context.Projects.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
   }
 
+  public Task<Project?> GetPublicByIdAsync(int id)
+  {
+    return _context.Projects.FirstOrDefaultAsync(p => p.Id == id && p.IsPublic);
+  }
+
   public Task<Project?> GetBySlugAsync(string slug, int userId)
   {
     return _context.Projects.FirstOrDefaultAsync(p => p.Slug == slug && p.UserId == userId);

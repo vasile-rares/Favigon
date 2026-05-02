@@ -91,6 +91,21 @@
             </div>
           }
         </div>
+      } @else if (project().isPublic) {
+        <button
+          type="button"
+          class="project-card__star-btn"
+          [class.project-card__star-btn--starred]="project().isStarredByCurrentUser"
+          [disabled]="isBusy()"
+          [attr.aria-label]="project().isStarredByCurrentUser ? 'Unstar project' : 'Star project'"
+          (click)="requestStarToggle($event)">
+          @if (project().isStarredByCurrentUser) {
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          } @else {
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          }
+          <span>{{ project().starCount }}</span>
+        </button>
       }
     </div>
   </div>

@@ -1,0 +1,213 @@
+.follow-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.follow-modal-backdrop--open {
+  opacity: 1;
+}
+
+.follow-modal-backdrop--closing {
+  opacity: 0;
+}
+
+.follow-modal {
+  width: 100%;
+  max-width: 420px;
+  max-height: min(520px, 85dvh);
+  display: flex;
+  flex-direction: column;
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(20, 21, 24, 0.95), rgba(12, 13, 15, 0.98));
+  border: 1px solid var(--color-card-border);
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  transform: translateY(12px) scale(0.97);
+  transition:
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.follow-modal-backdrop--open .follow-modal {
+  transform: translateY(0) scale(1);
+}
+
+.follow-modal-backdrop--closing .follow-modal {
+  transform: translateY(8px) scale(0.97);
+}
+
+.follow-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 1.25rem 1rem;
+  border-bottom: 1px solid var(--color-card-border);
+  flex-shrink: 0;
+}
+
+.follow-modal__title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+
+.follow-modal__close {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-subtle);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 8px;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.follow-modal__close:hover {
+  color: var(--color-text-primary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.follow-modal__body {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.follow-modal__body::-webkit-scrollbar {
+  width: 4px;
+}
+
+.follow-modal__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.follow-modal__body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 2px;
+}
+
+.follow-modal__state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+}
+
+.follow-modal__empty {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-subtle);
+}
+
+.follow-modal__dots {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.follow-modal__dots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-text-subtle);
+  animation: follow-dot-bounce 1.2s ease-in-out infinite both;
+}
+
+.follow-modal__dots span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+.follow-modal__dots span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes follow-dot-bounce {
+  0%,
+  80%,
+  100% {
+    transform: scale(0);
+    opacity: 0.3;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.follow-modal__list {
+  list-style: none;
+  margin: 0;
+  padding: 0.4rem 0;
+}
+
+.follow-modal__item {
+  padding: 0 0.4rem;
+}
+
+.follow-modal__user-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.85rem;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 10px;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.follow-modal__user-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.follow-modal__avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--color-card-border);
+}
+
+.follow-modal__user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.follow-modal__display-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.follow-modal__username {
+  font-size: 0.78rem;
+  color: var(--color-text-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

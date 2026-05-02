@@ -1,0 +1,44 @@
+<div class="stars-layout">
+  <app-header-bar class="page-header" appearance="canvas"></app-header-bar>
+
+  <div class="stars-container">
+    <div class="stars-content-wrapper">
+      <div class="stars-header">
+        <h1>Starred Projects</h1>
+        <p class="stars-header__subtitle">Projects you have starred from other users</p>
+      </div>
+
+      @if (isLoading()) {
+        <div class="stars-state stars-state--loading" aria-label="Loading starred projects">
+          <div class="stars-loading-dots">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      } @else if (errorMessage()) {
+        <div class="stars-state stars-state--error">
+          <p>{{ errorMessage() }}</p>
+        </div>
+      } @else if (projects().length === 0) {
+        <div class="stars-state stars-state--empty">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          <p>No starred projects yet.</p>
+          <p class="stars-state__hint">Browse other users' profiles and star projects you like.</p>
+        </div>
+      } @else {
+        <div class="projects-grid">
+          @for (project of projects(); track project.id) {
+            <app-project-card
+              [project]="project"
+              [isBusy]="false"
+              [isOwner]="false"
+              [openMode]="'preview'"
+              (starToggleRequested)="toggleStar($event)">
+            </app-project-card>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>

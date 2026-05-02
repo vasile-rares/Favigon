@@ -60,6 +60,20 @@ export class ProjectService {
       .pipe(map((projects) => projects.map((project) => this.normalizeProjectResponse(project))));
   }
 
+  getMyStars(): Observable<ProjectResponse[]> {
+    return this.http
+      .get<ProjectResponse[]>(`${this.baseUrl}/users/me/stars`)
+      .pipe(map((projects) => projects.map((p) => this.normalizeProjectResponse(p))));
+  }
+
+  starProject(projectId: number): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/projects/${projectId}/star`, {});
+  }
+
+  unstarProject(projectId: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/projects/${projectId}/star`);
+  }
+
   getDesign(projectId: number): Observable<ProjectDesignResponse> {
     return this.http.get<ProjectDesignResponse>(`${this.baseUrl}/projects/${projectId}/design`);
   }

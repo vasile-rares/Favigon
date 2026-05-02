@@ -115,6 +115,7 @@ export { FALLBACK_AVATAR_URL } from './user.models';
 export type {
   UserProfile,
   UserSearchResult,
+  UserFollowItem,
   LinkedAccountInfo,
   UserMe,
   UserProfileUpdateRequest,

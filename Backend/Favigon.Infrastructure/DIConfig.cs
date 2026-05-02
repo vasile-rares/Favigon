@@ -24,6 +24,8 @@ public static class ServiceCollectionExtensions
     services.AddScoped<IUserRepository, UserRepository>();
     services.AddScoped<ILinkedAccountRepository, LinkedAccountRepository>();
     services.AddScoped<IProjectRepository, ProjectRepository>();
+    services.AddScoped<IFollowRepository, FollowRepository>();
+    services.AddScoped<IBookmarkRepository, BookmarkRepository>();
     services.AddScoped<ProjectAssetStorage>();
     services.AddScoped<IProjectAssetStorage>(sp => sp.GetRequiredService<ProjectAssetStorage>());
     services.AddScoped<IUserProfileImageStorage>(sp => sp.GetRequiredService<ProjectAssetStorage>());

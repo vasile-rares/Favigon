@@ -10,6 +10,8 @@ export interface ProjectCardViewModel {
   createdAt: Date;
   lastEdited: Date;
   thumbnailDataUrl?: string | null;
+  starCount: number;
+  isStarredByCurrentUser: boolean;
 }
 
 @Component({
@@ -39,6 +41,7 @@ export class ProjectCardComponent {
   readonly renameRequested = output<ProjectCardViewModel>();
   readonly deleteRequested = output<ProjectCardViewModel>();
   readonly visibilityToggleRequested = output<ProjectCardViewModel>();
+  readonly starToggleRequested = output<ProjectCardViewModel>();
 
   get openLabel(): string {
     if (this.isBusy()) {
@@ -112,6 +115,16 @@ export class ProjectCardComponent {
     }
 
     this.deleteRequested.emit(this.project());
+  }
+
+  requestStarToggle(event: MouseEvent): void {
+    event.stopPropagation();
+
+    if (this.isBusy()) {
+      return;
+    }
+
+    this.starToggleRequested.emit(this.project());
   }
 
   @HostListener('document:click', ['$event'])

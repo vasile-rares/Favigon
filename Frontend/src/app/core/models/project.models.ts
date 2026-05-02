@@ -7,6 +7,8 @@ export interface ProjectResponse {
   createdAt: string;
   updatedAt: string;
   thumbnailDataUrl?: string | null;
+  starCount: number;
+  isStarredByCurrentUser: boolean;
 }
 
 export interface ProjectCreateRequest {

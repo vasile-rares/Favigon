@@ -11,11 +11,14 @@ public class MappingProfile : Profile
   {
     CreateMap<Project, ProjectResponse>()
       .ForMember(dest => dest.ProjectId, opt => opt.MapFrom(src => src.Id))
-      .ForMember(dest => dest.Slug, opt => opt.MapFrom(src => src.Slug));
+      .ForMember(dest => dest.Slug, opt => opt.MapFrom(src => src.Slug))
+      .ForMember(dest => dest.StarCount, opt => opt.Ignore())
+      .ForMember(dest => dest.IsStarredByCurrentUser, opt => opt.Ignore());
 
     CreateMap<ProjectCreateRequest, Project>()
       .ForMember(dest => dest.Id, opt => opt.Ignore())
       .ForMember(dest => dest.User, opt => opt.Ignore())
+      .ForMember(dest => dest.Bookmarks, opt => opt.Ignore())
       .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
       .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
 
@@ -23,6 +26,7 @@ public class MappingProfile : Profile
       .ForMember(dest => dest.Id, opt => opt.Ignore())
       .ForMember(dest => dest.UserId, opt => opt.Ignore())
       .ForMember(dest => dest.User, opt => opt.Ignore())
+      .ForMember(dest => dest.Bookmarks, opt => opt.Ignore())
       .ForMember(dest => dest.CreatedAt, opt => opt.Ignore());
 
     CreateMap<User, UserResponse>()
@@ -40,18 +44,27 @@ public class MappingProfile : Profile
       .ForMember(dest => dest.Id, opt => opt.Ignore())
       .ForMember(dest => dest.PasswordHash, opt => opt.Ignore())
       .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
-      .ForMember(dest => dest.Projects, opt => opt.Ignore());
+      .ForMember(dest => dest.Projects, opt => opt.Ignore())
+      .ForMember(dest => dest.Followers, opt => opt.Ignore())
+      .ForMember(dest => dest.Following, opt => opt.Ignore())
+      .ForMember(dest => dest.Bookmarks, opt => opt.Ignore());
 
     CreateMap<UserUpdateRequest, User>()
       .ForMember(dest => dest.Id, opt => opt.Ignore())
       .ForMember(dest => dest.PasswordHash, opt => opt.Ignore())
       .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
-      .ForMember(dest => dest.Projects, opt => opt.Ignore());
+      .ForMember(dest => dest.Projects, opt => opt.Ignore())
+      .ForMember(dest => dest.Followers, opt => opt.Ignore())
+      .ForMember(dest => dest.Following, opt => opt.Ignore())
+      .ForMember(dest => dest.Bookmarks, opt => opt.Ignore());
 
     CreateMap<RegisterRequest, User>()
       .ForMember(dest => dest.Id, opt => opt.Ignore())
       .ForMember(dest => dest.PasswordHash, opt => opt.Ignore())
       .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
-      .ForMember(dest => dest.Projects, opt => opt.Ignore());
+      .ForMember(dest => dest.Projects, opt => opt.Ignore())
+      .ForMember(dest => dest.Followers, opt => opt.Ignore())
+      .ForMember(dest => dest.Following, opt => opt.Ignore())
+      .ForMember(dest => dest.Bookmarks, opt => opt.Ignore());
   }
 }

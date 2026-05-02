@@ -1,0 +1,60 @@
+<div
+  class="follow-modal-backdrop"
+  [class.follow-modal-backdrop--open]="!isClosing()"
+  [class.follow-modal-backdrop--closing]="isClosing()"
+  role="dialog"
+  [attr.aria-label]="title()"
+  aria-modal="true"
+  (click)="onBackdropClick($event)">
+  <div class="follow-modal">
+    <div class="follow-modal__header">
+      <h2 class="follow-modal__title">{{ title() }}</h2>
+      <button
+        type="button"
+        class="follow-modal__close"
+        aria-label="Close"
+        (click)="close()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="follow-modal__body">
+      @if (isLoading()) {
+        <div class="follow-modal__state">
+          <div class="follow-modal__dots">
+            <span></span><span></span><span></span>
+          </div>
+        </div>
+      } @else if (users().length === 0) {
+        <div class="follow-modal__state">
+          <p class="follow-modal__empty">
+            {{ listType() === 'followers' ? 'No followers yet.' : 'Not following anyone yet.' }}
+          </p>
+        </div>
+      } @else {
+        <ul class="follow-modal__list" role="list">
+          @for (user of users(); track user.userId) {
+            <li class="follow-modal__item">
+              <button
+                type="button"
+                class="follow-modal__user-btn"
+                (click)="navigateToProfile(user.username)">
+                <img
+                  class="follow-modal__avatar"
+                  [src]="getAvatarUrl(user)"
+                  [alt]="user.displayName"
+                  (error)="$any($event.target).src = fallbackAvatar" />
+                <span class="follow-modal__user-info">
+                  <span class="follow-modal__display-name">{{ user.displayName }}</span>
+                  <span class="follow-modal__username">&#64;{{ user.username }}</span>
+                </span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </div>
+</div>

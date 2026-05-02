@@ -321,3 +321,44 @@
     gap: 0.55rem;
   }
 }
+
+.project-card__star-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0 0.4rem;
+  height: 26px;
+  border: 1px solid var(--color-card-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color 0.2s ease,
+    border-color 0.2s ease,
+    background 0.2s ease;
+}
+
+.project-card__star-btn:hover:not(:disabled) {
+  color: #f5c842;
+  border-color: rgba(245, 200, 66, 0.4);
+  background: rgba(245, 200, 66, 0.06);
+}
+
+.project-card__star-btn--starred {
+  color: #f5c842;
+  border-color: rgba(245, 200, 66, 0.4);
+}
+
+.project-card__star-btn--starred:hover:not(:disabled) {
+  color: var(--color-text-subtle);
+  border-color: var(--color-card-border);
+  background: transparent;
+}
+
+.project-card__star-btn:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}

@@ -10,4 +10,6 @@ public class ProjectResponse
   public DateTime CreatedAt { get; set; }
   public DateTime UpdatedAt { get; set; }
   public string? ThumbnailDataUrl { get; set; }
+  public int StarCount { get; set; }
+  public bool IsStarredByCurrentUser { get; set; }
 }

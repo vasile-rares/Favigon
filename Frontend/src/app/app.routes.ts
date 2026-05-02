@@ -47,6 +47,14 @@ export const routes: Routes = [
     canActivate: [authGuard],
   },
   {
+    path: 'stars',
+    loadComponent: () =>
+      import('./features/stars/pages/starred-projects-page.component').then(
+        (m) => m.StarredProjectsPage,
+      ),
+    canActivate: [authGuard],
+  },
+  {
     path: ':username',
     loadComponent: () =>
       import('./features/profile/pages/profile-page.component').then((m) => m.ProfilePage),

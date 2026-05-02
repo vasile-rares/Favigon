@@ -13,11 +13,12 @@ public class ProjectsControllerTests
 {
   private readonly Mock<IProjectService> _projectService = new();
   private readonly Mock<IProjectAssetService> _projectAssetService = new();
+  private readonly Mock<IBookmarkService> _bookmarkService = new();
   private readonly ProjectsController _controller;
 
   public ProjectsControllerTests()
   {
-    _controller = new ProjectsController(_projectService.Object, _projectAssetService.Object)
+    _controller = new ProjectsController(_projectService.Object, _projectAssetService.Object, _bookmarkService.Object)
     {
       ControllerContext = CreateControllerContext(userId: 1)
     };

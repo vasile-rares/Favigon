@@ -53,4 +53,10 @@ public class User
     public ICollection<Project> Projects { get; set; } = new List<Project>();
 
     public ICollection<LinkedAccount> LinkedAccounts { get; set; } = new List<LinkedAccount>();
+
+    public ICollection<UserFollow> Followers { get; set; } = new List<UserFollow>();
+
+    public ICollection<UserFollow> Following { get; set; } = new List<UserFollow>();
+
+    public ICollection<ProjectBookmark> Bookmarks { get; set; } = new List<ProjectBookmark>();
 }

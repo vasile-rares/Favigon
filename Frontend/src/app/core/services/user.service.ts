@@ -7,6 +7,7 @@ import {
   UserProfile,
   UserProfileUpdateRequest,
   UserSearchResult,
+  UserFollowItem,
 } from '../models/user.models';
 
 @Injectable({ providedIn: 'root' })
@@ -40,6 +41,26 @@ export class UserService {
 
   getByUsername(username: string): Observable<UserProfile> {
     return this.http.get<UserProfile>(`${this.baseUrl}/users/${encodeURIComponent(username)}`);
+  }
+
+  followUser(username: string): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/users/${encodeURIComponent(username)}/follow`, {});
+  }
+
+  unfollowUser(username: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/users/${encodeURIComponent(username)}/follow`);
+  }
+
+  getFollowers(username: string): Observable<UserFollowItem[]> {
+    return this.http.get<UserFollowItem[]>(
+      `${this.baseUrl}/users/${encodeURIComponent(username)}/followers`,
+    );
+  }
+
+  getFollowing(username: string): Observable<UserFollowItem[]> {
+    return this.http.get<UserFollowItem[]>(
+      `${this.baseUrl}/users/${encodeURIComponent(username)}/following`,
+    );
   }
 
   search(query: string): Observable<UserSearchResult[]> {

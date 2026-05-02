@@ -15,13 +15,16 @@ public class ProjectsController : ControllerBase
 {
   private readonly IProjectService _projectService;
   private readonly IProjectAssetService _projectAssetService;
+  private readonly IBookmarkService _bookmarkService;
 
   public ProjectsController(
     IProjectService projectService,
-    IProjectAssetService projectAssetService)
+    IProjectAssetService projectAssetService,
+    IBookmarkService bookmarkService)
   {
     _projectService = projectService;
     _projectAssetService = projectAssetService;
+    _bookmarkService = bookmarkService;
   }
 
   [HttpGet]
@@ -284,6 +287,38 @@ public class ProjectsController : ControllerBase
   {
     var projects = await _projectService.GetByUserIdAsync(userId, isPublic: true);
     return Ok(projects);
+  }
+
+  [HttpPost("{id:int}/star")]
+  public async Task<IActionResult> Star(int id)
+  {
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
+
+    try
+    {
+      await _bookmarkService.BookmarkAsync(userId, id);
+      return Ok();
+    }
+    catch (InvalidOperationException ex)
+    {
+      return BadRequest(new { message = ex.Message });
+    }
+  }
+
+  [HttpDelete("{id:int}/star")]
+  public async Task<IActionResult> Unstar(int id)
+  {
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
+
+    try
+    {
+      await _bookmarkService.UnbookmarkAsync(userId, id);
+      return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+      return BadRequest(new { message = ex.Message });
+    }
   }
 
 }
