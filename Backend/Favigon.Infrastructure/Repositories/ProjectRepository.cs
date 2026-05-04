@@ -61,4 +61,11 @@ public class ProjectRepository : IProjectRepository
     _context.Projects.Remove(project);
     await _context.SaveChangesAsync();
   }
+
+  public Task IncrementViewCountAsync(int projectId)
+  {
+    return _context.Projects
+      .Where(p => p.Id == projectId && p.IsPublic)
+      .ExecuteUpdateAsync(s => s.SetProperty(p => p.ViewCount, p => p.ViewCount + 1));
+  }
 }

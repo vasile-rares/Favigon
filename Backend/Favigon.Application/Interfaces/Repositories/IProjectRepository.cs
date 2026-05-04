@@ -12,4 +12,5 @@ public interface IProjectRepository
   Task<Project> AddAsync(Project project);
   Task UpdateAsync(Project project);
   Task DeleteAsync(Project project);
+  Task IncrementViewCountAsync(int projectId);
 }

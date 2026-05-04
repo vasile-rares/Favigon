@@ -120,3 +120,9 @@ export type {
   UserMe,
   UserProfileUpdateRequest,
 } from './user.models';
+
+export type {
+  ExploreProjectItem,
+  ExploreUserItem,
+  ExploreRecommendedResponse,
+} from './explore.models';

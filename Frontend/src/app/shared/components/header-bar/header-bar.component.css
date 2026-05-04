@@ -27,12 +27,12 @@
 
 .header-bar {
   position: relative;
-  height: 55px;
-  background: linear-gradient(137deg, rgba(17, 18, 20, 0.4) 4.87%, rgba(12, 13, 15, 0.3) 75.88%);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--color-card-border);
-  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.15);
+  height: 75px;
+  background: #0d0d0e80;
+  backdrop-filter: blur(50px);
+  -webkit-backdrop-filter: blur(50px);
+  border: none;
+  box-shadow: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -40,16 +40,13 @@
   box-sizing: border-box;
   flex-shrink: 0;
   gap: 1rem;
+  transition: background 0.3s ease-in-out;
 }
 
 .header-bar--canvas {
   min-height: 56px;
   height: auto;
   width: 100%;
-  padding: 0.55rem 0.75rem;
-  border: var(--chrome-panel-border);
-  border-radius: 18px;
-  background: var(--chrome-panel-background);
   backdrop-filter: var(--chrome-panel-blur);
   -webkit-backdrop-filter: var(--chrome-panel-blur);
   box-shadow: var(--chrome-panel-shadow);
@@ -62,7 +59,7 @@
   align-items: center;
 
   &.header-section--left {
-    gap: 1rem;
+    gap: 2rem;
     justify-content: flex-start;
   }
 
@@ -208,6 +205,30 @@
 }
 
 .header-action-btn,
+.header-nav-link {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0;
+  border: none;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 0.2s ease;
+  white-space: nowrap;
+  background: transparent;
+
+  &:hover {
+    color: #FF85D0;
+  }
+}
+
+.header-bar--canvas .header-nav-link {
+  padding: 0.3rem 0.6rem;
+}
+
 .header-icon-btn {
   background: transparent;
   border: 1px solid transparent;
@@ -231,13 +252,15 @@
 }
 
 .header-icon-btn--outlined {
-  border: 1px solid var(--color-border-dark);
-  color: var(--color-text-medium);
+  border: none;
+  padding: 0.4rem;
+  border-radius: 0;
+  color: #fff;
 
   &:hover {
-    background-color: var(--color-surface-elevated);
-    border-color: var(--color-border-medium);
-    color: var(--color-text-light);
+    background-color: transparent;
+    border: none;
+    color: #FF85D0;
   }
 }
 
@@ -262,11 +285,11 @@
 }
 
 .header-bar--canvas .header-icon-btn--outlined {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border-color: rgba(255, 255, 255, 0.08);
+  width: auto;
+  height: auto;
+  border-radius: 0;
+  background: transparent;
+  border: none;
 }
 
 .header-user-menu__avatar {

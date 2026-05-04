@@ -1,9 +1,10 @@
-import { Component, ElementRef, inject, output, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, effect, inject, signal, viewChild } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { UserService } from '@app/core';
 import type { UserSearchResult } from '@app/core';
+import { gsap } from 'gsap';
 import { Subject, of, debounceTime, distinctUntilChanged, switchMap } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
@@ -23,10 +24,78 @@ export class ProjectSearchComponent {
   readonly searchResults = signal<UserSearchResult[]>([]);
   readonly isSearchOpen = signal(false);
   readonly isSearchLoading = signal(false);
+  readonly isDropdownMounted = signal(false);
+  readonly isExpanded = signal(false);
+  readonly isExpandWrapMounted = signal(false);
 
   readonly searchContainer = viewChild<ElementRef<HTMLElement>>('searchContainer');
+  readonly dropdownEl = viewChild<ElementRef<HTMLElement>>('dropdownEl');
+  readonly pillEl = viewChild<ElementRef<HTMLElement>>('pillEl');
+  readonly inputEl = viewChild<ElementRef<HTMLInputElement>>('inputEl');
 
   constructor() {
+    // Expand/collapse pill animation
+    effect(() => {
+      const expanded = this.isExpanded();
+      if (expanded) {
+        this.isExpandWrapMounted.set(true);
+        queueMicrotask(() => {
+          const pill = this.pillEl()?.nativeElement;
+          if (!pill) return;
+          gsap.fromTo(
+            pill,
+            { width: 36 },
+            {
+              width: 240,
+              duration: 0.35,
+              ease: 'power3.out',
+              onComplete: () => this.inputEl()?.nativeElement.focus(),
+            },
+          );
+        });
+      } else {
+        const pill = this.pillEl()?.nativeElement;
+        if (!pill) {
+          this.isExpandWrapMounted.set(false);
+          return;
+        }
+        gsap.to(pill, {
+          width: 36,
+          duration: 0.22,
+          ease: 'power2.in',
+          onComplete: () => this.isExpandWrapMounted.set(false),
+        });
+      }
+    });
+
+    // Dropdown open/close animation
+    effect(() => {
+      const open = this.isSearchOpen();
+      if (open) {
+        this.isDropdownMounted.set(true);
+        queueMicrotask(() => {
+          const el = this.dropdownEl()?.nativeElement;
+          if (!el) return;
+          gsap.fromTo(
+            el,
+            { opacity: 0, y: -8, scale: 0.97 },
+            { opacity: 1, y: 0, scale: 1, duration: 0.22, ease: 'power3.out' },
+          );
+        });
+      } else {
+        const el = this.dropdownEl()?.nativeElement;
+        if (!el) return;
+        gsap.to(el, {
+          opacity: 0,
+          y: -6,
+          scale: 0.97,
+          duration: 0.15,
+          ease: 'power2.in',
+          onComplete: () => this.isDropdownMounted.set(false),
+        });
+      }
+    });
+
     this.searchSubject
       .pipe(
         debounceTime(300),
@@ -52,6 +121,22 @@ export class ProjectSearchComponent {
           this.isSearchLoading.set(false);
         },
       });
+  }
+
+  toggleSearch(): void {
+    if (this.isExpanded()) {
+      this.collapse();
+    } else {
+      this.isExpanded.set(true);
+    }
+  }
+
+  private collapse(): void {
+    this.isSearchOpen.set(false);
+    this.searchQuery.set('');
+    this.searchResults.set([]);
+    this.searchSubject.next('');
+    this.isExpanded.set(false);
   }
 
   onSearchInput(query: string): void {
@@ -88,7 +173,7 @@ export class ProjectSearchComponent {
   closeIfClickedOutside(target: Node): void {
     const searchEl = this.searchContainer()?.nativeElement;
     if (target && searchEl && !searchEl.contains(target)) {
-      this.isSearchOpen.set(false);
+      this.collapse();
     }
   }
 
@@ -96,3 +181,4 @@ export class ProjectSearchComponent {
     this.isSearchOpen.set(false);
   }
 }
+

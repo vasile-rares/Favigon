@@ -11,7 +11,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { ActivatedRoute, NavigationEnd, Router } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   AuthService,
@@ -44,6 +44,7 @@ interface HeaderUserProfile {
   standalone: true,
   imports: [
     ReactiveFormsModule,
+    RouterLink,
     UserMenuDropdownComponent,
     ...DIALOG_BOX_IMPORTS,
     TextInputComponent,

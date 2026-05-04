@@ -10,19 +10,20 @@
 }
 
 .user-menu__panel {
-  --user-menu-panel-radius: 18px;
+  --user-menu-panel-radius: 32px;
   position: relative;
   width: 256px;
   border-radius: var(--user-menu-panel-radius);
-  background: var(--chrome-panel-background);
-  backdrop-filter: var(--chrome-panel-blur);
-  -webkit-backdrop-filter: var(--chrome-panel-blur);
-  border: var(--chrome-panel-border);
-  box-shadow: var(--chrome-panel-shadow);
+  background: rgba(255, 133, 208, 0.1);
+  backdrop-filter: blur(62px);
+  -webkit-backdrop-filter: blur(62px);
+  border: 1px solid rgba(255, 133, 208, 0.45);
+  box-shadow: 0 -10px 14.7px rgba(255, 133, 208, 0.14);
   color: var(--color-text-light);
   overflow: hidden;
   z-index: 40;
   transform-origin: top right;
+  padding: 6px;
 }
 
 .user-menu__panel--open {
@@ -138,7 +139,7 @@
     color: var(--color-text-light);
 
     &::before {
-      background: rgba(255, 255, 255, 0.08);
+      background: rgba(255, 133, 208, 0.1);
     }
   }
 }

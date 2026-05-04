@@ -9,5 +9,6 @@ public interface IBookmarkRepository
   Task DeleteAsync(ProjectBookmark bookmark);
   Task<int> GetCountForProjectAsync(int projectId);
   Task<bool> IsBookmarkedAsync(int userId, int projectId);
+  Task<HashSet<int>> GetStarredProjectIdsAsync(int userId, IEnumerable<int> projectIds);
   Task<IReadOnlyList<Project>> GetBookmarkedProjectsAsync(int userId);
 }

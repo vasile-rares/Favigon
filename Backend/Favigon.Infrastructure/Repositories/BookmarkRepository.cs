@@ -42,6 +42,16 @@ public class BookmarkRepository : IBookmarkRepository
     return _context.ProjectBookmarks.AnyAsync(b => b.UserId == userId && b.ProjectId == projectId);
   }
 
+  public async Task<HashSet<int>> GetStarredProjectIdsAsync(int userId, IEnumerable<int> projectIds)
+  {
+    var ids = projectIds.ToList();
+    var starred = await _context.ProjectBookmarks
+      .Where(b => b.UserId == userId && ids.Contains(b.ProjectId))
+      .Select(b => b.ProjectId)
+      .ToListAsync();
+    return starred.ToHashSet();
+  }
+
   public async Task<IReadOnlyList<Project>> GetBookmarkedProjectsAsync(int userId)
   {
     return await _context.ProjectBookmarks

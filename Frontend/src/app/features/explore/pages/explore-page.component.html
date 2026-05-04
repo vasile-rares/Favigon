@@ -1,0 +1,184 @@
+<div class="xpl">
+  <app-header-bar class="xpl-header"></app-header-bar>
+
+  <section class="xpl-hero">
+    <p class="xpl-hero-text">Explore what the <span class="xpl-hero-accent">community</span> is building.</p>
+  </section>
+
+  @if (isLoading()) {
+    <div class="xpl-state">
+      <div class="xpl-dots"><span></span><span></span><span></span></div>
+    </div>
+  } @else if (errorMessage()) {
+    <div class="xpl-state xpl-state--err">{{ errorMessage() }}</div>
+  } @else {
+
+    @if (trendingProjects().length > 0) {
+      <section class="xpl-section">
+        <header class="xpl-section-head">
+          <div class="xpl-section-info">
+            <h2 class="xpl-section-title">Trending</h2>
+            <span class="xpl-section-desc">Most starred projects right now</span>
+          </div>
+        </header>
+        <div class="xpl-scroll-wrap">
+          <button class="xpl-arrow" (click)="scrollStrip(strip1, -1)" aria-label="Previous">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="xpl-scroll" data-smooth-prevent #strip1>
+          <div class="xpl-strip">
+            @for (p of trendingProjects(); track p.projectId) {
+              <article class="pcard" (click)="navigateToProject(p, $event)">
+                <div class="pcard-visual">
+                  @if (p.thumbnailDataUrl) {
+                    <img class="pcard-img" [src]="p.thumbnailDataUrl" [alt]="p.name" loading="lazy" />
+                  } @else {
+                    <div class="pcard-blank">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                    </div>
+                  }
+                  <div class="pcard-overlay"></div>
+                  <div class="pcard-foot">
+                    <div class="pcard-main">
+                      <div class="pcard-ava-wrap" (click)="$event.stopPropagation(); navigateToProfile(p.ownerUsername)">
+                        @if (p.ownerProfilePictureUrl) {
+                          <img class="pcard-ava" [src]="p.ownerProfilePictureUrl" [alt]="p.ownerDisplayName" />
+                        } @else {
+                          <div class="pcard-ava pcard-ava-fb">{{ p.ownerDisplayName.charAt(0).toUpperCase() }}</div>
+                        }
+                      </div>
+                      <div class="pcard-info">
+                        <p class="pcard-title">{{ p.name }}</p>
+                        <span class="pcard-author" (click)="$event.stopPropagation(); navigateToProfile(p.ownerUsername)">{{ p.ownerUsername }}</span>
+                      </div>
+                    </div>
+                    <div class="pcard-stats">
+                      <span class="pcard-stat">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        {{ p.starCount }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            }
+          </div>
+        </div>
+          <button class="xpl-arrow" (click)="scrollStrip(strip1, 1)" aria-label="Next">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+      </section>
+    }
+
+    @if (recommendedProjects().length > 0) {
+      <section class="xpl-section">
+        <header class="xpl-section-head">
+          <div class="xpl-section-info">
+            <h2 class="xpl-section-title">{{ isRecommendedPersonalized() ? 'From People You Follow' : 'Recently Updated' }}</h2>
+            <span class="xpl-section-desc">{{ isRecommendedPersonalized() ? 'New work from your following list' : 'Latest public projects' }}</span>
+          </div>
+        </header>
+        <div class="xpl-scroll-wrap">
+          <button class="xpl-arrow" (click)="scrollStrip(strip2, -1)" aria-label="Previous">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="xpl-scroll" data-smooth-prevent #strip2>
+          <div class="xpl-strip">
+            @for (p of recommendedProjects(); track p.projectId) {
+              <article class="pcard" (click)="navigateToProject(p, $event)">
+                <div class="pcard-visual">
+                  @if (p.thumbnailDataUrl) {
+                    <img class="pcard-img" [src]="p.thumbnailDataUrl" [alt]="p.name" loading="lazy" />
+                  } @else {
+                    <div class="pcard-blank">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#444" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+                    </div>
+                  }
+                  <div class="pcard-overlay"></div>
+                  <div class="pcard-foot">
+                    <div class="pcard-main">
+                      <div class="pcard-ava-wrap" (click)="$event.stopPropagation(); navigateToProfile(p.ownerUsername)">
+                        @if (p.ownerProfilePictureUrl) {
+                          <img class="pcard-ava" [src]="p.ownerProfilePictureUrl" [alt]="p.ownerDisplayName" />
+                        } @else {
+                          <div class="pcard-ava pcard-ava-fb">{{ p.ownerDisplayName.charAt(0).toUpperCase() }}</div>
+                        }
+                      </div>
+                      <div class="pcard-info">
+                        <p class="pcard-title">{{ p.name }}</p>
+                        <span class="pcard-author" (click)="$event.stopPropagation(); navigateToProfile(p.ownerUsername)">{{ p.ownerUsername }}</span>
+                      </div>
+                    </div>
+                    <div class="pcard-stats">
+                      <span class="pcard-stat">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="#FF85D0"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        {{ p.starCount }}
+                      </span>                      <span class="pcard-stat">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#909099" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        {{ p.viewCount }}
+                      </span>                      <span class="pcard-stat">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#909099" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        {{ p.viewCount }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </article>
+            }
+          </div>
+        </div>
+          <button class="xpl-arrow" (click)="scrollStrip(strip2, 1)" aria-label="Next">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+      </section>
+    }
+
+    @if (suggestedPeople().length > 0) {
+      <section class="xpl-section">
+        <header class="xpl-section-head">
+          <div class="xpl-section-info">
+            <h2 class="xpl-section-title">People</h2>
+            <span class="xpl-section-desc">Creators worth following</span>
+          </div>
+        </header>
+        <div class="xpl-scroll-wrap">
+          <button class="xpl-arrow" (click)="scrollStrip(strip3, -1)" aria-label="Previous">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <div class="xpl-scroll" data-smooth-prevent #strip3>
+          <div class="xpl-strip xpl-strip-people">
+            @for (u of suggestedPeople(); track u.userId) {
+              <article class="ucard" (click)="navigateToProfile(u.username)">
+                @if (u.profilePictureUrl) {
+                  <img class="ucard-ava" [src]="u.profilePictureUrl" [alt]="u.displayName" />
+                } @else {
+                  <div class="ucard-ava ucard-ava-fb">{{ u.displayName.charAt(0).toUpperCase() }}</div>
+                }
+                <p class="ucard-name">{{ u.displayName }}</p>
+                <p class="ucard-handle">&#64;{{ u.username }}</p>
+                <p class="ucard-stat">{{ u.followerCount }} {{ u.followerCount === 1 ? 'follower' : 'followers' }}</p>
+                <button class="ucard-btn" [class.ucard-btn-on]="u.isFollowedByCurrentUser"
+                  (click)="$event.stopPropagation(); toggleFollow(u)">
+                  {{ u.isFollowedByCurrentUser ? 'Following' : 'Follow' }}
+                </button>
+              </article>
+            }
+          </div>
+        </div>
+          <button class="xpl-arrow" (click)="scrollStrip(strip3, 1)" aria-label="Next">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
+        </div>
+      </section>
+    }
+
+    @if (trendingProjects().length === 0 && recommendedProjects().length === 0 && suggestedPeople().length === 0) {
+      <div class="xpl-state">Nothing here yet. Check back as the community grows.</div>
+    }
+
+  }
+
+</div>
+

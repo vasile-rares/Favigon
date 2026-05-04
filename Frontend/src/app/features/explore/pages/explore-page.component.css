@@ -1,0 +1,572 @@
+/* ===============================================
+   ROOT SHELL
+   =============================================== */
+
+.xpl {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: #0d0d0d;
+  color: #fff;
+  font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  font-weight: 600;
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding-top: 55px;
+}
+
+app-header-bar.xpl-header {
+  display: block;
+  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transition: background 0.3s ease-in-out, backdrop-filter 0.3s ease-in-out;
+}
+
+app-header-bar.xpl-header .header-bar {
+  width: 100%;
+  background: #0d0d0e80;
+  -webkit-backdrop-filter: blur(50px);
+  backdrop-filter: blur(50px);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+  transition: background 0.3s ease-in-out;
+}
+
+/* ===============================================
+   HERO
+   =============================================== */
+
+.xpl-hero {
+  padding: clamp(3rem, 6vw, 5rem) clamp(1.5rem, 6vw, 6rem) clamp(2rem, 4vw, 3rem);
+  position: relative;
+  text-align: center;
+}
+
+/* Centered pink glow at very top */
+.xpl-hero::before {
+  content: '';
+  position: absolute;
+  top: -1000px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1500px;
+  height: 1000px;
+  border-radius: 50%;
+  background: #FF85D0;
+  filter: blur(90px);
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.xpl-hero-text {
+  position: relative;
+  z-index: 1;
+  font-size: clamp(1.8rem, 2.6vw, 2.1rem);
+  color: #ffffff;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.xpl-hero-accent {
+  background: linear-gradient(180deg, #FFB3E2 0%, #FF85D0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ===============================================
+   STATES — loading / error / empty
+   =============================================== */
+
+.xpl-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 7rem 2rem;
+  color: #909099;
+  font-size: 0.875rem;
+  letter-spacing: 0.01em;
+}
+
+.xpl-state--err { color: #c0392b; }
+
+.xpl-dots { display: flex; gap: 5px; }
+
+.xpl-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #909099;
+  animation: xpldot 1.2s infinite ease-in-out both;
+}
+
+.xpl-dots span:nth-child(1) { animation-delay: -0.32s; }
+.xpl-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes xpldot {
+  0%, 80%, 100% { transform: scale(0.4); opacity: 0.3; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
+/* ===============================================
+   SECTIONS
+   =============================================== */
+
+.xpl-section {
+  padding: 4rem 0 0;
+  position: relative;
+}
+
+/* Gradient top border */
+.xpl-section-head {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 0 clamp(1.5rem, 6vw, 6rem);
+  margin-bottom: 2rem;
+}
+
+.xpl-section-info { display: flex; flex-direction: column; gap: 0.4rem; }
+
+.xpl-section-title {
+  font-size: clamp(1.8rem, 3.9375vw, 2.7rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  margin: 0;
+  color: #e0e0e2;
+  line-height: 1;
+}
+
+.xpl-section-desc {
+  font-size: clamp(1rem, 2.2vw, 1.5rem);
+  color: #FF85D0;
+  letter-spacing: 0.02em;
+}
+
+/* ===============================================
+   HORIZONTAL SCROLL STRIP
+   =============================================== */
+
+.xpl-scroll {
+  padding: 40px clamp(1.5rem, 6vw, 6rem) 4rem;
+  overflow-x: auto;
+  overflow-y: clip;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.xpl-scroll::-webkit-scrollbar { display: none; }
+
+.xpl-strip { display: flex; gap: 20px; width: max-content; }
+
+/* ===============================================
+   SECTION ARROWS
+   =============================================== */
+
+.xpl-scroll-wrap {
+  position: relative;
+}
+
+.xpl-arrow {
+  position: absolute;
+  top: 47%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 36px;
+  height: 36px;
+  border-radius: 100%;
+  background: linear-gradient(180deg, #cdcdcd, #7a7a7a 48%, #6d6d6d);
+  box-shadow: inset 0 -.3px 0 1px #cdcdcd, -1px 3px 20px #ffffff4d;
+  border: none;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000000;
+  transition: .25s ease-in-out;
+  padding: 0;
+}
+
+.xpl-arrow:first-child { left: clamp(0.5rem, 1.5vw, 1rem); }
+.xpl-arrow:last-child  { right: clamp(0.5rem, 1.5vw, 1rem); }
+
+.xpl-arrow:hover {
+  box-shadow: inset 0 -.3px 0 1px #FF85D0, -1px 3px 20px #FF85D0;
+}
+
+.xpl-arrow:active { transform: scale(.95); }
+
+/* ===============================================
+   PROJECT CARD — navarro.ro exact technique
+   --ib-card-color: #0a0a0a
+   --ib-card-border-clr: rgb(255 255 255 / 5%)
+   --ib-card-border-radius: 30px
+   =============================================== */
+
+.pcard {
+  position: relative;
+  width: 310px;
+  flex-shrink: 0;
+  background: linear-gradient(120deg, rgba(25, 25, 25, 1) 0%, rgba(11, 11, 11, 1) 90%, rgba(11, 11, 11, 1) 100%);
+  border-radius: 30px;
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: rgba(152, 152, 152, 0.14) 0px -13.49px 19.83px -4.05px;
+  --pink-reveal: 100%;
+}
+
+.pcard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 30px;
+  padding: 1px;
+  background: linear-gradient(140deg, rgb(255 255 255 / 15%) 0%, rgb(31 31 31 / 80%) 24%, rgb(255 255 255 / 13%) 80%, rgb(31 31 31 / 0%) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.pcard::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 30px;
+  padding: 1px;
+  background: #FF85D0;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 4;
+  clip-path: inset(0 0 var(--pink-reveal) 0 round 30px);
+}
+
+.pcard:active { transform: scale(.98); }
+
+.pcard-visual {
+  position: relative;
+  width: 100%;
+  height: 195px;
+  background: #080808;
+  overflow: hidden;
+  flex-shrink: 0;
+  border-radius: 29px;
+}
+
+.pcard-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform .3s ease-in-out;
+}
+
+.pcard:hover .pcard-img { transform: scale(1.04); }
+
+.pcard-blank {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(140deg, #181818, #0d0d0d 80%);
+}
+
+/* Badge — navarro gradient-border pill exact */
+.pcard-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: linear-gradient(90deg, #cccccc1a, #4545451a 59%, #6666661a);
+  padding: 2px;
+  border-radius: 999px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 -13.49px 19.83px -4.05px #98989824;
+  transition: box-shadow .3s ease-in-out;
+}
+
+/* Inner pill */
+.pcard-badge-inner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #0d0d0d;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #FF85D0;
+}
+
+.pcard-badge:hover {
+  box-shadow: 0 0 1px 1px #FF85D0;
+}
+
+.pcard-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.82) 0%, rgba(0,0,0,0.35) 45%, transparent 100%);
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.pcard-foot {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 2;
+}
+
+.pcard-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.pcard-ava-wrap { flex-shrink: 0; cursor: pointer; }
+
+.pcard-ava {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.1);
+  display: block;
+}
+
+.pcard-ava-fb {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #141414;
+  border: 1px solid rgba(255,255,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #909099;
+  flex-shrink: 0;
+}
+
+.pcard-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pcard-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #e0e0e2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pcard-author {
+  font-size: 0.7rem;
+  color: #909099;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: color .2s ease-in-out;
+}
+.pcard-author:hover { color: #c8c8cc; }
+
+.pcard-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.25rem 0.5rem;
+}
+
+.pcard-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: #FF85D0;
+  font-weight: 500;
+}
+
+/* ===============================================
+   PEOPLE STRIP
+   =============================================== */
+
+.xpl-strip-people { gap: 12px; }
+
+/* ===============================================
+   PEOPLE CARD — navarro.ro exact technique
+   =============================================== */
+
+.ucard {
+  position: relative;
+  width: 155px;
+  flex-shrink: 0;
+  background: #0a0a0a;
+  border-radius: 30px;
+  padding: 1.4rem 1rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: rgba(152,152,152,0.14) 0px -13.49px 19.83px -4.05px, rgba(255,133,208,0.01) 0px -13.49px 19.83px -4.05px;
+  --pink-reveal: 100%;
+}
+
+.ucard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 30px;
+  padding: 1px;
+  background: linear-gradient(140deg, rgb(255 255 255 / 15%) 0%, rgb(31 31 31 / 80%) 24%, rgb(255 255 255 / 13%) 80%, rgb(31 31 31 / 0%) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ucard::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 30px;
+  padding: 1px;
+  background: #FF85D0;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 2;
+  clip-path: inset(0 0 var(--pink-reveal) 0 round 30px);
+}
+
+.ucard:active { transform: scale(.98); }
+
+.ucard-ava {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  margin-bottom: 0.9rem;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.ucard-ava-fb {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: #111;
+  border: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #909099;
+  margin-bottom: 0.9rem;
+}
+
+.ucard-name {
+  margin: 0 0 3px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #e0e0e2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.ucard-handle {
+  margin: 0 0 5px;
+  font-size: 0.68rem;
+  color: #909099;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.ucard-stat {
+  margin: 0 0 1rem;
+  font-size: 0.65rem;
+  color: #6b3050;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Follow button — navarro glass pill */
+.ucard-btn {
+  width: 100%;
+  padding: 7px 0;
+  border-radius: 100px;
+  background: linear-gradient(180deg, #ffffff1a, #2929291a);
+  border: 1px solid #484848;
+  color: #909099;
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: .3s ease-in-out;
+  backdrop-filter: blur(50px);
+  -webkit-backdrop-filter: blur(50px);
+}
+
+.ucard-btn:hover {
+  background-color: #ffffff4d;
+  color: #e0e0e2;
+  box-shadow: 0 0 5px #4848486a, 0 0 10px #4848486a, 0 0 20px #4848486a;
+}
+
+.ucard-btn:active { transform: scale(.98); }
+
+/* Following — navarro green CTA / emphasis badge */
+.ucard-btn-on {
+  background: #1c0f18;
+  border: 1px solid #6b3050;
+  color: #FF85D0;
+  box-shadow: 0 -10px 10px #FF85D00f, 0 10px 10px #0000004d;
+}
+
+.ucard-btn-on:hover {
+  background: #1c0f18;
+  border-color: #FF85D0;
+  color: #FF85D0;
+  box-shadow: 0 0 5px #FF85D06a, 0 0 10px #FF85D06a, 0 0 20px #FF85D06a;
+}
+
+/* ===============================================
+   FOOTER
+   =============================================== */
+
+

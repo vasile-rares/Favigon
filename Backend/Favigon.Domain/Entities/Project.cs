@@ -31,5 +31,7 @@ public class Project
 
     public DateTime UpdatedAt { get; set; }
 
+    public int ViewCount { get; set; }
+
     public ICollection<ProjectBookmark> Bookmarks { get; set; } = new List<ProjectBookmark>();
 }

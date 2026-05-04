@@ -16,15 +16,18 @@ public class ProjectsController : ControllerBase
   private readonly IProjectService _projectService;
   private readonly IProjectAssetService _projectAssetService;
   private readonly IBookmarkService _bookmarkService;
+  private readonly IProjectRepository _projectRepository;
 
   public ProjectsController(
     IProjectService projectService,
     IProjectAssetService projectAssetService,
-    IBookmarkService bookmarkService)
+    IBookmarkService bookmarkService,
+    IProjectRepository projectRepository)
   {
     _projectService = projectService;
     _projectAssetService = projectAssetService;
     _bookmarkService = bookmarkService;
+    _projectRepository = projectRepository;
   }
 
   [HttpGet]
@@ -319,6 +322,14 @@ public class ProjectsController : ControllerBase
     {
       return BadRequest(new { message = ex.Message });
     }
+  }
+
+  [AllowAnonymous]
+  [HttpPost("{id:int}/view")]
+  public async Task<IActionResult> RecordView(int id)
+  {
+    await _projectRepository.IncrementViewCountAsync(id);
+    return NoContent();
   }
 
 }

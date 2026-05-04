@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
     services.AddScoped<IProjectAssetService, ProjectAssetService>();
     services.AddScoped<IFollowService, FollowService>();
     services.AddScoped<IBookmarkService, BookmarkService>();
+    services.AddScoped<IExploreService, ExploreService>();
     services.AddScoped<IConverterService, ConverterService>();
     services.AddScoped<IAiDesignService, AiDesignService>();
     services.AddScoped<AiIntentService>();
