@@ -1,4 +1,15 @@
-import { Component, DestroyRef, ElementRef, Injector, NgZone, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  Injector,
+  NgZone,
+  OnInit,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { forkJoin } from 'rxjs';
@@ -9,13 +20,12 @@ import Lenis from 'lenis';
 gsap.registerPlugin(ScrollTrigger);
 import { ExploreService, ProjectService, UserService, extractApiErrorMessage } from '@app/core';
 import type { ExploreProjectItem, ExploreUserItem } from '@app/core';
-import { HeaderBarComponent } from '@app/shared';
 import { CurrentUserService } from '../../../core/services/current-user.service';
 
 @Component({
   selector: 'app-explore-page',
   standalone: true,
-  imports: [HeaderBarComponent],
+  imports: [],
   templateUrl: './explore-page.component.html',
   styleUrl: './explore-page.component.css',
 })
@@ -60,10 +70,13 @@ export class ExplorePageComponent implements OnInit {
           this.isLoading.set(false);
           // afterNextRender garanteaza ca Angular a terminat de randat cardurile in DOM
           // inainte de a atasa animatiile — fix pentru race condition cu setTimeout(0)
-          afterNextRender(() => {
-            this.initScrollAnimations();
-            this.initCardHoverEffects();
-          }, { injector: this.injector });
+          afterNextRender(
+            () => {
+              this.initScrollAnimations();
+              this.initCardHoverEffects();
+            },
+            { injector: this.injector },
+          );
         },
         error: (err: unknown) => {
           this.errorMessage.set(extractApiErrorMessage(err, 'Failed to load explore content.'));
@@ -162,12 +175,24 @@ export class ExplorePageComponent implements OnInit {
       // function. Lenis registers all its listeners synchronously in the constructor,
       // so they get { passive: false }. After construction we delete the own property
       // and zone.js's prototype patch takes over again for everything else.
-      const nativeAdd = (window as any)['__zone_symbol__addEventListener'] as typeof window.addEventListener | undefined;
-      const nativeRemove = (window as any)['__zone_symbol__removeEventListener'] as typeof window.removeEventListener | undefined;
+      const nativeAdd = (window as any)['__zone_symbol__addEventListener'] as
+        | typeof window.addEventListener
+        | undefined;
+      const nativeRemove = (window as any)['__zone_symbol__removeEventListener'] as
+        | typeof window.removeEventListener
+        | undefined;
 
       if (nativeAdd && nativeRemove) {
-        Object.defineProperty(window, 'addEventListener', { value: nativeAdd, configurable: true, writable: true });
-        Object.defineProperty(window, 'removeEventListener', { value: nativeRemove, configurable: true, writable: true });
+        Object.defineProperty(window, 'addEventListener', {
+          value: nativeAdd,
+          configurable: true,
+          writable: true,
+        });
+        Object.defineProperty(window, 'removeEventListener', {
+          value: nativeRemove,
+          configurable: true,
+          writable: true,
+        });
       }
 
       this.lenis = new Lenis({ lerp: 0.07, smoothWheel: true, syncTouch: false });
@@ -200,13 +225,47 @@ export class ExplorePageComponent implements OnInit {
       // shadowMid   = crossfade: gri disparut, roz vizibil pe aceeasi pozitie
       // shadowDrain = roz coboara spre card si dispare (se scurge in border) — mouseenter faza 2
       // shadowSmoke = roz se extinde in exterior (blur+spread mari, alpha→0) ca un fum — mouseleave faza 2
-      const shadowRest  = 'rgba(152,152,152,0.14) 0px -13.49px 19.83px -4.05px, rgba(255,133,208,0.01) 0px -13.49px 19.83px -4.05px';
-      const shadowMid   = 'rgba(152,152,152,0.0)  0px -13.49px 19.83px -4.05px, rgba(255,133,208,0.45) 0px -15.49px 19.83px -4.05px';
-      const shadowDrain = 'rgba(152,152,152,0.0)  0px -13.49px 19.83px -4.05px, rgba(255,133,208,0.01) 0px 0px 8px 0px';
-      const shadowSmoke = 'rgba(152,152,152,0.14) 0px -13.49px 19.83px -4.05px, rgba(255,133,208,0.0) 0px -13.49px 20px 8px';
+      const shadowRest =
+        'rgba(152,152,152,0.14) 0px -13.49px 19.83px -4.05px, rgba(255,133,208,0.01) 0px -13.49px 19.83px -4.05px';
+      const shadowMid =
+        'rgba(152,152,152,0.0)  0px -13.49px 19.83px -4.05px, rgba(255,133,208,0.45) 0px -15.49px 19.83px -4.05px';
+      const shadowDrain =
+        'rgba(152,152,152,0.0)  0px -13.49px 19.83px -4.05px, rgba(255,133,208,0.01) 0px 0px 8px 0px';
+      const shadowSmoke =
+        'rgba(152,152,152,0.14) 0px -13.49px 19.83px -4.05px, rgba(255,133,208,0.0) 0px -13.49px 20px 8px';
+
+      const inset = 'inset 0px 4.7px 7.3px -1.3px #fdc8e98e';
 
       cards.forEach((card) => {
+        const isUcard = card.classList.contains('ucard');
+        const rest = isUcard ? `${shadowRest}, ${inset}` : shadowRest;
+        const mid = isUcard ? `${shadowMid}, ${inset}` : shadowMid;
+        const drain = isUcard ? `${shadowDrain}, ${inset}` : shadowDrain;
+        const smoke = isUcard ? `${shadowSmoke}, ${inset}` : shadowSmoke;
+
         let tl: gsap.core.Timeline | null = null;
+
+        const stats = card.querySelector<HTMLElement>('.pcard-stats');
+
+        // Masoara inaltimea naturala a stats o singura data, fara snap la final de animatie
+        let statsH = 0;
+        if (stats) {
+          gsap.set(stats, {
+            height: 'auto',
+            paddingTop: '0.25rem',
+            paddingBottom: '0.25rem',
+            visibility: 'hidden',
+            opacity: 0,
+          });
+          statsH = stats.offsetHeight;
+          gsap.set(stats, {
+            height: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+            visibility: 'visible',
+            opacity: 0,
+          });
+        }
 
         card.addEventListener('mouseenter', () => {
           tl?.kill();
@@ -214,14 +273,30 @@ export class ExplorePageComponent implements OnInit {
 
           tl.to(card, { scale: 1.03, y: -5, duration: 1, ease: 'power2.out' }, 0)
             // Faza 1: crossfade gri→roz (0 → 0.22s)
-            .fromTo(card,
-              { boxShadow: shadowRest },
-              { boxShadow: shadowMid, duration: 0.22, ease: 'power2.in' },
-              0
+            .fromTo(
+              card,
+              { boxShadow: rest },
+              { boxShadow: mid, duration: 0.22, ease: 'power2.in' },
+              0,
             )
             // Faza 2: roz coboara spre card si se scurge in border (0.22 → 0.38s)
-            .to(card, { boxShadow: shadowDrain, duration: 0.16, ease: 'power2.out' }, 0.22)
+            .to(card, { boxShadow: drain, duration: 0.16, ease: 'power2.out' }, 0.22)
             .to(card, { '--pink-reveal': '0%', duration: 0.16, ease: 'power2.out' }, 0.22);
+
+          if (stats && statsH) {
+            tl.to(
+              stats,
+              {
+                height: statsH,
+                paddingTop: '0.25rem',
+                paddingBottom: '0.25rem',
+                opacity: 1,
+                duration: 0.22,
+                ease: 'power2.out',
+              },
+              0.1,
+            );
+          }
         });
 
         card.addEventListener('mouseleave', () => {
@@ -230,9 +305,24 @@ export class ExplorePageComponent implements OnInit {
 
           // Faza 1: borderul dispare bottom→top + umbra roza reapare la card (0 → 0.16s)
           tl.to(card, { '--pink-reveal': '100%', duration: 0.16, ease: 'power2.in' }, 0)
-            .to(card, { boxShadow: shadowMid, duration: 0.16, ease: 'power2.out' }, 0)
+            .to(card, { boxShadow: mid, duration: 0.16, ease: 'power2.out' }, 0)
             // Faza 2: roz se extinde ca fum si dispare, gri revine simultan, card coboara (0.16 → 0.44s)
-            .to(card, { scale: 1, boxShadow: shadowSmoke, duration: 0.16, ease: 'power2.out' }, 0.16);
+            .to(card, { scale: 1, boxShadow: smoke, duration: 0.16, ease: 'power2.out' }, 0.16);
+
+          if (stats && statsH) {
+            tl.to(
+              stats,
+              {
+                height: 0,
+                paddingTop: 0,
+                paddingBottom: 0,
+                opacity: 0,
+                duration: 0.14,
+                ease: 'power2.in',
+              },
+              0,
+            );
+          }
         });
       });
     });
@@ -251,7 +341,11 @@ export class ExplorePageComponent implements OnInit {
       // leaving staggered elements briefly at opacity:1 — hence the semi-transparent flash.
       gsap.set(headers, { y: 20, opacity: 0, filter: 'blur(10px)' });
       strips.forEach((strip) =>
-        gsap.set(strip.querySelectorAll('.pcard, .ucard'), { y: 20, opacity: 0, filter: 'blur(10px)' }),
+        gsap.set(strip.querySelectorAll('.pcard, .ucard'), {
+          y: 20,
+          opacity: 0,
+          filter: 'blur(10px)',
+        }),
       );
 
       const stConfig = {

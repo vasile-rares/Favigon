@@ -27,7 +27,6 @@ import {
   ActionButtonComponent,
   DIALOG_BOX_IMPORTS,
   DropdownSelectComponent,
-  HeaderBarComponent,
   TextInputComponent,
 } from '@app/shared';
 import type { DropdownSelectOption } from '@app/shared';
@@ -51,7 +50,6 @@ type ProjectSortOption = 'updated' | 'created';
     DatePipe,
     FormsModule,
     ReactiveFormsModule,
-    HeaderBarComponent,
     ...DIALOG_BOX_IMPORTS,
     ActionButtonComponent,
     TextInputComponent,

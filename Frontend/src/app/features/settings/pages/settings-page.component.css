@@ -90,6 +90,7 @@
   min-height: 100vh;
   background: transparent;
   color: var(--color-text-light);
+  padding-top: 55px;
 
   .settings-container {
     flex: 1;

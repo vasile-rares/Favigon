@@ -82,18 +82,13 @@
     );
 }
 
-app-header-bar.page-header {
-  display: block;
-  width: min(1120px, calc(100vw - 48px));
-  margin: 14px auto 0;
-}
-
 .profile-layout {
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  padding-top: 55px;
 }
 
 .profile-main-shell {

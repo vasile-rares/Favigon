@@ -2,7 +2,6 @@ import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ProjectService, extractApiErrorMessage } from '@app/core';
 import type { ProjectResponse } from '@app/core';
-import { HeaderBarComponent } from '@app/shared';
 import {
   ProjectCardComponent,
   ProjectCardViewModel,
@@ -11,7 +10,7 @@ import {
 @Component({
   selector: 'app-starred-projects-page',
   standalone: true,
-  imports: [HeaderBarComponent, ProjectCardComponent],
+  imports: [ProjectCardComponent],
   templateUrl: './starred-projects-page.component.html',
   styleUrl: './starred-projects-page.component.css',
 })

@@ -4,6 +4,7 @@
   min-height: 100dvh;
   background: var(--app-background);
   color: var(--color-text-primary);
+  padding-top: 55px;
 }
 
 .stars-container {

@@ -21,12 +21,7 @@ import {
 } from '@app/core';
 import type { UserMe } from '@app/core';
 import { environment } from '../../../../environments/environment';
-import {
-  HeaderBarComponent,
-  TextInputComponent,
-  ActionButtonComponent,
-  DIALOG_BOX_IMPORTS,
-} from '@app/shared';
+import { TextInputComponent, ActionButtonComponent, DIALOG_BOX_IMPORTS } from '@app/shared';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const MAX_PROFILE_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -42,13 +37,7 @@ const PROFILE_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/av
 @Component({
   selector: 'app-settings-page',
   standalone: true,
-  imports: [
-    HeaderBarComponent,
-    FormsModule,
-    TextInputComponent,
-    ActionButtonComponent,
-    ...DIALOG_BOX_IMPORTS,
-  ],
+  imports: [FormsModule, TextInputComponent, ActionButtonComponent, ...DIALOG_BOX_IMPORTS],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
 })

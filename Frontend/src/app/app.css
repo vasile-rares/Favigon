@@ -2,3 +2,27 @@
   display: block;
   min-height: 100vh;
 }
+
+app-header-bar.global-header {
+  display: block;
+  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transition:
+    background 0.3s ease-in-out,
+    backdrop-filter 0.3s ease-in-out;
+}
+
+app-header-bar.global-header .header-bar {
+  width: 100%;
+  background: #0d0d0e80;
+  -webkit-backdrop-filter: blur(50px);
+  backdrop-filter: blur(50px);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  margin: 0;
+  transition: background 0.3s ease-in-out;
+}
