@@ -16,6 +16,7 @@ public class FavigonDbContext : Microsoft.EntityFrameworkCore.DbContext
     public DbSet<Project> Projects { get; set; }
     public DbSet<UserFollow> UserFollows { get; set; }
     public DbSet<ProjectBookmark> ProjectBookmarks { get; set; }
+    public DbSet<ProjectLike> ProjectLikes { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -153,6 +154,22 @@ public class FavigonDbContext : Microsoft.EntityFrameworkCore.DbContext
             .HasOne(b => b.Project)
             .WithMany(p => p.Bookmarks)
             .HasForeignKey(b => b.ProjectId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProjectLike>()
+            .ToTable("project_likes")
+            .HasKey(l => new { l.UserId, l.ProjectId });
+
+        modelBuilder.Entity<ProjectLike>()
+            .HasOne(l => l.User)
+            .WithMany()
+            .HasForeignKey(l => l.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProjectLike>()
+            .HasOne(l => l.Project)
+            .WithMany(p => p.Likes)
+            .HasForeignKey(l => l.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
     }
 

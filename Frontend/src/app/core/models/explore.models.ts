@@ -3,8 +3,10 @@ export interface ExploreProjectItem {
   name: string;
   slug: string;
   thumbnailDataUrl: string | null;
+  likeCount: number;
   starCount: number;
   viewCount: number;
+  isLikedByCurrentUser: boolean;
   isStarredByCurrentUser: boolean;
   updatedAt: string;
   ownerUserId: number;

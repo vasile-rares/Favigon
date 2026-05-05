@@ -16,17 +16,20 @@ public class ProjectsController : ControllerBase
   private readonly IProjectService _projectService;
   private readonly IProjectAssetService _projectAssetService;
   private readonly IBookmarkService _bookmarkService;
+  private readonly ILikeService _likeService;
   private readonly IProjectRepository _projectRepository;
 
   public ProjectsController(
     IProjectService projectService,
     IProjectAssetService projectAssetService,
     IBookmarkService bookmarkService,
+    ILikeService likeService,
     IProjectRepository projectRepository)
   {
     _projectService = projectService;
     _projectAssetService = projectAssetService;
     _bookmarkService = bookmarkService;
+    _likeService = likeService;
     _projectRepository = projectRepository;
   }
 
@@ -330,6 +333,38 @@ public class ProjectsController : ControllerBase
   {
     await _projectRepository.IncrementViewCountAsync(id);
     return NoContent();
+  }
+
+  [HttpPost("{id:int}/like")]
+  public async Task<IActionResult> Like(int id)
+  {
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
+
+    try
+    {
+      await _likeService.LikeAsync(userId, id);
+      return Ok();
+    }
+    catch (InvalidOperationException ex)
+    {
+      return BadRequest(new { message = ex.Message });
+    }
+  }
+
+  [HttpDelete("{id:int}/like")]
+  public async Task<IActionResult> Unlike(int id)
+  {
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
+
+    try
+    {
+      await _likeService.UnlikeAsync(userId, id);
+      return NoContent();
+    }
+    catch (InvalidOperationException ex)
+    {
+      return BadRequest(new { message = ex.Message });
+    }
   }
 
 }

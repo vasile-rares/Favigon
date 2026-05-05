@@ -34,4 +34,6 @@ public class Project
     public int ViewCount { get; set; }
 
     public ICollection<ProjectBookmark> Bookmarks { get; set; } = new List<ProjectBookmark>();
+
+    public ICollection<ProjectLike> Likes { get; set; } = new List<ProjectLike>();
 }

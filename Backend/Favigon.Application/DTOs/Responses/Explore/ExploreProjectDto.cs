@@ -6,8 +6,10 @@ public class ExploreProjectDto
   public string Name { get; set; } = string.Empty;
   public string Slug { get; set; } = string.Empty;
   public string? ThumbnailDataUrl { get; set; }
+  public int LikeCount { get; set; }
   public int StarCount { get; set; }
   public int ViewCount { get; set; }
+  public bool IsLikedByCurrentUser { get; set; }
   public bool IsStarredByCurrentUser { get; set; }
   public DateTime UpdatedAt { get; set; }
   public int OwnerUserId { get; set; }

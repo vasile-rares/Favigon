@@ -20,6 +20,7 @@ public class ExploreRepository : IExploreRepository
       .Where(p => p.IsPublic)
       .Include(p => p.User)
       .Include(p => p.Bookmarks)
+      .Include(p => p.Likes)
       .OrderByDescending(p => p.Bookmarks.Count)
       .ThenByDescending(p => p.UpdatedAt)
       .Take(limit)
@@ -35,6 +36,7 @@ public class ExploreRepository : IExploreRepository
         .SelectMany(f => f.Followee.Projects.Where(p => p.IsPublic))
         .Include(p => p.User)
         .Include(p => p.Bookmarks)
+        .Include(p => p.Likes)
         .Where(p => p.UserId != viewerUserId)
         .OrderByDescending(p => p.UpdatedAt)
         .Take(limit)
@@ -49,6 +51,7 @@ public class ExploreRepository : IExploreRepository
       .Where(p => p.IsPublic && (viewerUserId == 0 || p.UserId != viewerUserId))
       .Include(p => p.User)
       .Include(p => p.Bookmarks)
+      .Include(p => p.Likes)
       .OrderByDescending(p => p.UpdatedAt)
       .Take(limit)
       .ToListAsync();

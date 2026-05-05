@@ -32,23 +32,40 @@ public class ProjectService : IProjectService
   private readonly IMapper _mapper;
   private readonly IConverterEngine _converterEngine;
   private readonly IProjectAssetStorage _projectAssetStorage;
+  private readonly IBookmarkRepository _bookmarkRepository;
+  private readonly ILikeRepository _likeRepository;
 
   public ProjectService(
     IProjectRepository projectRepository,
     IMapper mapper,
     IConverterEngine converterEngine,
-    IProjectAssetStorage projectAssetStorage)
+    IProjectAssetStorage projectAssetStorage,
+    IBookmarkRepository bookmarkRepository,
+    ILikeRepository likeRepository)
   {
     _projectRepository = projectRepository;
     _mapper = mapper;
     _converterEngine = converterEngine;
     _projectAssetStorage = projectAssetStorage;
+    _bookmarkRepository = bookmarkRepository;
+    _likeRepository = likeRepository;
   }
 
   public async Task<IReadOnlyList<ProjectResponse>> GetByUserIdAsync(int userId, bool? isPublic = null)
   {
     var projects = await _projectRepository.GetByUserIdAsync(userId, isPublic);
-    return projects.Select(MapProjectResponse).ToList();
+    var projectIds = projects.Select(p => p.Id).ToList();
+
+    var starredIds = await _bookmarkRepository.GetStarredProjectIdsAsync(userId, projectIds);
+    var likedIds = await _likeRepository.GetLikedProjectIdsAsync(userId, projectIds);
+
+    return projects.Select(p =>
+    {
+      var r = MapProjectResponse(p);
+      r.IsStarredByCurrentUser = starredIds.Contains(p.Id);
+      r.IsLikedByCurrentUser = likedIds.Contains(p.Id);
+      return r;
+    }).ToList();
   }
 
   public async Task<ProjectResponse?> GetByIdAsync(int id, int userId)

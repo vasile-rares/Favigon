@@ -11,7 +11,10 @@ export interface ProjectCardViewModel {
   lastEdited: Date;
   thumbnailDataUrl?: string | null;
   starCount: number;
+  viewCount: number;
   isStarredByCurrentUser: boolean;
+  likeCount: number;
+  isLikedByCurrentUser: boolean;
 }
 
 @Component({

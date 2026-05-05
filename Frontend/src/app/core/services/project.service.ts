@@ -74,6 +74,14 @@ export class ProjectService {
     return this.http.delete<void>(`${this.baseUrl}/projects/${projectId}/star`);
   }
 
+  likeProject(projectId: number): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/projects/${projectId}/like`, {});
+  }
+
+  unlikeProject(projectId: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/projects/${projectId}/like`);
+  }
+
   getDesign(projectId: number): Observable<ProjectDesignResponse> {
     return this.http.get<ProjectDesignResponse>(`${this.baseUrl}/projects/${projectId}/design`);
   }

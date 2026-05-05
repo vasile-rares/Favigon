@@ -12,4 +12,7 @@ public class ProjectResponse
   public string? ThumbnailDataUrl { get; set; }
   public int StarCount { get; set; }
   public bool IsStarredByCurrentUser { get; set; }
+  public int LikeCount { get; set; }
+  public bool IsLikedByCurrentUser { get; set; }
+  public int ViewCount { get; set; }
 }

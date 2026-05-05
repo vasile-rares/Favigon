@@ -8,17 +8,20 @@ namespace Favigon.Application.Services;
 public class BookmarkService : IBookmarkService
 {
   private readonly IBookmarkRepository _bookmarkRepository;
+  private readonly ILikeRepository _likeRepository;
   private readonly IProjectRepository _projectRepository;
   private readonly IProjectAssetStorage _projectAssetStorage;
   private readonly IMapper _mapper;
 
   public BookmarkService(
     IBookmarkRepository bookmarkRepository,
+    ILikeRepository likeRepository,
     IProjectRepository projectRepository,
     IProjectAssetStorage projectAssetStorage,
     IMapper mapper)
   {
     _bookmarkRepository = bookmarkRepository;
+    _likeRepository = likeRepository;
     _projectRepository = projectRepository;
     _projectAssetStorage = projectAssetStorage;
     _mapper = mapper;
@@ -59,6 +62,8 @@ public class BookmarkService : IBookmarkService
   public async Task<IReadOnlyList<ProjectResponse>> GetMyBookmarksAsync(int userId)
   {
     var projects = await _bookmarkRepository.GetBookmarkedProjectsAsync(userId);
+    var projectIds = projects.Select(p => p.Id).ToList();
+    var likedIds = await _likeRepository.GetLikedProjectIdsAsync(userId, projectIds);
 
     var responses = new List<ProjectResponse>(projects.Count);
     foreach (var project in projects)
@@ -67,8 +72,8 @@ public class BookmarkService : IBookmarkService
       response.ThumbnailDataUrl =
         _projectAssetStorage.GetThumbnailUrl(project.UserId, project.Id) ??
         project.ThumbnailDataUrl;
-      response.StarCount = await _bookmarkRepository.GetCountForProjectAsync(project.Id);
       response.IsStarredByCurrentUser = true;
+      response.IsLikedByCurrentUser = likedIds.Contains(project.Id);
       responses.Add(response);
     }
 

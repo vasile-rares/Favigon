@@ -92,7 +92,10 @@ export class StarredProjectsPage implements OnInit {
       lastEdited: new Date(project.updatedAt),
       thumbnailDataUrl: project.thumbnailDataUrl ?? null,
       starCount: project.starCount ?? 0,
+      viewCount: project.viewCount ?? 0,
       isStarredByCurrentUser: project.isStarredByCurrentUser ?? true,
+      likeCount: project.likeCount ?? 0,
+      isLikedByCurrentUser: project.isLikedByCurrentUser ?? false,
     };
   }
 }

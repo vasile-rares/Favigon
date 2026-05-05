@@ -1,360 +1,455 @@
-<div class="profile-layout">
-  <div class="profile-main-shell">
-    <div class="profile-page-wrapper" [class.profile-page-wrapper--blurred]="isAnyDialogOpen()">
-      @if (isLoading() && !profile()) {
-        <div class="profile-state profile-state--loading">
-          <p>Loading profile...</p>
-        </div>
-      } @else if (errorMessage() && !profile()) {
-        <div class="profile-state profile-state--error">
-          <p>{{ errorMessage() }}</p>
-        </div>
-      } @else if (profile(); as profileData) {
-        <div class="profile-content">
-          <div class="profile-shell">
-            <aside class="profile-side-rail">
-              <div class="profile-side-rail__avatar-shell">
-                <img
-                  class="profile-side-rail__avatar"
-                  [src]="avatarUrl"
-                  [alt]="profileData.displayName + ' avatar'" />
-              </div>
+﻿<div class="prf-wrap" [class.prf-wrap--blurred]="isAnyDialogOpen()">
 
-              <div class="profile-side-rail__heading">
-                <h1 class="profile-side-rail__display-name">{{ profileData.displayName }}</h1>
-                <p class="profile-side-rail__username">&#64;{{ profileData.username }}</p>
-              </div>
+  @if (isLoading() && !profile()) {
+    <div class="prf-state">
+      <div class="prf-dots"><span></span><span></span><span></span></div>
+    </div>
+  } @else if (errorMessage() && !profile()) {
+    <div class="prf-state prf-state--err">
+      <p>{{ errorMessage() }}</p>
+    </div>
+  } @else if (profile(); as p) {
 
-              @if (profileBio()) {
-                <p class="profile-side-rail__bio">{{ profileBio() }}</p>
+    <!-- ===== HERO COVER ===== -->
+    <header class="prf-cover">
+      <div class="prf-cover-glow"></div>
+
+      <img class="prf-ava" [src]="avatarUrl" [alt]="p.displayName" />
+
+      <div class="prf-identity">
+        <h1 class="prf-name">{{ p.displayName }}</h1>
+        <p class="prf-handle">&#64;{{ p.username }}<span class="prf-joined-sep">·</span><span class="prf-joined">Joined {{ p.createdAt | date:'MMMM y' }}</span></p>
+      </div>
+
+      <div class="prf-stats-row">
+        <button class="prf-stat" type="button" (click)="openFollowList.set('followers')">
+          <span class="prf-stat-num">{{ followerCount() }}</span>
+          <span class="prf-stat-label">{{ followerCount() === 1 ? 'Follower' : 'Followers' }}</span>
+        </button>
+        <button class="prf-stat" type="button" (click)="openFollowList.set('following')">
+          <span class="prf-stat-num">{{ followingCount() }}</span>
+          <span class="prf-stat-label">Following</span>
+        </button>
+        <div class="prf-stat prf-stat--plain">
+          <span class="prf-stat-num">{{ projectCount() }}</span>
+          <span class="prf-stat-label">Projects</span>
+        </div>
+      </div>
+
+      @if (profileBio()) {
+        <p class="prf-bio">{{ profileBio() }}</p>
+      }
+
+      <div class="prf-cover-foot">
+        @if (isOwnProfile()) {
+          <button class="prf-action-btn" type="button" (click)="goToSettings()">Edit profile</button>
+        } @else {
+          <button
+            class="prf-action-btn"
+            [class.prf-action-btn--on]="isFollowing()"
+            type="button"
+            [disabled]="isTogglingFollow()"
+            (click)="toggleFollow()">
+            {{ isFollowing() ? 'Following' : 'Follow' }}
+          </button>
+        }
+      </div>
+    </header>
+
+    <!-- ===== PROJECTS SECTION ===== -->
+    <section class="prf-section">
+      <div class="prf-section-inner">
+
+        <!-- Toolbar -->
+        <div class="prf-toolbar">
+          <div class="prf-toolbar-head">
+            <h2 class="prf-section-title">Projects</h2>
+            <span class="prf-count-tag">{{ projectResultsLabel() }}</span>
+          </div>
+          <div class="prf-toolbar-controls">
+            <label class="prf-search">
+              <svg class="prf-search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                class="prf-search-input"
+                type="search"
+                placeholder="Search projects"
+                [value]="projectSearchQuery()"
+                (input)="updateProjectSearchQuery($event)" />
+              @if (projectSearchQuery()) {
+                <button class="prf-search-clr" type="button" (click)="clearProjectSearch()">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
               }
+            </label>
 
+            <div class="prf-pill-group">
+              <button class="prf-pill" [class.prf-pill--on]="projectTypeFilter() === 'all'" type="button" (click)="setProjectType('all')">All</button>
+              <button class="prf-pill" [class.prf-pill--on]="projectTypeFilter() === 'public'" type="button" (click)="setProjectType('public')">Public</button>
               @if (isOwnProfile()) {
-                <div class="profile-side-rail__action-row">
-                  <app-action-button variant="outline" [fullWidth]="false" (clicked)="goToSettings()">
-                    Edit profile
-                  </app-action-button>
-                </div>
-              } @else {
-                <div class="profile-side-rail__action-row">
-                  <app-action-button
-                    [variant]="isFollowing() ? 'outline' : 'primary'"
-                    [fullWidth]="false"
-                    [disabled]="isTogglingFollow()"
-                    (clicked)="toggleFollow()">
-                    {{ isFollowing() ? 'Unfollow' : 'Follow' }}
-                  </app-action-button>
-                </div>
+                <button class="prf-pill" [class.prf-pill--on]="projectTypeFilter() === 'private'" type="button" (click)="setProjectType('private')">Private</button>
               }
+            </div>
 
-              <dl class="profile-side-rail__details">
-                <div class="profile-detail-item">
-                  <dt>Joined</dt>
-                  <dd>{{ profileData.createdAt | date:'MMMM y' }}</dd>
-                </div>
+            <div class="prf-pill-group">
+              <button class="prf-pill" [class.prf-pill--on]="projectSortOption() === 'updated'" type="button" (click)="setProjectSort('updated')">Updated</button>
+              <button class="prf-pill" [class.prf-pill--on]="projectSortOption() === 'created'" type="button" (click)="setProjectSort('created')">Created</button>
+            </div>
 
-                <div class="profile-detail-item">
-                  <dt>Followers</dt>
-                  <dd>
-                    <button
-                      type="button"
-                      class="profile-detail-btn"
-                      (click)="openFollowList.set('followers')">
-                      {{ followerCount() }}
-                    </button>
-                  </dd>
-                </div>
+            @if (isOwnProfile()) {
+              <button class="prf-new-btn" type="button" (click)="openCreateProjectDialog()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                New Project
+              </button>
+            }
+          </div>
+        </div>
 
-                <div class="profile-detail-item">
-                  <dt>Following</dt>
-                  <dd>
-                    <button
-                      type="button"
-                      class="profile-detail-btn"
-                      (click)="openFollowList.set('following')">
-                      {{ followingCount() }}
-                    </button>
-                  </dd>
-                </div>
+        @if (errorMessage() && profile()) {
+          <div class="prf-err-banner">{{ errorMessage() }}</div>
+        }
 
-                <div class="profile-detail-item">
-                  <dt>Projects</dt>
-                  <dd>{{ projectCount() }}</dd>
-                </div>
+        @if (isLoading()) {
+          <div class="prf-section-state">
+            <div class="prf-dots"><span></span><span></span><span></span></div>
+          </div>
+        } @else if (projects().length === 0) {
+          <div class="prf-section-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.4">
+              <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+            @if (isOwnProfile()) {
+              <p>No projects yet.</p>
+              <button class="prf-action-btn" type="button" (click)="openCreateProjectDialog()">Create your first project</button>
+            } @else {
+              <p>No public projects yet.</p>
+            }
+          </div>
+        } @else if (filteredProjects().length === 0) {
+          <div class="prf-section-state">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1.4">
+              <circle cx="11" cy="11" r="7"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <p>No projects match your filters.</p>
+            @if (hasActiveProjectFilters()) {
+              <button class="prf-action-btn" type="button" (click)="resetProjectToolbar()">Clear filters</button>
+            }
+          </div>
+        } @else {
+          <div #projectsGrid class="prj-grid">
+            @for (project of pagedProjects(); track project.id) {
+              <article
+                class="prj-card"
+                [class.prj-card--busy]="isProjectBusy(project.id)"
+                (click)="navigateToProject(project)">
 
-                <div class="profile-detail-item">
-                  <dt>Public</dt>
-                  <dd>{{ publicProjectCount() }}</dd>
-                </div>
-
-                @if (isOwnProfile()) {
-                  <div class="profile-detail-item">
-                    <dt>Private</dt>
-                    <dd>{{ privateProjectCount() }}</dd>
-                  </div>
-                }
-              </dl>
-            </aside>
-
-            <div class="profile-main-column">
-              <section class="profile-projects-hub">
-                <div class="profile-projects-hub__header">
-                  <div class="profile-projects-hub__copy">
-                    <h2>Projects</h2>
-                    <span class="profile-status-pill">{{ projectResultsLabel() }}</span>
-                  </div>
-
-                  <div class="profile-projects-toolbar">
-                    <label class="profile-projects-search" aria-label="Search projects">
-                      <svg
-                        class="profile-projects-search__icon"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <div class="prj-card-visual">
+                  @if (project.thumbnailDataUrl) {
+                    <img class="prj-card-img" [src]="project.thumbnailDataUrl" [alt]="project.name" loading="lazy" />
+                  } @else {
+                    <div class="prj-card-blank">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1.4">
+                        <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                        <polyline points="21 15 16 10 5 21"></polyline>
                       </svg>
+                    </div>
+                  }
+                </div>
 
-                      <input
-                        type="search"
-                        placeholder="Search projects"
-                        [value]="projectSearchQuery()"
-                        (input)="updateProjectSearchQuery($event)" />
+                <div class="prj-card-body">
+                  <div class="prj-card-title-row">
+                    <p class="prj-card-name">{{ project.name }}</p>
+                    @if (!project.isPublic) {
+                      <span class="prj-private-pill">
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4">
+                          <rect x="3" y="11" width="18" height="11" rx="2"/>
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                        Private
+                      </span>
+                    }
+                  </div>
+                  <div class="prj-card-meta">
+                    <div class="prj-card-stats">
+                      <button
+                        class="prj-card-stat prj-card-stat--like"
+                        type="button"
+                        [class.prj-card-stat--liked]="project.isLikedByCurrentUser"
+                        title="{{ project.isLikedByCurrentUser ? 'Unlike' : 'Like' }}"
+                        (click)="toggleProjectLike(project); $event.stopPropagation()">
+                        <svg width="14" height="14" viewBox="0 0 24 24"
+                          [attr.fill]="project.isLikedByCurrentUser ? '#ff6b9d' : 'none'"
+                          [attr.stroke]="project.isLikedByCurrentUser ? '#ff6b9d' : '#fff'"
+                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                        </svg>
+                        {{ project.likeCount }}
+                      </button>
+                      <span class="prj-card-stat">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        {{ project.viewCount }}
+                      </span>
+                      <span class="prj-card-stat">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                        </svg>
+                        {{ project.starCount }}
+                      </span>
+                    </div>
 
-                      @if (projectSearchQuery()) {
+                    @if (isOwnProfile()) {
+                      <div class="prj-card-more" (click)="$event.stopPropagation()">
                         <button
+                          class="prj-card-more-btn"
                           type="button"
-                          class="profile-projects-search__clear"
-                          aria-label="Clear search"
-                          (click)="clearProjectSearch()">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                            <line x1="18" y1="6" x2="6" y2="18"></line>
-                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          title="More options"
+                          (click)="openCardMenu(project.id, $event)">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                            <circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/>
                           </svg>
                         </button>
-                      }
-                    </label>
-
-                    <app-dropdown-select
-                      class="profile-projects-toolbar__select"
-                      id="profile-project-type"
-                      placeholder="Type"
-                      [enableSearch]="false"
-                      [options]="projectTypeOptions()"
-                      [ngModelOptions]="{ standalone: true }"
-                      [ngModel]="projectTypeFilter()"
-                      (ngModelChange)="setProjectType($event)"></app-dropdown-select>
-
-                    <app-dropdown-select
-                      class="profile-projects-toolbar__select profile-projects-toolbar__select--sort"
-                      id="profile-project-sort"
-                      placeholder="Sort"
-                      [enableSearch]="false"
-                      [options]="projectSortOptions"
-                      [ngModelOptions]="{ standalone: true }"
-                      [ngModel]="projectSortOption()"
-                      (ngModelChange)="setProjectSort($event)"></app-dropdown-select>
-
-                    @if (isOwnProfile()) {
-                      <app-action-button
-                        class="profile-projects-toolbar__new-button"
-                        variant="primary"
-                        [fullWidth]="false"
-                        (clicked)="openCreateProjectDialog()">
-                        <svg class="action-button__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <line x1="12" y1="5" x2="12" y2="19"></line>
-                          <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        New Project
-                      </app-action-button>
+                        @if (openMenuProjectId() === project.id || closingMenuProjectId() === project.id) {
+                          <div class="prj-card-menu">
+                            <button class="prj-card-menu-item" type="button" (click)="openRenameProjectDialog(project); closeCardMenu()">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                              </svg>
+                              Rename
+                            </button>
+                            <button class="prj-card-menu-item" type="button" (click)="toggleProjectVisibility(project); closeCardMenu()">
+                              @if (project.isPublic) {
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                  <line x1="1" y1="1" x2="23" y2="23"/>
+                                </svg>
+                                Make private
+                              } @else {
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                  <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                Make public
+                              }
+                            </button>
+                            <div class="prj-card-menu-sep"></div>
+                            <button class="prj-card-menu-item prj-card-menu-item--del" type="button" (click)="openDeleteProjectDialog(project); closeCardMenu()">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"/>
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                                <path d="M10 11v6"/><path d="M14 11v6"/>
+                                <path d="M9 6V4h6v2"/>
+                              </svg>
+                              Delete
+                            </button>
+                          </div>
+                        }
+                      </div>
                     }
                   </div>
                 </div>
 
-                @if (errorMessage() && profile()) {
-                  <div class="profile-inline-banner profile-inline-banner--error">
-                    {{ errorMessage() }}
-                  </div>
-                }
+              </article>
+            }
+          </div>
 
-                @if (isLoading()) {
-                  <div class="profile-section-state">
-                    <p>Loading projects...</p>
-                  </div>
-                } @else if (projects().length === 0) {
-                  <div class="profile-section-state profile-section-state--empty">
-                    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                      <polyline points="21 15 16 10 5 21"></polyline>
-                    </svg>
-                    @if (isOwnProfile()) {
-                      <p>No projects yet. Start a new one and it will appear here immediately.</p>
-                      <app-action-button variant="primary" [fullWidth]="false" (clicked)="openCreateProjectDialog()">
-                        Create your first project
-                      </app-action-button>
-                    } @else {
-                      <p>No public projects are available yet.</p>
-                    }
-                  </div>
-                } @else if (filteredProjects().length === 0) {
-                  <div class="profile-section-state profile-section-state--empty">
-                    <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                      <circle cx="11" cy="11" r="7"></circle>
-                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                    </svg>
-                    <p>No projects match your current search or filters.</p>
-                    @if (hasActiveProjectFilters()) {
-                      <app-action-button variant="outline" [fullWidth]="false" (clicked)="resetProjectToolbar()">
-                        Clear filters
-                      </app-action-button>
-                    }
-                  </div>
+          @if (totalPages() > 1) {
+            <nav class="prj-pagination" aria-label="Projects pagination">
+              <button
+                class="prj-pg-btn prj-pg-arrow"
+                type="button"
+                [disabled]="currentPage() === 1"
+                (click)="goToPage(currentPage() - 1)"
+                aria-label="Previous page">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="15 18 9 12 15 6"/>
+                </svg>
+              </button>
+
+              @for (item of visiblePageItems(); track $index) {
+                @if (item === '...') {
+                  <span class="prj-pg-ellipsis">…</span>
                 } @else {
-                  <div #projectsGrid class="projects-grid">
-                    @for (project of filteredProjects(); track project.id) {
-                      <app-project-card
-                        [project]="project"
-                        [isBusy]="isProjectBusy(project.id)"
-                        [isOwner]="isOwnProfile()"
-                        [openMode]="isOwnProfile() ? 'editor' : 'preview'"
-                        (renameRequested)="openRenameProjectDialog($event)"
-                        (deleteRequested)="openDeleteProjectDialog($event)"
-                        (visibilityToggleRequested)="toggleProjectVisibility($event)"
-                        (starToggleRequested)="toggleProjectStar($event)"></app-project-card>
-                    }
-                  </div>
+                  <button
+                    class="prj-pg-btn"
+                    [class.prj-pg-btn--active]="item === currentPage()"
+                    type="button"
+                    [attr.aria-current]="item === currentPage() ? 'page' : null"
+                    (click)="goToPage(item)">
+                    {{ item }}
+                  </button>
                 }
-              </section>
-            </div>
-          </div>
-        </div>
-      }
-    </div>
+              }
 
-    @if (isCreateDialogOpen()) {
-      <app-dialog-box
-        #createDialog
-        title="Create project"
-        description="Give the project a name and set its starting visibility. You can change both later from the project card options."
-        [isBusy]="isCreatingProject()"
-        (closed)="closeCreateProjectDialog()">
-        <form
-          class="project-dialog-form"
-          [id]="createProjectFormId"
-          [formGroup]="createProjectForm"
-          (ngSubmit)="submitCreateProject()">
-          <app-text-input
-            id="project-name"
-            label="Name"
-            placeholder="Project name"
-            formControlName="name"
-            [requiredMarker]="true"
-            [maxLength]="120"
-            [errorText]="'Name is required.'"></app-text-input>
+              <button
+                class="prj-pg-btn prj-pg-arrow"
+                type="button"
+                [disabled]="currentPage() === totalPages()"
+                (click)="goToPage(currentPage() + 1)"
+                aria-label="Next page">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+              </button>
+            </nav>
+          }
+        }
 
-          <app-dropdown-select
-            id="project-visibility"
-            label="Visibility"
-            placeholder="Select visibility"
-            [enableSearch]="false"
-            [options]="visibilityOptions"
-            formControlName="isPublic"></app-dropdown-select>
-        </form>
+      </div>
+    </section>
 
-        <ng-template #dialogFooter>
-          <div class="project-dialog-footer">
-            <app-action-button
-              type="button"
-              variant="outline"
-              [fullWidth]="false"
-              [disabled]="isCreatingProject() || createDialog.isClosing"
-              (clicked)="createDialog.requestClose()">
-              Cancel
-            </app-action-button>
-            <app-action-button
-              type="submit"
-              variant="primary"
-              [form]="createProjectFormId"
-              [fullWidth]="false"
-              [disabled]="isCreatingProject() || createDialog.isClosing || createProjectForm.invalid">
-              {{ isCreatingProject() ? 'Creating...' : 'Create project' }}
-            </app-action-button>
-          </div>
-        </ng-template>
-      </app-dialog-box>
-    }
-
-    @if (isRenameDialogOpen()) {
-      <app-dialog-box
-        #renameDialog
-        title="Rename project"
-        description="Update the project name shown throughout your workspace and on your profile."
-        [isBusy]="isRenamingProject()"
-        [footerTemplate]="renameDialogFooter"
-        (closed)="closeRenameProjectDialog()">
-        <form
-          class="project-dialog-form"
-          [id]="renameProjectFormId"
-          [formGroup]="renameProjectForm"
-          (ngSubmit)="submitRenameProject()">
-          <app-text-input
-            id="rename-project-name"
-            label="Project name"
-            placeholder="Project name"
-            formControlName="name"
-            [requiredMarker]="true"
-            [maxLength]="120"
-            [errorText]="renameProjectNameError"
-            [forceInvalid]="!!renameProjectError()"></app-text-input>
-        </form>
-      </app-dialog-box>
-      <ng-template #renameDialogFooter>
-        <div class="project-dialog-footer">
-          <app-action-button
-            type="button"
-            variant="outline"
-            [fullWidth]="false"
-            [disabled]="isRenamingProject() || renameDialog.isClosing"
-            (clicked)="renameDialog.requestClose()">
-            Cancel
-          </app-action-button>
-          <app-action-button
-            type="submit"
-            variant="primary"
-            [form]="renameProjectFormId"
-            [fullWidth]="false"
-            [disabled]="isRenamingProject() || renameDialog.isClosing || renameProjectForm.invalid">
-            {{ isRenamingProject() ? 'Saving...' : 'Save name' }}
-          </app-action-button>
-        </div>
-      </ng-template>
-    }
-
-    @if (isDeleteDialogOpen()) {
-      <app-dialog-box
-        [title]="'Delete ' + (activeDeleteProject()?.name || 'project')"
-        description="This permanently removes the project from your workspace. This action cannot be undone."
-        [isBusy]="isDeleteDialogSubmitting()"
-        [primaryAction]="{ label: isDeleteDialogSubmitting() ? 'Deleting...' : 'Delete project', variant: 'danger' }"
-        [secondaryAction]="{ label: 'Cancel' }"
-        (closed)="closeDeleteProjectDialog()"
-        (primaryClicked)="confirmDeleteProject()"
-        (secondaryClicked)="closeDeleteProjectDialog()">
-      </app-dialog-box>
-    }
-
-    @if (openFollowList() !== null && profile() !== null) {
-      <app-follow-list-modal
-        [username]="profile()!.username"
-        [listType]="openFollowList()!"
-        (closed)="openFollowList.set(null)">
-      </app-follow-list-modal>
-    }
-  </div>
+  }
 </div>
+
+<!-- ===== DIALOGS ===== -->
+
+@if (isCreateDialogOpen()) {
+  <app-dialog-box
+    #createDialog
+    title="Create project"
+    description="Give the project a name and set its starting visibility. You can change both later."
+    [isBusy]="isCreatingProject()"
+    (closed)="closeCreateProjectDialog()">
+    <form
+      class="dlg-form"
+      [id]="createProjectFormId"
+      [formGroup]="createProjectForm"
+      (ngSubmit)="submitCreateProject()">
+      <div class="dlg-field">
+        <label class="dlg-label" for="cp-name">Name <span class="dlg-req">*</span></label>
+        <input
+          class="dlg-input"
+          id="cp-name"
+          type="text"
+          formControlName="name"
+          placeholder="Project name"
+          maxlength="120"
+          autocomplete="off" />
+        @if (createProjectForm.get('name')?.invalid && createProjectForm.get('name')?.touched) {
+          <span class="dlg-err-msg">Name is required.</span>
+        }
+      </div>
+      <div class="dlg-field">
+        <span class="dlg-label">Visibility</span>
+        <div class="dlg-vis-group">
+          <label class="dlg-vis-opt" [class.dlg-vis-opt--on]="createProjectForm.get('isPublic')?.value === false">
+            <input class="dlg-vis-radio" type="radio" formControlName="isPublic" [value]="false" />
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Private
+          </label>
+          <label class="dlg-vis-opt" [class.dlg-vis-opt--on]="createProjectForm.get('isPublic')?.value === true">
+            <input class="dlg-vis-radio" type="radio" formControlName="isPublic" [value]="true" />
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            Public
+          </label>
+        </div>
+      </div>
+    </form>
+    <ng-template #dialogFooter>
+      <div class="dlg-footer">
+        <button
+          class="dlg-btn dlg-btn--ghost"
+          type="button"
+          [disabled]="isCreatingProject() || createDialog.isClosing"
+          (click)="createDialog.requestClose()">Cancel</button>
+        <button
+          class="dlg-btn dlg-btn--primary"
+          type="submit"
+            [attr.form]="createProjectFormId"
+          [disabled]="isCreatingProject() || createDialog.isClosing || createProjectForm.invalid">
+          {{ isCreatingProject() ? 'Creating...' : 'Create project' }}
+        </button>
+      </div>
+    </ng-template>
+  </app-dialog-box>
+}
+
+@if (isRenameDialogOpen()) {
+  <app-dialog-box
+    #renameDialog
+    title="Rename project"
+    description="Update the project name shown on your profile and workspace."
+    [isBusy]="isRenamingProject()"
+    [footerTemplate]="renameDialogFooter"
+    (closed)="closeRenameProjectDialog()">
+    <form
+      class="dlg-form"
+      [id]="renameProjectFormId"
+      [formGroup]="renameProjectForm"
+      (ngSubmit)="submitRenameProject()">
+      <div class="dlg-field">
+        <label class="dlg-label" for="rp-name">Project name <span class="dlg-req">*</span></label>
+        <input
+          class="dlg-input"
+          [class.dlg-input--err]="!!renameProjectError() || (renameProjectForm.get('name')?.invalid && renameProjectForm.get('name')?.touched)"
+          id="rp-name"
+          type="text"
+          formControlName="name"
+          placeholder="Project name"
+          maxlength="120"
+          autocomplete="off" />
+        @if (renameProjectError() || (renameProjectForm.get('name')?.invalid && renameProjectForm.get('name')?.touched)) {
+          <span class="dlg-err-msg">{{ renameProjectNameError }}</span>
+        }
+      </div>
+    </form>
+  </app-dialog-box>
+  <ng-template #renameDialogFooter>
+    <div class="dlg-footer">
+      <button
+        class="dlg-btn dlg-btn--ghost"
+        type="button"
+        [disabled]="isRenamingProject() || renameDialog.isClosing"
+        (click)="renameDialog.requestClose()">Cancel</button>
+      <button
+        class="dlg-btn dlg-btn--primary"
+        type="submit"
+        [attr.form]="renameProjectFormId"
+        [disabled]="isRenamingProject() || renameDialog.isClosing || renameProjectForm.invalid">
+        {{ isRenamingProject() ? 'Saving...' : 'Save name' }}
+      </button>
+    </div>
+  </ng-template>
+}
+
+@if (isDeleteDialogOpen()) {
+  <app-dialog-box
+    [title]="'Delete ' + (activeDeleteProject()?.name || 'project')"
+    description="This permanently removes the project from your workspace. This action cannot be undone."
+    [isBusy]="isDeleteDialogSubmitting()"
+    [primaryAction]="{ label: isDeleteDialogSubmitting() ? 'Deleting...' : 'Delete project', variant: 'danger' }"
+    [secondaryAction]="{ label: 'Cancel' }"
+    (closed)="closeDeleteProjectDialog()"
+    (primaryClicked)="confirmDeleteProject()"
+    (secondaryClicked)="closeDeleteProjectDialog()">
+  </app-dialog-box>
+}
+
+@if (openFollowList() !== null && profile() !== null) {
+  <app-follow-list-modal
+    [username]="profile()!.username"
+    [listType]="openFollowList()!"
+    (closed)="openFollowList.set(null)">
+  </app-follow-list-modal>
+}

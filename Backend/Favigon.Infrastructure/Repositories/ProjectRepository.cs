@@ -19,6 +19,8 @@ public class ProjectRepository : IProjectRepository
     return await _context.Projects
         .AsNoTracking()
         .Where(p => p.UserId == userId && (isPublic == null || p.IsPublic == isPublic))
+        .Include(p => p.Bookmarks)
+        .Include(p => p.Likes)
         .ToListAsync();
   }
 

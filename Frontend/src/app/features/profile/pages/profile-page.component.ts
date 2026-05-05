@@ -3,7 +3,11 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  HostListener,
+  Injector,
+  NgZone,
   OnInit,
+  afterNextRender,
   computed,
   effect,
   inject,
@@ -11,7 +15,10 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import gsap from 'gsap';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+
+gsap.registerPlugin(ScrollTrigger);
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -23,18 +30,10 @@ import {
   FALLBACK_AVATAR_URL,
 } from '@app/core';
 import type { UserProfile } from '@app/core';
-import {
-  ActionButtonComponent,
-  DIALOG_BOX_IMPORTS,
-  DropdownSelectComponent,
-  TextInputComponent,
-} from '@app/shared';
+import { DIALOG_BOX_IMPORTS } from '@app/shared';
 import type { DropdownSelectOption } from '@app/shared';
 import { EMPTY, forkJoin, switchMap } from 'rxjs';
-import {
-  ProjectCardComponent,
-  ProjectCardViewModel,
-} from '../components/project-card/project-card.component';
+import type { ProjectCardViewModel } from '../components/project-card/project-card.component';
 import {
   FollowListModalComponent,
   FollowListType,
@@ -51,10 +50,6 @@ type ProjectSortOption = 'updated' | 'created';
     FormsModule,
     ReactiveFormsModule,
     ...DIALOG_BOX_IMPORTS,
-    ActionButtonComponent,
-    TextInputComponent,
-    DropdownSelectComponent,
-    ProjectCardComponent,
     FollowListModalComponent,
   ],
   templateUrl: './profile-page.component.html',
@@ -68,26 +63,21 @@ export class ProfilePage implements OnInit {
   private readonly currentUser = inject(CurrentUserService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
+  private readonly zone = inject(NgZone);
+  private readonly el = inject(ElementRef);
 
   private readonly projectsGridRef = viewChild<ElementRef<HTMLElement>>('projectsGrid');
   private projectsAnimated = false;
   private readonly _animateCards = effect(() => {
     if (this.projects().length > 0 && !this.projectsAnimated) {
       this.projectsAnimated = true;
-      requestAnimationFrame(() => {
-        const grid = this.projectsGridRef()?.nativeElement;
-        if (!grid) return;
-        const cards = Array.from(grid.querySelectorAll<HTMLElement>('app-project-card'));
-        if (cards.length > 0) {
-          gsap.from(cards, {
-            y: 20,
-            opacity: 0,
-            duration: 0.45,
-            stagger: 0.07,
-            ease: 'power3.out',
-          });
-        }
-      });
+      afterNextRender(
+        () => {
+          this.animateProjectCards();
+        },
+        { injector: this.injector },
+      );
     }
   });
 
@@ -102,8 +92,20 @@ export class ProfilePage implements OnInit {
   readonly projectSearchQuery = signal('');
   readonly projectTypeFilter = signal<ProjectTypeFilter>('all');
   readonly projectSortOption = signal<ProjectSortOption>('updated');
+  readonly currentPage = signal(1);
   readonly isLoading = signal(true);
   readonly errorMessage = signal<string | null>(null);
+
+  readonly pageSize = signal(this.getPageSize());
+
+  @HostListener('window:resize')
+  onResize(): void {
+    this.pageSize.set(this.getPageSize());
+  }
+
+  private getPageSize(): number {
+    return window.innerWidth <= 600 ? 3 : 8;
+  }
 
   readonly isCreateDialogOpen = signal(false);
   readonly isCreatingProject = signal(false);
@@ -117,6 +119,9 @@ export class ProfilePage implements OnInit {
   readonly activeDeleteProject = signal<ProjectCardViewModel | null>(null);
   readonly isDeleteDialogOpen = signal(false);
   readonly isDeleteDialogSubmitting = signal(false);
+
+  readonly openMenuProjectId = signal<number | null>(null);
+  readonly closingMenuProjectId = signal<number | null>(null);
 
   readonly createProjectFormId = 'profile-create-project-form';
   readonly renameProjectFormId = 'profile-rename-project-form';
@@ -190,17 +195,33 @@ export class ProfilePage implements OnInit {
   readonly projectResultsLabel = computed(() => {
     const visibleCount = this.visibleProjectCount();
     const totalCount = this.projectCount();
-
-    if (visibleCount === totalCount) {
-      return this.formatProjectCount(totalCount);
-    }
-
-    return `${visibleCount} of ${totalCount} projects`;
+    return visibleCount === totalCount ? `${totalCount}` : `${visibleCount}/${totalCount}`;
   });
   readonly isAnyDialogOpen = computed(
     () => this.isCreateDialogOpen() || this.isRenameDialogOpen() || this.isDeleteDialogOpen(),
   );
   readonly profileBio = computed(() => this.profile()?.bio?.trim() ?? '');
+
+  readonly totalPages = computed(() =>
+    Math.max(1, Math.ceil(this.filteredProjects().length / this.pageSize())),
+  );
+  readonly pagedProjects = computed(() => {
+    const page = Math.min(this.currentPage(), this.totalPages());
+    const start = (page - 1) * this.pageSize();
+    return this.filteredProjects().slice(start, start + this.pageSize());
+  });
+  readonly visiblePageItems = computed<Array<number | '...'>>((): Array<number | '...'> => {
+    const total = this.totalPages();
+    const current = this.currentPage();
+    if (total <= 3) return Array.from({ length: total }, (_, i) => i + 1);
+    const start = Math.max(1, Math.min(current - 1, total - 2));
+    const end = Math.min(total, start + 2);
+    const items: Array<number | '...'> = [];
+    if (start > 1) items.push('...');
+    for (let i = start; i <= end; i++) items.push(i);
+    if (end < total) items.push('...');
+    return items;
+  });
 
   get fallbackAvatarUrl(): string {
     return FALLBACK_AVATAR_URL;
@@ -215,6 +236,10 @@ export class ProfilePage implements OnInit {
   }
 
   ngOnInit(): void {
+    this.destroyRef.onDestroy(() => {
+      ScrollTrigger.getAll().forEach((t) => t.kill());
+    });
+
     this.route.paramMap
       .pipe(
         switchMap((params) => {
@@ -242,6 +267,13 @@ export class ProfilePage implements OnInit {
           this.followerCount.set(profileUser.followerCount ?? 0);
           this.followingCount.set(profileUser.followingCount ?? 0);
           this.loadProjects(profileUser, ownProfile);
+          afterNextRender(
+            () => {
+              this.animateHero();
+              this.initScrollAnimations();
+            },
+            { injector: this.injector },
+          );
         },
         error: () => {
           this.errorMessage.set('Profile not found.');
@@ -256,10 +288,12 @@ export class ProfilePage implements OnInit {
 
   updateProjectSearchQuery(event: Event): void {
     this.projectSearchQuery.set((event.target as HTMLInputElement).value);
+    this.currentPage.set(1);
   }
 
   clearProjectSearch(): void {
     this.projectSearchQuery.set('');
+    this.currentPage.set(1);
   }
 
   setProjectType(value: DropdownSelectOption['value'] | null): void {
@@ -268,6 +302,7 @@ export class ProfilePage implements OnInit {
     }
 
     this.projectTypeFilter.set(value);
+    this.currentPage.set(1);
   }
 
   setProjectSort(value: DropdownSelectOption['value'] | null): void {
@@ -276,16 +311,59 @@ export class ProfilePage implements OnInit {
     }
 
     this.projectSortOption.set(value);
+    this.currentPage.set(1);
   }
 
   resetProjectToolbar(): void {
     this.projectSearchQuery.set('');
     this.projectTypeFilter.set('all');
     this.projectSortOption.set('updated');
+    this.currentPage.set(1);
+  }
+
+  goToPage(page: number): void {
+    const clamped = Math.max(1, Math.min(page, this.totalPages()));
+    this.currentPage.set(clamped);
+  }
+
+  openCardMenu(projectId: number, event: MouseEvent): void {
+    event.stopPropagation();
+    const current = this.openMenuProjectId();
+    if (current === projectId) {
+      this.animateMenuClose();
+      return;
+    }
+    if (current !== null) {
+      this.openMenuProjectId.set(null);
+      this.closingMenuProjectId.set(null);
+    }
+    this.openMenuProjectId.set(projectId);
+    afterNextRender(() => this.animateMenuOpen(), { injector: this.injector });
+  }
+
+  closeCardMenu(): void {
+    if (this.openMenuProjectId() !== null) {
+      this.animateMenuClose();
+    }
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    if (this.openMenuProjectId() !== null) {
+      this.animateMenuClose();
+    }
   }
 
   isProjectBusy(projectId: number): boolean {
     return this.busyProjectIds().includes(projectId);
+  }
+
+  navigateToProject(project: ProjectCardViewModel): void {
+    if (this.isProjectBusy(project.id)) return;
+    const commands = this.isOwnProfile()
+      ? ['/project', project.slug]
+      : ['/project', project.slug, 'preview'];
+    void this.router.navigate(commands);
   }
 
   goToSettings(): void {
@@ -347,6 +425,44 @@ export class ProfilePage implements OnInit {
                   ...p,
                   isStarredByCurrentUser: wasStarred,
                   starCount: wasStarred ? p.starCount + 1 : p.starCount - 1,
+                }
+              : p,
+          ),
+        );
+      },
+    });
+  }
+
+  toggleProjectLike(project: ProjectCardViewModel): void {
+    const wasLiked = project.isLikedByCurrentUser;
+
+    // Optimistic update
+    this.projects.update((list) =>
+      list.map((p) =>
+        p.id === project.id
+          ? {
+              ...p,
+              isLikedByCurrentUser: !wasLiked,
+              likeCount: wasLiked ? p.likeCount - 1 : p.likeCount + 1,
+            }
+          : p,
+      ),
+    );
+
+    const request$ = wasLiked
+      ? this.projectService.unlikeProject(project.id)
+      : this.projectService.likeProject(project.id);
+
+    request$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      error: () => {
+        // Rollback on error
+        this.projects.update((list) =>
+          list.map((p) =>
+            p.id === project.id
+              ? {
+                  ...p,
+                  isLikedByCurrentUser: wasLiked,
+                  likeCount: wasLiked ? p.likeCount + 1 : p.likeCount - 1,
                 }
               : p,
           ),
@@ -565,7 +681,10 @@ export class ProfilePage implements OnInit {
       lastEdited: new Date(project.updatedAt),
       thumbnailDataUrl: project.thumbnailDataUrl ?? null,
       starCount: project.starCount ?? 0,
+      viewCount: project.viewCount ?? 0,
       isStarredByCurrentUser: project.isStarredByCurrentUser ?? false,
+      likeCount: project.likeCount ?? 0,
+      isLikedByCurrentUser: project.isLikedByCurrentUser ?? false,
     };
   }
 
@@ -645,5 +764,156 @@ export class ProfilePage implements OnInit {
     this.activeDeleteProject.set(null);
     this.isDeleteDialogOpen.set(false);
     this.isDeleteDialogSubmitting.set(false);
+    this.openMenuProjectId.set(null);
+    this.closingMenuProjectId.set(null);
+    this.projectsAnimated = false;
+    ScrollTrigger.getAll().forEach((t) => t.kill());
+  }
+
+  private animateMenuOpen(): void {
+    const host = this.el.nativeElement as HTMLElement;
+    const menu = host.querySelector<HTMLElement>('.prj-card-menu');
+    if (!menu) return;
+    this.zone.runOutsideAngular(() => {
+      gsap.fromTo(
+        menu,
+        { opacity: 0, scale: 0.88, y: 8, transformOrigin: 'bottom right' },
+        { opacity: 1, scale: 1, y: 0, duration: 0.22, ease: 'back.out(1.7)' },
+      );
+    });
+  }
+
+  private animateMenuClose(): void {
+    const id = this.openMenuProjectId();
+    if (id === null || this.closingMenuProjectId() !== null) return;
+    const host = this.el.nativeElement as HTMLElement;
+    const menu = host.querySelector<HTMLElement>('.prj-card-menu');
+    this.closingMenuProjectId.set(id);
+    this.openMenuProjectId.set(null);
+    if (!menu) {
+      this.closingMenuProjectId.set(null);
+      return;
+    }
+    this.zone.runOutsideAngular(() => {
+      gsap.to(menu, {
+        opacity: 0,
+        scale: 0.88,
+        y: 8,
+        duration: 0.15,
+        ease: 'power2.in',
+        transformOrigin: 'bottom right',
+        onComplete: () => {
+          this.zone.run(() => this.closingMenuProjectId.set(null));
+        },
+      });
+    });
+  }
+
+  private animateHero(): void {
+    this.zone.runOutsideAngular(() => {
+      const host = this.el.nativeElement as HTMLElement;
+      const ava = host.querySelector<HTMLElement>('.prf-ava');
+      const name = host.querySelector<HTMLElement>('.prf-name');
+      const handle = host.querySelector<HTMLElement>('.prf-handle');
+      const stats = host.querySelectorAll<HTMLElement>('.prf-stat');
+      const foot = host.querySelector<HTMLElement>('.prf-cover-foot');
+      const bio = host.querySelector<HTMLElement>('.prf-bio');
+
+      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+      if (ava) {
+        gsap.set(ava, { opacity: 0, scale: 0.82, filter: 'blur(12px)' });
+        tl.to(ava, { opacity: 1, scale: 1, filter: 'blur(0px)', duration: 0.8 }, 0);
+      }
+
+      if (name) {
+        gsap.set(name, { opacity: 0, y: 18, filter: 'blur(8px)' });
+        tl.to(name, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.7 }, 0.18);
+      }
+
+      if (handle) {
+        gsap.set(handle, { opacity: 0, y: 12, filter: 'blur(6px)' });
+        tl.to(handle, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.6 }, 0.28);
+      }
+
+      if (stats.length) {
+        gsap.set(stats, { opacity: 0, y: 10 });
+        tl.to(stats, { opacity: 1, y: 0, duration: 0.55, stagger: 0.07 }, 0.38);
+      }
+
+      if (foot) {
+        gsap.set(foot, { opacity: 0, y: 10 });
+        tl.to(foot, { opacity: 1, y: 0, duration: 0.5 }, 0.52);
+      }
+
+      if (bio) {
+        gsap.set(bio, { opacity: 0, y: 8 });
+        tl.to(bio, { opacity: 1, y: 0, duration: 0.5 }, 0.6);
+      }
+    });
+  }
+
+  private animateProjectCards(): void {
+    this.zone.runOutsideAngular(() => {
+      const grid = this.projectsGridRef()?.nativeElement;
+      if (!grid) return;
+      const cards = grid.querySelectorAll<HTMLElement>('.prj-card');
+      if (!cards.length) return;
+
+      gsap.set(cards, { opacity: 0, y: 22, filter: 'blur(8px)' });
+      gsap.to(cards, {
+        opacity: 1,
+        y: 0,
+        filter: 'blur(0px)',
+        duration: 0.6,
+        stagger: 0.07,
+        ease: 'power3.out',
+        scrollTrigger: {
+          trigger: grid,
+          start: 'top 92%',
+          toggleActions: 'play none none none',
+        },
+      });
+      requestAnimationFrame(() => ScrollTrigger.refresh());
+    });
+  }
+
+  private initScrollAnimations(): void {
+    this.zone.runOutsideAngular(() => {
+      const host = this.el.nativeElement as HTMLElement;
+      const toolbarHead = host.querySelector<HTMLElement>('.prf-toolbar-head');
+      const toolbarControls = host.querySelector<HTMLElement>('.prf-toolbar-controls');
+
+      const stConfig = {
+        start: 'top 92%',
+        toggleActions: 'play none none none' as const,
+      };
+
+      if (toolbarHead) {
+        gsap.set(toolbarHead, { opacity: 0, y: 18, filter: 'blur(10px)' });
+        gsap.to(toolbarHead, {
+          opacity: 1,
+          y: 0,
+          filter: 'blur(0px)',
+          duration: 0.7,
+          ease: 'power3.out',
+          scrollTrigger: { trigger: toolbarHead, ...stConfig },
+        });
+      }
+
+      if (toolbarControls) {
+        gsap.set(toolbarControls, { opacity: 0, y: 12, filter: 'blur(8px)' });
+        gsap.to(toolbarControls, {
+          opacity: 1,
+          y: 0,
+          filter: 'blur(0px)',
+          duration: 0.6,
+          ease: 'power3.out',
+          scrollTrigger: { trigger: toolbarControls, ...stConfig },
+        });
+      }
+
+      requestAnimationFrame(() => ScrollTrigger.refresh());
+    });
   }
 }

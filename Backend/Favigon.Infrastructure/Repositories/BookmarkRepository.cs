@@ -58,6 +58,8 @@ public class BookmarkRepository : IBookmarkRepository
       .AsNoTracking()
       .Where(b => b.UserId == userId)
       .OrderByDescending(b => b.CreatedAt)
+      .Include(b => b.Project).ThenInclude(p => p.Bookmarks)
+      .Include(b => b.Project).ThenInclude(p => p.Likes)
       .Select(b => b.Project)
       .ToListAsync();
   }

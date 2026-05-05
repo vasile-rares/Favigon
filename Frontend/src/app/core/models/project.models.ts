@@ -8,7 +8,10 @@ export interface ProjectResponse {
   updatedAt: string;
   thumbnailDataUrl?: string | null;
   starCount: number;
+  viewCount?: number;
   isStarredByCurrentUser: boolean;
+  likeCount?: number;
+  isLikedByCurrentUser?: boolean;
 }
 
 export interface ProjectCreateRequest {

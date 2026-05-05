@@ -13,17 +13,20 @@ public class ExploreService : IExploreService
   private readonly IExploreRepository _exploreRepository;
   private readonly IBookmarkRepository _bookmarkRepository;
   private readonly IFollowRepository _followRepository;
+  private readonly ILikeRepository _likeRepository;
   private readonly IProjectAssetStorage _projectAssetStorage;
 
   public ExploreService(
     IExploreRepository exploreRepository,
     IBookmarkRepository bookmarkRepository,
     IFollowRepository followRepository,
+    ILikeRepository likeRepository,
     IProjectAssetStorage projectAssetStorage)
   {
     _exploreRepository = exploreRepository;
     _bookmarkRepository = bookmarkRepository;
     _followRepository = followRepository;
+    _likeRepository = likeRepository;
     _projectAssetStorage = projectAssetStorage;
   }
 
@@ -78,10 +81,12 @@ public class ExploreService : IExploreService
     int viewerUserId)
   {
     HashSet<int> starredIds = new();
+    HashSet<int> likedIds = new();
     if (viewerUserId > 0)
     {
       var ids = projects.Select(p => p.Id).ToList();
       starredIds = await GetStarredIdsAsync(viewerUserId, ids);
+      likedIds = await _likeRepository.GetLikedProjectIdsAsync(viewerUserId, ids);
     }
 
     return projects.Select(p => new ExploreProjectDto
@@ -90,8 +95,10 @@ public class ExploreService : IExploreService
       Name = p.Name,
       Slug = p.Slug,
       ThumbnailDataUrl = _projectAssetStorage.GetThumbnailUrl(p.UserId, p.Id) ?? p.ThumbnailDataUrl,
+      LikeCount = p.Likes.Count,
       StarCount = p.Bookmarks.Count,
       ViewCount = p.ViewCount,
+      IsLikedByCurrentUser = likedIds.Contains(p.Id),
       IsStarredByCurrentUser = starredIds.Contains(p.Id),
       UpdatedAt = p.UpdatedAt,
       OwnerUserId = p.UserId,

@@ -12,13 +12,16 @@ public class MappingProfile : Profile
     CreateMap<Project, ProjectResponse>()
       .ForMember(dest => dest.ProjectId, opt => opt.MapFrom(src => src.Id))
       .ForMember(dest => dest.Slug, opt => opt.MapFrom(src => src.Slug))
-      .ForMember(dest => dest.StarCount, opt => opt.Ignore())
-      .ForMember(dest => dest.IsStarredByCurrentUser, opt => opt.Ignore());
+      .ForMember(dest => dest.StarCount, opt => opt.MapFrom(src => src.Bookmarks.Count))
+      .ForMember(dest => dest.LikeCount, opt => opt.MapFrom(src => src.Likes.Count))
+      .ForMember(dest => dest.IsStarredByCurrentUser, opt => opt.Ignore())
+      .ForMember(dest => dest.IsLikedByCurrentUser, opt => opt.Ignore());
 
     CreateMap<ProjectCreateRequest, Project>()
       .ForMember(dest => dest.Id, opt => opt.Ignore())
       .ForMember(dest => dest.User, opt => opt.Ignore())
       .ForMember(dest => dest.Bookmarks, opt => opt.Ignore())
+      .ForMember(dest => dest.Likes, opt => opt.Ignore())
       .ForMember(dest => dest.CreatedAt, opt => opt.Ignore())
       .ForMember(dest => dest.UpdatedAt, opt => opt.Ignore());
 
@@ -27,6 +30,7 @@ public class MappingProfile : Profile
       .ForMember(dest => dest.UserId, opt => opt.Ignore())
       .ForMember(dest => dest.User, opt => opt.Ignore())
       .ForMember(dest => dest.Bookmarks, opt => opt.Ignore())
+      .ForMember(dest => dest.Likes, opt => opt.Ignore())
       .ForMember(dest => dest.CreatedAt, opt => opt.Ignore());
 
     CreateMap<User, UserResponse>()

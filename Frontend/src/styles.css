@@ -1,9 +1,8 @@
 :root {
   /* Fonts */
   --font-sans:
-    'SF Pro Display', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
-    'Helvetica Neue', Arial, 'Noto Sans', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-    'Segoe UI Symbol', 'Noto Color Emoji';
+    'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    sans-serif;
 
   /* Colors - Base Palette */
   --color-white: #ffffff;
@@ -158,12 +157,12 @@ textarea {
 
 ::selection {
   color: #000000;
-  background: #b3b3b3;
+  background: #ff85d0;
 }
 
 ::-moz-selection {
   color: #000000;
-  background: #b3b3b3;
+  background: #ff85d0;
 }
 
 /* Global Apple Background Animation */
