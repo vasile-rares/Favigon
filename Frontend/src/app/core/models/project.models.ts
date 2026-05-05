@@ -12,6 +12,8 @@ export interface ProjectResponse {
   isStarredByCurrentUser: boolean;
   likeCount?: number;
   isLikedByCurrentUser?: boolean;
+  forkedFromProjectId?: number | null;
+  forkedFromOwnerUsername?: string | null;
 }
 
 export interface ProjectCreateRequest {

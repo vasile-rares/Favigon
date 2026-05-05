@@ -1,7 +1,7 @@
 :host {
   position: absolute;
   top: calc(100% + 0.75rem);
-  right: 0;
+  right: 1.5rem;
   z-index: 40;
 }
 
@@ -14,46 +14,18 @@
   position: relative;
   width: 256px;
   border-radius: var(--user-menu-panel-radius);
-  background: rgba(255, 133, 208, 0.1);
-  backdrop-filter: blur(62px);
-  -webkit-backdrop-filter: blur(62px);
-  border: 1px solid rgba(255, 133, 208, 0.45);
-  box-shadow: 0 -10px 14.7px rgba(255, 133, 208, 0.14);
+  background: #0d0d0e80;
+  backdrop-filter: blur(50px);
+  -webkit-backdrop-filter: blur(50px);
+  border: none;
+  box-shadow:
+    0 0 0 1.5px #ff85d0,
+    -1px 3px 22px rgba(255, 133, 208, 0.45);
   color: var(--color-text-light);
-  overflow: hidden;
+  overflow: clip;
   z-index: 40;
   transform-origin: top right;
   padding: 6px;
-}
-
-.user-menu__panel--open {
-  animation: user-menu-enter 0.12s ease-out forwards;
-}
-
-.user-menu__panel--closing {
-  animation: user-menu-exit 0.12s ease-in forwards;
-}
-
-@keyframes user-menu-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes user-menu-exit {
-  from {
-    opacity: 1;
-    transform: scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-6px) scale(0.95);
-  }
 }
 
 .user-menu__identity {
@@ -96,6 +68,7 @@
 .user-menu__identity-email {
   color: var(--color-text-medium);
   font-size: 0.75rem;
+  font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
   overflow: hidden;
@@ -118,7 +91,7 @@
   gap: 0.35rem;
   padding: 0.6rem;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
@@ -129,17 +102,21 @@
     content: '';
     position: absolute;
     inset: 4px;
-    border-radius: calc(var(--user-menu-panel-radius) - 4px);
+    border-radius: calc(var(--user-menu-panel-radius) - 10px);
     background: transparent;
     z-index: -1;
     transition: background-color 0.2s ease;
   }
 
   &:hover {
-    color: var(--color-text-light);
+    color: #ff85d0;
 
     &::before {
-      background: rgba(255, 133, 208, 0.1);
+      background: rgba(255, 133, 208, 0.08);
+    }
+
+    .user-menu__item-icon {
+      color: #ff85d0;
     }
   }
 }
@@ -149,24 +126,25 @@
   display: inline-flex;
   width: 16px;
   margin-top: 0.05rem;
+  transition: color 0.2s ease;
 }
 
 .user-menu__item--danger {
-  color: var(--color-danger-light);
+  color: #ff85d0;
 
   .user-menu__item-icon {
-    color: var(--color-danger-light);
+    color: #ff85d0;
   }
 
   &:hover {
-    color: var(--color-danger-light);
+    color: #ff85d0;
 
     &::before {
-      background: var(--color-danger-dark);
+      background: rgba(255, 133, 208, 0.08);
     }
 
     .user-menu__item-icon {
-      color: var(--color-danger-light);
+      color: #ff85d0;
     }
   }
 }

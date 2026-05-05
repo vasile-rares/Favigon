@@ -82,6 +82,12 @@ export class ProjectService {
     return this.http.delete<void>(`${this.baseUrl}/projects/${projectId}/like`);
   }
 
+  forkProject(projectId: number): Observable<ProjectResponse> {
+    return this.http
+      .post<ProjectResponse>(`${this.baseUrl}/projects/${projectId}/fork`, {})
+      .pipe(map((project) => this.normalizeProjectResponse(project)));
+  }
+
   getDesign(projectId: number): Observable<ProjectDesignResponse> {
     return this.http.get<ProjectDesignResponse>(`${this.baseUrl}/projects/${projectId}/design`);
   }

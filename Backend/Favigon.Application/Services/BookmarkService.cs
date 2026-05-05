@@ -65,6 +65,15 @@ public class BookmarkService : IBookmarkService
     var projectIds = projects.Select(p => p.Id).ToList();
     var likedIds = await _likeRepository.GetLikedProjectIdsAsync(userId, projectIds);
 
+    var forkedFromIds = projects
+      .Where(p => p.ForkedFromProjectId.HasValue)
+      .Select(p => p.ForkedFromProjectId!.Value)
+      .Distinct()
+      .ToList();
+    var forkedOwners = forkedFromIds.Count > 0
+      ? await _projectRepository.GetOwnerUsernamesByProjectIdsAsync(forkedFromIds)
+      : new Dictionary<int, string>();
+
     var responses = new List<ProjectResponse>(projects.Count);
     foreach (var project in projects)
     {
@@ -74,6 +83,8 @@ public class BookmarkService : IBookmarkService
         project.ThumbnailDataUrl;
       response.IsStarredByCurrentUser = true;
       response.IsLikedByCurrentUser = likedIds.Contains(project.Id);
+      if (project.ForkedFromProjectId.HasValue && forkedOwners.TryGetValue(project.ForkedFromProjectId.Value, out var username))
+        response.ForkedFromOwnerUsername = username;
       responses.Add(response);
     }
 

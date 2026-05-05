@@ -936,6 +936,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   onPageShellPointerDown(event: MouseEvent, pageId: string): void {
+    if ((event as PointerEvent).pointerType === 'touch') {
+      return;
+    }
     if (event.button !== 0) {
       return;
     }
@@ -1047,6 +1050,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const target = event.target as HTMLElement;
     this.gesture.flowDragPlaceholder.set(null);
     this.gesture.setSuppressNextCanvasClick(true);
+
+    if ((event as PointerEvent).pointerType === 'touch') {
+      if (!this.pinchActive) {
+        this.viewport.startPanning(event);
+        this.gesture.cancelDragState();
+      }
+      return;
+    }
 
     if (this.shouldStartPanning(event, target)) {
       this.viewport.startPanning(event);
@@ -1648,6 +1659,72 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.viewport.handleWheel(event, canvas.getBoundingClientRect());
   }
 
+  // ── Touch / Pinch ─────────────────────────────────────────
+
+  private pinchActive = false;
+  private pinchStartDist = 0;
+  private pinchStartZoom = 0;
+  private pinchCenter: Point = { x: 0, y: 0 };
+  private pinchLastCenter: Point = { x: 0, y: 0 };
+
+  private getTouchDist(touches: TouchList): number {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  private getTouchCenter(touches: TouchList): Point {
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2,
+      y: (touches[0].clientY + touches[1].clientY) / 2,
+    };
+  }
+
+  @HostListener('touchstart', ['$event'])
+  onTouchStart(event: TouchEvent): void {
+    if (event.touches.length >= 2) {
+      event.preventDefault();
+      this.pinchActive = true;
+      this.pinchStartDist = this.getTouchDist(event.touches);
+      this.pinchStartZoom = this.viewport.zoomLevel();
+      this.pinchCenter = this.getTouchCenter(event.touches);
+      this.pinchLastCenter = { ...this.pinchCenter };
+      this.viewport.endPan();
+    }
+  }
+
+  @HostListener('touchmove', ['$event'])
+  onTouchMove(event: TouchEvent): void {
+    if (this.pinchActive && event.touches.length >= 2) {
+      event.preventDefault();
+      const dist = this.getTouchDist(event.touches);
+      const center = this.getTouchCenter(event.touches);
+
+      if (this.pinchStartDist > 0) {
+        const scale = dist / this.pinchStartDist;
+        this.viewport.setZoom(this.pinchStartZoom * scale, this.pinchCenter);
+      }
+
+      // Pan: translate by the delta of the midpoint
+      const dx = center.x - this.pinchLastCenter.x;
+      const dy = center.y - this.pinchLastCenter.y;
+      if (dx !== 0 || dy !== 0) {
+        this.viewport.viewportOffset.update((offset) => ({
+          x: roundToTwoDecimals(offset.x + dx),
+          y: roundToTwoDecimals(offset.y + dy),
+        }));
+      }
+      this.pinchLastCenter = center;
+    }
+  }
+
+  @HostListener('touchend', ['$event'])
+  onTouchEnd(event: TouchEvent): void {
+    if (event.touches.length < 2) {
+      this.pinchActive = false;
+    }
+  }
+
   // ── Zoom Toolbar Delegates ────────────────────────────────
 
   onAiDesignApplied(ir: IRNode): void {
@@ -2030,6 +2107,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     this.projectService.getBySlug(this.projectSlug).subscribe({
       next: (project) => {
+        const currentUserId = this.currentUser.user()?.userId;
+        if (currentUserId !== undefined && project.userId !== currentUserId) {
+          void this.router.navigate(['/project', this.projectSlug, 'preview'], {
+            replaceUrl: true,
+          });
+          return;
+        }
+
         this.projectIdAsNumber = project.projectId;
         this.loadingMessage.set('Loading design...');
         this.loadingPercent.set(55);
@@ -2301,6 +2386,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   private shouldStartPanning(event: MouseEvent, target: HTMLElement): boolean {
+    if ((event as PointerEvent).pointerType === 'touch') {
+      return true;
+    }
     if (event.button === 1) {
       return true;
     }

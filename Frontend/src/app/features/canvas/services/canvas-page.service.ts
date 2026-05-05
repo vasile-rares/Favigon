@@ -655,9 +655,10 @@ export class CanvasPageService {
       return null;
     }
 
-    const leftInset = 316;
-    const rightInset = 316;
-    const topInset = 84;
+    const isMobile = window.innerWidth <= 720;
+    const leftInset = isMobile ? 0 : 316;
+    const rightInset = isMobile ? 0 : 316;
+    const topInset = isMobile ? 75 : 84;
     const bottomInset = 24;
 
     const safeWidth = canvasElement.clientWidth - leftInset - rightInset;
@@ -1211,7 +1212,6 @@ export class CanvasPageService {
     };
   }
 
-  
   private getCanvasElement(): HTMLElement | null {
     // The canvas element reference is held by the component.
     // The service accesses it through focusPageSmooth's parameter.
@@ -1219,7 +1219,6 @@ export class CanvasPageService {
     return this._canvasElement;
   }
 
-  
   private _canvasElement: HTMLElement | null = null;
 
   setCanvasElement(el: HTMLElement | null): void {

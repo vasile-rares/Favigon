@@ -51,19 +51,31 @@ public class ProjectService : IProjectService
     _likeRepository = likeRepository;
   }
 
-  public async Task<IReadOnlyList<ProjectResponse>> GetByUserIdAsync(int userId, bool? isPublic = null)
+  public async Task<IReadOnlyList<ProjectResponse>> GetByUserIdAsync(int userId, bool? isPublic = null, int? viewerUserId = null)
   {
     var projects = await _projectRepository.GetByUserIdAsync(userId, isPublic);
     var projectIds = projects.Select(p => p.Id).ToList();
 
-    var starredIds = await _bookmarkRepository.GetStarredProjectIdsAsync(userId, projectIds);
-    var likedIds = await _likeRepository.GetLikedProjectIdsAsync(userId, projectIds);
+    var contextUserId = viewerUserId ?? userId;
+    var starredIds = await _bookmarkRepository.GetStarredProjectIdsAsync(contextUserId, projectIds);
+    var likedIds = await _likeRepository.GetLikedProjectIdsAsync(contextUserId, projectIds);
+
+    var forkedFromIds = projects
+      .Where(p => p.ForkedFromProjectId.HasValue)
+      .Select(p => p.ForkedFromProjectId!.Value)
+      .Distinct()
+      .ToList();
+    var forkedOwners = forkedFromIds.Count > 0
+      ? await _projectRepository.GetOwnerUsernamesByProjectIdsAsync(forkedFromIds)
+      : new Dictionary<int, string>();
 
     return projects.Select(p =>
     {
       var r = MapProjectResponse(p);
       r.IsStarredByCurrentUser = starredIds.Contains(p.Id);
       r.IsLikedByCurrentUser = likedIds.Contains(p.Id);
+      if (p.ForkedFromProjectId.HasValue && forkedOwners.TryGetValue(p.ForkedFromProjectId.Value, out var username))
+        r.ForkedFromOwnerUsername = username;
       return r;
     }).ToList();
   }
@@ -76,7 +88,8 @@ public class ProjectService : IProjectService
 
   public async Task<ProjectResponse?> GetBySlugAsync(string slug, int userId)
   {
-    var project = await _projectRepository.GetBySlugAsync(slug, userId);
+    var project = await _projectRepository.GetBySlugAsync(slug, userId)
+                  ?? await _projectRepository.GetPublicBySlugAsync(slug);
     return project == null ? null : MapProjectResponse(project);
   }
 
@@ -122,7 +135,8 @@ public class ProjectService : IProjectService
 
   public async Task<ProjectDesignResponse?> GetDesignByProjectIdAsync(int projectId, int userId)
   {
-    var project = await _projectRepository.GetByIdAsync(projectId, userId);
+    var project = await _projectRepository.GetByIdAsync(projectId, userId)
+                  ?? await _projectRepository.GetPublicByIdAsync(projectId);
     if (project == null) return null;
 
     return new ProjectDesignResponse
@@ -194,7 +208,30 @@ public class ProjectService : IProjectService
     response.ThumbnailDataUrl =
       _projectAssetStorage.GetThumbnailUrl(project.UserId, project.Id) ??
       project.ThumbnailDataUrl;
+    response.ForkedFromOwnerUsername = project.ForkedFromProject?.User?.Username;
     return response;
+  }
+
+  public async Task<ProjectResponse?> ForkAsync(int sourceProjectId, int userId)
+  {
+    var source = await _projectRepository.GetPublicByIdWithDesignAsync(sourceProjectId);
+    if (source == null) return null;
+
+    var forkedName = $"{source.Name} (Fork)";
+    var fork = new Project
+    {
+      UserId = userId,
+      Name = forkedName,
+      Slug = await GenerateUniqueSlugAsync(forkedName, userId),
+      DesignJson = source.DesignJson,
+      IsPublic = false,
+      ForkedFromProjectId = source.Id,
+      CreatedAt = DateTime.UtcNow,
+      UpdatedAt = DateTime.UtcNow,
+    };
+
+    var created = await _projectRepository.AddAsync(fork);
+    return MapProjectResponse(created);
   }
 
   private async Task<string> GenerateUniqueSlugAsync(string name, int userId, int? excludeProjectId = null)

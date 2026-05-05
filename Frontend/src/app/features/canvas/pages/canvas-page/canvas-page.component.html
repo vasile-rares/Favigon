@@ -1,5 +1,13 @@
 <div class="canvas-layout" [style.--canvas-side-panel-width.px]="projectPanelWidth()">
   <app-header-bar class="canvas-header" appearance="canvas">
+    <button
+      header-mobile-top
+      type="button"
+      class="header-mobile-menu__link header-mobile-menu__anim-item canvas-mobile-back-link"
+      role="menuitem"
+      (click)="navigateToProjectsList()">
+      Back to projects
+    </button>
     <div header-left-extra class="canvas-nav-left">
       <button
         type="button"

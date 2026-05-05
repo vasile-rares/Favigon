@@ -171,6 +171,12 @@ public class FavigonDbContext : Microsoft.EntityFrameworkCore.DbContext
             .WithMany(p => p.Likes)
             .HasForeignKey(l => l.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<Project>()
+            .HasOne(p => p.ForkedFromProject)
+            .WithMany()
+            .HasForeignKey(p => p.ForkedFromProjectId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 
     public override int SaveChanges()

@@ -9,22 +9,20 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Location } from '@angular/common';
 import {
   CanvasPageModel,
   ConverterService,
+  CurrentUserService,
   ProjectService,
   extractApiErrorMessage,
 } from '@app/core';
-import { DropdownSelectComponent } from '@app/shared';
-import type { DropdownSelectOption } from '@app/shared';
 import { HeaderBarComponent } from '@app/shared';
 import { CanvasPersistenceService } from '../../services/canvas-persistence.service';
 import { buildCanvasIRPages } from '../../mappers/canvas-to-ir.mapper';
 import { VIEWPORT_PRESET_OPTIONS } from '../../canvas.types';
-import { NumberInputComponent } from '../../components/properties-panel/number-input/number-input.component';
 
 interface FrameSizeOption {
   label: string;
@@ -38,7 +36,7 @@ const GOOGLE_FONTS_URL =
 @Component({
   selector: 'app-canvas-preview-page',
   standalone: true,
-  imports: [FormsModule, HeaderBarComponent, DropdownSelectComponent, NumberInputComponent],
+  imports: [HeaderBarComponent],
   providers: [CanvasPersistenceService],
   templateUrl: './canvas-preview-page.component.html',
   styleUrl: './canvas-preview-page.component.css',
@@ -48,6 +46,7 @@ export class CanvasPreviewPage {
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly location = inject(Location);
   private readonly sanitizer = inject(DomSanitizer);
 
   private readonly destroyRef = inject(DestroyRef);
@@ -55,6 +54,7 @@ export class CanvasPreviewPage {
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
   private readonly converterService = inject(ConverterService);
   private readonly projectApiService = inject(ProjectService);
+  private readonly currentUserService = inject(CurrentUserService);
 
   private projectIdAsNumber = NaN;
 
@@ -66,6 +66,17 @@ export class CanvasPreviewPage {
   readonly error = signal<string | null>(null);
   readonly pageSearchQuery = signal('');
   readonly isPageDropdownOpen = signal(false);
+
+  readonly isOwner = signal(false);
+  readonly isStarred = signal(false);
+  readonly isLiked = signal(false);
+  readonly starCount = signal(0);
+  readonly likeCount = signal(0);
+  readonly isStarring = signal(false);
+  readonly isLiking = signal(false);
+  readonly isForking = signal(false);
+
+  private projectIdForFork = NaN;
 
   readonly generatedHtml = signal('');
   readonly generatedCss = signal('');
@@ -149,14 +160,6 @@ export class CanvasPreviewPage {
     return options[idx] ?? options[0] ?? null;
   });
 
-  readonly deviceSelectOptions = computed<DropdownSelectOption[]>(() => {
-    return this.frameSizeOptions().map((option, index) => ({
-      label: option.label,
-      triggerLabel: option.label,
-      value: index,
-    }));
-  });
-
   readonly viewportWidth = computed<number>(() => {
     const override = this.resizeWidth();
     if (override !== null) return override;
@@ -222,7 +225,26 @@ ${html}
   }
 
   goBack(): void {
-    void this.router.navigate(['/project', this.projectSlug], { state: { fromPreview: true } });
+    if (this.isOwner()) {
+      void this.router.navigate(['/project', this.projectSlug], { state: { fromPreview: true } });
+    } else if (window.history.length > 1) {
+      this.location.back();
+    } else {
+      void this.router.navigate(['/explore']);
+    }
+  }
+
+  forkProject(): void {
+    if (this.isForking() || Number.isNaN(this.projectIdForFork)) return;
+    this.isForking.set(true);
+    this.projectApiService.forkProject(this.projectIdForFork).subscribe({
+      next: (forked) => {
+        void this.router.navigate(['/project', forked.slug]);
+      },
+      error: () => {
+        this.isForking.set(false);
+      },
+    });
   }
 
   onFrameSizeChange(index: number | string | boolean | null): void {
@@ -246,6 +268,20 @@ ${html}
     this.resizeHeight.set(
       Math.max(120, Math.min(this.getStageMaxViewportHeight(), Math.round(value))),
     );
+  }
+
+  onNativeFrameSizeChange(event: Event): void {
+    this.onFrameSizeChange(Number((event.target as HTMLSelectElement).value));
+  }
+
+  onNativeWidthChange(event: Event): void {
+    const v = (event.target as HTMLInputElement).valueAsNumber;
+    if (Number.isFinite(v)) this.onWidthInputChange(v);
+  }
+
+  onNativeHeightChange(event: Event): void {
+    const v = (event.target as HTMLInputElement).valueAsNumber;
+    if (Number.isFinite(v)) this.onHeightInputChange(v);
   }
 
   onResizeHandlePointerDown(event: PointerEvent, axis: 'right' | 'bottom' | 'corner'): void {
@@ -303,6 +339,40 @@ ${html}
 
   refreshPreview(): void {
     this.loadPreview(this.currentPageId());
+  }
+
+  toggleStar(): void {
+    if (this.isStarring()) return;
+    this.isStarring.set(true);
+    const wasStarred = this.isStarred();
+    const api = wasStarred
+      ? this.projectApiService.unstarProject(this.projectIdAsNumber)
+      : this.projectApiService.starProject(this.projectIdAsNumber);
+    api.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.isStarred.set(!wasStarred);
+        this.starCount.update((c) => (wasStarred ? c - 1 : c + 1));
+        this.isStarring.set(false);
+      },
+      error: () => this.isStarring.set(false),
+    });
+  }
+
+  toggleLike(): void {
+    if (this.isLiking()) return;
+    this.isLiking.set(true);
+    const wasLiked = this.isLiked();
+    const api = wasLiked
+      ? this.projectApiService.unlikeProject(this.projectIdAsNumber)
+      : this.projectApiService.likeProject(this.projectIdAsNumber);
+    api.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.isLiked.set(!wasLiked);
+        this.likeCount.update((c) => (wasLiked ? c - 1 : c + 1));
+        this.isLiking.set(false);
+      },
+      error: () => this.isLiking.set(false),
+    });
   }
 
   getStageMaxViewportHeight(): number {
@@ -397,6 +467,13 @@ ${html}
       .subscribe({
         next: (project) => {
           this.projectIdAsNumber = project.projectId;
+          this.projectIdForFork = project.projectId;
+          const currentUserId = this.currentUserService.user()?.userId;
+          this.isOwner.set(currentUserId !== undefined && project.userId === currentUserId);
+          this.isStarred.set(project.isStarredByCurrentUser);
+          this.isLiked.set(project.isLikedByCurrentUser ?? false);
+          this.starCount.set(project.starCount);
+          this.likeCount.set(project.likeCount ?? 0);
           this.canvasPersistenceService
             .loadProjectDesign(this.projectIdAsNumber)
             .pipe(takeUntilDestroyed(this.destroyRef))

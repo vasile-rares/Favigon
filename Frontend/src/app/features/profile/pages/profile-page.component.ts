@@ -39,7 +39,7 @@ import {
   FollowListType,
 } from '../components/follow-list-modal/follow-list-modal.component';
 
-type ProjectTypeFilter = 'all' | 'public' | 'private' | 'forks';
+type ProjectTypeFilter = 'all' | 'public' | 'private' | 'forked';
 type ProjectSortOption = 'updated' | 'created';
 
 @Component({
@@ -181,7 +181,9 @@ export class ProfilePage implements OnInit {
             ? project.isPublic
             : typeFilter === 'private'
               ? !project.isPublic
-              : false;
+              : typeFilter === 'forked'
+                ? !!project.forkedFromProjectId
+                : false;
 
       return matchesSearch && matchesType;
     });
@@ -685,6 +687,8 @@ export class ProfilePage implements OnInit {
       isStarredByCurrentUser: project.isStarredByCurrentUser ?? false,
       likeCount: project.likeCount ?? 0,
       isLikedByCurrentUser: project.isLikedByCurrentUser ?? false,
+      forkedFromProjectId: project.forkedFromProjectId ?? null,
+      forkedFromOwnerUsername: project.forkedFromOwnerUsername ?? null,
     };
   }
 
@@ -722,7 +726,7 @@ export class ProfilePage implements OnInit {
   private isProjectTypeFilter(
     value: DropdownSelectOption['value'] | null,
   ): value is ProjectTypeFilter {
-    return value === 'all' || value === 'public' || value === 'private' || value === 'forks';
+    return value === 'all' || value === 'public' || value === 'private' || value === 'forked';
   }
 
   private isProjectSortOption(

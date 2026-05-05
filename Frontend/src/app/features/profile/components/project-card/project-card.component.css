@@ -175,6 +175,26 @@
   color: var(--color-text-medium);
 }
 
+.project-card__fork-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #7dd3fc;
+  font-size: 0.67rem;
+  line-height: 1;
+  opacity: 0.85;
+
+  strong {
+    font-weight: 600;
+  }
+}
+
+.project-card__fork-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .project-card__copy {
   display: flex;
   flex-direction: column;

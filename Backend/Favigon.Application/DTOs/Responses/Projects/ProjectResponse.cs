@@ -15,4 +15,6 @@ public class ProjectResponse
   public int LikeCount { get; set; }
   public bool IsLikedByCurrentUser { get; set; }
   public int ViewCount { get; set; }
+  public int? ForkedFromProjectId { get; set; }
+  public string? ForkedFromOwnerUsername { get; set; }
 }

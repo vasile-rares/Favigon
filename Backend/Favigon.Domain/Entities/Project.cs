@@ -36,4 +36,8 @@ public class Project
     public ICollection<ProjectBookmark> Bookmarks { get; set; } = new List<ProjectBookmark>();
 
     public ICollection<ProjectLike> Likes { get; set; } = new List<ProjectLike>();
+
+    public int? ForkedFromProjectId { get; set; }
+
+    public Project? ForkedFromProject { get; set; }
 }

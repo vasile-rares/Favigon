@@ -1,8 +1,11 @@
 import {
+  afterNextRender,
   Component,
   DestroyRef,
   ElementRef,
   HostListener,
+  Injector,
+  NgZone,
   OnInit,
   effect,
   inject,
@@ -11,6 +14,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { gsap } from 'gsap';
 import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
@@ -67,7 +71,10 @@ export class HeaderBarComponent implements OnInit {
   private readonly projectService = inject(ProjectService);
   private readonly currentUser = inject(CurrentUserService);
   private readonly fb = inject(FormBuilder);
+  private readonly injector = inject(Injector);
+  private readonly zone = inject(NgZone);
   private readonly fallbackAvatarUrl = FALLBACK_AVATAR_URL;
+  private readonly mobileBreakpoint = 720;
 
   profilePictureUrl: string | null = null;
   displayName = '';
@@ -79,6 +86,10 @@ export class HeaderBarComponent implements OnInit {
   currentProjectIsPublic: boolean | null = null;
   isProjectContext = false;
   isUserMenuOpen = false;
+  isMobileMenuOpen = false;
+  showMobileMenuPanel = false;
+  isMobileAccountMenuOpen = false;
+  showMobileAccountMenu = false;
 
   // Create project dialog
   isCreateDialogOpen = signal(false);
@@ -97,6 +108,22 @@ export class HeaderBarComponent implements OnInit {
   readonly userMenuContainer = viewChild<ElementRef<HTMLElement>>('userMenuContainer');
 
   readonly userMenuDropdownEl = viewChild('userMenuDropdownEl', { read: ElementRef });
+
+  readonly mobileMenuTriggerContainer = viewChild<ElementRef<HTMLElement>>(
+    'mobileMenuTriggerContainer',
+  );
+
+  readonly mobileMenuPanelEl = viewChild<ElementRef<HTMLElement>>('mobileMenuPanelEl');
+
+  readonly mobileAccountMenuEl = viewChild<ElementRef<HTMLElement>>('mobileAccountMenuEl');
+
+  readonly mobileAccountChevronEl = viewChild<ElementRef<HTMLElement>>('mobileAccountChevronEl');
+
+  readonly mobileMenuLineTopEl = viewChild<ElementRef<HTMLElement>>('mobileMenuLineTopEl');
+
+  readonly mobileMenuLineMiddleEl = viewChild<ElementRef<HTMLElement>>('mobileMenuLineMiddleEl');
+
+  readonly mobileMenuLineBottomEl = viewChild<ElementRef<HTMLElement>>('mobileMenuLineBottomEl');
 
   readonly projectSearch = viewChild<ProjectSearchComponent>('projectSearch');
 
@@ -136,9 +163,15 @@ export class HeaderBarComponent implements OnInit {
         distinctUntilChanged(),
         takeUntilDestroyed(this.destroyRef),
       )
-      .subscribe((slug) => this.syncRouteContext(slug));
+      .subscribe((slug) => {
+        this.closeUserMenu();
+        this.closeMobileMenu(true);
+        this.syncRouteContext(slug);
+      });
 
     this.syncRouteContext(this.getProjectSlugFromRoute());
+
+    afterNextRender(() => this.setMobileMenuTriggerClosedState(), { injector: this.injector });
 
     this.currentUser
       .load()
@@ -202,17 +235,250 @@ export class HeaderBarComponent implements OnInit {
 
   onLogout() {
     this.isUserMenuOpen = false;
+    this.closeMobileMenu(true);
     this.currentUser.invalidate();
     this.authService.logout().subscribe();
     void this.router.navigate(['/login'], { replaceUrl: true });
   }
 
   toggleUserMenu(): void {
+    this.closeMobileMenu(true);
     this.isUserMenuOpen = !this.isUserMenuOpen;
   }
 
   closeUserMenu(): void {
     this.isUserMenuOpen = false;
+  }
+
+  toggleMobileMenu(): void {
+    if (!this.isMobileViewport()) return;
+
+    if (this.isMobileMenuOpen) {
+      this.closeMobileMenu();
+      return;
+    }
+
+    this.closeUserMenu();
+    this.isMobileMenuOpen = true;
+    this.showMobileMenuPanel = true;
+    this.animateMobileTriggerToOpen();
+    afterNextRender(() => this.animateMobileMenuOpen(), { injector: this.injector });
+  }
+
+  closeMobileMenu(immediate = false): void {
+    if (!this.showMobileMenuPanel) {
+      this.isMobileMenuOpen = false;
+      this.setMobileMenuTriggerClosedState();
+      this.resetMobileAccountMenuState();
+      return;
+    }
+
+    this.isMobileMenuOpen = false;
+
+    const panel = this.mobileMenuPanelEl()?.nativeElement;
+    if (immediate || !panel) {
+      this.setMobileMenuTriggerClosedState();
+      this.showMobileMenuPanel = false;
+      this.resetMobileAccountMenuState();
+      return;
+    }
+
+    this.animateMobileTriggerToClosed();
+
+    this.zone.runOutsideAngular(() => {
+      gsap.killTweensOf(panel);
+      gsap.to(panel, {
+        opacity: 0,
+        y: -14,
+        scale: 0.98,
+        duration: 0.18,
+        ease: 'power2.in',
+        transformOrigin: 'top center',
+        onComplete: () => {
+          this.zone.run(() => {
+            this.showMobileMenuPanel = false;
+            this.resetMobileAccountMenuState();
+          });
+        },
+      });
+    });
+  }
+
+  toggleMobileAccountMenu(): void {
+    if (this.isMobileAccountMenuOpen) {
+      this.closeMobileAccountMenu();
+      return;
+    }
+
+    this.isMobileAccountMenuOpen = true;
+    this.showMobileAccountMenu = true;
+    afterNextRender(() => this.animateMobileAccountMenuOpen(), { injector: this.injector });
+  }
+
+  closeMobileMenuAndNavigate(): void {
+    this.closeMobileMenu();
+  }
+
+  private animateMobileTriggerToOpen(): void {
+    const lines = this.getMobileMenuTriggerLines();
+    if (!lines) return;
+
+    const [top, middle, bottom] = lines;
+
+    this.zone.runOutsideAngular(() => {
+      gsap.killTweensOf([top, middle, bottom]);
+      gsap.to(top, { y: 6, rotate: 45, duration: 0.22, ease: 'power2.out' });
+      gsap.to(middle, { opacity: 0, scaleX: 0.45, duration: 0.18, ease: 'power2.out' });
+      gsap.to(bottom, { y: -6, rotate: -45, duration: 0.22, ease: 'power2.out' });
+    });
+  }
+
+  private animateMobileTriggerToClosed(): void {
+    const lines = this.getMobileMenuTriggerLines();
+    if (!lines) return;
+
+    const [top, middle, bottom] = lines;
+
+    this.zone.runOutsideAngular(() => {
+      gsap.killTweensOf([top, middle, bottom]);
+      gsap.to(top, { y: 0, rotate: 0, duration: 0.18, ease: 'power2.out' });
+      gsap.to(middle, { opacity: 1, scaleX: 1, duration: 0.18, ease: 'power2.out' });
+      gsap.to(bottom, { y: 0, rotate: 0, duration: 0.18, ease: 'power2.out' });
+    });
+  }
+
+  private setMobileMenuTriggerClosedState(): void {
+    const lines = this.getMobileMenuTriggerLines();
+    if (!lines) return;
+
+    const [top, middle, bottom] = lines;
+
+    this.zone.runOutsideAngular(() => {
+      gsap.killTweensOf([top, middle, bottom]);
+      gsap.set(top, { y: 0, rotate: 0 });
+      gsap.set(middle, { opacity: 1, scaleX: 1 });
+      gsap.set(bottom, { y: 0, rotate: 0 });
+    });
+  }
+
+  private animateMobileMenuOpen(): void {
+    const panel = this.mobileMenuPanelEl()?.nativeElement;
+    if (!panel) return;
+
+    const items = panel.querySelectorAll<HTMLElement>('.header-mobile-menu__anim-item');
+
+    this.zone.runOutsideAngular(() => {
+      gsap.killTweensOf(panel);
+      gsap.killTweensOf(items);
+      gsap.set(items, { opacity: 0, y: 10 });
+      gsap.fromTo(
+        panel,
+        { opacity: 0, y: -14, scale: 0.98, transformOrigin: 'top center' },
+        {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          duration: 0.24,
+          ease: 'back.out(1.55)',
+          clearProps: 'transform',
+        },
+      );
+      gsap.to(items, {
+        opacity: 1,
+        y: 0,
+        duration: 0.22,
+        stagger: 0.04,
+        ease: 'power2.out',
+        delay: 0.04,
+      });
+    });
+  }
+
+  private animateMobileAccountMenuOpen(): void {
+    const menu = this.mobileAccountMenuEl()?.nativeElement;
+    const chevron = this.mobileAccountChevronEl()?.nativeElement;
+    if (!menu) return;
+
+    this.zone.runOutsideAngular(() => {
+      gsap.killTweensOf(menu);
+      if (chevron) {
+        gsap.killTweensOf(chevron);
+        gsap.to(chevron, { rotate: 180, duration: 0.22, ease: 'power2.out' });
+      }
+
+      gsap.fromTo(
+        menu,
+        { height: 0, opacity: 0, y: -8, overflow: 'hidden' },
+        {
+          height: 'auto',
+          opacity: 1,
+          y: 0,
+          duration: 0.22,
+          ease: 'power2.out',
+          onComplete: () => {
+            gsap.set(menu, { clearProps: 'height,overflow' });
+          },
+        },
+      );
+    });
+  }
+
+  private closeMobileAccountMenu(immediate = false): void {
+    this.isMobileAccountMenuOpen = false;
+
+    const menu = this.mobileAccountMenuEl()?.nativeElement;
+    const chevron = this.mobileAccountChevronEl()?.nativeElement;
+
+    if (immediate || !menu) {
+      this.showMobileAccountMenu = false;
+      if (chevron) {
+        gsap.set(chevron, { clearProps: 'transform' });
+      }
+      return;
+    }
+
+    this.zone.runOutsideAngular(() => {
+      gsap.killTweensOf(menu);
+      if (chevron) {
+        gsap.killTweensOf(chevron);
+        gsap.to(chevron, { rotate: 0, duration: 0.18, ease: 'power2.out' });
+      }
+
+      gsap.to(menu, {
+        height: 0,
+        opacity: 0,
+        y: -8,
+        duration: 0.18,
+        ease: 'power2.in',
+        overflow: 'hidden',
+        onComplete: () => {
+          this.zone.run(() => {
+            this.showMobileAccountMenu = false;
+          });
+        },
+      });
+    });
+  }
+
+  private resetMobileAccountMenuState(): void {
+    this.isMobileAccountMenuOpen = false;
+    this.showMobileAccountMenu = false;
+  }
+
+  private getMobileMenuTriggerLines(): [HTMLElement, HTMLElement, HTMLElement] | null {
+    const top = this.mobileMenuLineTopEl()?.nativeElement;
+    const middle = this.mobileMenuLineMiddleEl()?.nativeElement;
+    const bottom = this.mobileMenuLineBottomEl()?.nativeElement;
+
+    if (!top || !middle || !bottom) {
+      return null;
+    }
+
+    return [top, middle, bottom];
+  }
+
+  private isMobileViewport(): boolean {
+    return typeof window !== 'undefined' && window.innerWidth <= this.mobileBreakpoint;
   }
 
   // ── Private ───────────────────────────────────────────────
@@ -287,13 +553,32 @@ export class HeaderBarComponent implements OnInit {
       }
     }
 
+    if (this.isMobileMenuOpen) {
+      const triggerEl = this.mobileMenuTriggerContainer()?.nativeElement;
+      const panelEl = this.mobileMenuPanelEl()?.nativeElement;
+      if (!(triggerEl && triggerEl.contains(target)) && !(panelEl && panelEl.contains(target))) {
+        this.closeMobileMenu();
+      }
+    }
+
     this.projectSearch()?.closeIfClickedOutside(target);
+  }
+
+  @HostListener('window:resize')
+  onResize(): void {
+    if (this.isMobileViewport()) {
+      this.closeUserMenu();
+      return;
+    }
+
+    this.closeMobileMenu(true);
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.projectMenu()?.close();
     this.closeUserMenu();
+    this.closeMobileMenu();
     this.projectSearch()?.closeDropdown();
   }
 }

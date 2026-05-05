@@ -46,7 +46,7 @@ export class ProjectSearchComponent {
             pill,
             { width: 36 },
             {
-              width: 240,
+              width: this.getExpandedWidth(),
               duration: 0.35,
               ease: 'power3.out',
               onComplete: () => this.inputEl()?.nativeElement.focus(),
@@ -180,5 +180,16 @@ export class ProjectSearchComponent {
   closeDropdown(): void {
     this.isSearchOpen.set(false);
   }
-}
 
+  private getExpandedWidth(): number {
+    if (typeof window === 'undefined') {
+      return 240;
+    }
+
+    if (window.innerWidth > 720) {
+      return 240;
+    }
+
+    return Math.max(144, Math.min(184, window.innerWidth - 208));
+  }
+}

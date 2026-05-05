@@ -282,7 +282,7 @@
   font-size: 2rem;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: rgba(255, 255, 255, 0.88);
+  color: rgb(255, 255, 255);
 }
 
 .prf-count-tag {
@@ -505,6 +505,8 @@
   cursor: pointer;
   overflow: visible;
   border: none;
+  display: flex;
+  flex-direction: column;
   box-shadow:
     0 0 0 1.5px rgb(255, 255, 255),
     -1px 3px 18px rgba(0, 0, 0, 0.35);
@@ -554,6 +556,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.42rem;
+  flex: 1;
   border-top: 1.5px solid rgb(255, 255, 255);
   transition: border-top-color 0.25s ease-in-out;
 }
@@ -572,6 +575,22 @@
   text-overflow: ellipsis;
   letter-spacing: -0.01em;
   min-width: 0;
+}
+
+.prj-card-fork-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.67rem;
+  color: rgba(255, 255, 255, 0.4);
+  opacity: 0.85;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+
+  strong {
+    font-weight: 600;
+  }
 }
 
 .prj-card-title-row {
@@ -602,6 +621,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  margin-top: auto;
 }
 
 .prj-card-stats {
@@ -631,6 +651,57 @@
 
 .prj-card-stat--liked svg {
   filter: drop-shadow(0 0 4px #ff6b9d88);
+}
+
+.prj-card-stat--star {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    color 0.15s ease;
+}
+
+.prj-card-stat--starred svg {
+  filter: drop-shadow(0 0 4px #ff85d088);
+}
+
+/* === STAR SAVE BUTTON (non-owner) === */
+.prj-card-star-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  background: none;
+  border: none;
+  box-shadow: inset 0 -0.3px 0 1.5px #cdcdcd;
+  color: rgb(255, 255, 255);
+  cursor: pointer;
+  transition:
+    box-shadow 0.25s ease-in-out,
+    background 0.25s ease-in-out,
+    color 0.25s ease-in-out;
+  padding: 0;
+  flex-shrink: 0;
+
+  &:hover {
+    box-shadow: inset 0 -0.3px 0 1.5px #ff85d0;
+    background: rgba(255, 133, 208, 0.1);
+    color: #ff85d0;
+  }
+}
+
+.prj-card-star-btn--starred {
+  box-shadow: inset 0 -0.3px 0 1.5px #ff85d0;
+  background: rgba(255, 133, 208, 0.1);
+  color: #ff85d0;
+
+  &:hover {
+    background: rgba(255, 133, 208, 0.18);
+  }
 }
 
 /* === CARD MORE MENU === */

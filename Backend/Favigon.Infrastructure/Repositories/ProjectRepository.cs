@@ -21,6 +21,8 @@ public class ProjectRepository : IProjectRepository
         .Where(p => p.UserId == userId && (isPublic == null || p.IsPublic == isPublic))
         .Include(p => p.Bookmarks)
         .Include(p => p.Likes)
+        .Include(p => p.ForkedFromProject)
+            .ThenInclude(fp => fp!.User)
         .ToListAsync();
   }
 
@@ -37,6 +39,11 @@ public class ProjectRepository : IProjectRepository
   public Task<Project?> GetBySlugAsync(string slug, int userId)
   {
     return _context.Projects.FirstOrDefaultAsync(p => p.Slug == slug && p.UserId == userId);
+  }
+
+  public Task<Project?> GetPublicBySlugAsync(string slug)
+  {
+    return _context.Projects.FirstOrDefaultAsync(p => p.Slug == slug && p.IsPublic);
   }
 
   public Task<bool> SlugExistsForUserAsync(string slug, int userId, int? excludeProjectId = null)
@@ -69,5 +76,25 @@ public class ProjectRepository : IProjectRepository
     return _context.Projects
       .Where(p => p.Id == projectId && p.IsPublic)
       .ExecuteUpdateAsync(s => s.SetProperty(p => p.ViewCount, p => p.ViewCount + 1));
+  }
+
+  public Task<Project?> GetPublicByIdWithDesignAsync(int id)
+  {
+    return _context.Projects
+      .AsNoTracking()
+      .FirstOrDefaultAsync(p => p.Id == id && p.IsPublic);
+  }
+
+  public async Task<Dictionary<int, string>> GetOwnerUsernamesByProjectIdsAsync(IEnumerable<int> projectIds)
+  {
+    var ids = projectIds.ToList();
+    return await _context.Projects
+      .AsNoTracking()
+      .Where(p => ids.Contains(p.Id))
+      .Join(_context.Users,
+            p => p.UserId,
+            u => u.Id,
+            (p, u) => new { p.Id, u.Username })
+      .ToDictionaryAsync(x => x.Id, x => x.Username);
   }
 }

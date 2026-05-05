@@ -68,7 +68,7 @@
           </div>
           <div class="prf-toolbar-controls">
             <label class="prf-search">
-              <svg class="prf-search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg class="prf-search-ico" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
@@ -94,6 +94,7 @@
               @if (isOwnProfile()) {
                 <button class="prf-pill" [class.prf-pill--on]="projectTypeFilter() === 'private'" type="button" (click)="setProjectType('private')">Private</button>
               }
+              <button class="prf-pill" [class.prf-pill--on]="projectTypeFilter() === 'forked'" type="button" (click)="setProjectType('forked')">Forked</button>
             </div>
 
             <div class="prf-pill-group">
@@ -181,6 +182,13 @@
                       </span>
                     }
                   </div>
+
+                  @if (project.forkedFromProjectId) {
+                    <div class="prj-card-fork-row">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v1a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9"/><line x1="12" x2="12" y1="12" y2="15"/></svg>
+                      <span>Forked from <strong>&#64;{{ project.forkedFromOwnerUsername ?? 'unknown' }}</strong></span>
+                    </div>
+                  }
                   <div class="prj-card-meta">
                     <div class="prj-card-stats">
                       <button
@@ -212,7 +220,21 @@
                       </span>
                     </div>
 
-                    @if (isOwnProfile()) {
+                    @if (!isOwnProfile() && project.isPublic) {
+                      <button
+                        class="prj-card-star-btn"
+                        type="button"
+                        [class.prj-card-star-btn--starred]="project.isStarredByCurrentUser"
+                        [title]="project.isStarredByCurrentUser ? 'Unstar' : 'Star'"
+                        (click)="toggleProjectStar(project); $event.stopPropagation()">
+                        <svg width="14" height="14" viewBox="0 0 24 24"
+                          [attr.fill]="project.isStarredByCurrentUser ? 'currentColor' : 'none'"
+                          stroke="currentColor"
+                          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                        </svg>
+                      </button>
+                    } @else if (isOwnProfile()) {
                       <div class="prj-card-more" (click)="$event.stopPropagation()">
                         <button
                           class="prj-card-more-btn"

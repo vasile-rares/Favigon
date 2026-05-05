@@ -291,7 +291,8 @@ public class ProjectsController : ControllerBase
   [HttpGet("user/{userId:int}")]
   public async Task<IActionResult> GetPublicByUserId(int userId)
   {
-    var projects = await _projectService.GetByUserIdAsync(userId, isPublic: true);
+    int? viewerUserId = User.TryGetUserId(out var vid) ? vid : null;
+    var projects = await _projectService.GetByUserIdAsync(userId, isPublic: true, viewerUserId: viewerUserId);
     return Ok(projects);
   }
 
@@ -365,6 +366,17 @@ public class ProjectsController : ControllerBase
     {
       return BadRequest(new { message = ex.Message });
     }
+  }
+
+  [HttpPost("{id:int}/fork")]
+  public async Task<IActionResult> Fork(int id)
+  {
+    if (!User.TryGetUserId(out var userId)) return Unauthorized();
+
+    var forked = await _projectService.ForkAsync(id, userId);
+    if (forked == null) return NotFound();
+
+    return CreatedAtAction(nameof(GetById), new { id = forked.ProjectId }, forked);
   }
 
 }

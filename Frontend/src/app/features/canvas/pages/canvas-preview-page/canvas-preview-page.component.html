@@ -1,10 +1,60 @@
 <div class="preview-page">
   <app-header-bar
-    class="canvas-header preview-header"
+    class="preview-header"
     appearance="preview"
     (runPreviewClicked)="refreshPreview()">
 
-    
+    @if (!isOwner()) {
+      <div header-right-extra class="preview-social-actions">
+        <button
+          type="button"
+          class="preview-social-btn preview-social-btn--fork"
+          [disabled]="isForking()"
+          (click)="forkProject()"
+          aria-label="Fork project"
+          title="Fork project — copy to your profile">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><circle cx="18" cy="6" r="3"/><path d="M18 9v1a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V9"/><line x1="12" x2="12" y1="12" y2="15"/></svg>
+          Fork
+        </button>
+
+        <div class="preview-social-divider"></div>
+
+        <button
+          type="button"
+          class="preview-social-btn"
+          [class.preview-social-btn--active]="isLiked()"
+          [disabled]="isLiking()"
+          (click)="toggleLike()"
+          [attr.aria-label]="isLiked() ? 'Unlike project' : 'Like project'"
+          [attr.title]="isLiked() ? 'Unlike project' : 'Like project'">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          @if (likeCount() > 0) {
+            <span class="preview-social-btn__count">{{ likeCount() }}</span>
+          }
+        </button>
+
+        <button
+          type="button"
+          class="preview-social-btn"
+          [class.preview-social-btn--active]="isStarred()"
+          [class.preview-social-btn--star]="true"
+          [disabled]="isStarring()"
+          (click)="toggleStar()"
+          [attr.aria-label]="isStarred() ? 'Unstar project' : 'Star project'"
+          [attr.title]="isStarred() ? 'Unstar project' : 'Star project'">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+          @if (starCount() > 0) {
+            <span class="preview-social-btn__count">{{ starCount() }}</span>
+          }
+        </button>
+      </div>
+    }
+
+
     <div header-left-extra class="preview-nav-left">
       <button type="button" class="preview-back-btn" (click)="goBack()" aria-label="Back to editor">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
@@ -12,42 +62,42 @@
 
       <div class="preview-nav-divider"></div>
 
-      <div class="preview-device-dropdown">
-        <app-dropdown-select
-          [ngModel]="selectedFrameIndex()"
-          (ngModelChange)="onFrameSizeChange($event)"
-          [options]="deviceSelectOptions()"
-          [enableSearch]="false"
-          [closeOnSelect]="true"
-          placeholder="Select device">
-        </app-dropdown-select>
-      </div>
+      <select
+        class="preview-device-select"
+        (change)="onNativeFrameSizeChange($event)"
+        aria-label="Select device">
+        @for (opt of frameSizeOptions(); track $index) {
+          <option [value]="$index" [selected]="$index === selectedFrameIndex()">{{ opt.label }}</option>
+        }
+      </select>
 
-      <div class="preview-dimension-inputs">
-        <app-number-input
-          [value]="viewportWidth()"
-          [min]="120"
-          [max]="getStageMaxViewportWidth()"
-          appearance="compact"
-          ariaLabel="Viewport width"
-          suffix="W"
-          suffixMode="stepper"
-          (valueChange)="onWidthInputChange($event)">
-        </app-number-input>
-        <app-number-input
-          [value]="viewportHeight()"
-          [min]="120"
-          [max]="getStageMaxViewportHeight()"
-          appearance="compact"
-          ariaLabel="Viewport height"
-          suffix="H"
-          suffixMode="stepper"
-          (valueChange)="onHeightInputChange($event)">
-        </app-number-input>
+      <div class="preview-dim-inputs">
+        <div class="preview-dim-group">
+          <input
+            type="number"
+            class="preview-dim-input"
+            [value]="viewportWidth()"
+            [min]="120"
+            [max]="getStageMaxViewportWidth()"
+            aria-label="Viewport width"
+            (change)="onNativeWidthChange($event)" />
+          <span class="preview-dim-label" aria-hidden="true">W</span>
+        </div>
+        <div class="preview-dim-group">
+          <input
+            type="number"
+            class="preview-dim-input"
+            [value]="viewportHeight()"
+            [min]="120"
+            [max]="getStageMaxViewportHeight()"
+            aria-label="Viewport height"
+            (change)="onNativeHeightChange($event)" />
+          <span class="preview-dim-label" aria-hidden="true">H</span>
+        </div>
       </div>
     </div>
 
-    
+
     <div header-center class="preview-nav-center">
       <div class="preview-address-bar">
         <svg class="preview-address-bar__icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
@@ -107,7 +157,7 @@
             frameborder="0"></iframe>
         </div>
 
-        
+
         <div
           class="resize-handle resize-handle--right"
           (pointerdown)="onResizeHandlePointerDown($event, 'right')">

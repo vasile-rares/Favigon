@@ -12,6 +12,7 @@
   background-color: var(--color-bg-page);
   color: var(--color-white);
   overflow: hidden;
+  touch-action: none;
 }
 
 .canvas-header {
@@ -40,20 +41,16 @@
   border: none;
   border-radius: 10px;
   background: transparent;
-  color: var(--color-text-light, #f4f4f5);
+  color: rgba(255, 255, 255);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s;
+  transition: color 0.2s ease;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
-  }
-
-  &:active {
-    background: rgba(255, 255, 255, 0.12);
+    color: #ff85d0;
   }
 }
 
@@ -605,6 +602,55 @@
   &:hover {
     background: rgba(239, 68, 68, 0.12);
     color: #fca5a5;
+  }
+}
+
+@media (max-width: 720px) {
+  app-project-panel,
+  app-properties-panel,
+  app-toolbar {
+    display: none !important;
+  }
+
+  .canvas-header {
+    top: 0;
+    left: 0;
+    right: 0;
+  }
+
+  .canvas-back-btn,
+  .canvas-nav-divider,
+  .canvas-nav-left {
+    display: none;
+  }
+}
+
+.canvas-mobile-back-link {
+  position: relative;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7rem;
+  padding: 1.5rem 0.95rem;
+  font-size: 1.18rem;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  font: inherit;
+  font-size: 1.18rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+
+  &:hover {
+    color: #ff85d0;
   }
 }
 
