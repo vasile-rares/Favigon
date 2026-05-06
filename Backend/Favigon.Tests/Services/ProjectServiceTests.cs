@@ -47,6 +47,8 @@ public class ProjectServiceTests
             new() { Id = 2, UserId = 7, Name = "Beta",  CreatedAt = DateTime.UtcNow, UpdatedAt = DateTime.UtcNow }
         };
     _projectRepo.Setup(r => r.GetByUserIdAsync(7, It.IsAny<bool?>())).ReturnsAsync(projects);
+    _bookmarkRepo.Setup(r => r.GetStarredProjectIdsAsync(It.IsAny<int>(), It.IsAny<IEnumerable<int>>())).ReturnsAsync(new HashSet<int>());
+    _likeRepo.Setup(r => r.GetLikedProjectIdsAsync(It.IsAny<int>(), It.IsAny<IEnumerable<int>>())).ReturnsAsync(new HashSet<int>());
 
     // Act
     var result = await _sut.GetByUserIdAsync(7);
