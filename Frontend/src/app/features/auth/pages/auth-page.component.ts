@@ -11,7 +11,7 @@ import {
 import { firstValueFrom } from 'rxjs';
 import { AuthService, UserService, CurrentUserService, extractApiErrorMessage } from '@app/core';
 import { environment } from '../../../../environments/environment';
-import { TextInputComponent, ActionButtonComponent, DIALOG_BOX_IMPORTS } from '@app/shared';
+import { DIALOG_BOX_IMPORTS } from '@app/shared';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const CREDENTIAL_MAX_LENGTH = 100;
@@ -28,7 +28,7 @@ function passwordStrengthValidator(): ValidatorFn {
 @Component({
   selector: 'app-auth-page',
   standalone: true,
-  imports: [ReactiveFormsModule, ...DIALOG_BOX_IMPORTS, TextInputComponent, ActionButtonComponent],
+  imports: [ReactiveFormsModule, ...DIALOG_BOX_IMPORTS],
   templateUrl: './auth-page.component.html',
   styleUrl: './auth-page.component.css',
 })
@@ -45,6 +45,9 @@ export class AuthPage implements OnInit {
   // --- State Signals ---
   readonly mode = signal<'login' | 'register'>('login');
   readonly isSubmitting = signal(false);
+  readonly showLoginPassword = signal(false);
+  readonly showRegPassword = signal(false);
+  readonly showConfirmPassword = signal(false);
   readonly isForgotPasswordSubmitting = signal(false);
   readonly isForgotPasswordDialogOpen = signal(false);
   readonly isTwoFactorSubmitting = signal(false);

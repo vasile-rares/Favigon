@@ -16,6 +16,8 @@ public class ProjectServiceTests
   private readonly Mock<IProjectRepository> _projectRepo = new();
   private readonly Mock<IConverterEngine> _converterEngine = new();
   private readonly Mock<IProjectAssetStorage> _projectAssetStorage = new();
+  private readonly Mock<IBookmarkRepository> _bookmarkRepo = new();
+  private readonly Mock<ILikeRepository> _likeRepo = new();
   private readonly IMapper _mapper;
   private readonly ProjectService _sut;
 
@@ -28,7 +30,9 @@ public class ProjectServiceTests
       _projectRepo.Object,
       _mapper,
       _converterEngine.Object,
-      _projectAssetStorage.Object);
+      _projectAssetStorage.Object,
+      _bookmarkRepo.Object,
+      _likeRepo.Object);
   }
 
   // --- GetByUserId ---

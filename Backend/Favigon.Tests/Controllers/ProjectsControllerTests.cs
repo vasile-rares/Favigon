@@ -46,7 +46,7 @@ public class ProjectsControllerTests
       new() { ProjectId = 1, UserId = 1, Name = "Alpha" },
       new() { ProjectId = 2, UserId = 1, Name = "Beta" },
     };
-    _projectService.Setup(s => s.GetByUserIdAsync(1, null)).ReturnsAsync(projects);
+    _projectService.Setup(s => s.GetByUserIdAsync(1, null, null)).ReturnsAsync(projects);
 
     var result = await _controller.GetAll();
 
