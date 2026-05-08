@@ -172,7 +172,7 @@ export class ExplorePageComponent implements OnInit {
   navigateToProject(project: ExploreProjectItem, event: MouseEvent): void {
     event.preventDefault();
     this.exploreService.recordView(project.projectId);
-    this.router.navigate(['/', project.ownerUsername, project.slug]);
+    this.router.navigate(['/project', project.slug, 'preview'], { state: { fromExplore: true } });
   }
 
   navigateToProfile(username: string): void {

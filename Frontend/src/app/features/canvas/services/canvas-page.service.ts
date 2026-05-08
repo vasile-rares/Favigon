@@ -492,18 +492,25 @@ export class CanvasPageService {
     const rootFrames = targetPage ? this.el.getRootFrames(targetPage.elements) : [];
     const hasMobile = rootFrames.some((f) => (f.name ?? '').toLowerCase().startsWith('mobile'));
     const hasTablet = rootFrames.some((f) => (f.name ?? '').toLowerCase().startsWith('tablet'));
+    const hasDesktop = rootFrames.some((f) => (f.name ?? '').toLowerCase().startsWith('desktop'));
     this.deviceMenuItems.set([
       {
-        id: 'device-mobile',
-        label: 'Mobile',
-        disabled: hasMobile,
-        action: () => this.addDeviceFrame('mobile'),
+        id: 'device-desktop',
+        label: 'Desktop',
+        disabled: hasDesktop,
+        action: () => this.addDeviceFrame('desktop'),
       },
       {
         id: 'device-tablet',
         label: 'Tablet',
         disabled: hasTablet,
         action: () => this.addDeviceFrame('tablet'),
+      },
+      {
+        id: 'device-mobile',
+        label: 'Mobile',
+        disabled: hasMobile,
+        action: () => this.addDeviceFrame('mobile'),
       },
       {
         id: 'device-custom',

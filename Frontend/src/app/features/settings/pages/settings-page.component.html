@@ -42,7 +42,8 @@
                     <img
                       class="stg-photo-avatar"
                       [src]="accountAvatarUrl"
-                      [alt]="(displayName || username || 'Profile') + ' avatar'" />
+                      [alt]="(displayName || username || 'Profile') + ' avatar'"
+                      (error)="$any($event.target).src = fallbackUrl" />
                   } @else {
                     <div class="stg-photo-avatar stg-photo-avatar--fallback">{{ accountInitial }}</div>
                   }

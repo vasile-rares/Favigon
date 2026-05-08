@@ -342,12 +342,12 @@
 }
 
 .header-user-menu__icon {
-  color: var(--color-text-medium);
+  color: #fff;
   display: inline-flex;
   transition: color 0.2s;
 
   &:hover {
-    color: var(--color-text-light);
+    color: #ff85d0;
   }
 }
 

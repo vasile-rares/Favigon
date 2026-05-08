@@ -71,7 +71,9 @@ public class GithubOAuthClient : IGithubOAuthClient
       Email = email,
       Username = githubUser.Login,
       DisplayName = githubUser.Name,
-      ProfilePictureUrl = githubUser.AvatarUrl,
+      ProfilePictureUrl = !string.IsNullOrWhiteSpace(githubUser.AvatarUrl)
+        ? githubUser.AvatarUrl
+        : $"https://api.dicebear.com/9.x/adventurer/svg?seed={Uri.EscapeDataString(email)}",
     };
   }
 

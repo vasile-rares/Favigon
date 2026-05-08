@@ -109,6 +109,8 @@ export interface IRStyle {
   filter?: string;
   backdropFilter?: string;
 
+  backgroundClip?: string;
+
   padding?: IRSpacing;
   margin?: IRSpacing;
 }
@@ -137,13 +139,13 @@ export interface IRSpacing {
 export interface IRBorder {
   width?: IRLength;
   color?: string;
-  
+
   style: BorderStyle;
   topWidth?: IRLength;
   rightWidth?: IRLength;
   bottomWidth?: IRLength;
   leftWidth?: IRLength;
-  
+
   top?: boolean;
   right?: boolean;
   bottom?: boolean;

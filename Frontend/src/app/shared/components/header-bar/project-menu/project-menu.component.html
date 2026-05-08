@@ -2,54 +2,55 @@
   <div
     class="header-project-menu"
     #projectMenuEl
-    [class.header-project-menu--open]="!isClosing()"
-    [class.header-project-menu--closing]="isClosing()"
     role="dialog"
     aria-label="Project settings">
-    <app-text-input
-      #projectNameInput
-      class="header-project-menu__input"
-      id="header-project-menu-name"
-      label="Project name"
-      placeholder="Project name"
-      [maxLength]="100"
-      [errorText]="updateError() || ''"
-      [forceInvalid]="!!updateError()"
-      [ngModel]="nameDraft()"
-      (ngModelChange)="nameDraft.set($event)"
-      (keydown.enter)="$event.preventDefault(); save()"
-      (keydown.escape)="$event.preventDefault(); close()"></app-text-input>
 
-    <div class="header-project-menu__field">
-      <span class="header-project-menu__label">Visibility</span>
-      <app-toggle-group
-        [options]="visibilityOptions"
-        [value]="visibilityDraft()"
-        [stretch]="true"
-        [minWidth]="null"
-        ariaLabel="Project visibility"
-        (valueChange)="visibilityDraft.set($event === true)"></app-toggle-group>
+    <div class="cp-field">
+      <label class="cp-label" for="pm-name">Project name</label>
+      <input
+        #nameInput
+        class="cp-input"
+        id="pm-name"
+        type="text"
+        placeholder="Project name"
+        autocomplete="off"
+        maxlength="100"
+        [value]="nameDraft()"
+        (input)="nameDraft.set($any($event.target).value)"
+        (keydown.enter)="$event.preventDefault(); save()"
+        (keydown.escape)="$event.preventDefault(); close()" />
+      @if (updateError()) {
+        <span class="cp-err-msg">{{ updateError() }}</span>
+      }
     </div>
 
-    <div class="header-project-menu__actions">
-      <app-action-button
-        class="header-project-menu__action"
-        type="button"
-        variant="outline"
-        [fullWidth]="false"
-        [disabled]="isUpdating()"
-        (clicked)="close()">
-        Cancel
-      </app-action-button>
-      <app-action-button
-        class="header-project-menu__action"
-        type="button"
-        variant="primary"
-        [fullWidth]="false"
-        [disabled]="isUpdating()"
-        (clicked)="save()">
+    <div class="cp-field">
+      <span class="cp-label">Visibility</span>
+      <div class="cp-vis-group">
+        <label class="cp-vis-opt" [class.cp-vis-opt--on]="visibilityDraft() === false" (click)="visibilityDraft.set(false)">
+          <input type="radio" name="pm-visibility" [checked]="visibilityDraft() === false" />
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          Private
+        </label>
+        <label class="cp-vis-opt" [class.cp-vis-opt--on]="visibilityDraft() === true" (click)="visibilityDraft.set(true)">
+          <input type="radio" name="pm-visibility" [checked]="visibilityDraft() === true" />
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+          Public
+        </label>
+      </div>
+    </div>
+
+    <div class="cp-modal-foot">
+      <button class="cp-btn cp-btn--quiet" type="button" [disabled]="isUpdating()" (click)="close()">Cancel</button>
+      <button class="cp-btn cp-btn--primary" type="button" [disabled]="isUpdating()" (click)="save()">
         {{ isUpdating() ? 'Saving...' : 'Save' }}
-      </app-action-button>
+      </button>
     </div>
   </div>
 }

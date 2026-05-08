@@ -9,7 +9,9 @@ import { CanvasViewportService } from './canvas-viewport.service';
 const PAGE_SHELL_SIDE_PADDING = 28;
 const PAGE_SHELL_BOTTOM_PADDING = 28;
 const PAGE_SHELL_HEADER_HEIGHT = 44;
+const PAGE_SHELL_HEADER_INSET = 25;
 const PAGE_FRAME_TITLE_OFFSET = 24;
+export const FRAME_TITLE_ZOOM_THRESHOLD = 0.3;
 
 @Injectable()
 export class CanvasPageGeometryService {
@@ -68,16 +70,23 @@ export class CanvasPageGeometryService {
   }
 
   getPageShellHeaderScreenLeft(pageId: string, layouts: CanvasPageLayout[]): number {
-    return roundToTwoDecimals(this.getPageShellLeft(pageId, layouts) * this.viewport.zoomLevel());
+    const inset = PAGE_SHELL_HEADER_INSET * this.viewport.zoomLevel();
+    return roundToTwoDecimals(
+      this.getPageShellLeft(pageId, layouts) * this.viewport.zoomLevel() + inset,
+    );
   }
 
   getPageShellHeaderScreenTop(pageId: string, layouts: CanvasPageLayout[]): number {
     const shellScreenTop = this.getPageShellTop(pageId, layouts) * this.viewport.zoomLevel();
-    return roundToTwoDecimals(shellScreenTop - PAGE_SHELL_HEADER_HEIGHT - 8);
+    const gap = this.viewport.zoomLevel() >= FRAME_TITLE_ZOOM_THRESHOLD ? -10 : -25;
+    return roundToTwoDecimals(shellScreenTop - PAGE_SHELL_HEADER_HEIGHT - gap);
   }
 
   getPageShellHeaderScreenWidth(pageId: string, layouts: CanvasPageLayout[]): number {
-    return roundToTwoDecimals(this.getPageShellWidth(pageId, layouts) * this.viewport.zoomLevel());
+    const inset = PAGE_SHELL_HEADER_INSET * this.viewport.zoomLevel();
+    return roundToTwoDecimals(
+      this.getPageShellWidth(pageId, layouts) * this.viewport.zoomLevel() - inset * 2,
+    );
   }
 
   getPageShellSelectionLeft(pageId: string, layouts: CanvasPageLayout[]): number {

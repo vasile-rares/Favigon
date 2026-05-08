@@ -78,7 +78,9 @@ public class GoogleOAuthClient : IGoogleOAuthClient
       ProviderUserId = googleUser.Subject,
       Email = googleUser.Email,
       DisplayName = googleUser.Name,
-      ProfilePictureUrl = googleUser.Picture,
+      ProfilePictureUrl = !string.IsNullOrWhiteSpace(googleUser.Picture)
+        ? googleUser.Picture
+        : $"https://api.dicebear.com/9.x/adventurer/svg?seed={Uri.EscapeDataString(googleUser.Email)}",
     };
   }
 }

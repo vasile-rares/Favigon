@@ -225,7 +225,12 @@ ${html}
   }
 
   goBack(): void {
-    if (this.isOwner()) {
+    const nav = this.router.getCurrentNavigation();
+    const fromExplore =
+      (this.location.getState() as Record<string, unknown>)?.['fromExplore'] === true;
+    if (fromExplore) {
+      void this.router.navigate(['/explore']);
+    } else if (this.isOwner()) {
       void this.router.navigate(['/project', this.projectSlug], { state: { fromPreview: true } });
     } else if (window.history.length > 1) {
       this.location.back();

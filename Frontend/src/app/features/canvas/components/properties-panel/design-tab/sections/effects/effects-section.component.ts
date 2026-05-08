@@ -50,6 +50,7 @@ const EFFECT_PREVIEW_CLICK_IDLE_MS = 1080;
     ContextMenuComponent,
   ],
   templateUrl: './effects-section.component.html',
+  styleUrl: './effects-section.component.css',
   encapsulation: ViewEncapsulation.None,
 })
 export class EffectsSectionComponent {

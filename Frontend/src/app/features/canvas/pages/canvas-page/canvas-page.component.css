@@ -191,53 +191,56 @@
 
 /* -- Page shells -------------------------------------------- */
 
-.page-shell-bg {
-  position: absolute;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 4px;
-  pointer-events: none;
-}
-.page-shell-bg--active {
-  border-color: rgba(255, 255, 255, 0.22);
-}
-
 .page-shell-header {
   position: absolute;
   height: auto;
   min-height: 36px;
-  background: rgba(30, 30, 36, 0.9);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  background: #111111;
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.15),
+    -1px 4px 18px rgba(0, 0, 0, 0.55);
+  border-radius: 12px;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   padding: 4px 8px;
   pointer-events: auto;
   cursor: default;
   white-space: nowrap;
   overflow: hidden;
   min-width: 0;
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+.page-shell-header--hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.08s ease;
 }
 .page-shell-header--active {
-  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 0 0 1.5px rgba(255, 255, 255, 0.7),
+    -1px 4px 18px rgba(0, 0, 0, 0.55);
 }
 .page-shell-header--selected {
-  border-color: #3b82f6;
+  box-shadow:
+    0 0 0 1.5px #ff85d0,
+    -1px 4px 18px rgba(255, 133, 208, 0.25);
 }
 
 .page-shell-play-btn {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: rgb(255, 255, 255);
   cursor: pointer;
   padding: 4px;
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  transition: color 0.12s ease;
 }
 .page-shell-play-btn:hover {
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .page-shell-info {
@@ -252,38 +255,48 @@
 .page-shell-name {
   font-size: 12px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.65);
   overflow: hidden;
   text-overflow: ellipsis;
-  font-family: Inter, system-ui, sans-serif;
+  font-family:
+    'Geist',
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  letter-spacing: -0.01em;
 }
 .page-shell-header--active .page-shell-name {
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(255, 255, 255, 0.92);
 }
 .page-shell-device-count {
   font-size: 10px;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.4);
-  font-family: Inter, system-ui, sans-serif;
+  color: rgba(255, 255, 255, 0.32);
+  font-family:
+    'Geist',
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .page-shell-header--active .page-shell-device-count {
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.48);
 }
 
 .page-shell-add-btn {
   background: none;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgb(255, 255, 255);
   cursor: pointer;
   padding: 4px 6px;
   font-size: 16px;
   line-height: 1;
   flex-shrink: 0;
+  transition: color 0.12s ease;
 }
 .page-shell-add-btn:hover {
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .frame-title {
@@ -296,9 +309,16 @@
   cursor: pointer;
   white-space: nowrap;
   line-height: 1;
+  opacity: 1;
+  transition: opacity 0.15s ease;
 }
 .frame-title--active {
   color: #ffffff;
+}
+.frame-title--hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.08s ease;
 }
 
 /* -- Overlays ------------------------------------------------ */
@@ -536,6 +556,11 @@
   letter-spacing: 0.01em;
   white-space: nowrap;
   pointer-events: auto;
+  background: var(--chrome-panel-background);
+  backdrop-filter: var(--chrome-panel-blur);
+  -webkit-backdrop-filter: var(--chrome-panel-blur);
+  border: var(--chrome-panel-border);
+  box-shadow: var(--chrome-panel-shadow);
 }
 
 .file-import-toast--error .file-import-toast__icon {

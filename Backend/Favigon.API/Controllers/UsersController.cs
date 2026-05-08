@@ -98,8 +98,22 @@ public class UsersController : ControllerBase
     var deleted = await _userService.DeleteMyAccountAsync(userId);
     if (!deleted) return NotFound();
 
-    Response.Cookies.Delete("jwt");
-    Response.Cookies.Delete("refresh_token");
+    var isSecure = Request.IsHttps || Request.Headers["X-Forwarded-Proto"] == "https";
+    Response.Cookies.Append("jwt", "", new Microsoft.AspNetCore.Http.CookieOptions
+    {
+      HttpOnly = true,
+      Secure = isSecure,
+      SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict,
+      Expires = DateTime.UtcNow.AddDays(-1)
+    });
+    Response.Cookies.Append("refresh_token", "", new Microsoft.AspNetCore.Http.CookieOptions
+    {
+      HttpOnly = true,
+      Secure = isSecure,
+      SameSite = Microsoft.AspNetCore.Http.SameSiteMode.Strict,
+      Path = "/api/account/refresh",
+      Expires = DateTime.UtcNow.AddDays(-1)
+    });
     return NoContent();
   }
 

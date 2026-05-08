@@ -359,7 +359,13 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
   }
 
   if (element.fillMode === 'gradient' && element.gradient) {
-    style.background = gradientToCss(element.gradient);
+    if (element.type === 'text') {
+      style.background = gradientToCss(element.gradient);
+      style.backgroundClip = 'text';
+      style.color = 'transparent';
+    } else {
+      style.background = gradientToCss(element.gradient);
+    }
     style.gradient = {
       type: element.gradient.type,
       angle:

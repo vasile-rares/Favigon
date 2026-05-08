@@ -342,7 +342,7 @@ public class AuthService : IAuthService
 
     var githubProfile = await _githubOAuthClient.GetUserProfileAsync(code);
     var normalizedEmail = githubProfile.Email.Trim().ToLowerInvariant();
-    await LinkProviderAsync(userId, "github", githubProfile.ProviderUserId, normalizedEmail);
+    await LinkProviderAsync(userId, "github", githubProfile.ProviderUserId, normalizedEmail, githubProfile.ProfilePictureUrl);
   }
 
   public async Task LinkWithGoogleAsync(int userId, GoogleAuthRequest request)
@@ -353,10 +353,10 @@ public class AuthService : IAuthService
 
     var googleProfile = await _googleOAuthClient.GetUserProfileAsync(code);
     var normalizedEmail = googleProfile.Email.Trim().ToLowerInvariant();
-    await LinkProviderAsync(userId, "google", googleProfile.ProviderUserId, normalizedEmail);
+    await LinkProviderAsync(userId, "google", googleProfile.ProviderUserId, normalizedEmail, googleProfile.ProfilePictureUrl);
   }
 
-  private async Task LinkProviderAsync(int userId, string provider, string providerUserId, string normalizedEmail)
+  private async Task LinkProviderAsync(int userId, string provider, string providerUserId, string normalizedEmail, string? profilePictureUrl = null)
   {
     var existingLink = await _linkedAccountRepository.GetByProviderAsync(provider, providerUserId);
     if (existingLink != null && existingLink.UserId != userId)
@@ -383,6 +383,18 @@ public class AuthService : IAuthService
       ProviderUserId = providerUserId,
       ProviderEmail = normalizedEmail,
     });
+
+    // Set profile picture from OAuth provider if user doesn't already have one
+    if (!string.IsNullOrWhiteSpace(profilePictureUrl))
+    {
+      var user = await _userRepository.GetByIdAsync(userId);
+      if (user is not null && string.IsNullOrWhiteSpace(user.ProfilePictureUrl))
+      {
+        user.ProfilePictureUrl = profilePictureUrl;
+        await _userRepository.UpdateAsync(user);
+      }
+    }
+
     _audit.OAuthProviderLinked(userId, provider);
   }
 
@@ -419,6 +431,13 @@ public class AuthService : IAuthService
         await _linkedAccountRepository.UpdateAsync(existingProvider);
       }
 
+      // Always refresh the profile picture from OAuth provider
+      if (!string.IsNullOrWhiteSpace(profilePictureUrl) && linkedUser.ProfilePictureUrl != profilePictureUrl)
+      {
+        linkedUser.ProfilePictureUrl = profilePictureUrl;
+        await _userRepository.UpdateAsync(linkedUser);
+      }
+
       return linkedUser;
     }
 
@@ -442,6 +461,12 @@ public class AuthService : IAuthService
       };
 
       await _userRepository.AddAsync(user);
+    }
+    else if (string.IsNullOrWhiteSpace(user.ProfilePictureUrl) && !string.IsNullOrWhiteSpace(profilePictureUrl))
+    {
+      // Email-matched user had no picture — set it from the OAuth provider
+      user.ProfilePictureUrl = profilePictureUrl;
+      await _userRepository.UpdateAsync(user);
     }
 
     await _linkedAccountRepository.AddAsync(new LinkedAccount

@@ -18,6 +18,11 @@
   -ms-overflow-style: none;
   animation: context-menu-in 100ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   transform-origin: top left;
+  background: var(--chrome-panel-background);
+  backdrop-filter: var(--chrome-panel-blur);
+  -webkit-backdrop-filter: var(--chrome-panel-blur);
+  border: var(--chrome-panel-border);
+  box-shadow: var(--chrome-panel-shadow);
 
   &::-webkit-scrollbar {
     display: none;

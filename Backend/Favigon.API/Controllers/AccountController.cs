@@ -201,7 +201,7 @@ public class AccountController : ControllerBase
   [DisableRateLimiting]
   public IActionResult Logout()
   {
-    Response.Cookies.Delete("jwt");
+    DeleteAccessTokenCookie();
     DeleteRefreshTokenCookie();
     return Ok(new { message = "Logged out successfully" });
   }
@@ -246,6 +246,17 @@ public class AccountController : ControllerBase
       SameSite = SameSiteMode.Strict,
       Path = "/api/account/refresh",
       Expires = DateTime.UtcNow.AddDays(30)
+    });
+  }
+
+  private void DeleteAccessTokenCookie()
+  {
+    Response.Cookies.Append("jwt", "", new CookieOptions
+    {
+      HttpOnly = true,
+      Secure = IsSecure,
+      SameSite = SameSiteMode.Strict,
+      Expires = DateTime.UtcNow.AddDays(-1)
     });
   }
 

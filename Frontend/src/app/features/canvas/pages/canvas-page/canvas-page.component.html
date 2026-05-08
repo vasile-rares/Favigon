@@ -150,18 +150,12 @@
         <div class="dom-overlay">
           @for (pg of pages(); track pg.id) {
 
-            <div class="page-shell-bg"
-              [class.page-shell-bg--active]="pg.id === currentPageId()"
-              [ngStyle]="getPageShellStyle(pg.id)">
-            </div>
-
-            @if (viewport.zoomLevel() >= 0.3) {
-
-              <div class="page-shell-header"
-                [class.page-shell-header--active]="pg.id === currentPageId()"
-                [class.page-shell-header--selected]="pg.id === page.selectedCanvasPageId()"
-                [ngStyle]="getPageHeaderStyle(pg.id)"
-                (pointerdown)="onPageHeaderPointerDown($event, pg.id)">
+            <div class="page-shell-header"
+              [class.page-shell-header--active]="pg.id === currentPageId()"
+              [class.page-shell-header--selected]="pg.id === page.selectedCanvasPageId()"
+              [class.page-shell-header--hidden]="viewport.isPanning() || viewport.isZooming()"
+              [ngStyle]="getPageHeaderStyle(pg.id)"
+              (pointerdown)="onPageHeaderPointerDown($event, pg.id)">
                 <button type="button" class="page-shell-play-btn"
                   (click)="$event.stopPropagation(); onPageHeaderPlayClick(pg.id)">
                   <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
@@ -186,12 +180,12 @@
               @for (frame of getRootFrames(pg); track frame.id) {
                 <div class="frame-title"
                   [class.frame-title--active]="pg.id === currentPageId()"
+                  [class.frame-title--hidden]="viewport.isPanning() || viewport.isZooming() || viewport.zoomLevel() < frameTitleZoomThreshold"
                   [ngStyle]="getFrameTitleStyle(pg.id, frame)"
                   (pointerdown)="$event.stopPropagation(); onFrameTitlePointerDown(pg.id, frame.id)">
                   {{ getFrameTitle(frame) }}
                 </div>
               }
-            }
           }
 
 
@@ -403,7 +397,7 @@
 
 
     @if (fileImportToast(); as toast) {
-      <div class="file-import-toast glass-panel" [class.file-import-toast--error]="toast.state === 'error'" role="status" aria-live="polite">
+      <div class="file-import-toast" [class.file-import-toast--error]="toast.state === 'error'" role="status" aria-live="polite">
         <div class="file-import-toast__icon">
           @if (toast.state === 'importing') {
             <div class="file-import-toast__spinner"></div>

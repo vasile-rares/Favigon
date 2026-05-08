@@ -23,6 +23,8 @@ public class UserService : IUserService
   private readonly IUserRepository _userRepository;
   private readonly ILinkedAccountRepository _linkedAccountRepository;
   private readonly IUserProfileImageStorage _userProfileImageStorage;
+  private readonly IProjectRepository _projectRepository;
+  private readonly IProjectAssetStorage _projectAssetStorage;
   private readonly IMapper _mapper;
   private readonly IAuditLogger _audit;
 
@@ -30,12 +32,16 @@ public class UserService : IUserService
     IUserRepository userRepository,
     ILinkedAccountRepository linkedAccountRepository,
     IUserProfileImageStorage userProfileImageStorage,
+    IProjectRepository projectRepository,
+    IProjectAssetStorage projectAssetStorage,
     IMapper mapper,
     IAuditLogger audit)
   {
     _userRepository = userRepository;
     _linkedAccountRepository = linkedAccountRepository;
     _userProfileImageStorage = userProfileImageStorage;
+    _projectRepository = projectRepository;
+    _projectAssetStorage = projectAssetStorage;
     _mapper = mapper;
     _audit = audit;
   }
@@ -230,6 +236,12 @@ public class UserService : IUserService
   {
     var user = await _userRepository.GetByIdAsync(userId);
     if (user == null) return false;
+
+    // Delete all project asset files before removing the user (cascade will remove DB rows)
+    var projects = await _projectRepository.GetByUserIdAsync(userId);
+    var deleteTasks = projects.Select(p =>
+      _projectAssetStorage.DeleteProjectAssetsAsync(userId, p.Id, CancellationToken.None));
+    await Task.WhenAll(deleteTasks);
 
     await _userRepository.DeleteAsync(user);
     await _userProfileImageStorage.DeleteUserAssetsAsync(userId, CancellationToken.None);

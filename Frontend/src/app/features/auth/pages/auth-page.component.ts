@@ -219,7 +219,6 @@ export class AuthPage implements OnInit {
       );
 
       this.resetTwoFactorChallenge();
-      this.statusMessage.set({ type: 'success', text: response.message || 'Login successful.' });
 
       const user = await firstValueFrom(this.userService.getMe());
       this.currentUser.set(user);
@@ -278,11 +277,6 @@ export class AuthPage implements OnInit {
           password,
         }),
       );
-
-      this.statusMessage.set({
-        type: 'success',
-        text: response.message || 'Account created successfully.',
-      });
 
       // Auto-switch to login and pre-fill email
       this.switchMode('login');
@@ -400,6 +394,9 @@ export class AuthPage implements OnInit {
         } else {
           await firstValueFrom(this.authService.linkWithGithub({ code }));
         }
+        // Refresh user data so the new profile picture becomes visible immediately
+        const user = await firstValueFrom(this.userService.getMe());
+        this.currentUser.set(user);
         await this.router.navigate(['/settings']);
       } catch (error: unknown) {
         this.handleError(
@@ -460,7 +457,6 @@ export class AuthPage implements OnInit {
       return;
     }
 
-    this.statusMessage.set({ type: 'success', text: response.message || successMessage });
     const user = await firstValueFrom(this.userService.getMe());
     this.currentUser.set(user);
     await this.navigateAfterLogin(user.username);

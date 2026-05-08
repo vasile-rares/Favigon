@@ -300,20 +300,14 @@
   font-size: 0.8rem;
   font-weight: 400;
   margin: 0;
-  padding: 0.5rem 0.75rem;
-  border-radius: 8px;
 }
 
 .auth-status--error {
   color: rgba(255, 100, 100, 0.9);
-  background: rgba(255, 100, 100, 0.08);
-  border: 1px solid rgba(255, 100, 100, 0.15);
 }
 
 .auth-status--success {
   color: rgba(100, 220, 150, 0.9);
-  background: rgba(100, 220, 150, 0.08);
-  border: 1px solid rgba(100, 220, 150, 0.15);
 }
 
 /* ===== BUTTONS ===== */

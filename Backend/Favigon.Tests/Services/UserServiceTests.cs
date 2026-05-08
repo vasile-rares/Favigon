@@ -13,6 +13,8 @@ public class UserServiceTests
   private readonly Mock<IUserRepository> _userRepo = new();
   private readonly Mock<ILinkedAccountRepository> _linkedAccountRepo = new();
   private readonly Mock<IUserProfileImageStorage> _profileImageStorage = new();
+  private readonly Mock<IProjectRepository> _projectRepo = new();
+  private readonly Mock<IProjectAssetStorage> _projectAssetStorage = new();
   private readonly Mock<IMapper> _mapper = new();
   private readonly Mock<IAuditLogger> _audit = new();
   private readonly UserService _sut;
@@ -23,6 +25,8 @@ public class UserServiceTests
       _userRepo.Object,
       _linkedAccountRepo.Object,
       _profileImageStorage.Object,
+      _projectRepo.Object,
+      _projectAssetStorage.Object,
       _mapper.Object,
       _audit.Object);
   }
@@ -223,6 +227,7 @@ public class UserServiceTests
     // Arrange
     var user = new User { Id = 5, Username = "delme", Email = "delme@test.com" };
     _userRepo.Setup(r => r.GetByIdAsync(5)).ReturnsAsync(user);
+    _projectRepo.Setup(r => r.GetByUserIdAsync(5, null)).ReturnsAsync(new List<Project>());
 
     // Act
     var result = await _sut.DeleteMyAccountAsync(5);

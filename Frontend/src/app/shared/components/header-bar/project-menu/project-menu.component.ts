@@ -2,6 +2,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  NgZone,
   inject,
   input,
   output,
@@ -12,18 +13,14 @@ import {
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ProjectService } from '@app/core';
-import { TextInputComponent } from '../../text-input/text-input.component';
-import { ToggleGroupComponent, ToggleGroupOption } from '../../toggle-group/toggle-group.component';
-import { ActionButtonComponent } from '../../action-button/action-button.component';
 import { extractApiErrorMessage } from '@app/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-
-const PROJECT_MENU_ANIMATION_MS = 120;
+import gsap from 'gsap';
 
 @Component({
   selector: 'app-project-menu',
   standalone: true,
-  imports: [FormsModule, TextInputComponent, ToggleGroupComponent, ActionButtonComponent],
+  imports: [FormsModule],
   templateUrl: './project-menu.component.html',
   styleUrl: './project-menu.component.css',
 })
@@ -31,6 +28,7 @@ export class ProjectMenuComponent {
   private readonly destroyRef = inject(DestroyRef);
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
+  private readonly zone = inject(NgZone);
 
   readonly projectId = input.required<number>();
   readonly projectSlug = input.required<string>();
@@ -42,30 +40,22 @@ export class ProjectMenuComponent {
   readonly previewRequested = output<void>();
   readonly closed = output<void>();
 
-  readonly isOpen = signal(false);
   readonly showMenu = signal(false);
-  readonly isClosing = signal(false);
   readonly isUpdating = signal(false);
   readonly nameDraft = signal('');
   readonly visibilityDraft = signal(false);
   readonly updateError = signal<string | null>(null);
 
-  readonly visibilityOptions: ToggleGroupOption[] = [
-    { label: 'Private', value: false },
-    { label: 'Public', value: true },
-  ];
-
-  readonly projectMenuEl = viewChild<ElementRef<HTMLElement>>('projectMenuEl');
-  readonly projectNameInput = viewChild<TextInputComponent>('projectNameInput');
-
-  private closeTimer: ReturnType<typeof setTimeout> | null = null;
-
-  constructor() {
-    this.destroyRef.onDestroy(() => this.clearCloseTimer());
+  // kept for aria-expanded in host template
+  isOpen(): boolean {
+    return this.showMenu();
   }
 
+  readonly projectMenuEl = viewChild<ElementRef<HTMLElement>>('projectMenuEl');
+  readonly projectNameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
+
   toggle(): void {
-    if (this.isOpen()) {
+    if (this.showMenu()) {
       this.close();
     } else {
       this.open();
@@ -75,15 +65,32 @@ export class ProjectMenuComponent {
   open(): void {
     if (this.isUpdating()) return;
 
-    this.clearCloseTimer();
     this.nameDraft.set(this.projectName());
     this.visibilityDraft.set(this.projectIsPublic());
     this.updateError.set(null);
-    this.isClosing.set(false);
     this.showMenu.set(true);
-    this.isOpen.set(true);
 
-    setTimeout(() => this.projectNameInput()?.focus(true));
+    setTimeout(() => {
+      const el = this.projectMenuEl()?.nativeElement;
+      if (el) {
+        this.zone.runOutsideAngular(() => {
+          gsap.fromTo(
+            el,
+            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'top center' },
+            {
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              duration: 0.25,
+              ease: 'back.out(1.7)',
+              clearProps: 'transform',
+            },
+          );
+        });
+      }
+      this.projectNameInput()?.nativeElement.focus();
+      this.projectNameInput()?.nativeElement.select();
+    });
   }
 
   close(): void {
@@ -92,22 +99,34 @@ export class ProjectMenuComponent {
     this.nameDraft.set(this.projectName());
     this.visibilityDraft.set(this.projectIsPublic());
     this.updateError.set(null);
-    this.isOpen.set(false);
 
-    if (!this.showMenu()) return;
-
-    this.clearCloseTimer();
-    this.isClosing.set(true);
-    this.closeTimer = setTimeout(() => {
+    this.animateClose(() => {
       this.showMenu.set(false);
-      this.isClosing.set(false);
-      this.closeTimer = null;
       this.closed.emit();
-    }, PROJECT_MENU_ANIMATION_MS);
+    });
+  }
+
+  private animateClose(onDone: () => void): void {
+    const el = this.projectMenuEl()?.nativeElement;
+    if (!el) {
+      onDone();
+      return;
+    }
+    this.zone.runOutsideAngular(() => {
+      gsap.to(el, {
+        opacity: 0,
+        scale: 0.92,
+        y: 12,
+        duration: 0.17,
+        ease: 'power2.in',
+        transformOrigin: 'top center',
+        onComplete: () => this.zone.run(onDone),
+      });
+    });
   }
 
   save(): void {
-    if (!this.isOpen() || this.isUpdating()) return;
+    if (!this.showMenu() || this.isUpdating()) return;
 
     const nextName = this.nameDraft().trim();
     const currentName = this.projectName().trim();
@@ -116,7 +135,7 @@ export class ProjectMenuComponent {
 
     if (!nextName) {
       this.updateError.set('Project name is required.');
-      setTimeout(() => this.projectNameInput()?.focus(true));
+      setTimeout(() => this.projectNameInput()?.nativeElement.focus());
       return;
     }
 
@@ -144,7 +163,7 @@ export class ProjectMenuComponent {
         error: (error: unknown) => {
           this.updateError.set(extractApiErrorMessage(error, 'Failed to update project.'));
           this.isUpdating.set(false);
-          setTimeout(() => this.projectNameInput()?.focus(true));
+          setTimeout(() => this.projectNameInput()?.nativeElement.focus());
         },
       });
   }
@@ -162,13 +181,6 @@ export class ProjectMenuComponent {
       !(menuEl && menuEl.contains(target))
     ) {
       this.close();
-    }
-  }
-
-  private clearCloseTimer(): void {
-    if (this.closeTimer) {
-      clearTimeout(this.closeTimer);
-      this.closeTimer = null;
     }
   }
 }

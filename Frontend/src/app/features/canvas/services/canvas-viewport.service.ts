@@ -14,11 +14,13 @@ export class CanvasViewportService {
   readonly zoomLevel = signal(CANVAS_DEFAULT_ZOOM);
   readonly viewportOffset = signal<Point>({ x: 0, y: 0 });
   readonly isPanning = signal(false);
+  readonly isZooming = signal(false);
   readonly isSpacePressed = signal(false);
   readonly frameTemplate = signal({ width: 390, height: 844 });
 
   private panStartPosition: Point = { x: 0, y: 0 };
   private _panMoved = false;
+  private zoomTimer: ReturnType<typeof setTimeout> | null = null;
 
   get panMoved(): boolean {
     return this._panMoved;
@@ -49,6 +51,8 @@ export class CanvasViewportService {
     if (clampedZoom === previousZoom) {
       return;
     }
+
+    this.markZooming();
 
     if (anchor) {
       const offset = this.viewportOffset();
@@ -90,6 +94,15 @@ export class CanvasViewportService {
 
   endPan(): void {
     this.isPanning.set(false);
+  }
+
+  private markZooming(): void {
+    this.isZooming.set(true);
+    if (this.zoomTimer !== null) clearTimeout(this.zoomTimer);
+    this.zoomTimer = setTimeout(() => {
+      this.isZooming.set(false);
+      this.zoomTimer = null;
+    }, 350);
   }
 
   // ── Scroll / Wheel ────────────────────────────────────────

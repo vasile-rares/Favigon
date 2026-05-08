@@ -23,6 +23,7 @@ public static class StyleTransformer
     if (style.TransformStyle is not null) { css["-webkit-transform-style"] = style.TransformStyle; css["transform-style"] = style.TransformStyle; }
     if (style.Filter is not null) { css["-webkit-filter"] = style.Filter; css["filter"] = style.Filter; }
     if (style.BackdropFilter is not null) { css["-webkit-backdrop-filter"] = style.BackdropFilter; css["backdrop-filter"] = style.BackdropFilter; }
+    if (style.BackgroundClip is not null) { css["-webkit-background-clip"] = style.BackgroundClip; css["background-clip"] = style.BackgroundClip; }
     if (style.Border is not null) ApplyBorder(css, style.Border);
 
     if (style.BorderRadius is { Value: not 0 }) css["border-radius"] = style.BorderRadius.ToString();

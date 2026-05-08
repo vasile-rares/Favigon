@@ -1,5 +1,5 @@
 <div
-  class="context-menu__panel glass-panel"
+  class="context-menu__panel"
   [class.context-menu__panel--closing]="isClosing"
   [class.context-menu__panel--above]="verticalDirection() === 'above'"
   role="menu"
@@ -13,7 +13,7 @@
     }
 
     @if (item.children?.length) {
-      
+
       <div
         class="context-menu__item context-menu__item--submenu"
         role="menuitem"
@@ -32,7 +32,7 @@
         <span class="context-menu__item-arrow">›</span>
 
         @if (openSubmenuId === item.id) {
-          <div class="context-menu__submenu glass-panel" role="menu" [class.context-menu__submenu--left]="submenuDirection() === 'left'" [class.context-menu__submenu--above]="submenuFlipAbove">
+          <div class="context-menu__submenu" role="menu" [class.context-menu__submenu--left]="submenuDirection() === 'left'" [class.context-menu__submenu--above]="submenuFlipAbove">
             @for (child of item.children; track child.id) {
               <button
                 type="button"
@@ -59,7 +59,7 @@
         }
       </div>
     } @else {
-      
+
       <button
         type="button"
         class="context-menu__item"

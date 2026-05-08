@@ -17,9 +17,11 @@ import {
   CanvasTextSpacingUnit,
   CanvasTextTransform,
   CanvasTextVerticalAlign,
+  GradientFill,
 } from '@app/core';
 
 import { roundToTwoDecimals } from '../../../../../utils/canvas-math.util';
+import { gradientToCss } from '../../../../../utils/gradient.utils';
 import { GoogleFontsService } from '../../../../../services/google-fonts.service';
 import {
   getDefaultCornerRadius,
@@ -643,26 +645,50 @@ export class TypographySectionComponent implements OnInit {
   }
 
   fillLabel(element: CanvasElement): string {
+    if (element.fillMode === 'gradient') {
+      switch (element.gradient?.type) {
+        case 'linear':
+          return 'Linear';
+        case 'radial':
+          return 'Radial';
+        case 'conic':
+          return 'Conic';
+      }
+    }
     const value = this.fillInputValue(element);
     return value === 'transparent' ? 'Transparent' : preserveColorDisplayValue(value);
   }
 
   fillSwatchBackground(element: CanvasElement): string | null {
+    if (element.fillMode === 'gradient' && element.gradient) {
+      return gradientToCss(element.gradient);
+    }
     const value = this.fillInputValue(element);
     return value === 'transparent' ? null : value;
   }
 
   isTransparentFill(element: CanvasElement): boolean {
+    if (element.fillMode === 'gradient') return false;
     return isTransparentColor(this.fillInputValue(element));
   }
 
   fillInputValue(element: CanvasElement): string {
+    if (element.fillMode === 'gradient') {
+      return element.gradient?.stops[0]?.color ?? '#000000';
+    }
     return this.toHexColorOrFallback(element.fill, this.defaultFillColor);
   }
 
   fillPickerValue(element: CanvasElement): string {
+    if (element.fillMode === 'gradient') {
+      return element.gradient?.stops[0]?.color ?? this.defaultFillColor;
+    }
     const fillValue = this.fillInputValue(element);
     return fillValue !== 'transparent' ? fillValue : this.defaultFillColor;
+  }
+
+  fillGradient(element: CanvasElement): GradientFill | null {
+    return element.gradient ?? null;
   }
 
   private fontSizeInPixels(element: CanvasElement): number {

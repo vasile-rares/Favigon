@@ -10,6 +10,9 @@
   display: inline-flex;
   padding: 0.3rem;
   border-radius: 16px;
+  background: var(--chrome-panel-background);
+  backdrop-filter: var(--chrome-panel-blur);
+  -webkit-backdrop-filter: var(--chrome-panel-blur);
 }
 
 .toolbar__rail {
@@ -44,8 +47,9 @@
   }
 
   &.is-active {
-    background: var(--color-accent);
-    border: 1px solid var(--color-accent-border);
+    background: rgba(255, 133, 208, 0.1);
+    border: 1px solid rgba(255, 133, 208, 0.5);
+    color: #ff85d0;
   }
 
   svg {

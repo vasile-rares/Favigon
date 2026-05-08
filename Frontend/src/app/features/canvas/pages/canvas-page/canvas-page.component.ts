@@ -86,7 +86,10 @@ import {
 } from '../../services/editor/canvas-context-menu.service';
 import { CanvasEditorStateService } from '../../services/canvas-editor-state.service';
 import { CanvasPageService } from '../../services/canvas-page.service';
-import { CanvasPageGeometryService } from '../../services/canvas-page-geometry.service';
+import {
+  CanvasPageGeometryService,
+  FRAME_TITLE_ZOOM_THRESHOLD,
+} from '../../services/canvas-page-geometry.service';
 import { CanvasGestureService } from '../../services/editor/canvas-gesture.service';
 import { CanvasDomStyleService } from '../../services/canvas-dom-style.service';
 import { firstValueFrom } from 'rxjs';
@@ -149,6 +152,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private readonly currentUser = inject(CurrentUserService);
   readonly generation = inject(CanvasGenerationService);
   readonly viewport = inject(CanvasViewportService);
+  readonly frameTitleZoomThreshold = FRAME_TITLE_ZOOM_THRESHOLD;
   private readonly history = inject(CanvasHistoryService);
   private readonly clipboard = inject(CanvasClipboardService);
   readonly element = inject(CanvasElementService);

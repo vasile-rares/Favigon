@@ -276,6 +276,10 @@ export class SettingsPage implements OnInit, AfterViewInit {
     return !!this.userMe?.profilePictureUrl?.trim();
   }
 
+  get fallbackUrl(): string {
+    return this.fallbackAvatarUrl;
+  }
+
   get accountInitial(): string {
     const source = this.displayName.trim() || this.username.trim() || 'S';
     return source.charAt(0).toUpperCase();

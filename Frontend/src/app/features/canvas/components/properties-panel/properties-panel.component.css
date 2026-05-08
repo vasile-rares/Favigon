@@ -41,8 +41,7 @@
      (e.g. context menus) are not trapped inside this element's containing block */
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  border: var(--chrome-panel-border);
-  box-shadow: var(--chrome-panel-shadow);
+  border: none;
   position: relative;
   isolation: isolate;
 }

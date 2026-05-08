@@ -230,7 +230,8 @@ export class CanvasDomStyleService {
     }
 
     // ── Text color ────────────────────────────────────────
-    if (element.type === 'text' && element.fill) {
+    // Gradient on text is handled in buildTextContentStyle() via background-clip:text on the span.
+    if (element.type === 'text' && element.fillMode !== 'gradient' && element.fill) {
       style['color'] = element.fill;
     }
 
@@ -418,7 +419,21 @@ export class CanvasDomStyleService {
       'max-width': (element.widthMode ?? 'fixed') === 'fit-content' ? null : '100%',
       // Background fill applied here so it covers only the text content area,
       // not any empty space below when the container is taller than the text.
-      'background-color': element.backgroundColor ?? null,
+      ...(element.fillMode === 'gradient' && element.gradient
+        ? {
+            'background-color': 'transparent',
+            'background-image': gradientToCss(element.gradient),
+            '-webkit-background-clip': 'text',
+            'background-clip': 'text',
+            color: 'transparent',
+          }
+        : {
+            'background-color': element.backgroundColor ?? null,
+            'background-image': null,
+            '-webkit-background-clip': null,
+            'background-clip': null,
+            color: null,
+          }),
     };
   }
 

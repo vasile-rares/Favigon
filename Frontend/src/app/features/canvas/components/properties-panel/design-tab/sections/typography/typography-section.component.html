@@ -70,7 +70,10 @@
         [isTransparent]="isTransparentFill(element())"
         [colorValue]="fillInputValue(element())"
         [pickerColor]="fillPickerValue(element())"
-        [clearPatch]="{ fill: 'transparent' }"
+        [initialColorMode]="element().fillMode === 'gradient' ? (element().gradient?.type ?? 'linear') : 'solid'"
+        [gradient]="fillGradient(element())"
+        [activationPatch]="element().fillMode === 'gradient' ? { fillMode: 'gradient', gradient: element().gradient } : { fill: fillPickerValue(element()) }"
+        [clearPatch]="{ fill: 'transparent', fillMode: 'color', gradient: undefined }"
         (patchRequested)="elementPatch.emit($event)"
         (numberGestureStarted)="onNumberInputGestureStarted()"
         (numberGestureCommitted)="onNumberInputGestureCommitted()">

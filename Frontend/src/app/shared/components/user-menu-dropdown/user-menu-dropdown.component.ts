@@ -27,6 +27,8 @@ export class UserMenuDropdownComponent {
   readonly username = input('');
   readonly isOpen = input(false);
 
+  readonly fallbackUrl = FALLBACK_AVATAR_URL;
+
   readonly logoutClicked = output<void>();
   readonly closeRequested = output<void>();
 

@@ -137,6 +137,10 @@ export class HeaderBarComponent implements OnInit {
     return this.profilePictureUrl?.trim() || this.fallbackAvatarUrl;
   }
 
+  onAvatarError(event: Event): void {
+    (event.target as HTMLImageElement).src = this.fallbackAvatarUrl;
+  }
+
   ngOnInit(): void {
     this.router.events
       .pipe(filter((event) => event instanceof NavigationEnd))
