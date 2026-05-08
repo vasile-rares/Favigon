@@ -189,6 +189,11 @@
   font-weight: 600;
   color: rgba(255, 255, 255, 0.4);
   letter-spacing: 0.05em;
+  transition: color 0.18s ease;
+}
+
+.prf-stat:not(.prf-stat--plain):hover .prf-stat-label {
+  color: #ff85d0;
 }
 
 /* === COVER FOOT === */
@@ -206,21 +211,19 @@
   gap: 0.4rem;
   padding: 0.5rem 1.25rem;
   border-radius: 999px;
-  border: 1px solid #ffffff;
-  background: #111111;
-  color: rgb(255, 255, 255);
+  border: none;
+  background: #ff85d0;
+  color: #0d0d0d;
   font-size: 0.84rem;
   font-weight: 600;
   font-family: inherit;
   letter-spacing: 0.01em;
   cursor: pointer;
-  transition:
-    background 0.18s,
-    color 0.18s;
+  will-change: opacity;
+  transition: opacity 0.18s ease;
 
   &:hover:not(:disabled) {
-    background: #ffffff;
-    color: black;
+    opacity: 0.75;
   }
 
   &:disabled {
@@ -230,14 +233,18 @@
 }
 
 .prf-action-btn--on {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.62);
+  background: #111111;
+  box-shadow: 0 0 0 1.5px #ffffff;
+  color: #ffffff;
+  will-change: auto;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease;
 
   &:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.22);
-    color: rgba(255, 255, 255, 0.85);
+    opacity: 1;
+    background: #ffffff;
+    color: #000000;
   }
 }
 
@@ -380,7 +387,7 @@
   border-radius: 999px;
   overflow: hidden;
   border: none;
-  box-shadow: 0 0 0 1.5px rgb(200, 200, 200);
+  box-shadow: 0 0 0 1.5px rgb(255, 255, 255);
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -851,7 +858,7 @@
   user-select: none;
 }
 
-/* ===== DIALOG FORM STYLES ===== */
+/* ===== RENAME DIALOG FORM STYLES ===== */
 .dlg-form {
   display: flex;
   flex-direction: column;

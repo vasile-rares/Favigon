@@ -178,10 +178,11 @@
 }
 
 .auth-field__label {
-  font-size: 0.75rem;
+  font-size: 0.825rem;
   font-weight: 500;
   color: rgb(255, 255, 255);
   letter-spacing: 0.02em;
+  margin-bottom: 0.2rem;
 }
 
 .auth-field--error .auth-field__label {
@@ -221,7 +222,7 @@
   height: 2.5rem;
   border-radius: 999px;
   border: none;
-  box-shadow: 0 0 0 1px #ffffff;
+  box-shadow: 0 0 0 1.5px #ffffff;
   background: rgba(255, 255, 255, 0.04);
   padding-inline: 0.875rem;
   font-size: 0.875rem;
@@ -238,11 +239,13 @@
   }
 
   &:hover:not(:disabled):not(:focus) {
-    box-shadow: 0 0 0 1px #ff85d0;
+    box-shadow: 0 0 0 1.5px #ff85d0;
   }
 
   &:focus {
-    box-shadow: 0 0 0 1px #ff85d0, -1px 3px 22px rgba(255, 133, 208, 0.45);
+    box-shadow:
+      0 0 0 1.5px #ff85d0,
+      -1px 3px 22px rgba(255, 133, 208, 0.45);
   }
 
   &:disabled {
@@ -255,7 +258,9 @@
   box-shadow: 0 0 0 1px rgba(255, 133, 133, 0.85);
 
   &:focus {
-    box-shadow: 0 0 0 1px #ff8585, -1px 3px 22px rgba(255, 133, 133, 0.45);
+    box-shadow:
+      0 0 0 1px #ff8585,
+      -1px 3px 22px rgba(255, 133, 133, 0.45);
   }
 }
 

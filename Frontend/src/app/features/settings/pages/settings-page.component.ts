@@ -1,7 +1,12 @@
 import {
+  AfterViewInit,
   Component,
   ElementRef,
-  AfterViewInit,
+  HostListener,
+  Injector,
+  NgZone,
+  afterNextRender,
+  effect,
   inject,
   OnInit,
   signal,
@@ -21,7 +26,6 @@ import {
 } from '@app/core';
 import type { UserMe } from '@app/core';
 import { environment } from '../../../../environments/environment';
-import { TextInputComponent, ActionButtonComponent, DIALOG_BOX_IMPORTS } from '@app/shared';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const MAX_PROFILE_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -37,7 +41,7 @@ const PROFILE_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/av
 @Component({
   selector: 'app-settings-page',
   standalone: true,
-  imports: [FormsModule, TextInputComponent, ActionButtonComponent, ...DIALOG_BOX_IMPORTS],
+  imports: [FormsModule],
   templateUrl: './settings-page.component.html',
   styleUrl: './settings-page.component.css',
 })
@@ -46,11 +50,18 @@ export class SettingsPage implements OnInit, AfterViewInit {
   private readonly userService = inject(UserService);
   private readonly currentUser = inject(CurrentUserService);
   private readonly router = inject(Router);
+  private readonly el = inject(ElementRef);
+  private readonly zone = inject(NgZone);
+  private readonly injector = inject(Injector);
   private readonly fallbackAvatarUrl = FALLBACK_AVATAR_URL;
 
   private readonly tabContentRef = viewChild<ElementRef<HTMLElement>>('tabContent');
 
   activeTab: 'account' | 'password' | 'linked-accounts' = 'account';
+
+  showDeleteDialog = signal(false);
+  showPasswordDialog = signal(false);
+  showTwoFactorDialog = signal(false);
 
   displayName = '';
   username = '';
@@ -62,6 +73,9 @@ export class SettingsPage implements OnInit, AfterViewInit {
   passwordDialogMode: 'set' | 'change' = 'change';
   twoFactorCode = '';
   twoFactorDialogMode: 'enable' | 'disable' = 'enable';
+  showCurrentPassword = false;
+  showNewPassword = false;
+  showConfirmPassword = false;
 
   readonly isLoading = signal(false);
   readonly isSaving = signal(false);
@@ -87,6 +101,97 @@ export class SettingsPage implements OnInit, AfterViewInit {
   readonly profileImageAccept = PROFILE_IMAGE_ACCEPT;
 
   private userMe: UserMe | null = null;
+
+  constructor() {
+    effect(
+      () => {
+        if (!this.isLoading()) {
+          afterNextRender(() => this.animatePageEnter(), { injector: this.injector });
+        }
+      },
+      { injector: this.injector },
+    );
+
+    effect(() => {
+      if (this.isDeleteDialogOpen()) {
+        this.showDeleteDialog.set(true);
+        afterNextRender(() => this.animateModalOpen('delete'), { injector: this.injector });
+      } else if (this.showDeleteDialog()) {
+        this.animateModalClose('delete', () => {
+          this.showDeleteDialog.set(false);
+        });
+      }
+    });
+
+    effect(() => {
+      if (this.isPasswordDialogOpen()) {
+        this.showPasswordDialog.set(true);
+        afterNextRender(() => this.animateModalOpen('password'), { injector: this.injector });
+      } else if (this.showPasswordDialog()) {
+        this.animateModalClose('password', () => {
+          this.showPasswordDialog.set(false);
+        });
+      }
+    });
+
+    effect(() => {
+      if (this.isTwoFactorDialogOpen()) {
+        this.showTwoFactorDialog.set(true);
+        afterNextRender(() => this.animateModalOpen('twofactor'), { injector: this.injector });
+      } else if (this.showTwoFactorDialog()) {
+        this.animateModalClose('twofactor', () => {
+          this.showTwoFactorDialog.set(false);
+        });
+      }
+    });
+  }
+
+  private getModalEl(key: 'delete' | 'password' | 'twofactor'): HTMLElement | null {
+    const map = {
+      delete: 'stg-delete-modal',
+      password: 'stg-password-modal',
+      twofactor: 'stg-twofactor-modal',
+    };
+    return (this.el.nativeElement as HTMLElement).querySelector<HTMLElement>(`.${map[key]}`);
+  }
+
+  private animateModalOpen(key: 'delete' | 'password' | 'twofactor'): void {
+    const modal = this.getModalEl(key);
+    if (!modal) return;
+    this.zone.runOutsideAngular(() => {
+      gsap.fromTo(
+        modal,
+        { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
+        {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          duration: 0.25,
+          ease: 'back.out(1.7)',
+          clearProps: 'transform',
+        },
+      );
+    });
+  }
+
+  private animateModalClose(key: 'delete' | 'password' | 'twofactor', onDone: () => void): void {
+    const modal = this.getModalEl(key);
+    if (!modal) {
+      onDone();
+      return;
+    }
+    this.zone.runOutsideAngular(() => {
+      gsap.to(modal, {
+        opacity: 0,
+        scale: 0.92,
+        y: 12,
+        duration: 0.17,
+        ease: 'power2.in',
+        transformOrigin: 'center center',
+        onComplete: () => this.zone.run(onDone),
+      });
+    });
+  }
 
   async ngOnInit() {
     this.isLoading.set(true);
@@ -114,14 +219,53 @@ export class SettingsPage implements OnInit, AfterViewInit {
     });
   }
 
-  ngAfterViewInit(): void {
-    const el = this.tabContentRef()?.nativeElement;
-    if (el)
-      gsap.fromTo(
-        el,
-        { opacity: 0, y: 8 },
-        { opacity: 1, y: 0, duration: 0.3, ease: 'power3.out' },
-      );
+  ngAfterViewInit(): void {}
+
+  private animatePageEnter(): void {
+    this.zone.runOutsideAngular(() => {
+      const host = this.el.nativeElement as HTMLElement;
+      const topbar = host.querySelector<HTMLElement>('.stg-topbar');
+      const tabs = host.querySelector<HTMLElement>('.stg-tabs');
+      const body = host.querySelector<HTMLElement>('.stg-body');
+
+      const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+
+      if (topbar) {
+        gsap.set(topbar, { opacity: 0, y: 18, filter: 'blur(8px)' });
+        tl.to(topbar, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.6 }, 0);
+      }
+
+      if (tabs) {
+        gsap.set(tabs, { opacity: 0, y: 12, filter: 'blur(6px)' });
+        tl.to(tabs, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.55 }, 0.15);
+      }
+
+      if (body) {
+        gsap.set(body, { opacity: 0, y: 16, filter: 'blur(8px)' });
+        tl.to(body, { opacity: 1, y: 0, filter: 'blur(0px)', duration: 0.6 }, 0.28);
+      }
+    });
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.isChangingPassword() || this.isDeleting() || this.isTwoFactorDialogSubmitting()) {
+      return;
+    }
+
+    if (this.isPasswordDialogOpen()) {
+      this.closeChangePasswordDialog();
+      return;
+    }
+
+    if (this.isTwoFactorDialogOpen()) {
+      this.closeTwoFactorDialog();
+      return;
+    }
+
+    if (this.isDeleteDialogOpen()) {
+      this.closeDeleteDialog();
+    }
   }
 
   get accountAvatarUrl(): string {
@@ -130,6 +274,19 @@ export class SettingsPage implements OnInit, AfterViewInit {
 
   get hasProfileImage(): boolean {
     return !!this.userMe?.profilePictureUrl?.trim();
+  }
+
+  get accountInitial(): string {
+    const source = this.displayName.trim() || this.username.trim() || 'S';
+    return source.charAt(0).toUpperCase();
+  }
+
+  get linkedAccountsCount(): number {
+    return this.userMe?.linkedAccounts.length ?? 0;
+  }
+
+  get isAnyDialogOpen(): boolean {
+    return this.isDeleteDialogOpen() || this.isPasswordDialogOpen() || this.isTwoFactorDialogOpen();
   }
 
   async saveAccountChanges() {
@@ -225,6 +382,9 @@ export class SettingsPage implements OnInit, AfterViewInit {
     this.currentPassword = '';
     this.newPassword = '';
     this.confirmPassword = '';
+    this.showCurrentPassword = false;
+    this.showNewPassword = false;
+    this.showConfirmPassword = false;
     this.statusMessage.set(null);
     this.passwordDialogMessage.set(null);
     this.isPasswordDialogSuccess.set(false);
@@ -236,7 +396,24 @@ export class SettingsPage implements OnInit, AfterViewInit {
       this.isPasswordDialogOpen.set(false);
       this.passwordDialogMessage.set(null);
       this.isPasswordDialogSuccess.set(false);
+      this.showCurrentPassword = false;
+      this.showNewPassword = false;
+      this.showConfirmPassword = false;
     }
+  }
+
+  togglePasswordVisibility(field: 'current' | 'new' | 'confirm'): void {
+    if (field === 'current') {
+      this.showCurrentPassword = !this.showCurrentPassword;
+      return;
+    }
+
+    if (field === 'new') {
+      this.showNewPassword = !this.showNewPassword;
+      return;
+    }
+
+    this.showConfirmPassword = !this.showConfirmPassword;
   }
 
   openTwoFactorDialog() {
@@ -448,18 +625,6 @@ export class SettingsPage implements OnInit, AfterViewInit {
     }
 
     return true;
-  }
-
-  get passwordDialogValidationMessage(): string | null {
-    if (this.newPassword && !PASSWORD_PATTERN.test(this.newPassword)) {
-      return 'Password must contain at least one lowercase letter, one uppercase letter, one digit, and be at least 8 characters long.';
-    }
-
-    if (this.confirmPassword && this.newPassword !== this.confirmPassword) {
-      return 'Passwords do not match.';
-    }
-
-    return null;
   }
 
   get twoFactorDialogTitle(): string {

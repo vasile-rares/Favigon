@@ -190,6 +190,6 @@ export class ProjectSearchComponent {
       return 240;
     }
 
-    return Math.max(144, Math.min(184, window.innerWidth - 208));
+    return Math.max(120, Math.min(160, window.innerWidth - 208));
   }
 }

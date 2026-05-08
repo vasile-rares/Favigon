@@ -101,7 +101,7 @@
         <span class="header-user-menu__avatar">
           <img [src]="avatarUrl" [alt]="displayName" />
         </span>
-        <span class="header-user-menu__icon" aria-hidden="true">
+        <span class="header-user-menu__icon" #userMenuIconEl aria-hidden="true">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="6 9 12 15 18 9" />
           </svg>
@@ -228,59 +228,6 @@
   (logoutClicked)="onLogout()"></app-user-menu-dropdown>
 
 @if (isCreateDialogOpen()) {
-  <app-dialog-box
-    #createDialog
-    title="Create project"
-    description="Set up your project details. You can adjust settings later from project options."
-    [isBusy]="isCreatingProject()"
-    (closed)="closeCreateProjectDialog()">
-    <form
-      class="project-dialog-form"
-      [id]="createProjectFormId"
-      [formGroup]="createProjectForm"
-      (ngSubmit)="submitCreateProject()">
-      <app-text-input
-        id="header-project-name"
-        label="Name"
-        placeholder="Project name"
-        formControlName="name"
-        [requiredMarker]="true"
-        [maxLength]="120"
-        [errorText]="'Name is required.'"></app-text-input>
-
-      <app-dropdown-select
-        id="header-project-visibility"
-        label="Visibility"
-        placeholder="Select visibility"
-        [enableSearch]="false"
-        [options]="visibilityOptions"
-        formControlName="isPublic"></app-dropdown-select>
-
-      @if (createDialogError()) {
-        <p class="project-dialog-error">{{ createDialogError() }}</p>
-      }
-    </form>
-
-    <ng-template #dialogFooter>
-      <div class="project-dialog-footer">
-        <app-action-button
-          type="button"
-          variant="outline"
-          [fullWidth]="false"
-          [disabled]="isCreatingProject() || createDialog.isClosing"
-          (clicked)="createDialog.requestClose()">
-          Cancel
-        </app-action-button>
-        <app-action-button
-          type="submit"
-          variant="primary"
-          [form]="createProjectFormId"
-          [fullWidth]="false"
-          [disabled]="isCreatingProject() || createDialog.isClosing || createProjectForm.invalid">
-          {{ isCreatingProject() ? 'Creating...' : 'Create project' }}
-        </app-action-button>
-      </div>
-    </ng-template>
-  </app-dialog-box>
+  <app-create-project-dialog (closed)="isCreateDialogOpen.set(false)" />
 }
 

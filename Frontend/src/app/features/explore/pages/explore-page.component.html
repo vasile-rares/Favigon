@@ -20,7 +20,7 @@
           </div>
         </header>
         <div class="xpl-scroll-wrap">
-          <button class="xpl-arrow" (click)="scrollStrip(strip1, -1)" aria-label="Previous">
+          <button class="xpl-arrow" [disabled]="!strip1CanPrev()" (click)="scrollStrip(strip1, -1)" aria-label="Previous">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
           <div class="xpl-scroll" data-smooth-prevent #strip1>
@@ -80,7 +80,7 @@
             }
           </div>
         </div>
-          <button class="xpl-arrow" (click)="scrollStrip(strip1, 1)" aria-label="Next">
+          <button class="xpl-arrow" [disabled]="!strip1CanNext()" (click)="scrollStrip(strip1, 1)" aria-label="Next">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
         </div>
@@ -96,7 +96,7 @@
           </div>
         </header>
         <div class="xpl-scroll-wrap">
-          <button class="xpl-arrow" (click)="scrollStrip(strip2, -1)" aria-label="Previous">
+          <button class="xpl-arrow" [disabled]="!strip2CanPrev()" (click)="scrollStrip(strip2, -1)" aria-label="Previous">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
           <div class="xpl-scroll" data-smooth-prevent #strip2>
@@ -144,7 +144,7 @@
                         {{ p.viewCount }}
                       </span>
                       <span class="pcard-stat">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                         </svg>
                         {{ p.starCount }}
@@ -156,7 +156,7 @@
             }
           </div>
         </div>
-          <button class="xpl-arrow" (click)="scrollStrip(strip2, 1)" aria-label="Next">
+          <button class="xpl-arrow" [disabled]="!strip2CanNext()" (click)="scrollStrip(strip2, 1)" aria-label="Next">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
         </div>
@@ -172,7 +172,7 @@
           </div>
         </header>
         <div class="xpl-scroll-wrap">
-          <button class="xpl-arrow" (click)="scrollStrip(strip3, -1)" aria-label="Previous">
+          <button class="xpl-arrow" [disabled]="!strip3CanPrev()" (click)="scrollStrip(strip3, -1)" aria-label="Previous">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
           </button>
           <div class="xpl-scroll" data-smooth-prevent #strip3>
@@ -195,7 +195,7 @@
             }
           </div>
         </div>
-          <button class="xpl-arrow" (click)="scrollStrip(strip3, 1)" aria-label="Next">
+          <button class="xpl-arrow" [disabled]="!strip3CanNext()" (click)="scrollStrip(strip3, 1)" aria-label="Next">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
           </button>
         </div>

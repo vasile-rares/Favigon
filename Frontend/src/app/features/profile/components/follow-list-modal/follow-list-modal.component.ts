@@ -1,18 +1,23 @@
 import {
+  AfterViewInit,
   Component,
   DestroyRef,
+  ElementRef,
+  NgZone,
+  OnDestroy,
   OnInit,
   computed,
   inject,
   input,
-  OnDestroy,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { UserService, FALLBACK_AVATAR_URL } from '@app/core';
 import type { UserFollowItem } from '@app/core';
+import gsap from 'gsap';
 
 export type FollowListType = 'followers' | 'following';
 
@@ -23,10 +28,14 @@ export type FollowListType = 'followers' | 'following';
   templateUrl: './follow-list-modal.component.html',
   styleUrl: './follow-list-modal.component.css',
 })
-export class FollowListModalComponent implements OnInit, OnDestroy {
+export class FollowListModalComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly userService = inject(UserService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly zone = inject(NgZone);
+
+  private readonly backdropRef = viewChild<ElementRef<HTMLElement>>('backdrop');
+  private readonly modalRef = viewChild<ElementRef<HTMLElement>>('modal');
 
   readonly username = input.required<string>();
   readonly listType = input.required<FollowListType>();
@@ -40,10 +49,10 @@ export class FollowListModalComponent implements OnInit, OnDestroy {
 
   readonly fallbackAvatar = FALLBACK_AVATAR_URL;
 
-  private closeTimeoutId: ReturnType<typeof setTimeout> | null = null;
-
   ngOnInit(): void {
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
     document.body.style.overflow = 'hidden';
+    document.body.style.paddingRight = `${scrollbarWidth}px`;
     const request$ =
       this.listType() === 'followers'
         ? this.userService.getFollowers(this.username())
@@ -58,19 +67,63 @@ export class FollowListModalComponent implements OnInit, OnDestroy {
     });
   }
 
+  ngAfterViewInit(): void {
+    const modal = this.modalRef()?.nativeElement;
+    if (!modal) return;
+    this.zone.runOutsideAngular(() => {
+      gsap.fromTo(
+        modal,
+        { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
+        {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          duration: 0.25,
+          ease: 'back.out(1.7)',
+          clearProps: 'transform',
+        },
+      );
+    });
+  }
+
   ngOnDestroy(): void {
     document.body.style.overflow = '';
-    if (this.closeTimeoutId !== null) {
-      clearTimeout(this.closeTimeoutId);
+    document.body.style.paddingRight = '';
+  }
+
+  private animateClose(onDone: () => void): void {
+    const modal = this.modalRef()?.nativeElement;
+    const backdrop = this.backdropRef()?.nativeElement;
+    if (!modal && !backdrop) {
+      onDone();
+      return;
     }
+    this.zone.runOutsideAngular(() => {
+      const tl = gsap.timeline({ onComplete: () => this.zone.run(onDone) });
+      if (modal) {
+        tl.to(
+          modal,
+          {
+            opacity: 0,
+            scale: 0.92,
+            y: 12,
+            duration: 0.17,
+            ease: 'power2.in',
+            transformOrigin: 'center center',
+          },
+          0,
+        );
+      }
+      if (backdrop) {
+        tl.to(backdrop, { opacity: 0, duration: 0.17, ease: 'power2.in' }, 0);
+      }
+    });
   }
 
   close(): void {
     if (this.isClosing()) return;
     this.isClosing.set(true);
-    this.closeTimeoutId = setTimeout(() => {
-      this.closed.emit();
-    }, 200);
+    this.animateClose(() => this.closed.emit());
   }
 
   onBackdropClick(event: MouseEvent): void {

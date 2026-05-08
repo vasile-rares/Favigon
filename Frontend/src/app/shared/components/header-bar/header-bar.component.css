@@ -344,7 +344,7 @@
 .header-user-menu__icon {
   color: var(--color-text-medium);
   display: inline-flex;
-  transition: all 0.2s;
+  transition: color 0.2s;
 
   &:hover {
     color: var(--color-text-light);
@@ -576,25 +576,6 @@
   }
 }
 
-/* Create project dialog */
-.project-dialog-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-}
-
-.project-dialog-footer {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: flex-end;
-}
-
-.project-dialog-error {
-  font-size: 0.8125rem;
-  color: var(--color-error, #f87171);
-  margin: 0;
-}
-
 @media (max-width: 960px) {
   .header-project-center {
     max-width: calc(100% - 8.5rem);
@@ -602,10 +583,6 @@
 }
 
 @media (max-width: 720px) {
-  .header-bar {
-    padding: 0 1rem;
-  }
-
   .header-bar--canvas {
     border-radius: 0;
     padding: 0 1.5rem;

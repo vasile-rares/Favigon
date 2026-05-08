@@ -32,6 +32,7 @@ import {
 import type { UserProfile } from '@app/core';
 import { DIALOG_BOX_IMPORTS } from '@app/shared';
 import type { DropdownSelectOption } from '@app/shared';
+import { CreateProjectDialogComponent } from '../../../shared/components/create-project-dialog/create-project-dialog.component';
 import { EMPTY, forkJoin, switchMap } from 'rxjs';
 import type { ProjectCardViewModel } from '../components/project-card/project-card.component';
 import {
@@ -51,6 +52,7 @@ type ProjectSortOption = 'updated' | 'created';
     ReactiveFormsModule,
     ...DIALOG_BOX_IMPORTS,
     FollowListModalComponent,
+    CreateProjectDialogComponent,
   ],
   templateUrl: './profile-page.component.html',
   styleUrl: './profile-page.component.css',
@@ -108,7 +110,6 @@ export class ProfilePage implements OnInit {
   }
 
   readonly isCreateDialogOpen = signal(false);
-  readonly isCreatingProject = signal(false);
 
   readonly busyProjectIds = signal<number[]>([]);
   readonly activeRenameProject = signal<ProjectCardViewModel | null>(null);
@@ -123,13 +124,7 @@ export class ProfilePage implements OnInit {
   readonly openMenuProjectId = signal<number | null>(null);
   readonly closingMenuProjectId = signal<number | null>(null);
 
-  readonly createProjectFormId = 'profile-create-project-form';
   readonly renameProjectFormId = 'profile-rename-project-form';
-
-  readonly createProjectForm = this.fb.nonNullable.group({
-    name: ['Untitled Project', [Validators.required, Validators.maxLength(120)]],
-    isPublic: [false],
-  });
 
   readonly renameProjectForm = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(120)]],
@@ -475,42 +470,7 @@ export class ProfilePage implements OnInit {
 
   openCreateProjectDialog(): void {
     this.errorMessage.set(null);
-    this.createProjectForm.reset({ name: 'Untitled Project', isPublic: false });
     this.isCreateDialogOpen.set(true);
-  }
-
-  closeCreateProjectDialog(): void {
-    if (this.isCreatingProject()) {
-      return;
-    }
-
-    this.isCreateDialogOpen.set(false);
-  }
-
-  submitCreateProject(): void {
-    if (this.createProjectForm.invalid || this.isCreatingProject()) {
-      this.createProjectForm.markAllAsTouched();
-      return;
-    }
-
-    this.isCreatingProject.set(true);
-    this.errorMessage.set(null);
-
-    const { name, isPublic } = this.createProjectForm.getRawValue();
-    this.projectService
-      .create({ name: name.trim(), isPublic })
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (project) => {
-          this.isCreatingProject.set(false);
-          this.isCreateDialogOpen.set(false);
-          void this.router.navigate(['/project', project.slug]);
-        },
-        error: (error: unknown) => {
-          this.errorMessage.set(extractApiErrorMessage(error, 'Failed to create project.'));
-          this.isCreatingProject.set(false);
-        },
-      });
   }
 
   openRenameProjectDialog(project: ProjectCardViewModel): void {
@@ -754,7 +714,6 @@ export class ProfilePage implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set(null);
     this.isCreateDialogOpen.set(false);
-    this.isCreatingProject.set(false);
     this.busyProjectIds.set([]);
     this.isFollowing.set(false);
     this.followerCount.set(0);

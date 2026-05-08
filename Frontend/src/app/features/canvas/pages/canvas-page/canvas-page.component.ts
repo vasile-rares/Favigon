@@ -2093,6 +2093,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     const loadingStartedAt = Date.now();
     const hideOverlay = () => {
+      if (fromPreview) {
+        // Thumbnail was already captured on the initial canvas entry; skip re-capture.
+        return;
+      }
       const elapsed = Date.now() - loadingStartedAt;
       const remaining = Math.max(0, 1000 - elapsed);
       // Wait for the minimum display time, then run html2canvas while the

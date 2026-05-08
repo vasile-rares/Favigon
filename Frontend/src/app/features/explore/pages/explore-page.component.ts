@@ -5,6 +5,7 @@ import {
   Injector,
   NgZone,
   OnInit,
+  WritableSignal,
   afterNextRender,
   computed,
   inject,
@@ -53,6 +54,13 @@ export class ExplorePageComponent implements OnInit {
 
   readonly isAuthenticated = computed(() => this.currentUserService.user() != null);
 
+  readonly strip1CanPrev = signal(false);
+  readonly strip1CanNext = signal(false);
+  readonly strip2CanPrev = signal(false);
+  readonly strip2CanNext = signal(false);
+  readonly strip3CanPrev = signal(false);
+  readonly strip3CanNext = signal(false);
+
   ngOnInit(): void {
     this.initSmoothScroll();
     forkJoin({
@@ -74,6 +82,15 @@ export class ExplorePageComponent implements OnInit {
             () => {
               this.initScrollAnimations();
               this.initCardHoverEffects();
+              const strips = (this.el.nativeElement as HTMLElement).querySelectorAll<HTMLElement>(
+                '.xpl-scroll',
+              );
+              if (strips[0])
+                this.initStripScrollState(strips[0], this.strip1CanPrev, this.strip1CanNext);
+              if (strips[1])
+                this.initStripScrollState(strips[1], this.strip2CanPrev, this.strip2CanNext);
+              if (strips[2])
+                this.initStripScrollState(strips[2], this.strip3CanPrev, this.strip3CanNext);
             },
             { injector: this.injector },
           );
@@ -164,6 +181,19 @@ export class ExplorePageComponent implements OnInit {
 
   scrollStrip(el: HTMLElement, dir: 1 | -1): void {
     el.scrollBy({ left: dir * 340, behavior: 'smooth' });
+  }
+
+  private initStripScrollState(
+    el: HTMLElement,
+    canPrev: WritableSignal<boolean>,
+    canNext: WritableSignal<boolean>,
+  ): void {
+    const update = () => {
+      canPrev.set(el.scrollLeft > 2);
+      canNext.set(el.scrollLeft + el.clientWidth < el.scrollWidth - 2);
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
   }
 
   private initSmoothScroll(): void {

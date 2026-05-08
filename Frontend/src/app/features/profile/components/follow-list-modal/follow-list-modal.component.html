@@ -1,12 +1,11 @@
 <div
+  #backdrop
   class="follow-modal-backdrop"
-  [class.follow-modal-backdrop--open]="!isClosing()"
-  [class.follow-modal-backdrop--closing]="isClosing()"
   role="dialog"
   [attr.aria-label]="title()"
   aria-modal="true"
   (click)="onBackdropClick($event)">
-  <div class="follow-modal">
+  <div #modal class="follow-modal">
     <div class="follow-modal__header">
       <h2 class="follow-modal__title">{{ title() }}</h2>
       <button

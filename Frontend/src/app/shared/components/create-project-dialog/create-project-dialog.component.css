@@ -1,0 +1,216 @@
+.cp-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: cp-backdrop-in 0.25s ease-out both;
+}
+
+@keyframes cp-backdrop-in {
+  from {
+    background: rgba(0, 0, 0, 0);
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+}
+
+.cp-modal {
+  width: min(100%, 520px);
+  border-radius: 24px;
+  background: #111111;
+  box-shadow:
+    0 0 0 1.5px #ffffff,
+    -1px 6px 34px rgba(0, 0, 0, 0.42);
+  overflow: hidden;
+  padding: 1.35rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  will-change: transform;
+}
+
+.cp-modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.cp-modal-title {
+  margin: 0;
+  font-size: 1.35rem;
+  line-height: 1.08;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: #fff;
+}
+
+.cp-modal-text {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.52);
+}
+
+.cp-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-top: 0.5rem;
+}
+
+.cp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.cp-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+}
+
+.cp-label {
+  font-size: 0.825rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+  margin-bottom: 0.2rem;
+}
+
+.cp-req {
+  color: #ff85d0;
+  margin-left: 0.12rem;
+}
+
+.cp-input {
+  width: 100%;
+  min-width: 0;
+  border: none;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1.5px #ffffff;
+  background: rgba(255, 255, 255, 0.04);
+  color: #f0f0f0;
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  height: 2.5rem;
+  padding-inline: 0.875rem;
+  transition:
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+
+  &::placeholder {
+    color: rgba(255, 255, 255, 0.22);
+  }
+
+  &:hover:not(:disabled):not(:focus) {
+    box-shadow: 0 0 0 1.5px #ff85d0;
+  }
+
+  &:focus {
+    box-shadow:
+      0 0 0 1.5px #ff85d0,
+      -1px 3px 22px rgba(255, 133, 208, 0.45);
+  }
+}
+
+.cp-err-msg {
+  font-size: 0.74rem;
+  color: rgba(255, 115, 115, 0.88);
+  margin: 0;
+}
+
+.cp-vis-group {
+  display: flex;
+  gap: 0.55rem;
+}
+
+.cp-vis-opt {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  padding: 0.58rem 0.75rem;
+  border-radius: 999px;
+  border: none;
+  box-shadow: 0 0 0 1.5px #ffffff;
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    box-shadow 0.18s ease,
+    background 0.18s ease,
+    color 0.18s ease;
+
+  input {
+    display: none;
+  }
+
+  &:hover:not(.cp-vis-opt--on) {
+    background: #ffffff;
+    color: #000;
+  }
+}
+
+.cp-vis-opt--on {
+  background: rgba(255, 133, 208, 0.1);
+  color: #ff85d0;
+  box-shadow: 0 0 0 1.5px #ff85d0;
+}
+
+.cp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 38px;
+  padding: 0.55rem 1rem;
+  border: none;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.cp-btn--primary {
+  background: #ff85d0;
+  color: #0d0d0d;
+  will-change: opacity;
+
+  &:hover:not(:disabled) {
+    opacity: 0.75;
+  }
+}
+
+.cp-btn--quiet {
+  background: #111111;
+  box-shadow: 0 0 0 1.5px #ffffff;
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: #ffffff;
+    color: #000;
+  }
+}

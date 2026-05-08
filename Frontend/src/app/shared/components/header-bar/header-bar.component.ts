@@ -25,16 +25,12 @@ import {
   FALLBACK_AVATAR_URL,
 } from '@app/core';
 import { UserMenuDropdownComponent } from '../user-menu-dropdown/user-menu-dropdown.component';
-import { DIALOG_BOX_IMPORTS } from '../dialog-box/dialog-box.component';
-import { TextInputComponent } from '../text-input/text-input.component';
-import { DropdownSelectComponent } from '../dropdown-select/dropdown-select.component';
-import type { DropdownSelectOption } from '../dropdown-select/dropdown-select.component';
-import { ActionButtonComponent } from '../action-button/action-button.component';
 import { filter, map, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { ProjectSearchComponent } from './project-search/project-search.component';
 import { ProjectMenuComponent } from './project-menu/project-menu.component';
+import { CreateProjectDialogComponent } from '../create-project-dialog/create-project-dialog.component';
 
 interface HeaderUserProfile {
   displayName: string;
@@ -47,15 +43,11 @@ interface HeaderUserProfile {
   selector: 'app-header-bar',
   standalone: true,
   imports: [
-    ReactiveFormsModule,
     RouterLink,
     UserMenuDropdownComponent,
-    ...DIALOG_BOX_IMPORTS,
-    TextInputComponent,
-    DropdownSelectComponent,
-    ActionButtonComponent,
     ProjectSearchComponent,
     ProjectMenuComponent,
+    CreateProjectDialogComponent,
   ],
   templateUrl: './header-bar.component.html',
   styleUrl: './header-bar.component.css',
@@ -70,7 +62,6 @@ export class HeaderBarComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly projectService = inject(ProjectService);
   private readonly currentUser = inject(CurrentUserService);
-  private readonly fb = inject(FormBuilder);
   private readonly injector = inject(Injector);
   private readonly zone = inject(NgZone);
   private readonly fallbackAvatarUrl = FALLBACK_AVATAR_URL;
@@ -93,19 +84,10 @@ export class HeaderBarComponent implements OnInit {
 
   // Create project dialog
   isCreateDialogOpen = signal(false);
-  isCreatingProject = signal(false);
-  createDialogError = signal<string | null>(null);
-  readonly createProjectFormId = 'header-create-project-form';
-  readonly createProjectForm = this.fb.nonNullable.group({
-    name: ['Untitled Project', [Validators.required, Validators.maxLength(120)]],
-    isPublic: [false],
-  });
-  readonly visibilityOptions: DropdownSelectOption[] = [
-    { label: 'Private', value: false },
-    { label: 'Public', value: true },
-  ];
 
   readonly userMenuContainer = viewChild<ElementRef<HTMLElement>>('userMenuContainer');
+
+  readonly userMenuIconEl = viewChild<ElementRef<HTMLElement>>('userMenuIconEl');
 
   readonly userMenuDropdownEl = viewChild('userMenuDropdownEl', { read: ElementRef });
 
@@ -202,33 +184,7 @@ export class HeaderBarComponent implements OnInit {
   }
 
   openCreateProjectDialog(): void {
-    this.createDialogError.set(null);
-    this.createProjectForm.reset({ name: 'Untitled Project', isPublic: false });
     this.isCreateDialogOpen.set(true);
-  }
-
-  closeCreateProjectDialog(): void {
-    if (this.isCreatingProject()) return;
-    this.isCreateDialogOpen.set(false);
-  }
-
-  submitCreateProject(): void {
-    if (this.createProjectForm.invalid || this.isCreatingProject()) return;
-
-    this.isCreatingProject.set(true);
-    const { name, isPublic } = this.createProjectForm.getRawValue();
-
-    this.projectService.create({ name, isPublic }).subscribe({
-      next: (project) => {
-        this.isCreatingProject.set(false);
-        this.isCreateDialogOpen.set(false);
-        void this.router.navigate(['/project', project.slug]);
-      },
-      error: (error: unknown) => {
-        this.createDialogError.set(extractApiErrorMessage(error, 'Failed to create project.'));
-        this.isCreatingProject.set(false);
-      },
-    });
   }
 
   // ── User Menu ─────────────────────────────────────────────
@@ -244,10 +200,28 @@ export class HeaderBarComponent implements OnInit {
   toggleUserMenu(): void {
     this.closeMobileMenu(true);
     this.isUserMenuOpen = !this.isUserMenuOpen;
+    const icon = this.userMenuIconEl()?.nativeElement;
+    if (icon) {
+      this.zone.runOutsideAngular(() => {
+        gsap.killTweensOf(icon);
+        gsap.to(icon, {
+          rotate: this.isUserMenuOpen ? 180 : 0,
+          duration: 0.22,
+          ease: 'power2.out',
+        });
+      });
+    }
   }
 
   closeUserMenu(): void {
     this.isUserMenuOpen = false;
+    const icon = this.userMenuIconEl()?.nativeElement;
+    if (icon) {
+      this.zone.runOutsideAngular(() => {
+        gsap.killTweensOf(icon);
+        gsap.to(icon, { rotate: 0, duration: 0.18, ease: 'power2.out' });
+      });
+    }
   }
 
   toggleMobileMenu(): void {

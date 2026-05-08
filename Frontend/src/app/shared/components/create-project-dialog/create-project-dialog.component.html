@@ -1,0 +1,72 @@
+<div #backdrop class="cp-backdrop" (click)="close()">
+  <div
+    #modal
+    class="cp-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="cp-dialog-title"
+    (click)="$event.stopPropagation()">
+    <div class="cp-modal-head">
+      <h2 class="cp-modal-title" id="cp-dialog-title">Create project</h2>
+      <p class="cp-modal-text">Set up your project details. You can adjust settings later from project options.</p>
+    </div>
+
+    <form class="cp-form" [id]="formId" [formGroup]="form" (ngSubmit)="submit()">
+      <div class="cp-field">
+        <label class="cp-label" for="cpd-name">Name <span class="cp-req">*</span></label>
+        <input
+          class="cp-input"
+          id="cpd-name"
+          type="text"
+          formControlName="name"
+          placeholder="Project name"
+          maxlength="120"
+          autocomplete="off" />
+        @if (form.get('name')?.invalid && form.get('name')?.touched) {
+          <span class="cp-err-msg">Name is required.</span>
+        }
+      </div>
+
+      <div class="cp-field">
+        <span class="cp-label">Visibility</span>
+        <div class="cp-vis-group">
+          <label class="cp-vis-opt" [class.cp-vis-opt--on]="form.get('isPublic')?.value === false">
+            <input type="radio" formControlName="isPublic" [value]="false" />
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            Private
+          </label>
+          <label class="cp-vis-opt" [class.cp-vis-opt--on]="form.get('isPublic')?.value === true">
+            <input type="radio" formControlName="isPublic" [value]="true" />
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            Public
+          </label>
+        </div>
+      </div>
+
+      @if (error()) {
+        <p class="cp-err-msg">{{ error() }}</p>
+      }
+    </form>
+
+    <div class="cp-modal-foot">
+      <button
+        class="cp-btn cp-btn--quiet"
+        type="button"
+        [disabled]="isCreating()"
+        (click)="close()">Cancel</button>
+      <button
+        class="cp-btn cp-btn--primary"
+        type="submit"
+        [attr.form]="formId"
+        [disabled]="isCreating() || form.invalid">
+        {{ isCreating() ? 'Creating...' : 'Create project' }}
+      </button>
+    </div>
+  </div>
+</div>
