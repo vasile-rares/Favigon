@@ -25,7 +25,10 @@
         environment:
             ASPNETCORE_ENVIRONMENT: Production
             ASPNETCORE_URLS: http://+:8080
+            ASPNETCORE_WEBROOT: /app/uploads
             ConnectionStrings__FavigonDb: "Host=db;Port=5432;Database=FavigonDb;Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+        volumes:
+            - uploads_data:/app/uploads
         depends_on:
             db:
                 condition: service_healthy
@@ -53,6 +56,7 @@
 
 volumes:
     postgres_data:
+    uploads_data:
 
 networks:
     internal:

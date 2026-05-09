@@ -1,4 +1,14 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  NgZone,
+  OnInit,
+  afterNextRender,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   AbstractControl,
@@ -9,9 +19,9 @@ import {
   Validators,
 } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
+import gsap from 'gsap';
 import { AuthService, UserService, CurrentUserService, extractApiErrorMessage } from '@app/core';
 import { environment } from '../../../../environments/environment';
-import { DIALOG_BOX_IMPORTS } from '@app/shared';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const CREDENTIAL_MAX_LENGTH = 100;
@@ -28,7 +38,7 @@ function passwordStrengthValidator(): ValidatorFn {
 @Component({
   selector: 'app-auth-page',
   standalone: true,
-  imports: [ReactiveFormsModule, ...DIALOG_BOX_IMPORTS],
+  imports: [ReactiveFormsModule],
   templateUrl: './auth-page.component.html',
   styleUrl: './auth-page.component.css',
 })
@@ -39,6 +49,11 @@ export class AuthPage implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly zone = inject(NgZone);
+  private readonly injector = inject(Injector);
+
+  readonly forgotPasswordCardRef = viewChild<ElementRef<HTMLElement>>('forgotPasswordCard');
+  readonly twoFactorCardRef = viewChild<ElementRef<HTMLElement>>('twoFactorCard');
 
   private static readonly REMEMBER_EMAIL_KEY = 'favigon.rememberedEmail';
 
@@ -140,6 +155,27 @@ export class AuthPage implements OnInit {
       email: this.loginForm.controls.email.value?.trim() ?? '',
     });
     this.isForgotPasswordDialogOpen.set(true);
+    afterNextRender(
+      () => {
+        const card = this.forgotPasswordCardRef()?.nativeElement;
+        if (!card) return;
+        this.zone.runOutsideAngular(() => {
+          gsap.fromTo(
+            card,
+            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
+            {
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              duration: 0.25,
+              ease: 'back.out(1.7)',
+              clearProps: 'transform',
+            },
+          );
+        });
+      },
+      { injector: this.injector },
+    );
   }
 
   closeForgotPasswordDialog() {
@@ -147,7 +183,23 @@ export class AuthPage implements OnInit {
       return;
     }
 
-    this.isForgotPasswordDialogOpen.set(false);
+    const card = this.forgotPasswordCardRef()?.nativeElement;
+    if (!card) {
+      this.isForgotPasswordDialogOpen.set(false);
+      return;
+    }
+
+    this.zone.runOutsideAngular(() => {
+      gsap.to(card, {
+        opacity: 0,
+        scale: 0.92,
+        y: 12,
+        duration: 0.17,
+        ease: 'power2.in',
+        transformOrigin: 'center center',
+        onComplete: () => this.zone.run(() => this.isForgotPasswordDialogOpen.set(false)),
+      });
+    });
   }
 
   closeTwoFactorDialog() {
@@ -155,7 +207,23 @@ export class AuthPage implements OnInit {
       return;
     }
 
-    this.resetTwoFactorChallenge();
+    const card = this.twoFactorCardRef()?.nativeElement;
+    if (!card) {
+      this.resetTwoFactorChallenge();
+      return;
+    }
+
+    this.zone.runOutsideAngular(() => {
+      gsap.to(card, {
+        opacity: 0,
+        scale: 0.92,
+        y: 12,
+        duration: 0.17,
+        ease: 'power2.in',
+        transformOrigin: 'center center',
+        onComplete: () => this.zone.run(() => this.resetTwoFactorChallenge()),
+      });
+    });
   }
 
   async submitForgotPassword() {
@@ -484,6 +552,27 @@ export class AuthPage implements OnInit {
       text: response.message || 'We sent a verification code to your email.',
     });
     this.isTwoFactorDialogOpen.set(true);
+    afterNextRender(
+      () => {
+        const card = this.twoFactorCardRef()?.nativeElement;
+        if (!card) return;
+        this.zone.runOutsideAngular(() => {
+          gsap.fromTo(
+            card,
+            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
+            {
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              duration: 0.25,
+              ease: 'back.out(1.7)',
+              clearProps: 'transform',
+            },
+          );
+        });
+      },
+      { injector: this.injector },
+    );
   }
 
   private resetTwoFactorChallenge() {

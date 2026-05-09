@@ -184,7 +184,9 @@ try
     }
 
     var app = builder.Build();
-    var webRootPath = Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+    var webRootPath = !string.IsNullOrWhiteSpace(app.Environment.WebRootPath)
+        ? app.Environment.WebRootPath
+        : Path.Combine(app.Environment.ContentRootPath, "wwwroot");
 
     Directory.CreateDirectory(webRootPath);
 

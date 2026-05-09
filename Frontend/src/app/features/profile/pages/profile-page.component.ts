@@ -30,7 +30,6 @@ import {
   FALLBACK_AVATAR_URL,
 } from '@app/core';
 import type { UserProfile } from '@app/core';
-import { DIALOG_BOX_IMPORTS } from '@app/shared';
 import type { DropdownSelectOption } from '@app/shared';
 import { CreateProjectDialogComponent } from '../../../shared/components/create-project-dialog/create-project-dialog.component';
 import { EMPTY, forkJoin, switchMap } from 'rxjs';
@@ -50,7 +49,6 @@ type ProjectSortOption = 'updated' | 'created';
     DatePipe,
     FormsModule,
     ReactiveFormsModule,
-    ...DIALOG_BOX_IMPORTS,
     FollowListModalComponent,
     CreateProjectDialogComponent,
   ],
@@ -70,6 +68,8 @@ export class ProfilePage implements OnInit {
   private readonly el = inject(ElementRef);
 
   private readonly projectsGridRef = viewChild<ElementRef<HTMLElement>>('projectsGrid');
+  private readonly renameCardRef = viewChild<ElementRef<HTMLElement>>('renameCard');
+  private readonly deleteCardRef = viewChild<ElementRef<HTMLElement>>('deleteCard');
   private projectsAnimated = false;
   private readonly _animateCards = effect(() => {
     if (this.projects().length > 0 && !this.projectsAnimated) {
@@ -483,6 +483,27 @@ export class ProfilePage implements OnInit {
     this.renameProjectForm.reset({ name: project.name });
     this.renameProjectError.set(null);
     this.isRenameDialogOpen.set(true);
+    afterNextRender(
+      () => {
+        const card = this.renameCardRef()?.nativeElement;
+        if (!card) return;
+        this.zone.runOutsideAngular(() => {
+          gsap.fromTo(
+            card,
+            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
+            {
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              duration: 0.25,
+              ease: 'back.out(1.7)',
+              clearProps: 'transform',
+            },
+          );
+        });
+      },
+      { injector: this.injector },
+    );
   }
 
   closeRenameProjectDialog(): void {
@@ -490,9 +511,30 @@ export class ProfilePage implements OnInit {
       return;
     }
 
-    this.isRenameDialogOpen.set(false);
-    this.activeRenameProject.set(null);
-    this.renameProjectError.set(null);
+    const card = this.renameCardRef()?.nativeElement;
+    if (!card) {
+      this.isRenameDialogOpen.set(false);
+      this.activeRenameProject.set(null);
+      this.renameProjectError.set(null);
+      return;
+    }
+
+    this.zone.runOutsideAngular(() => {
+      gsap.to(card, {
+        opacity: 0,
+        scale: 0.92,
+        y: 12,
+        duration: 0.17,
+        ease: 'power2.in',
+        transformOrigin: 'center center',
+        onComplete: () =>
+          this.zone.run(() => {
+            this.isRenameDialogOpen.set(false);
+            this.activeRenameProject.set(null);
+            this.renameProjectError.set(null);
+          }),
+      });
+    });
   }
 
   submitRenameProject(): void {
@@ -548,6 +590,27 @@ export class ProfilePage implements OnInit {
     this.errorMessage.set(null);
     this.activeDeleteProject.set(project);
     this.isDeleteDialogOpen.set(true);
+    afterNextRender(
+      () => {
+        const card = this.deleteCardRef()?.nativeElement;
+        if (!card) return;
+        this.zone.runOutsideAngular(() => {
+          gsap.fromTo(
+            card,
+            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
+            {
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              duration: 0.25,
+              ease: 'back.out(1.7)',
+              clearProps: 'transform',
+            },
+          );
+        });
+      },
+      { injector: this.injector },
+    );
   }
 
   closeDeleteProjectDialog(): void {
@@ -555,8 +618,28 @@ export class ProfilePage implements OnInit {
       return;
     }
 
-    this.isDeleteDialogOpen.set(false);
-    this.activeDeleteProject.set(null);
+    const card = this.deleteCardRef()?.nativeElement;
+    if (!card) {
+      this.isDeleteDialogOpen.set(false);
+      this.activeDeleteProject.set(null);
+      return;
+    }
+
+    this.zone.runOutsideAngular(() => {
+      gsap.to(card, {
+        opacity: 0,
+        scale: 0.92,
+        y: 12,
+        duration: 0.17,
+        ease: 'power2.in',
+        transformOrigin: 'center center',
+        onComplete: () =>
+          this.zone.run(() => {
+            this.isDeleteDialogOpen.set(false);
+            this.activeDeleteProject.set(null);
+          }),
+      });
+    });
   }
 
   confirmDeleteProject(): void {

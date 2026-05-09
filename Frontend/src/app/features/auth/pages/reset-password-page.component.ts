@@ -1,4 +1,14 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Injector,
+  NgZone,
+  afterNextRender,
+  computed,
+  inject,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
   AbstractControl,
@@ -9,8 +19,8 @@ import {
   Validators,
 } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
+import gsap from 'gsap';
 import { AuthService, extractApiErrorMessage } from '@app/core';
-import { ActionButtonComponent, TextInputComponent } from '@app/shared';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const CREDENTIAL_MAX_LENGTH = 100;
@@ -28,7 +38,7 @@ function passwordStrengthValidator(): ValidatorFn {
 @Component({
   selector: 'app-reset-password-page',
   standalone: true,
-  imports: [ReactiveFormsModule, TextInputComponent, ActionButtonComponent],
+  imports: [ReactiveFormsModule],
   templateUrl: './reset-password-page.component.html',
   styleUrl: './reset-password-page.component.css',
 })
@@ -37,6 +47,13 @@ export class ResetPasswordPage {
   private readonly fb = inject(FormBuilder);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
+  private readonly zone = inject(NgZone);
+  private readonly injector = inject(Injector);
+
+  readonly cardRef = viewChild<ElementRef<HTMLElement>>('card');
+
+  readonly showPassword = signal(false);
+  readonly showConfirmPassword = signal(false);
 
   readonly token = this.route.snapshot.queryParamMap.get('token')?.trim() ?? '';
   readonly isSubmitting = signal(false);
@@ -58,6 +75,30 @@ export class ResetPasswordPage {
     },
     { validators: [this.passwordMatchValidator] },
   );
+
+  constructor() {
+    afterNextRender(
+      () => {
+        const card = this.cardRef()?.nativeElement;
+        if (!card) return;
+        this.zone.runOutsideAngular(() => {
+          gsap.fromTo(
+            card,
+            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
+            {
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              duration: 0.25,
+              ease: 'back.out(1.7)',
+              clearProps: 'transform',
+            },
+          );
+        });
+      },
+      { injector: this.injector },
+    );
+  }
 
   async submit(): Promise<void> {
     if (!this.hasValidToken()) {

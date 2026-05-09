@@ -28,7 +28,7 @@
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: calc(var(--radius-lg) - 0.2rem);
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--color-text-light);
   cursor: pointer;

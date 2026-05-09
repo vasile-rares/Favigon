@@ -277,105 +277,103 @@
   </div>
 
   @if (isForgotPasswordDialogOpen()) {
-    <app-dialog-box
-      #forgotPasswordDialog
-      title="Forgot password"
-      [description]="forgotPasswordEmailSent() ? 'Check your inbox for the password reset link.' : 'Enter your email address and we will send you a password reset link.'"
-      [isBusy]="isForgotPasswordSubmitting()"
-      width="420px"
-      (closed)="closeForgotPasswordDialog()">
-      @if (!forgotPasswordEmailSent()) {
-        <form
-          class="auth-dialog-form"
-          id="forgot-password-form"
-          [formGroup]="forgotPasswordForm"
-          (ngSubmit)="submitForgotPassword()">
-          <div class="auth-field" [class.auth-field--error]="forgotPasswordForm.controls.email.invalid && forgotPasswordForm.controls.email.touched">
-            <label class="auth-field__label" for="forgot-password-email">Email address</label>
-            <input
-              class="auth-field__input"
-              id="forgot-password-email"
-              type="email"
-              placeholder="Email address"
-              formControlName="email"
-              maxlength="100" />
-            @if (forgotPasswordForm.controls.email.invalid && forgotPasswordForm.controls.email.touched) {
-              <p class="auth-field__error">Please enter a valid email address.</p>
-            }
-          </div>
-          @if (forgotPasswordStatusMessage()?.type === 'error') {
-            <p class="auth-status auth-status--error">{{ forgotPasswordStatusMessage()!.text }}</p>
-          }
-        </form>
-      } @else {
-        <div class="auth-dialog-success">
-          <p>{{ forgotPasswordStatusMessage()?.text }}</p>
+    <div class="auth-modal-backdrop" (click)="closeForgotPasswordDialog()">
+      <div class="auth-modal" #forgotPasswordCard (click)="$event.stopPropagation()">
+        <div class="auth-modal-head">
+          <h2 class="auth-modal-title">Forgot password</h2>
+          <p class="auth-modal-text">
+            {{ forgotPasswordEmailSent() ? 'Check your inbox for the password reset link.' : 'Enter your email address and we will send you a password reset link.' }}
+          </p>
         </div>
-      }
 
-      <ng-template #dialogFooter>
-        <div class="auth-dialog-footer">
+        @if (!forgotPasswordEmailSent()) {
+          <form
+            class="auth-modal-form"
+            id="forgot-password-form"
+            [formGroup]="forgotPasswordForm"
+            (ngSubmit)="submitForgotPassword()">
+            <div class="auth-field" [class.auth-field--error]="forgotPasswordForm.controls.email.invalid && forgotPasswordForm.controls.email.touched">
+              <label class="auth-field__label" for="forgot-password-email">Email address</label>
+              <input
+                class="auth-field__input"
+                id="forgot-password-email"
+                type="email"
+                placeholder="Email address"
+                formControlName="email"
+                maxlength="100" />
+              @if (forgotPasswordForm.controls.email.invalid && forgotPasswordForm.controls.email.touched) {
+                <p class="auth-field__error">Please enter a valid email address.</p>
+              }
+            </div>
+            @if (forgotPasswordStatusMessage()?.type === 'error') {
+              <p class="auth-status auth-status--error">{{ forgotPasswordStatusMessage()!.text }}</p>
+            }
+          </form>
+        } @else {
+          <p class="auth-modal-success-text">{{ forgotPasswordStatusMessage()?.text }}</p>
+        }
+
+        <div class="auth-modal-foot">
           @if (forgotPasswordEmailSent()) {
-            <button class="auth-btn auth-btn--primary" type="button" (click)="forgotPasswordDialog.requestClose()">
+            <button class="auth-modal-btn auth-modal-btn--primary" type="button" (click)="closeForgotPasswordDialog()">
               Close
             </button>
           } @else {
-            <button class="auth-btn auth-btn--ghost" type="button" [disabled]="isForgotPasswordSubmitting() || forgotPasswordDialog.isClosing" (click)="forgotPasswordDialog.requestClose()">
+            <button class="auth-modal-btn auth-modal-btn--quiet" type="button" [disabled]="isForgotPasswordSubmitting()" (click)="closeForgotPasswordDialog()">
               Cancel
             </button>
-            <button class="auth-btn auth-btn--primary" type="submit" form="forgot-password-form" [disabled]="isForgotPasswordSubmitting() || forgotPasswordDialog.isClosing || forgotPasswordForm.invalid">
+            <button class="auth-modal-btn auth-modal-btn--primary" type="submit" form="forgot-password-form" [disabled]="isForgotPasswordSubmitting() || forgotPasswordForm.invalid">
               {{ isForgotPasswordSubmitting() ? 'Sending...' : 'Send email' }}
             </button>
           }
         </div>
-      </ng-template>
-    </app-dialog-box>
+      </div>
+    </div>
   }
 
   @if (isTwoFactorDialogOpen()) {
-    <app-dialog-box
-      #twoFactorDialog
-      title="Check your email"
-      [description]="twoFactorDialogDescription"
-      [isBusy]="isTwoFactorSubmitting()"
-      [footerTemplate]="twoFactorDialogFooter"
-      width="420px"
-      (closed)="closeTwoFactorDialog()">
-      <form
-        class="auth-dialog-form"
-        id="two-factor-form"
-        [formGroup]="twoFactorForm"
-        (ngSubmit)="submitTwoFactorLogin()">
-        <div class="auth-field" [class.auth-field--error]="twoFactorForm.controls.code.invalid && twoFactorForm.controls.code.touched">
-          <label class="auth-field__label" for="two-factor-code">Verification code</label>
-          <input
-            class="auth-field__input"
-            id="two-factor-code"
-            type="text"
-            placeholder="6-digit code"
-            formControlName="code"
-            autocomplete="one-time-code"
-            maxlength="6" />
-          @if (twoFactorForm.controls.code.invalid && twoFactorForm.controls.code.touched) {
-            <p class="auth-field__error">Enter the 6-digit code.</p>
-          }
+    <div class="auth-modal-backdrop" (click)="closeTwoFactorDialog()">
+      <div class="auth-modal" #twoFactorCard (click)="$event.stopPropagation()">
+        <div class="auth-modal-head">
+          <h2 class="auth-modal-title">Check your email</h2>
+          <p class="auth-modal-text">{{ twoFactorDialogDescription }}</p>
         </div>
-        @if (twoFactorStatusMessage()?.type === 'error') {
-          <p class="auth-status auth-status--error">{{ twoFactorStatusMessage()!.text }}</p>
-        }
-        @if (twoFactorStatusMessage()?.type === 'success') {
-          <p class="auth-status auth-status--success">{{ twoFactorStatusMessage()!.text }}</p>
-        }
-      </form>
-    </app-dialog-box>
-    <ng-template #twoFactorDialogFooter>
-      <div class="auth-dialog-footer">
-        <button class="auth-btn auth-btn--ghost" type="button" [disabled]="isTwoFactorSubmitting() || twoFactorDialog.isClosing" (click)="twoFactorDialog.requestClose()">
-          Cancel
-        </button>
-        <button class="auth-btn auth-btn--primary" type="submit" form="two-factor-form" [disabled]="isTwoFactorSubmitting() || twoFactorDialog.isClosing || twoFactorForm.invalid">
-          {{ isTwoFactorSubmitting() ? 'Verifying...' : 'Verify code' }}
-        </button>
+
+        <form
+          class="auth-modal-form"
+          id="two-factor-form"
+          [formGroup]="twoFactorForm"
+          (ngSubmit)="submitTwoFactorLogin()">
+          <div class="auth-field" [class.auth-field--error]="twoFactorForm.controls.code.invalid && twoFactorForm.controls.code.touched">
+            <label class="auth-field__label" for="two-factor-code">Verification code</label>
+            <input
+              class="auth-field__input"
+              id="two-factor-code"
+              type="text"
+              placeholder="6-digit code"
+              formControlName="code"
+              autocomplete="one-time-code"
+              maxlength="6" />
+            @if (twoFactorForm.controls.code.invalid && twoFactorForm.controls.code.touched) {
+              <p class="auth-field__error">Enter the 6-digit code.</p>
+            }
+          </div>
+          @if (twoFactorStatusMessage()?.type === 'error') {
+            <p class="auth-status auth-status--error">{{ twoFactorStatusMessage()!.text }}</p>
+          }
+          @if (twoFactorStatusMessage()?.type === 'success') {
+            <p class="auth-status auth-status--success">{{ twoFactorStatusMessage()!.text }}</p>
+          }
+        </form>
+
+        <div class="auth-modal-foot">
+          <button class="auth-modal-btn auth-modal-btn--quiet" type="button" [disabled]="isTwoFactorSubmitting()" (click)="closeTwoFactorDialog()">
+            Cancel
+          </button>
+          <button class="auth-modal-btn auth-modal-btn--primary" type="submit" form="two-factor-form" [disabled]="isTwoFactorSubmitting() || twoFactorForm.invalid">
+            {{ isTwoFactorSubmitting() ? 'Verifying...' : 'Verify code' }}
+          </button>
+        </div>
       </div>
-    </ng-template>
+    </div>
   }
