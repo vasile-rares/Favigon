@@ -3,8 +3,10 @@ import {
   Component,
   ElementRef,
   HostListener,
+  Injector,
   NgZone,
   OnDestroy,
+  afterNextRender,
   viewChild,
   computed,
   effect,
@@ -31,7 +33,7 @@ import {
   buildCanvasProjectDocument,
   buildPersistedCanvasDesign,
 } from '../../mappers/canvas-persistence.mapper';
-import { HeaderBarComponent, ContextMenuComponent, DialogBoxComponent } from '@app/shared';
+import { HeaderBarComponent, ContextMenuComponent } from '@app/shared';
 import type { ContextMenuItem } from '@app/shared';
 import { ToolbarComponent } from '../../components/toolbar/toolbar.component';
 import { ProjectPanelComponent } from '../../components/project-panel/project-panel.component';
@@ -96,6 +98,7 @@ import { CanvasGestureService } from '../../services/editor/canvas-gesture.servi
 import { CanvasDomStyleService } from '../../services/canvas-dom-style.service';
 import { firstValueFrom } from 'rxjs';
 import gsap from 'gsap';
+import { gsapFadeIn, gsapFadeOut } from '../../../../shared/utils/gsap-animations.util';
 
 const ROOT_FRAME_INSERT_GAP = 48;
 const ELEMENT_DRAG_START_THRESHOLD = 3;
@@ -122,7 +125,6 @@ interface RectangleDrawState {
     ProjectPanelComponent,
     PropertiesPanelComponent,
     ContextMenuComponent,
-    DialogBoxComponent,
     CanvasDomElementComponent,
     CanvasLoadingOverlayComponent,
     NgStyle,
@@ -158,6 +160,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private readonly history = inject(CanvasHistoryService);
   private readonly historyPersistence = inject(CanvasHistoryPersistenceService);
   private readonly ngZone = inject(NgZone);
+  private readonly injector = inject(Injector);
   private readonly clipboard = inject(CanvasClipboardService);
   readonly element = inject(CanvasElementService);
   private readonly keyboard = inject(CanvasKeyboardService);
@@ -172,6 +175,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly canvasSceneRef = viewChild<ElementRef<HTMLElement>>('canvasScene');
   private readonly deletePageCardRef = viewChild<ElementRef<HTMLElement>>('deletePageCard');
+  private readonly customFrameModalRef = viewChild<ElementRef<HTMLElement>>('customFrameModal');
+
+  readonly showCustomFrameDialog = signal(false);
 
   readonly pages = this.editorState.pages;
   readonly currentPageId = this.editorState.currentPageId;
@@ -652,6 +658,27 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     // Sync dot-grid CSS vars so the glow mask can align with the dots.
     // (Moved to applyViewportCssVars so it runs alongside transform updates,
     //  avoiding the reactive effect that was triggered on every pan frame.)
+
+    // Animate custom frame modal with settings-page pattern.
+    effect(() => {
+      if (this.page.isCustomFrameDialogOpen()) {
+        this.showCustomFrameDialog.set(true);
+        afterNextRender(
+          () => {
+            const modal = this.customFrameModalRef()?.nativeElement;
+            if (modal) gsapFadeIn(this.ngZone, modal);
+          },
+          { injector: this.injector },
+        );
+      } else if (this.showCustomFrameDialog()) {
+        const modal = this.customFrameModalRef()?.nativeElement;
+        if (!modal) {
+          this.showCustomFrameDialog.set(false);
+        } else {
+          gsapFadeOut(this.ngZone, modal, () => this.showCustomFrameDialog.set(false));
+        }
+      }
+    });
 
     // Animate toast in with GSAP when it first appears.
     effect(() => {
@@ -1840,20 +1867,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       requestAnimationFrame(() => {
         const card = this.deletePageCardRef()?.nativeElement;
         if (!card) return;
-        this.ngZone.runOutsideAngular(() => {
-          gsap.fromTo(
-            card,
-            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
-            {
-              opacity: 1,
-              scale: 1,
-              y: 0,
-              duration: 0.25,
-              ease: 'back.out(1.7)',
-              clearProps: 'transform',
-            },
-          );
-        });
+        gsapFadeIn(this.ngZone, card);
       });
     });
   }
@@ -1864,17 +1878,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.page.cancelDeletePage();
       return;
     }
-    this.ngZone.runOutsideAngular(() => {
-      gsap.to(card, {
-        opacity: 0,
-        scale: 0.92,
-        y: 12,
-        duration: 0.17,
-        ease: 'power2.in',
-        transformOrigin: 'center center',
-        onComplete: () => this.ngZone.run(() => this.page.cancelDeletePage()),
-      });
-    });
+    gsapFadeOut(this.ngZone, card, () => this.page.cancelDeletePage());
   }
 
   confirmDeletePage(): void {

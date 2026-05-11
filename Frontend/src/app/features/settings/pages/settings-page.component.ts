@@ -17,6 +17,7 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import gsap from 'gsap';
+import { gsapFadeIn, gsapFadeOut } from '../../../shared/utils/gsap-animations.util';
 import {
   AuthService,
   UserService,
@@ -158,20 +159,7 @@ export class SettingsPage implements OnInit, AfterViewInit {
   private animateModalOpen(key: 'delete' | 'password' | 'twofactor'): void {
     const modal = this.getModalEl(key);
     if (!modal) return;
-    this.zone.runOutsideAngular(() => {
-      gsap.fromTo(
-        modal,
-        { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
-        {
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          duration: 0.25,
-          ease: 'back.out(1.7)',
-          clearProps: 'transform',
-        },
-      );
-    });
+    gsapFadeIn(this.zone, modal);
   }
 
   private animateModalClose(key: 'delete' | 'password' | 'twofactor', onDone: () => void): void {
@@ -180,17 +168,7 @@ export class SettingsPage implements OnInit, AfterViewInit {
       onDone();
       return;
     }
-    this.zone.runOutsideAngular(() => {
-      gsap.to(modal, {
-        opacity: 0,
-        scale: 0.92,
-        y: 12,
-        duration: 0.17,
-        ease: 'power2.in',
-        transformOrigin: 'center center',
-        onComplete: () => this.zone.run(onDone),
-      });
-    });
+    gsapFadeOut(this.zone, modal, onDone);
   }
 
   async ngOnInit() {

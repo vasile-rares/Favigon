@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { CanvasElement, CanvasPageModel, CanvasPageViewportPreset } from '@app/core';
-import type { ContextMenuItem, DialogBoxField } from '@app/shared';
+import type { ContextMenuItem } from '@app/shared';
 import { roundToTwoDecimals, clamp } from '../utils/canvas-math.util';
 import { mutateNormalizeElement } from '../utils/element/canvas-element-normalization.util';
 import { CANVAS_MAX_ZOOM, CANVAS_MIN_ZOOM } from './canvas-viewport.service';
@@ -60,21 +60,6 @@ export class CanvasPageService {
     if (!id) return null;
     return this.editorState.pages().find((p) => p.id === id) ?? null;
   });
-  readonly customFrameDialogFields = computed<DialogBoxField[]>(() => [
-    {
-      key: 'width',
-      label: 'Width',
-      type: 'number',
-      initialValue: String(this.customFrameWidth()),
-    },
-    {
-      key: 'height',
-      label: 'Height',
-      type: 'number',
-      initialValue: String(this.customFrameHeight()),
-    },
-  ]);
-
   readonly pageLayouts = computed<CanvasPageLayout[]>(() => {
     const pages = this.editorState.pages();
     let cursorX = 0;
@@ -599,21 +584,6 @@ export class CanvasPageService {
     }
     this.deviceMenuTargetPageId.set(null);
     this.closeCustomFrameDialog();
-  }
-
-  onCustomFrameDialogPrimary(values: Record<string, string>): void {
-    const width = Number.parseInt(values['width'] ?? '', 10);
-    const height = Number.parseInt(values['height'] ?? '', 10);
-
-    if (Number.isFinite(width)) {
-      this.customFrameWidth.set(this.normalizeViewportSize(width, this.customFrameWidth()));
-    }
-
-    if (Number.isFinite(height)) {
-      this.customFrameHeight.set(this.normalizeViewportSize(height, this.customFrameHeight()));
-    }
-
-    this.submitCustomFrameDialog();
   }
 
   // ── Preview ───────────────────────────────────────────────

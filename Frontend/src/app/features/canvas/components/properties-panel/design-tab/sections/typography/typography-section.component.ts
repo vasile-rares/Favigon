@@ -35,6 +35,7 @@ import {
   normalizeTextShadowValue,
   resolveEditableTextShadow,
 } from '../../../../../utils/element/canvas-text-shadow.util';
+import { DEFAULT_FILL_COLOR } from '../../../../../utils/canvas-defaults.constants';
 
 type EditableTypographyField =
   | 'fontFamily'
@@ -111,8 +112,6 @@ export class TypographySectionComponent implements OnInit {
   readonly elementPatch = output<Partial<CanvasElement>>();
   readonly numberInputGestureStarted = output<void>();
   readonly numberInputGestureCommitted = output<void>();
-
-  private readonly defaultFillColor = '#e0e0e0';
 
   // ── Optional props menu state ────────────────────────────────────────────
   typographyMenuItems: ContextMenuItem[] = [];
@@ -676,15 +675,15 @@ export class TypographySectionComponent implements OnInit {
     if (element.fillMode === 'gradient') {
       return element.gradient?.stops[0]?.color ?? '#000000';
     }
-    return this.toHexColorOrFallback(element.fill, this.defaultFillColor);
+    return this.toHexColorOrFallback(element.fill, DEFAULT_FILL_COLOR);
   }
 
   fillPickerValue(element: CanvasElement): string {
     if (element.fillMode === 'gradient') {
-      return element.gradient?.stops[0]?.color ?? this.defaultFillColor;
+      return element.gradient?.stops[0]?.color ?? DEFAULT_FILL_COLOR;
     }
     const fillValue = this.fillInputValue(element);
-    return fillValue !== 'transparent' ? fillValue : this.defaultFillColor;
+    return fillValue !== 'transparent' ? fillValue : DEFAULT_FILL_COLOR;
   }
 
   fillGradient(element: CanvasElement): GradientFill | null {

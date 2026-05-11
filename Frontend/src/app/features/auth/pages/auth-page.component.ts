@@ -19,7 +19,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import gsap from 'gsap';
+import { gsapFadeIn, gsapFadeOut } from '../../../shared/utils/gsap-animations.util';
 import { AuthService, UserService, CurrentUserService, extractApiErrorMessage } from '@app/core';
 import { environment } from '../../../../environments/environment';
 
@@ -133,20 +133,7 @@ export class AuthPage implements OnInit {
       () => {
         const card = this.authCardRef()?.nativeElement;
         if (!card) return;
-        this.zone.runOutsideAngular(() => {
-          gsap.fromTo(
-            card,
-            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
-            {
-              opacity: 1,
-              scale: 1,
-              y: 0,
-              duration: 0.25,
-              ease: 'back.out(1.7)',
-              clearProps: 'transform',
-            },
-          );
-        });
+        gsapFadeIn(this.zone, card);
       },
       { injector: this.injector },
     );
@@ -181,20 +168,7 @@ export class AuthPage implements OnInit {
       () => {
         const card = this.forgotPasswordCardRef()?.nativeElement;
         if (!card) return;
-        this.zone.runOutsideAngular(() => {
-          gsap.fromTo(
-            card,
-            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
-            {
-              opacity: 1,
-              scale: 1,
-              y: 0,
-              duration: 0.25,
-              ease: 'back.out(1.7)',
-              clearProps: 'transform',
-            },
-          );
-        });
+        gsapFadeIn(this.zone, card);
       },
       { injector: this.injector },
     );
@@ -211,17 +185,7 @@ export class AuthPage implements OnInit {
       return;
     }
 
-    this.zone.runOutsideAngular(() => {
-      gsap.to(card, {
-        opacity: 0,
-        scale: 0.92,
-        y: 12,
-        duration: 0.17,
-        ease: 'power2.in',
-        transformOrigin: 'center center',
-        onComplete: () => this.zone.run(() => this.isForgotPasswordDialogOpen.set(false)),
-      });
-    });
+    gsapFadeOut(this.zone, card, () => this.isForgotPasswordDialogOpen.set(false));
   }
 
   closeTwoFactorDialog() {
@@ -235,17 +199,7 @@ export class AuthPage implements OnInit {
       return;
     }
 
-    this.zone.runOutsideAngular(() => {
-      gsap.to(card, {
-        opacity: 0,
-        scale: 0.92,
-        y: 12,
-        duration: 0.17,
-        ease: 'power2.in',
-        transformOrigin: 'center center',
-        onComplete: () => this.zone.run(() => this.resetTwoFactorChallenge()),
-      });
-    });
+    gsapFadeOut(this.zone, card, () => this.resetTwoFactorChallenge());
   }
 
   async submitForgotPassword() {
@@ -578,20 +532,7 @@ export class AuthPage implements OnInit {
       () => {
         const card = this.twoFactorCardRef()?.nativeElement;
         if (!card) return;
-        this.zone.runOutsideAngular(() => {
-          gsap.fromTo(
-            card,
-            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
-            {
-              opacity: 1,
-              scale: 1,
-              y: 0,
-              duration: 0.25,
-              ease: 'back.out(1.7)',
-              clearProps: 'transform',
-            },
-          );
-        });
+        gsapFadeIn(this.zone, card);
       },
       { injector: this.injector },
     );

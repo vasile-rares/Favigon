@@ -19,7 +19,7 @@ import {
   Validators,
 } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import gsap from 'gsap';
+import { gsapFadeIn } from '../../../shared/utils/gsap-animations.util';
 import { AuthService, extractApiErrorMessage } from '@app/core';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -81,20 +81,7 @@ export class ResetPasswordPage {
       () => {
         const card = this.cardRef()?.nativeElement;
         if (!card) return;
-        this.zone.runOutsideAngular(() => {
-          gsap.fromTo(
-            card,
-            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
-            {
-              opacity: 1,
-              scale: 1,
-              y: 0,
-              duration: 0.25,
-              ease: 'back.out(1.7)',
-              clearProps: 'transform',
-            },
-          );
-        });
+        gsapFadeIn(this.zone, card);
       },
       { injector: this.injector },
     );

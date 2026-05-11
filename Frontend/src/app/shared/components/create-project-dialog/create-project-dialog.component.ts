@@ -14,6 +14,7 @@ import { Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ProjectService, extractApiErrorMessage } from '@app/core';
 import gsap from 'gsap';
+import { gsapFadeIn } from '../../utils/gsap-animations.util';
 
 @Component({
   selector: 'app-create-project-dialog',
@@ -47,20 +48,7 @@ export class CreateProjectDialogComponent implements AfterViewInit {
   ngAfterViewInit(): void {
     const modal = this.modalRef()?.nativeElement;
     if (!modal) return;
-    this.zone.runOutsideAngular(() => {
-      gsap.fromTo(
-        modal,
-        { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
-        {
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          duration: 0.25,
-          ease: 'back.out(1.7)',
-          clearProps: 'transform',
-        },
-      );
-    });
+    gsapFadeIn(this.zone, modal);
   }
 
   private animateClose(onDone: () => void): void {

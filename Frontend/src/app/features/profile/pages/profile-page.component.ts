@@ -16,6 +16,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { gsap } from 'gsap';
+import { gsapFadeIn, gsapFadeOut } from '../../../shared/utils/gsap-animations.util';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -487,20 +488,7 @@ export class ProfilePage implements OnInit {
       () => {
         const card = this.renameCardRef()?.nativeElement;
         if (!card) return;
-        this.zone.runOutsideAngular(() => {
-          gsap.fromTo(
-            card,
-            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
-            {
-              opacity: 1,
-              scale: 1,
-              y: 0,
-              duration: 0.25,
-              ease: 'back.out(1.7)',
-              clearProps: 'transform',
-            },
-          );
-        });
+        gsapFadeIn(this.zone, card);
       },
       { injector: this.injector },
     );
@@ -519,21 +507,10 @@ export class ProfilePage implements OnInit {
       return;
     }
 
-    this.zone.runOutsideAngular(() => {
-      gsap.to(card, {
-        opacity: 0,
-        scale: 0.92,
-        y: 12,
-        duration: 0.17,
-        ease: 'power2.in',
-        transformOrigin: 'center center',
-        onComplete: () =>
-          this.zone.run(() => {
-            this.isRenameDialogOpen.set(false);
-            this.activeRenameProject.set(null);
-            this.renameProjectError.set(null);
-          }),
-      });
+    gsapFadeOut(this.zone, card, () => {
+      this.isRenameDialogOpen.set(false);
+      this.activeRenameProject.set(null);
+      this.renameProjectError.set(null);
     });
   }
 
@@ -594,20 +571,7 @@ export class ProfilePage implements OnInit {
       () => {
         const card = this.deleteCardRef()?.nativeElement;
         if (!card) return;
-        this.zone.runOutsideAngular(() => {
-          gsap.fromTo(
-            card,
-            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
-            {
-              opacity: 1,
-              scale: 1,
-              y: 0,
-              duration: 0.25,
-              ease: 'back.out(1.7)',
-              clearProps: 'transform',
-            },
-          );
-        });
+        gsapFadeIn(this.zone, card);
       },
       { injector: this.injector },
     );
@@ -625,20 +589,9 @@ export class ProfilePage implements OnInit {
       return;
     }
 
-    this.zone.runOutsideAngular(() => {
-      gsap.to(card, {
-        opacity: 0,
-        scale: 0.92,
-        y: 12,
-        duration: 0.17,
-        ease: 'power2.in',
-        transformOrigin: 'center center',
-        onComplete: () =>
-          this.zone.run(() => {
-            this.isDeleteDialogOpen.set(false);
-            this.activeDeleteProject.set(null);
-          }),
-      });
+    gsapFadeOut(this.zone, card, () => {
+      this.isDeleteDialogOpen.set(false);
+      this.activeDeleteProject.set(null);
     });
   }
 

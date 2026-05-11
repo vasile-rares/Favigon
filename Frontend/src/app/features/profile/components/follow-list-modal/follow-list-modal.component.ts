@@ -18,6 +18,7 @@ import { Router } from '@angular/router';
 import { UserService, FALLBACK_AVATAR_URL } from '@app/core';
 import type { UserFollowItem } from '@app/core';
 import gsap from 'gsap';
+import { gsapFadeIn } from '../../../../shared/utils/gsap-animations.util';
 
 export type FollowListType = 'followers' | 'following';
 
@@ -70,20 +71,7 @@ export class FollowListModalComponent implements OnInit, AfterViewInit, OnDestro
   ngAfterViewInit(): void {
     const modal = this.modalRef()?.nativeElement;
     if (!modal) return;
-    this.zone.runOutsideAngular(() => {
-      gsap.fromTo(
-        modal,
-        { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
-        {
-          opacity: 1,
-          scale: 1,
-          y: 0,
-          duration: 0.25,
-          ease: 'back.out(1.7)',
-          clearProps: 'transform',
-        },
-      );
-    });
+    gsapFadeIn(this.zone, modal);
   }
 
   ngOnDestroy(): void {

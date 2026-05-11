@@ -24,7 +24,7 @@ import {
   extractApiErrorMessage,
   FALLBACK_AVATAR_URL,
 } from '@app/core';
-import { UserMenuDropdownComponent } from '../user-menu-dropdown/user-menu-dropdown.component';
+import { UserMenuDropdownComponent } from './user-menu-dropdown/user-menu-dropdown.component';
 import { filter, map, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 

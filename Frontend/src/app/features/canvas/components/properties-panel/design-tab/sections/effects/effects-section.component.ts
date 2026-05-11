@@ -27,6 +27,10 @@ import {
   createDefaultCanvasEffect,
   resolveCanvasEffect,
 } from '../../../../../utils/element/canvas-effect.util';
+import {
+  DEFAULT_FILL_COLOR,
+  DEFAULT_FRAME_FILL_COLOR,
+} from '../../../../../utils/canvas-defaults.constants';
 
 type EffectPopupView = 'main' | 'transition' | 'fill' | 'shadow';
 
@@ -105,9 +109,6 @@ export class EffectsSectionComponent {
     { label: 'Play', value: 'play' },
     { label: 'Pause', value: 'pause' },
   ];
-
-  private readonly defaultFillColor = '#e0e0e0';
-  private readonly defaultFrameFillColor = '#3f3f46';
 
   onNumberInputGestureStarted(): void {
     this.numberInputGestureStarted.emit();
@@ -290,14 +291,14 @@ export class EffectsSectionComponent {
     const fill = effect.fill?.trim();
     if (fill) return fill;
     const element = this.element();
-    return this.hasFill(element.type) ? this.fillInputValue(element) : this.defaultFillColor;
+    return this.hasFill(element.type) ? this.fillInputValue(element) : DEFAULT_FILL_COLOR;
   }
 
   effectFillPickerValue(effect: CanvasEffect): string {
     const fillValue = this.effectFillInputValue(effect);
     if (fillValue !== 'transparent') return fillValue;
     const element = this.element();
-    return this.hasFill(element.type) ? this.fillPickerValue(element) : this.defaultFillColor;
+    return this.hasFill(element.type) ? this.fillPickerValue(element) : DEFAULT_FILL_COLOR;
   }
 
   effectHasActiveShadow(effect: CanvasEffect): boolean {
@@ -527,14 +528,14 @@ export class EffectsSectionComponent {
   }
 
   private fillInputValue(element: CanvasElement): string {
-    const fallback = element.type === 'frame' ? this.defaultFrameFillColor : this.defaultFillColor;
+    const fallback = element.type === 'frame' ? DEFAULT_FRAME_FILL_COLOR : DEFAULT_FILL_COLOR;
     return this.toHexColorOrFallback(element.fill, fallback);
   }
 
   private fillPickerValue(element: CanvasElement): string {
     const fillValue = this.fillInputValue(element);
     if (fillValue !== 'transparent') return fillValue;
-    return element.type === 'frame' ? this.defaultFrameFillColor : this.defaultFillColor;
+    return element.type === 'frame' ? DEFAULT_FRAME_FILL_COLOR : DEFAULT_FILL_COLOR;
   }
 
   private patchEffectAt(index: number, patch: Partial<CanvasEffect>): void {

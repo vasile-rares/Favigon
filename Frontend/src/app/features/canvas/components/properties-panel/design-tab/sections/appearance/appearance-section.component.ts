@@ -31,6 +31,11 @@ import {
 } from '../../../../../utils/element/canvas-shadow.util';
 import { DropdownSelectComponent } from '@app/shared';
 import type { DropdownSelectOption } from '@app/shared';
+import {
+  DEFAULT_FILL_COLOR,
+  DEFAULT_FRAME_FILL_COLOR,
+  DEFAULT_STROKE_COLOR,
+} from '../../../../../utils/canvas-defaults.constants';
 
 type CornerRadiusMode = 'full' | 'per-corner';
 type EditableNumericField = 'opacity' | 'cornerRadius';
@@ -164,10 +169,6 @@ export class AppearanceSectionComponent {
 
   readonly filterDefinitions = FILTER_DEFINITIONS;
 
-  private readonly defaultFillColor = '#e0e0e0';
-  private readonly defaultFrameFillColor = '#3f3f46';
-  private readonly defaultStrokeColor = '#52525b';
-
   onNumberInputGestureStarted(): void {
     this.numberInputGestureStarted.emit();
   }
@@ -248,7 +249,7 @@ export class AppearanceSectionComponent {
       return element.gradient?.stops[0]?.color ?? '#000000';
     }
     if (element.type === 'svg' && !element.fill) return 'transparent';
-    const fallback = element.type === 'frame' ? this.defaultFrameFillColor : this.defaultFillColor;
+    const fallback = element.type === 'frame' ? DEFAULT_FRAME_FILL_COLOR : DEFAULT_FILL_COLOR;
     return this.toHexColorOrFallback(element.fill, fallback);
   }
 
@@ -258,7 +259,7 @@ export class AppearanceSectionComponent {
     }
     const fillValue = this.fillInputValue(element);
     if (fillValue !== 'transparent') return fillValue;
-    return element.type === 'frame' ? this.defaultFrameFillColor : this.defaultFillColor;
+    return element.type === 'frame' ? DEFAULT_FRAME_FILL_COLOR : DEFAULT_FILL_COLOR;
   }
 
   fillGradient(element: CanvasElement): GradientFill | null {
@@ -340,7 +341,7 @@ export class AppearanceSectionComponent {
   }
 
   strokeInputValue(element: CanvasElement): string {
-    return this.toHexColorOrFallback(element.stroke, this.defaultStrokeColor);
+    return this.toHexColorOrFallback(element.stroke, DEFAULT_STROKE_COLOR);
   }
 
   strokeSidesValue(element: CanvasElement): CanvasBorderSides | null {

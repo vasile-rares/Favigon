@@ -461,17 +461,40 @@
   }
 }
 
-@defer (prefetch on idle; when page.isCustomFrameDialogOpen()) {
-  @if (page.isCustomFrameDialogOpen()) {
-    <app-dialog-box
-      title="Custom Frame"
-      description="Set custom width and height for the new frame."
-      [fields]="page.customFrameDialogFields()"
-      [primaryAction]="{ label: 'Add Frame', variant: 'primary' }"
-      [secondaryAction]="{ label: 'Cancel', variant: 'outline' }"
-      (primaryClicked)="page.onCustomFrameDialogPrimary($event)"
-      (secondaryClicked)="page.closeCustomFrameDialog()"
-      (closed)="page.closeCustomFrameDialog()"></app-dialog-box>
+@defer (prefetch on idle; when showCustomFrameDialog()) {
+  @if (showCustomFrameDialog()) {
+    <div class="custom-frame-backdrop" (click)="page.closeCustomFrameDialog()">
+      <div class="custom-frame-modal" #customFrameModal (click)="$event.stopPropagation()">
+        <div class="custom-frame-modal-head">
+          <h2 class="custom-frame-modal-title">Custom Frame</h2>
+          <p class="custom-frame-modal-text">Set custom width and height for the new frame.</p>
+        </div>
+        <div class="custom-frame-modal-fields">
+          <div class="custom-frame-modal-field">
+            <label class="custom-frame-modal-label" for="custom-frame-width">Width</label>
+            <input
+              id="custom-frame-width"
+              class="custom-frame-modal-input"
+              type="number"
+              [value]="page.customFrameWidth()"
+              (input)="page.onCustomFrameWidthInput($event)" />
+          </div>
+          <div class="custom-frame-modal-field">
+            <label class="custom-frame-modal-label" for="custom-frame-height">Height</label>
+            <input
+              id="custom-frame-height"
+              class="custom-frame-modal-input"
+              type="number"
+              [value]="page.customFrameHeight()"
+              (input)="page.onCustomFrameHeightInput($event)" />
+          </div>
+        </div>
+        <div class="custom-frame-modal-foot">
+          <button class="custom-frame-btn custom-frame-btn--quiet" type="button" (click)="page.closeCustomFrameDialog()">Cancel</button>
+          <button class="custom-frame-btn custom-frame-btn--primary" type="button" (click)="page.submitCustomFrameDialog()">Add Frame</button>
+        </div>
+      </div>
+    </div>
   }
 }
 
