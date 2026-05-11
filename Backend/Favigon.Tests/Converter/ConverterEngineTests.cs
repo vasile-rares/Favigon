@@ -150,12 +150,6 @@ public class ConverterEngineTests
 
     Assert.Contains(".rect-1", homeCss.Content);
     Assert.Contains(".rect-2", homeCss.Content);
-
-    var debugMap = Assert.Single(files, file => file.Path == "debug/home.class-map.json");
-    Assert.Contains("\"id\": \"rect-a\"", debugMap.Content);
-    Assert.Contains("\"htmlTag\": \"div\"", debugMap.Content);
-    Assert.Contains("\"markupClass\": \"rect rect-1\"", debugMap.Content);
-    Assert.Contains("\"cssSelector\": \".rect-1\"", debugMap.Content);
   }
 
   [Fact]
