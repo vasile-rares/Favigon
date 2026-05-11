@@ -431,8 +431,10 @@ public class AuthService : IAuthService
         await _linkedAccountRepository.UpdateAsync(existingProvider);
       }
 
-      // Always refresh the profile picture from OAuth provider
-      if (!string.IsNullOrWhiteSpace(profilePictureUrl) && linkedUser.ProfilePictureUrl != profilePictureUrl)
+      // Only refresh the profile picture from OAuth if the user hasn't uploaded a custom one
+      var hasCustomAvatar = !string.IsNullOrWhiteSpace(linkedUser.ProfilePictureUrl)
+        && linkedUser.ProfilePictureUrl.Contains("/avatar/", StringComparison.OrdinalIgnoreCase);
+      if (!hasCustomAvatar && !string.IsNullOrWhiteSpace(profilePictureUrl) && linkedUser.ProfilePictureUrl != profilePictureUrl)
       {
         linkedUser.ProfilePictureUrl = profilePictureUrl;
         await _userRepository.UpdateAsync(linkedUser);

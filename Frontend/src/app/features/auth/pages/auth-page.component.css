@@ -40,6 +40,21 @@
   -webkit-mask-image: radial-gradient(ellipse 50% 40% at 50% 0%, black 0%, transparent 100%);
   mask-image: radial-gradient(ellipse 50% 40% at 50% 0%, black 0%, transparent 100%);
   pointer-events: none;
+  animation: dot-breathe 6s ease-in-out infinite;
+}
+
+@keyframes dot-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+  }
+  50% {
+    opacity: 1;
+    -webkit-mask-size: 130% 130%;
+    mask-size: 130% 130%;
+  }
 }
 
 .auth-bg::before {

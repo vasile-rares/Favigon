@@ -28,7 +28,10 @@ public class ProjectRepository : IProjectRepository
 
   public Task<Project?> GetByIdAsync(int id, int userId)
   {
-    return _context.Projects.FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
+    return _context.Projects
+      .Include(p => p.ForkedFromProject)
+          .ThenInclude(fp => fp!.User)
+      .FirstOrDefaultAsync(p => p.Id == id && p.UserId == userId);
   }
 
   public Task<Project?> GetPublicByIdAsync(int id)

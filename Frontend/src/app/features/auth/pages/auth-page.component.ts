@@ -54,6 +54,7 @@ export class AuthPage implements OnInit {
 
   readonly forgotPasswordCardRef = viewChild<ElementRef<HTMLElement>>('forgotPasswordCard');
   readonly twoFactorCardRef = viewChild<ElementRef<HTMLElement>>('twoFactorCard');
+  private readonly authCardRef = viewChild<ElementRef<HTMLElement>>('authCard');
 
   private static readonly REMEMBER_EMAIL_KEY = 'favigon.rememberedEmail';
 
@@ -128,6 +129,27 @@ export class AuthPage implements OnInit {
   ngOnInit() {
     this.checkRememberedEmail();
     void this.tryOAuthCallbackLogin();
+    afterNextRender(
+      () => {
+        const card = this.authCardRef()?.nativeElement;
+        if (!card) return;
+        this.zone.runOutsideAngular(() => {
+          gsap.fromTo(
+            card,
+            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
+            {
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              duration: 0.25,
+              ease: 'back.out(1.7)',
+              clearProps: 'transform',
+            },
+          );
+        });
+      },
+      { injector: this.injector },
+    );
   }
 
   // --- Actions ---

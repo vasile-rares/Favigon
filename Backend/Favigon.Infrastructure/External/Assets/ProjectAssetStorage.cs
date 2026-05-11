@@ -7,7 +7,9 @@ namespace Favigon.Infrastructure.External.Assets;
 public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorage
 {
   private const string ThumbnailFileStem = "thumbnail";
-  private const string UserProfileAssetDirectoryName = "user-profile-assets";
+  private const string AvatarSubdirectoryName = "avatar";
+  private const string ProjectsSubdirectoryName = "projects";
+  private const string AssetsSubdirectoryName = "assets";
 
   private static readonly IReadOnlyDictionary<string, string> ContentTypeExtensions =
     new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -35,16 +37,16 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
     CancellationToken cancellationToken = default)
   {
     var extension = ResolveExtension(fileName, contentType);
-    var assetDirectory = GetProjectAssetDirectory(userId, projectId);
-    Directory.CreateDirectory(assetDirectory);
+    var assetsDirectory = GetProjectAssetsSubdirectory(userId, projectId);
+    Directory.CreateDirectory(assetsDirectory);
 
     var storedFileName = $"{Guid.NewGuid():N}{extension}";
-    var physicalPath = Path.Combine(assetDirectory, storedFileName);
+    var physicalPath = Path.Combine(assetsDirectory, storedFileName);
 
     await using var destination = new FileStream(physicalPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
     await content.CopyToAsync(destination, cancellationToken);
 
-    return $"/project-assets/{userId.ToString(CultureInfo.InvariantCulture)}/{projectId.ToString(CultureInfo.InvariantCulture)}/{storedFileName}";
+    return BuildProjectAssetFileUrl(userId, projectId, storedFileName);
   }
 
   public async Task<string> SaveThumbnailAsync(
@@ -55,18 +57,18 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
     CancellationToken cancellationToken = default)
   {
     var extension = ResolveExtension(null, contentType);
-    var assetDirectory = GetProjectAssetDirectory(userId, projectId);
-    Directory.CreateDirectory(assetDirectory);
+    var projectDirectory = GetProjectDirectory(userId, projectId);
+    Directory.CreateDirectory(projectDirectory);
 
-    DeleteExistingThumbnailFiles(assetDirectory);
+    DeleteExistingThumbnailFiles(projectDirectory);
 
     var storedFileName = $"{ThumbnailFileStem}{extension}";
-    var physicalPath = Path.Combine(assetDirectory, storedFileName);
+    var physicalPath = Path.Combine(projectDirectory, storedFileName);
 
     await using var destination = new FileStream(physicalPath, FileMode.Create, FileAccess.Write, FileShare.None);
     await content.CopyToAsync(destination, cancellationToken);
 
-    return BuildProjectAssetUrl(userId, projectId, storedFileName);
+    return BuildProjectThumbnailUrl(userId, projectId, storedFileName);
   }
 
   public async Task<string> SaveImageAsync(
@@ -77,16 +79,16 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
     CancellationToken cancellationToken = default)
   {
     var extension = ResolveExtension(fileName, contentType);
-    var assetDirectory = GetUserProfileAssetDirectory(userId);
-    Directory.CreateDirectory(assetDirectory);
+    var avatarDirectory = GetAvatarDirectory(userId);
+    Directory.CreateDirectory(avatarDirectory);
 
     var storedFileName = $"{Guid.NewGuid():N}{extension}";
-    var physicalPath = Path.Combine(assetDirectory, storedFileName);
+    var physicalPath = Path.Combine(avatarDirectory, storedFileName);
 
     await using var destination = new FileStream(physicalPath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
     await content.CopyToAsync(destination, cancellationToken);
 
-    return BuildUserProfileAssetUrl(userId, storedFileName);
+    return BuildAvatarUrl(userId, storedFileName);
   }
 
   public Task DeleteImageAsync(
@@ -96,15 +98,15 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
   {
     cancellationToken.ThrowIfCancellationRequested();
 
-    var userDirectory = Path.GetFullPath(GetUserProfileAssetDirectory(userId));
-    var physicalPath = TryResolveUserProfileAssetPath(userDirectory, userId, imageUrlOrPath);
+    var avatarDirectory = Path.GetFullPath(GetAvatarDirectory(userId));
+    var physicalPath = TryResolveAvatarPath(avatarDirectory, userId, imageUrlOrPath);
     if (physicalPath == null || !File.Exists(physicalPath))
     {
       return Task.CompletedTask;
     }
 
     File.Delete(physicalPath);
-    DeleteDirectoryIfEmpty(userDirectory);
+    DeleteDirectoryIfEmpty(avatarDirectory);
 
     return Task.CompletedTask;
   }
@@ -115,7 +117,7 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
   {
     cancellationToken.ThrowIfCancellationRequested();
 
-    var assetDirectory = GetUserProfileAssetDirectory(userId);
+    var assetDirectory = GetUserRootDirectory(userId);
     if (Directory.Exists(assetDirectory))
     {
       Directory.Delete(assetDirectory, recursive: true);
@@ -126,14 +128,14 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
 
   public string? GetThumbnailUrl(int userId, int projectId)
   {
-    var assetDirectory = GetProjectAssetDirectory(userId, projectId);
-    if (!Directory.Exists(assetDirectory))
+    var projectDirectory = GetProjectDirectory(userId, projectId);
+    if (!Directory.Exists(projectDirectory))
     {
       return null;
     }
 
     var thumbnailPath = Directory
-      .EnumerateFiles(assetDirectory, $"{ThumbnailFileStem}.*", SearchOption.TopDirectoryOnly)
+      .EnumerateFiles(projectDirectory, $"{ThumbnailFileStem}.*", SearchOption.TopDirectoryOnly)
       .OrderByDescending(File.GetLastWriteTimeUtc)
       .FirstOrDefault();
     if (string.IsNullOrWhiteSpace(thumbnailPath))
@@ -143,7 +145,7 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
 
     var fileName = Path.GetFileName(thumbnailPath);
     var version = File.GetLastWriteTimeUtc(thumbnailPath).Ticks.ToString(CultureInfo.InvariantCulture);
-    return $"{BuildProjectAssetUrl(userId, projectId, fileName)}?v={version}";
+    return $"{BuildProjectThumbnailUrl(userId, projectId, fileName)}?v={version}";
   }
 
   public Task DeleteAssetsAsync(
@@ -152,13 +154,13 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
     IEnumerable<string> assetPaths,
     CancellationToken cancellationToken = default)
   {
-    var projectDirectory = Path.GetFullPath(GetProjectAssetDirectory(userId, projectId));
+    var assetsSubdirectory = Path.GetFullPath(GetProjectAssetsSubdirectory(userId, projectId));
 
     foreach (var assetPath in assetPaths.Distinct(StringComparer.OrdinalIgnoreCase))
     {
       cancellationToken.ThrowIfCancellationRequested();
 
-      var physicalPath = TryResolveProjectAssetPath(projectDirectory, userId, projectId, assetPath);
+      var physicalPath = TryResolveProjectAssetPath(assetsSubdirectory, userId, projectId, assetPath);
       if (physicalPath == null || !File.Exists(physicalPath))
       {
         continue;
@@ -167,12 +169,7 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
       File.Delete(physicalPath);
     }
 
-    DeleteDirectoryIfEmpty(projectDirectory);
-    var userDirectory = Path.GetDirectoryName(projectDirectory);
-    if (!string.IsNullOrWhiteSpace(userDirectory))
-    {
-      DeleteDirectoryIfEmpty(userDirectory);
-    }
+    DeleteDirectoryIfEmpty(assetsSubdirectory);
 
     return Task.CompletedTask;
   }
@@ -184,30 +181,51 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
   {
     cancellationToken.ThrowIfCancellationRequested();
 
-    var assetDirectory = GetProjectAssetDirectory(userId, projectId);
-    if (Directory.Exists(assetDirectory))
+    var projectDirectory = GetProjectDirectory(userId, projectId);
+    if (Directory.Exists(projectDirectory))
     {
-      Directory.Delete(assetDirectory, recursive: true);
+      Directory.Delete(projectDirectory, recursive: true);
     }
+
+    var projectsDirectory = GetProjectsRootDirectory(userId);
+    DeleteDirectoryIfEmpty(projectsDirectory);
 
     return Task.CompletedTask;
   }
 
-  private string GetProjectAssetDirectory(int userId, int projectId)
+  private string GetUserRootDirectory(int userId)
   {
     return Path.Combine(
       GetWebRootPath(),
-      "project-assets",
-      userId.ToString(CultureInfo.InvariantCulture),
+      userId.ToString(CultureInfo.InvariantCulture));
+  }
+
+  private string GetAvatarDirectory(int userId)
+  {
+    return Path.Combine(
+      GetUserRootDirectory(userId),
+      AvatarSubdirectoryName);
+  }
+
+  private string GetProjectsRootDirectory(int userId)
+  {
+    return Path.Combine(
+      GetUserRootDirectory(userId),
+      ProjectsSubdirectoryName);
+  }
+
+  private string GetProjectDirectory(int userId, int projectId)
+  {
+    return Path.Combine(
+      GetProjectsRootDirectory(userId),
       projectId.ToString(CultureInfo.InvariantCulture));
   }
 
-  private string GetUserProfileAssetDirectory(int userId)
+  private string GetProjectAssetsSubdirectory(int userId, int projectId)
   {
     return Path.Combine(
-      GetWebRootPath(),
-      UserProfileAssetDirectoryName,
-      userId.ToString(CultureInfo.InvariantCulture));
+      GetProjectDirectory(userId, projectId),
+      AssetsSubdirectoryName);
   }
 
   private string GetWebRootPath()
@@ -218,7 +236,7 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
   }
 
   private static string? TryResolveProjectAssetPath(
-    string projectDirectory,
+    string assetsSubdirectory,
     int userId,
     int projectId,
     string assetPath)
@@ -228,8 +246,8 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
       return null;
     }
 
-    var normalizedPath = assetPath.Replace('\\', '/');
-    var expectedPrefix = $"/project-assets/{userId.ToString(CultureInfo.InvariantCulture)}/{projectId.ToString(CultureInfo.InvariantCulture)}/";
+    var normalizedPath = ExtractAssetPath(assetPath).Replace('\\', '/');
+    var expectedPrefix = $"/{userId.ToString(CultureInfo.InvariantCulture)}/{ProjectsSubdirectoryName}/{projectId.ToString(CultureInfo.InvariantCulture)}/{AssetsSubdirectoryName}/";
     if (!normalizedPath.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
     {
       return null;
@@ -242,10 +260,10 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
     }
 
     var physicalPath = Path.GetFullPath(Path.Combine(
-      projectDirectory,
+      assetsSubdirectory,
       relativePath.Replace('/', Path.DirectorySeparatorChar)));
 
-    return physicalPath.StartsWith(projectDirectory, StringComparison.OrdinalIgnoreCase)
+    return physicalPath.StartsWith(assetsSubdirectory, StringComparison.OrdinalIgnoreCase)
       ? physicalPath
       : null;
   }
@@ -281,8 +299,8 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
     }
   }
 
-  private static string? TryResolveUserProfileAssetPath(
-    string userDirectory,
+  private static string? TryResolveAvatarPath(
+    string avatarDirectory,
     int userId,
     string imageUrlOrPath)
   {
@@ -297,7 +315,7 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
       normalizedPath = $"/{normalizedPath.TrimStart('/')}";
     }
 
-    var expectedPrefix = $"/{UserProfileAssetDirectoryName}/{userId.ToString(CultureInfo.InvariantCulture)}/";
+    var expectedPrefix = $"/{userId.ToString(CultureInfo.InvariantCulture)}/{AvatarSubdirectoryName}/";
     if (!normalizedPath.StartsWith(expectedPrefix, StringComparison.OrdinalIgnoreCase))
     {
       return null;
@@ -310,22 +328,27 @@ public class ProjectAssetStorage : IProjectAssetStorage, IUserProfileImageStorag
     }
 
     var physicalPath = Path.GetFullPath(Path.Combine(
-      userDirectory,
+      avatarDirectory,
       relativePath.Replace('/', Path.DirectorySeparatorChar)));
 
-    return physicalPath.StartsWith(userDirectory, StringComparison.OrdinalIgnoreCase)
+    return physicalPath.StartsWith(avatarDirectory, StringComparison.OrdinalIgnoreCase)
       ? physicalPath
       : null;
   }
 
-  private static string BuildProjectAssetUrl(int userId, int projectId, string fileName)
+  private static string BuildProjectThumbnailUrl(int userId, int projectId, string fileName)
   {
-    return $"/project-assets/{userId.ToString(CultureInfo.InvariantCulture)}/{projectId.ToString(CultureInfo.InvariantCulture)}/{fileName}";
+    return $"/{userId.ToString(CultureInfo.InvariantCulture)}/{ProjectsSubdirectoryName}/{projectId.ToString(CultureInfo.InvariantCulture)}/{fileName}";
   }
 
-  private static string BuildUserProfileAssetUrl(int userId, string fileName)
+  private static string BuildProjectAssetFileUrl(int userId, int projectId, string fileName)
   {
-    return $"/{UserProfileAssetDirectoryName}/{userId.ToString(CultureInfo.InvariantCulture)}/{fileName}";
+    return $"/{userId.ToString(CultureInfo.InvariantCulture)}/{ProjectsSubdirectoryName}/{projectId.ToString(CultureInfo.InvariantCulture)}/{AssetsSubdirectoryName}/{fileName}";
+  }
+
+  private static string BuildAvatarUrl(int userId, string fileName)
+  {
+    return $"/{userId.ToString(CultureInfo.InvariantCulture)}/{AvatarSubdirectoryName}/{fileName}";
   }
 
   private static string ExtractAssetPath(string imageUrlOrPath)
