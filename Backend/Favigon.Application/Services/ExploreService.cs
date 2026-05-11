@@ -11,22 +11,19 @@ public class ExploreService : IExploreService
   private const int PeopleLimit = 12;
 
   private readonly IExploreRepository _exploreRepository;
-  private readonly IBookmarkRepository _bookmarkRepository;
-  private readonly IFollowRepository _followRepository;
-  private readonly ILikeRepository _likeRepository;
+  private readonly IProjectRepository _projectRepository;
+  private readonly IUserRepository _userRepository;
   private readonly IProjectAssetStorage _projectAssetStorage;
 
   public ExploreService(
     IExploreRepository exploreRepository,
-    IBookmarkRepository bookmarkRepository,
-    IFollowRepository followRepository,
-    ILikeRepository likeRepository,
+    IProjectRepository projectRepository,
+    IUserRepository userRepository,
     IProjectAssetStorage projectAssetStorage)
   {
     _exploreRepository = exploreRepository;
-    _bookmarkRepository = bookmarkRepository;
-    _followRepository = followRepository;
-    _likeRepository = likeRepository;
+    _projectRepository = projectRepository;
+    _userRepository = userRepository;
     _projectAssetStorage = projectAssetStorage;
   }
 
@@ -40,7 +37,7 @@ public class ExploreService : IExploreService
   {
     if (viewerUserId > 0)
     {
-      var followingCount = await _followRepository.GetFollowingCountAsync(viewerUserId);
+      var followingCount = await _userRepository.GetFollowingCountAsync(viewerUserId);
       if (followingCount > 0)
       {
         var personalized = await _exploreRepository.GetRecommendedProjectsAsync(viewerUserId, RecommendedLimit);
@@ -60,7 +57,7 @@ public class ExploreService : IExploreService
     var dtos = new List<ExploreUserDto>(users.Count);
     foreach (var user in users)
     {
-      var isFollowed = viewerUserId > 0 && await _followRepository.IsFollowingAsync(viewerUserId, user.Id);
+      var isFollowed = viewerUserId > 0 && await _userRepository.IsFollowingAsync(viewerUserId, user.Id);
       dtos.Add(new ExploreUserDto
       {
         UserId = user.Id,
@@ -86,7 +83,7 @@ public class ExploreService : IExploreService
     {
       var ids = projects.Select(p => p.Id).ToList();
       starredIds = await GetStarredIdsAsync(viewerUserId, ids);
-      likedIds = await _likeRepository.GetLikedProjectIdsAsync(viewerUserId, ids);
+      likedIds = await _projectRepository.GetLikedProjectIdsAsync(viewerUserId, ids);
     }
 
     return projects.Select(p => new ExploreProjectDto
@@ -110,6 +107,6 @@ public class ExploreService : IExploreService
 
   private Task<HashSet<int>> GetStarredIdsAsync(int userId, List<int> projectIds)
   {
-    return _bookmarkRepository.GetStarredProjectIdsAsync(userId, projectIds);
+    return _projectRepository.GetStarredProjectIdsAsync(userId, projectIds);
   }
 }

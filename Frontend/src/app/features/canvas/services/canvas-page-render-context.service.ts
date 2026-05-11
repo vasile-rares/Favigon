@@ -14,7 +14,7 @@ const PAGE_FRAME_TITLE_OFFSET = 24;
 export const FRAME_TITLE_ZOOM_THRESHOLD = 0.3;
 
 @Injectable()
-export class CanvasPageGeometryService {
+export class CanvasPageRenderContextService {
   private readonly editorState = inject(CanvasEditorStateService);
   private readonly el = inject(CanvasElementService);
   private readonly viewport = inject(CanvasViewportService);

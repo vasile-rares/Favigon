@@ -1,7 +1,7 @@
 import { CanvasElement, CanvasPageModel } from '@app/core';
-import { getResolvedCornerRadii } from '../element/canvas-element-normalization.util';
-import { getAbsolutePos } from '../canvas-tree.util';
-import { Bounds } from '../../canvas.types';
+import { getResolvedCornerRadii } from './element/canvas-element-normalization.util';
+import { getAbsolutePos } from './canvas-tree.util';
+import { Bounds } from '../canvas.types';
 
 const THUMB_W = 300;
 const THUMB_H = 168;

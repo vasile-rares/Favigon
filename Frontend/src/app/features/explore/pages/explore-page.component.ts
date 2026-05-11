@@ -21,7 +21,6 @@ import Lenis from 'lenis';
 gsap.registerPlugin(ScrollTrigger);
 import { ExploreService, ProjectService, UserService, extractApiErrorMessage } from '@app/core';
 import type { ExploreProjectItem, ExploreUserItem } from '@app/core';
-import { CurrentUserService } from '../../../core/services/current-user.service';
 
 @Component({
   selector: 'app-explore-page',
@@ -34,7 +33,7 @@ export class ExplorePageComponent implements OnInit {
   private readonly exploreService = inject(ExploreService);
   private readonly projectService = inject(ProjectService);
   private readonly userService = inject(UserService);
-  private readonly currentUserService = inject(CurrentUserService);
+  private readonly currentUserService = inject(UserService);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
@@ -52,7 +51,7 @@ export class ExplorePageComponent implements OnInit {
   readonly isLoading = signal(true);
   readonly errorMessage = signal<string | null>(null);
 
-  readonly isAuthenticated = computed(() => this.currentUserService.user() != null);
+  readonly isAuthenticated = computed(() => this.currentUserService.currentUser() != null);
 
   readonly strip1CanPrev = signal(false);
   readonly strip1CanNext = signal(false);

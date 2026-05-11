@@ -5,7 +5,7 @@ using Favigon.Converter.Models;
 using Favigon.Converter.Validation;
 using Microsoft.Extensions.Logging;
 
-namespace Favigon.Application.Services;
+namespace Favigon.Application.Helpers;
 
 /// <summary>
 /// Shared utilities for parsing, validating, and normalising AI-generated IRNode JSON.

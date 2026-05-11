@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
-import { PendingProjectFlushService } from '@app/core';
+import { ProjectService } from '@app/core';
 import { HeaderBarComponent } from './shared/components/header-bar/header-bar.component';
 import { filter } from 'rxjs';
 
@@ -13,7 +13,7 @@ const HIDDEN_HEADER_ROUTES = ['/login', '/reset-password', '/project/'];
   styleUrl: './app.css',
 })
 export class App {
-  private readonly pendingProjectFlush = inject(PendingProjectFlushService);
+  private readonly _projectService = inject(ProjectService);
   private readonly router = inject(Router);
 
   readonly showHeader = signal(false);

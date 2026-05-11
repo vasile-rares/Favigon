@@ -32,23 +32,17 @@ public class ProjectService : IProjectService
   private readonly IMapper _mapper;
   private readonly IConverterEngine _converterEngine;
   private readonly IProjectAssetStorage _projectAssetStorage;
-  private readonly IBookmarkRepository _bookmarkRepository;
-  private readonly ILikeRepository _likeRepository;
 
   public ProjectService(
     IProjectRepository projectRepository,
     IMapper mapper,
     IConverterEngine converterEngine,
-    IProjectAssetStorage projectAssetStorage,
-    IBookmarkRepository bookmarkRepository,
-    ILikeRepository likeRepository)
+    IProjectAssetStorage projectAssetStorage)
   {
     _projectRepository = projectRepository;
     _mapper = mapper;
     _converterEngine = converterEngine;
     _projectAssetStorage = projectAssetStorage;
-    _bookmarkRepository = bookmarkRepository;
-    _likeRepository = likeRepository;
   }
 
   public async Task<IReadOnlyList<ProjectResponse>> GetByUserIdAsync(int userId, bool? isPublic = null, int? viewerUserId = null)
@@ -57,8 +51,8 @@ public class ProjectService : IProjectService
     var projectIds = projects.Select(p => p.Id).ToList();
 
     var contextUserId = viewerUserId ?? userId;
-    var starredIds = await _bookmarkRepository.GetStarredProjectIdsAsync(contextUserId, projectIds);
-    var likedIds = await _likeRepository.GetLikedProjectIdsAsync(contextUserId, projectIds);
+    var starredIds = await _projectRepository.GetStarredProjectIdsAsync(contextUserId, projectIds);
+    var likedIds = await _projectRepository.GetLikedProjectIdsAsync(contextUserId, projectIds);
 
     var forkedFromIds = projects
       .Where(p => p.ForkedFromProjectId.HasValue)
@@ -516,6 +510,148 @@ public class ProjectService : IProjectService
     }
 
     return trimmed;
+  }
+
+  // ── Likes ──────────────────────────────────────────────────────────────────
+
+  public async Task LikeAsync(int userId, int projectId)
+  {
+    var project = await _projectRepository.GetPublicByIdAsync(projectId);
+    if (project == null)
+    {
+      project = await _projectRepository.GetByIdAsync(projectId, userId);
+    }
+
+    if (project == null)
+      throw new InvalidOperationException("Project not found or not accessible.");
+
+    var existing = await _projectRepository.GetLikeAsync(userId, projectId);
+    if (existing != null)
+      throw new InvalidOperationException("Project is already liked.");
+
+    await _projectRepository.AddLikeAsync(new ProjectLike
+    {
+      UserId = userId,
+      ProjectId = projectId,
+      CreatedAt = DateTime.UtcNow
+    });
+  }
+
+  public async Task UnlikeAsync(int userId, int projectId)
+  {
+    var like = await _projectRepository.GetLikeAsync(userId, projectId)
+        ?? throw new InvalidOperationException("Project is not liked.");
+
+    await _projectRepository.DeleteLikeAsync(like);
+  }
+
+  // ── Bookmarks ──────────────────────────────────────────────────────────────
+
+  public async Task BookmarkAsync(int userId, int projectId)
+  {
+    var project = await _projectRepository.GetPublicByIdAsync(projectId);
+    if (project == null)
+    {
+      project = await _projectRepository.GetByIdAsync(projectId, userId);
+    }
+
+    if (project == null)
+      throw new InvalidOperationException("Project not found or not accessible.");
+
+    var existing = await _projectRepository.GetBookmarkAsync(userId, projectId);
+    if (existing != null)
+      throw new InvalidOperationException("Project is already starred.");
+
+    await _projectRepository.AddBookmarkAsync(new ProjectBookmark
+    {
+      UserId = userId,
+      ProjectId = projectId,
+      CreatedAt = DateTime.UtcNow
+    });
+  }
+
+  public async Task UnbookmarkAsync(int userId, int projectId)
+  {
+    var bookmark = await _projectRepository.GetBookmarkAsync(userId, projectId)
+      ?? throw new InvalidOperationException("Project is not starred.");
+
+    await _projectRepository.DeleteBookmarkAsync(bookmark);
+  }
+
+  public async Task<IReadOnlyList<ProjectResponse>> GetMyBookmarksAsync(int userId)
+  {
+    var projects = await _projectRepository.GetBookmarkedProjectsAsync(userId);
+    var projectIds = projects.Select(p => p.Id).ToList();
+    var likedIds = await _projectRepository.GetLikedProjectIdsAsync(userId, projectIds);
+
+    var forkedFromIds = projects
+      .Where(p => p.ForkedFromProjectId.HasValue)
+      .Select(p => p.ForkedFromProjectId!.Value)
+      .Distinct()
+      .ToList();
+    var forkedOwners = forkedFromIds.Count > 0
+      ? await _projectRepository.GetOwnerUsernamesByProjectIdsAsync(forkedFromIds)
+      : new Dictionary<int, string>();
+
+    var responses = new List<ProjectResponse>(projects.Count);
+    foreach (var project in projects)
+    {
+      var response = _mapper.Map<ProjectResponse>(project);
+      response.ThumbnailDataUrl =
+        _projectAssetStorage.GetThumbnailUrl(project.UserId, project.Id) ??
+        project.ThumbnailDataUrl;
+      response.IsStarredByCurrentUser = true;
+      response.IsLikedByCurrentUser = likedIds.Contains(project.Id);
+      if (project.ForkedFromProjectId.HasValue && forkedOwners.TryGetValue(project.ForkedFromProjectId.Value, out var username))
+        response.ForkedFromOwnerUsername = username;
+      responses.Add(response);
+    }
+
+    return responses;
+  }
+
+  // ── Assets ─────────────────────────────────────────────────────────────────
+
+  private const long MaxImageSizeBytes = 10 * 1024 * 1024;
+
+  private static readonly HashSet<string> AllowedImageContentTypes = new(StringComparer.OrdinalIgnoreCase)
+  {
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/gif",
+    "image/avif"
+  };
+
+  public async Task<string?> UploadImageAsync(
+    int projectId,
+    int userId,
+    ProjectImageUploadRequest request,
+    CancellationToken cancellationToken = default)
+  {
+    var project = await _projectRepository.GetByIdAsync(projectId, userId);
+    if (project == null)
+    {
+      return null;
+    }
+
+    ImageUploadValidator.Validate(new ImageUploadRequest(
+      Content: request.Content,
+      FileName: request.FileName,
+      ContentType: request.ContentType,
+      Length: request.Length,
+      MaxBytes: MaxImageSizeBytes,
+      AllowedTypes: AllowedImageContentTypes,
+      AssetLabel: "Image file",
+      UnsupportedFormatMessage: "Only PNG, JPEG, WebP, GIF, and AVIF images are supported."));
+
+    return await _projectAssetStorage.SaveImageAsync(
+      userId,
+      projectId,
+      request.Content,
+      request.FileName,
+      request.ContentType,
+      cancellationToken);
   }
 
 }

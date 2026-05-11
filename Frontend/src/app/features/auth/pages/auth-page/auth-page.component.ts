@@ -19,9 +19,9 @@ import {
   Validators,
 } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
-import { gsapFadeIn, gsapFadeOut } from '../../../shared/utils/gsap-animations.util';
-import { AuthService, UserService, CurrentUserService, extractApiErrorMessage } from '@app/core';
-import { environment } from '../../../../environments/environment';
+import { gsapFadeIn, gsapFadeOut } from '../../../../shared/utils/gsap-animations.util';
+import { AuthService, UserService, extractApiErrorMessage } from '@app/core';
+import { environment } from '../../../../../environments/environment';
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
 const CREDENTIAL_MAX_LENGTH = 100;
@@ -45,7 +45,6 @@ function passwordStrengthValidator(): ValidatorFn {
 export class AuthPage implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly userService = inject(UserService);
-  private readonly currentUser = inject(CurrentUserService);
   private readonly fb = inject(FormBuilder);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
@@ -265,7 +264,7 @@ export class AuthPage implements OnInit {
       this.resetTwoFactorChallenge();
 
       const user = await firstValueFrom(this.userService.getMe());
-      this.currentUser.set(user);
+      this.userService.setCurrentUser(user);
       await this.navigateAfterLogin(user.username);
     } catch (error: unknown) {
       this.twoFactorStatusMessage.set({
@@ -440,7 +439,7 @@ export class AuthPage implements OnInit {
         }
         // Refresh user data so the new profile picture becomes visible immediately
         const user = await firstValueFrom(this.userService.getMe());
-        this.currentUser.set(user);
+        this.userService.setCurrentUser(user);
         await this.router.navigate(['/settings']);
       } catch (error: unknown) {
         this.handleError(
@@ -502,7 +501,7 @@ export class AuthPage implements OnInit {
     }
 
     const user = await firstValueFrom(this.userService.getMe());
-    this.currentUser.set(user);
+    this.userService.setCurrentUser(user);
     await this.navigateAfterLogin(user.username);
   }
 

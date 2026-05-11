@@ -16,12 +16,12 @@ export const routes: Routes = [
   {
     path: 'login',
     loadComponent: () =>
-      import('./features/auth/pages/auth-page.component').then((m) => m.AuthPage),
+      import('./features/auth/pages/auth-page/auth-page.component').then((m) => m.AuthPage),
   },
   {
     path: 'reset-password',
     loadComponent: () =>
-      import('./features/auth/pages/reset-password-page.component').then(
+      import('./features/auth/pages/reset-password-page/reset-password-page.component').then(
         (m) => m.ResetPasswordPage,
       ),
   },

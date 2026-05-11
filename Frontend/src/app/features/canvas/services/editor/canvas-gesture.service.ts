@@ -16,17 +16,17 @@ import { CanvasViewportService } from '../canvas-viewport.service';
 import { CanvasHistoryService } from './canvas-history.service';
 import { CanvasElementService } from '../canvas-element.service';
 import { CanvasEditorStateService } from '../canvas-editor-state.service';
-import { CanvasPageService } from '../canvas-page.service';
+import { CanvasPageManagerService } from '../canvas-page-manager.service';
 
 import { mutateNormalizeElement } from '../../utils/element/canvas-element-normalization.util';
 import { clamp, roundToTwoDecimals } from '../../utils/canvas-math.util';
 import { collectSubtreeIds, removeWithChildren } from '../../utils/canvas-tree.util';
 import {
   buildSnapCandidates,
+  calculateResizedBounds,
   computeSnappedPosition,
   SNAP_THRESHOLD,
-} from '../../utils/interaction/canvas-snap.util';
-import { calculateResizedBounds } from '../../utils/interaction/canvas-resize.util';
+} from '../../utils/canvas-interaction.util';
 import { getCanvasSizeMode } from '../../utils/element/canvas-sizing.util';
 import {
   getTextFontFamily,
@@ -57,7 +57,7 @@ export class CanvasGestureService {
   private readonly history = inject(CanvasHistoryService);
   private readonly element = inject(CanvasElementService);
   private readonly editorState = inject(CanvasEditorStateService);
-  private readonly page = inject(CanvasPageService);
+  private readonly page = inject(CanvasPageManagerService);
   // ── Canvas element access (set by component) ────────────
 
   private canvasElementGetter: (() => HTMLElement | null) | null = null;

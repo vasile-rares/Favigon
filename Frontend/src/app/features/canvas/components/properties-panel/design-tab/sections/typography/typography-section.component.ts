@@ -21,8 +21,8 @@ import {
 } from '@app/core';
 
 import { roundToTwoDecimals } from '../../../../../utils/canvas-math.util';
-import { gradientToCss } from '../../../../../utils/gradient.utils';
-import { GoogleFontsService } from '../../../../../services/google-fonts.service';
+import { gradientToCss } from '../../../../../utils/canvas-gradient.util';
+import { CanvasFontsService } from '../../../../../services/canvas-fonts.service';
 import {
   getDefaultCornerRadius,
   getResolvedCornerRadii,
@@ -104,7 +104,7 @@ const TYPOGRAPHY_OPTIONAL_DEFS: readonly TypographyOptionalDef[] = [
   encapsulation: ViewEncapsulation.None,
 })
 export class TypographySectionComponent implements OnInit {
-  private readonly googleFonts = inject(GoogleFontsService);
+  private readonly googleFonts = inject(CanvasFontsService);
 
   readonly element = input.required<CanvasElement>();
   readonly projectId = input<number | null>(null);

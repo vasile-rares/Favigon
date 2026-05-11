@@ -21,7 +21,6 @@ public class UserService : IUserService
   };
 
   private readonly IUserRepository _userRepository;
-  private readonly ILinkedAccountRepository _linkedAccountRepository;
   private readonly IUserProfileImageStorage _userProfileImageStorage;
   private readonly IProjectRepository _projectRepository;
   private readonly IProjectAssetStorage _projectAssetStorage;
@@ -30,7 +29,6 @@ public class UserService : IUserService
 
   public UserService(
     IUserRepository userRepository,
-    ILinkedAccountRepository linkedAccountRepository,
     IUserProfileImageStorage userProfileImageStorage,
     IProjectRepository projectRepository,
     IProjectAssetStorage projectAssetStorage,
@@ -38,7 +36,6 @@ public class UserService : IUserService
     IAuditLogger audit)
   {
     _userRepository = userRepository;
-    _linkedAccountRepository = linkedAccountRepository;
     _userProfileImageStorage = userProfileImageStorage;
     _projectRepository = projectRepository;
     _projectAssetStorage = projectAssetStorage;
@@ -251,17 +248,17 @@ public class UserService : IUserService
 
   public async Task<bool> UnlinkProviderAsync(int userId, string provider)
   {
-    var link = await _linkedAccountRepository.GetByUserIdAndProviderAsync(userId, provider);
+    var link = await _userRepository.GetLinkedAccountByUserIdAndProviderAsync(userId, provider);
     if (link == null) return false;
 
-    await _linkedAccountRepository.RemoveAsync(link);
+    await _userRepository.RemoveLinkedAccountAsync(link);
     _audit.OAuthProviderUnlinked(userId, provider);
     return true;
   }
 
   private async Task<UserResponse> BuildMyProfileResponseAsync(User user)
   {
-    var linkedAccounts = await _linkedAccountRepository.GetByUserIdAsync(user.Id);
+    var linkedAccounts = await _userRepository.GetLinkedAccountsByUserIdAsync(user.Id);
     var response = _mapper.Map<UserResponse>(user);
     response.LinkedAccounts = _mapper.Map<List<LinkedAccountResponse>>(linkedAccounts);
     return response;
@@ -296,4 +293,87 @@ public class UserService : IUserService
     var normalizedAssetPath = assetPath.StartsWith('/') ? assetPath : $"/{assetPath}";
     return $"{normalizedBaseUrl}{normalizedAssetPath}";
   }
+
+  // ── Follow ─────────────────────────────────────────────────────────────────
+
+  public async Task FollowAsync(int followerId, string followeeUsername)
+  {
+    var followee = await _userRepository.GetByUsernameAsync(followeeUsername)
+      ?? throw new InvalidOperationException("User not found.");
+
+    if (followee.Id == followerId)
+      throw new InvalidOperationException("You cannot follow yourself.");
+
+    var existing = await _userRepository.GetFollowAsync(followerId, followee.Id);
+    if (existing != null)
+      throw new InvalidOperationException("Already following this user.");
+
+    await _userRepository.AddFollowAsync(new UserFollow
+    {
+      FollowerId = followerId,
+      FolloweeId = followee.Id,
+      CreatedAt = DateTime.UtcNow
+    });
+  }
+
+  public async Task UnfollowAsync(int followerId, string followeeUsername)
+  {
+    var followee = await _userRepository.GetByUsernameAsync(followeeUsername)
+      ?? throw new InvalidOperationException("User not found.");
+
+    var follow = await _userRepository.GetFollowAsync(followerId, followee.Id)
+      ?? throw new InvalidOperationException("Not following this user.");
+
+    await _userRepository.DeleteFollowAsync(follow);
+  }
+
+  public Task<bool> IsFollowingAsync(int followerId, int followeeId)
+    => _userRepository.IsFollowingAsync(followerId, followeeId);
+
+  public Task<int> GetFollowerCountAsync(int userId)
+    => _userRepository.GetFollowerCountAsync(userId);
+
+  public Task<int> GetFollowingCountAsync(int userId)
+    => _userRepository.GetFollowingCountAsync(userId);
+
+  public Task<IReadOnlyList<User>> GetFollowersAsync(int userId)
+    => _userRepository.GetFollowersAsync(userId);
+
+  public Task<IReadOnlyList<User>> GetFollowingAsync(int userId)
+    => _userRepository.GetFollowingAsync(userId);
+
+  // ── Bookmarks ──────────────────────────────────────────────────────────────
+
+  public async Task<IReadOnlyList<ProjectResponse>> GetMyBookmarksAsync(int userId)
+  {
+    var projects = await _projectRepository.GetBookmarkedProjectsAsync(userId);
+    var projectIds = projects.Select(p => p.Id).ToList();
+    var likedIds = await _projectRepository.GetLikedProjectIdsAsync(userId, projectIds);
+
+    var forkedFromIds = projects
+      .Where(p => p.ForkedFromProjectId.HasValue)
+      .Select(p => p.ForkedFromProjectId!.Value)
+      .Distinct()
+      .ToList();
+    var forkedOwners = forkedFromIds.Count > 0
+      ? await _projectRepository.GetOwnerUsernamesByProjectIdsAsync(forkedFromIds)
+      : new Dictionary<int, string>();
+
+    var responses = new List<ProjectResponse>(projects.Count);
+    foreach (var project in projects)
+    {
+      var response = _mapper.Map<ProjectResponse>(project);
+      response.ThumbnailDataUrl =
+        _projectAssetStorage.GetThumbnailUrl(project.UserId, project.Id) ??
+        project.ThumbnailDataUrl;
+      response.IsStarredByCurrentUser = true;
+      response.IsLikedByCurrentUser = likedIds.Contains(project.Id);
+      if (project.ForkedFromProjectId.HasValue && forkedOwners.TryGetValue(project.ForkedFromProjectId.Value, out var username))
+        response.ForkedFromOwnerUsername = username;
+      responses.Add(response);
+    }
+
+    return responses;
+  }
+
 }

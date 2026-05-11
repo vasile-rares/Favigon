@@ -100,4 +100,82 @@ public class ProjectRepository : IProjectRepository
             (p, u) => new { p.Id, u.Username })
       .ToDictionaryAsync(x => x.Id, x => x.Username);
   }
+
+  // ── Likes ──────────────────────────────────────────────────────────────────
+
+  public Task<ProjectLike?> GetLikeAsync(int userId, int projectId)
+    => _context.ProjectLikes.FirstOrDefaultAsync(l => l.UserId == userId && l.ProjectId == projectId);
+
+  public async Task AddLikeAsync(ProjectLike like)
+  {
+    _context.ProjectLikes.Add(like);
+    await _context.SaveChangesAsync();
+  }
+
+  public async Task DeleteLikeAsync(ProjectLike like)
+  {
+    _context.ProjectLikes.Remove(like);
+    await _context.SaveChangesAsync();
+  }
+
+  public Task<int> GetLikeCountForProjectAsync(int projectId)
+    => _context.ProjectLikes.CountAsync(l => l.ProjectId == projectId);
+
+  public Task<bool> IsLikedAsync(int userId, int projectId)
+    => _context.ProjectLikes.AnyAsync(l => l.UserId == userId && l.ProjectId == projectId);
+
+  public async Task<HashSet<int>> GetLikedProjectIdsAsync(int userId, IEnumerable<int> projectIds)
+  {
+    var ids = projectIds.ToList();
+    var liked = await _context.ProjectLikes
+      .Where(l => l.UserId == userId && ids.Contains(l.ProjectId))
+      .Select(l => l.ProjectId)
+      .ToListAsync();
+    return liked.ToHashSet();
+  }
+
+  // ── Bookmarks ──────────────────────────────────────────────────────────────
+
+  public Task<ProjectBookmark?> GetBookmarkAsync(int userId, int projectId)
+    => _context.ProjectBookmarks.FirstOrDefaultAsync(b => b.UserId == userId && b.ProjectId == projectId);
+
+  public async Task AddBookmarkAsync(ProjectBookmark bookmark)
+  {
+    _context.ProjectBookmarks.Add(bookmark);
+    await _context.SaveChangesAsync();
+  }
+
+  public async Task DeleteBookmarkAsync(ProjectBookmark bookmark)
+  {
+    _context.ProjectBookmarks.Remove(bookmark);
+    await _context.SaveChangesAsync();
+  }
+
+  public Task<int> GetBookmarkCountForProjectAsync(int projectId)
+    => _context.ProjectBookmarks.CountAsync(b => b.ProjectId == projectId);
+
+  public Task<bool> IsBookmarkedAsync(int userId, int projectId)
+    => _context.ProjectBookmarks.AnyAsync(b => b.UserId == userId && b.ProjectId == projectId);
+
+  public async Task<HashSet<int>> GetStarredProjectIdsAsync(int userId, IEnumerable<int> projectIds)
+  {
+    var ids = projectIds.ToList();
+    var starred = await _context.ProjectBookmarks
+      .Where(b => b.UserId == userId && ids.Contains(b.ProjectId))
+      .Select(b => b.ProjectId)
+      .ToListAsync();
+    return starred.ToHashSet();
+  }
+
+  public async Task<IReadOnlyList<Project>> GetBookmarkedProjectsAsync(int userId)
+  {
+    return await _context.ProjectBookmarks
+      .AsNoTracking()
+      .Where(b => b.UserId == userId)
+      .OrderByDescending(b => b.CreatedAt)
+      .Include(b => b.Project).ThenInclude(p => p.Bookmarks)
+      .Include(b => b.Project).ThenInclude(p => p.Likes)
+      .Select(b => b.Project)
+      .ToListAsync();
+  }
 }

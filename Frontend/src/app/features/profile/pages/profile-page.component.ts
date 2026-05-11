@@ -23,7 +23,6 @@ gsap.registerPlugin(ScrollTrigger);
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
-  CurrentUserService,
   ProjectResponse,
   ProjectService,
   UserService,
@@ -61,7 +60,6 @@ export class ProfilePage implements OnInit {
   private readonly router = inject(Router);
   private readonly projectService = inject(ProjectService);
   private readonly userService = inject(UserService);
-  private readonly currentUser = inject(CurrentUserService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
   private readonly injector = inject(Injector);
@@ -251,7 +249,7 @@ export class ProfilePage implements OnInit {
 
           return forkJoin({
             profileUser: this.userService.getByUsername(username),
-            currentUser: this.currentUser.load(),
+            currentUser: this.userService.loadCurrentUser(),
           });
         }),
         takeUntilDestroyed(this.destroyRef),

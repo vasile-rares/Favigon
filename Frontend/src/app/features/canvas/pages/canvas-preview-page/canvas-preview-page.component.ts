@@ -15,7 +15,7 @@ import { Location } from '@angular/common';
 import {
   CanvasPageModel,
   ConverterService,
-  CurrentUserService,
+  UserService,
   ProjectService,
   extractApiErrorMessage,
 } from '@app/core';
@@ -54,7 +54,7 @@ export class CanvasPreviewPage {
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
   private readonly converterService = inject(ConverterService);
   private readonly projectApiService = inject(ProjectService);
-  private readonly currentUserService = inject(CurrentUserService);
+  private readonly currentUserService = inject(UserService);
 
   private projectIdAsNumber = NaN;
 
@@ -501,7 +501,7 @@ document.addEventListener('click', function(e) {
         next: (project) => {
           this.projectIdAsNumber = project.projectId;
           this.projectIdForFork = project.projectId;
-          const currentUserId = this.currentUserService.user()?.userId;
+          const currentUserId = this.currentUserService.currentUser()?.userId;
           this.isOwner.set(currentUserId !== undefined && project.userId === currentUserId);
           this.isStarred.set(project.isStarredByCurrentUser);
           this.isLiked.set(project.isLikedByCurrentUser ?? false);

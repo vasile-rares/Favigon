@@ -67,34 +67,3 @@ export function resolveEditableTextShadow(
 function copyEditableTextShadow(shadow: EditableTextShadow): EditableTextShadow {
   return { ...shadow };
 }
-
-export function buildSquircleMaskImage(squircle: number): string {
-  const s = Math.max(0, Math.min(100, squircle)) / 100;
-  if (s <= 0) return '';
-
-  // In a 0-1 normalised viewBox:
-  // r = corner radius (0..0.45)
-  // p = how far along each edge the curve starts  (> r at high smoothing = squircle)
-  // c = cubic bezier handle distance
-  const r = s * 0.45;
-  const p = Math.min(r * (1 + s * 0.75), 0.499);
-  const c = Math.min(r * (0.55 + s * 0.35), p);
-
-  const fmt = (n: number) => n.toFixed(5).replace(/0+$/, '').replace(/\.$/, '');
-
-  const d = [
-    `M ${fmt(p)} 0`,
-    `H ${fmt(1 - p)}`,
-    `C ${fmt(1 - p + c)} 0 1 ${fmt(p - c)} 1 ${fmt(p)}`,
-    `V ${fmt(1 - p)}`,
-    `C 1 ${fmt(1 - p + c)} ${fmt(1 - p + c)} 1 ${fmt(1 - p)} 1`,
-    `H ${fmt(p)}`,
-    `C ${fmt(p - c)} 1 0 ${fmt(1 - p + c)} 0 ${fmt(1 - p)}`,
-    `V ${fmt(p)}`,
-    `C 0 ${fmt(p - c)} ${fmt(p - c)} 0 ${fmt(p)} 0`,
-    `Z`,
-  ].join(' ');
-
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'><path d='${d}' fill='black'/></svg>`;
-  return `url("data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}")`;
-}

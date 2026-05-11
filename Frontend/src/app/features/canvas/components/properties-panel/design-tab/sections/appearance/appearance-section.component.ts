@@ -14,7 +14,7 @@ import {
   CanvasOverflowMode,
   GradientFill,
 } from '@app/core';
-import { gradientToCss } from '../../../../../utils/gradient.utils';
+import { gradientToCss } from '../../../../../utils/canvas-gradient.util';
 
 import {
   getDefaultCornerRadius,

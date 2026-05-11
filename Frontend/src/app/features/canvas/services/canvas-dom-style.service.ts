@@ -15,8 +15,8 @@ import {
   hasPerSideStrokeWidths,
   getStrokeWidths,
 } from '../utils/element/canvas-element-normalization.util';
-import { gradientToCss } from '../utils/gradient.utils';
-import { buildSquircleMaskImage } from '../utils/element/canvas-text-shadow.util';
+import { gradientToCss } from '../utils/canvas-gradient.util';
+import { buildSquircleMaskImage } from '../utils/element/canvas-transform.util';
 
 export type DomStyleMap = Record<string, string | null | undefined>;
 

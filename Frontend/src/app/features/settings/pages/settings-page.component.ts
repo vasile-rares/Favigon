@@ -18,13 +18,7 @@ import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import gsap from 'gsap';
 import { gsapFadeIn, gsapFadeOut } from '../../../shared/utils/gsap-animations.util';
-import {
-  AuthService,
-  UserService,
-  CurrentUserService,
-  extractApiErrorMessage,
-  FALLBACK_AVATAR_URL,
-} from '@app/core';
+import { AuthService, UserService, extractApiErrorMessage, FALLBACK_AVATAR_URL } from '@app/core';
 import type { UserMe } from '@app/core';
 import { environment } from '../../../../environments/environment';
 
@@ -49,7 +43,6 @@ const PROFILE_IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,image/av
 export class SettingsPage implements OnInit, AfterViewInit {
   private readonly authService = inject(AuthService);
   private readonly userService = inject(UserService);
-  private readonly currentUser = inject(CurrentUserService);
   private readonly router = inject(Router);
   private readonly el = inject(ElementRef);
   private readonly zone = inject(NgZone);
@@ -174,7 +167,7 @@ export class SettingsPage implements OnInit, AfterViewInit {
   async ngOnInit() {
     this.isLoading.set(true);
     try {
-      const me = await firstValueFrom(this.currentUser.load());
+      const me = await firstValueFrom(this.userService.loadCurrentUser());
       if (me) this.populateForm(me);
     } catch {
       // auth guard should handle unauthenticated state
@@ -282,7 +275,7 @@ export class SettingsPage implements OnInit, AfterViewInit {
           bio: this.bio.trim() || null,
         }),
       );
-      this.currentUser.set(updated);
+      this.userService.setCurrentUser(updated);
       this.populateForm(updated);
       this.statusMessage.set({ type: 'success', text: 'Profile updated successfully.' });
     } catch (error: unknown) {
@@ -317,7 +310,7 @@ export class SettingsPage implements OnInit, AfterViewInit {
 
     try {
       const updated = await firstValueFrom(this.userService.uploadMyProfileImage(file));
-      this.currentUser.set(updated);
+      this.userService.setCurrentUser(updated);
       this.populateForm(updated);
       this.statusMessage.set({ type: 'success', text: 'Profile image updated successfully.' });
     } catch (error: unknown) {
@@ -444,7 +437,7 @@ export class SettingsPage implements OnInit, AfterViewInit {
           ...this.userMe,
           hasPassword: true,
         };
-        this.currentUser.set(updatedUser);
+        this.userService.setCurrentUser(updatedUser);
         this.userMe = updatedUser;
       }
 
@@ -514,7 +507,7 @@ export class SettingsPage implements OnInit, AfterViewInit {
           ...this.userMe,
           isTwoFactorEnabled: isNowEnabled,
         };
-        this.currentUser.set(updatedUser);
+        this.userService.setCurrentUser(updatedUser);
         this.userMe = updatedUser;
       }
 

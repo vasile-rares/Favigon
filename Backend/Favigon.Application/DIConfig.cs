@@ -16,16 +16,9 @@ public static class ServiceCollectionExtensions
     services.AddScoped<IUserService, UserService>();
     services.AddScoped<IAuthService, AuthService>();
     services.AddScoped<IProjectService, ProjectService>();
-    services.AddScoped<IProjectAssetService, ProjectAssetService>();
-    services.AddScoped<IFollowService, FollowService>();
-    services.AddScoped<IBookmarkService, BookmarkService>();
-    services.AddScoped<ILikeService, LikeService>();
     services.AddScoped<IExploreService, ExploreService>();
     services.AddScoped<IConverterService, ConverterService>();
     services.AddScoped<IAiDesignService, AiDesignService>();
-    services.AddScoped<AiIntentService>();
-    services.AddScoped<AiStructureService>();
-    services.AddScoped<AiStyleService>();
     services.AddScoped<IAiPipelineService, AiPipelineService>();
     services.AddFavigonConverter();
 

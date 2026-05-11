@@ -44,7 +44,7 @@ import {
   interpolateGradientColor,
   clampPosition,
   buildGradient,
-} from '../../../utils/gradient.utils';
+} from '../../../utils/canvas-gradient.util';
 
 type StylePopupFieldKind =
   | 'fill'
@@ -384,7 +384,6 @@ export class DropdownMenuComponent implements OnDestroy {
     }
   }
 
-  
   finalizeGesture(): void {
     if (this.isColorGestureActive) {
       this.isColorGestureActive = false;

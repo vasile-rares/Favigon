@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { dataUrlToBlob } from '../utils/data-url.util';
 import {
   ProjectCreateRequest,
   ProjectDesignResponse,
@@ -11,10 +12,117 @@ import {
   ProjectUpdateRequest,
 } from '../models/project.models';
 
+const PENDING_FLUSH_KEY_PREFIX = 'favigon.pending-project-flush.';
+
+interface PendingFlushPayload {
+  version: 1;
+  projectId: number;
+  designJson: string;
+  thumbnailDataUrl: string | null;
+  createdAt: number;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProjectService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = environment.apiBaseUrl;
+
+  constructor() {
+    queueMicrotask(() => this.replayPendingFlushes());
+  }
+
+  // ── Pending flush (crash recovery) ────────────────────────
+
+  queueAndDispatchFlush(
+    projectId: number,
+    designJson: string,
+    thumbnailDataUrl: string | null,
+  ): void {
+    const payload: PendingFlushPayload = {
+      version: 1,
+      projectId,
+      designJson,
+      thumbnailDataUrl,
+      createdAt: Date.now(),
+    };
+    this.writePendingPayload(payload);
+    this.dispatchExitFlush(projectId, designJson, dataUrlToBlob(thumbnailDataUrl));
+  }
+
+  clearPendingFlush(projectId: number): void {
+    if (!this.canUseLocalStorage()) return;
+    try {
+      window.localStorage.removeItem(this.getPendingFlushKey(projectId));
+    } catch {
+      // Ignore storage failures.
+    }
+  }
+
+  private replayPendingFlushes(): void {
+    const payloads = this.readPendingPayloads();
+    if (payloads.length === 0) return;
+
+    for (const payload of payloads.sort((a, b) => a.createdAt - b.createdAt)) {
+      this.flushProjectOnExit(
+        payload.projectId,
+        payload.designJson,
+        dataUrlToBlob(payload.thumbnailDataUrl),
+      ).subscribe({
+        next: () => this.clearPendingFlush(payload.projectId),
+        error: (err: { status?: number }) => {
+          if (err.status === 404) this.clearPendingFlush(payload.projectId);
+        },
+      });
+    }
+  }
+
+  private readPendingPayloads(): PendingFlushPayload[] {
+    if (!this.canUseLocalStorage()) return [];
+    const payloads: PendingFlushPayload[] = [];
+    try {
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (!key?.startsWith(PENDING_FLUSH_KEY_PREFIX)) continue;
+        const raw = window.localStorage.getItem(key);
+        if (!raw) continue;
+        try {
+          const parsed = JSON.parse(raw) as PendingFlushPayload;
+          if (
+            parsed?.version === 1 &&
+            Number.isInteger(parsed.projectId) &&
+            typeof parsed.designJson === 'string'
+          ) {
+            payloads.push(parsed);
+          }
+        } catch {
+          window.localStorage.removeItem(key);
+        }
+      }
+    } catch {
+      return [];
+    }
+    return payloads;
+  }
+
+  private writePendingPayload(payload: PendingFlushPayload): void {
+    if (!this.canUseLocalStorage()) return;
+    try {
+      window.localStorage.setItem(
+        this.getPendingFlushKey(payload.projectId),
+        JSON.stringify(payload),
+      );
+    } catch {
+      // Ignore storage failures.
+    }
+  }
+
+  private canUseLocalStorage(): boolean {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  }
+
+  private getPendingFlushKey(projectId: number): string {
+    return `${PENDING_FLUSH_KEY_PREFIX}${projectId}`;
+  }
 
   getProjects(): Observable<ProjectResponse[]> {
     return this.http

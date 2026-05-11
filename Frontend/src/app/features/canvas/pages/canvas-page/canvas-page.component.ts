@@ -21,18 +21,11 @@ import {
   CanvasPageModel,
   IRNode,
   ConverterPageRequest,
-  dataUrlToBlob,
-  extractApiErrorMessage,
-  PendingProjectFlushService,
+  UserService,
   ProjectService,
-  CurrentUserService,
 } from '@app/core';
 import { buildCanvasIR, buildCanvasIRPages } from '../../mappers/canvas-to-ir.mapper';
 import { buildCanvasElementsFromIR } from '../../mappers/ir-to-canvas.mapper';
-import {
-  buildCanvasProjectDocument,
-  buildPersistedCanvasDesign,
-} from '../../mappers/canvas-persistence.mapper';
 import { HeaderBarComponent, ContextMenuComponent } from '@app/shared';
 import type { ContextMenuItem } from '@app/shared';
 import { ToolbarComponent } from '../../components/toolbar/toolbar.component';
@@ -48,10 +41,6 @@ import {
   removeWithChildren,
   buildChildrenMap,
 } from '../../utils/canvas-tree.util';
-import {
-  generateThumbnail,
-  generateThumbnailHtml2Canvas,
-} from '../../utils/pixi/canvas-thumbnail.util';
 import {
   getTextFontFamily,
   getTextFontWeight,
@@ -77,7 +66,6 @@ import {
 } from '../../canvas.types';
 import { CanvasViewportService } from '../../services/canvas-viewport.service';
 import { CanvasHistoryService } from '../../services/editor/canvas-history.service';
-import { CanvasHistoryPersistenceService } from '../../services/editor/canvas-history-persistence.service';
 import { CanvasClipboardService } from '../../services/editor/canvas-clipboard.service';
 import { CanvasElementService } from '../../services/canvas-element.service';
 import {
@@ -89,11 +77,11 @@ import {
   ContextMenuActionCallbacks,
 } from '../../services/editor/canvas-context-menu.service';
 import { CanvasEditorStateService } from '../../services/canvas-editor-state.service';
-import { CanvasPageService } from '../../services/canvas-page.service';
+import { CanvasPageManagerService } from '../../services/canvas-page-manager.service';
 import {
-  CanvasPageGeometryService,
+  CanvasPageRenderContextService,
   FRAME_TITLE_ZOOM_THRESHOLD,
-} from '../../services/canvas-page-geometry.service';
+} from '../../services/canvas-page-render-context.service';
 import { CanvasGestureService } from '../../services/editor/canvas-gesture.service';
 import { CanvasDomStyleService } from '../../services/canvas-dom-style.service';
 import { firstValueFrom } from 'rxjs';
@@ -104,9 +92,6 @@ const ROOT_FRAME_INSERT_GAP = 48;
 const ELEMENT_DRAG_START_THRESHOLD = 3;
 const CONTAINER_DROP_TOLERANCE = 4;
 const DEFAULT_PROJECT_PANEL_WIDTH = 280;
-const PERSIST_FLUSH_POLL_MS = 50;
-const PERSIST_FLUSH_MAX_WAIT_MS = 4000;
-
 type RectangleDrawTool = 'rectangle' | 'image';
 
 interface RectangleDrawState {
@@ -139,8 +124,8 @@ interface RectangleDrawState {
     CanvasContextMenuService,
     CanvasPersistenceService,
     CanvasGenerationService,
-    CanvasPageGeometryService,
-    CanvasPageService,
+    CanvasPageRenderContextService,
+    CanvasPageManagerService,
     CanvasDomStyleService,
     CanvasGestureService,
   ],
@@ -153,12 +138,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private readonly router = inject(Router);
   private readonly canvasPersistenceService = inject(CanvasPersistenceService);
   private readonly projectService = inject(ProjectService);
-  private readonly currentUser = inject(CurrentUserService);
+  private readonly currentUser = inject(UserService);
   readonly generation = inject(CanvasGenerationService);
   readonly viewport = inject(CanvasViewportService);
   readonly frameTitleZoomThreshold = FRAME_TITLE_ZOOM_THRESHOLD;
   private readonly history = inject(CanvasHistoryService);
-  private readonly historyPersistence = inject(CanvasHistoryPersistenceService);
   private readonly ngZone = inject(NgZone);
   private readonly injector = inject(Injector);
   private readonly clipboard = inject(CanvasClipboardService);
@@ -166,11 +150,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private readonly keyboard = inject(CanvasKeyboardService);
   readonly contextMenu = inject(CanvasContextMenuService);
   readonly editorState = inject(CanvasEditorStateService);
-  readonly page = inject(CanvasPageService);
-  readonly pageLayout = inject(CanvasPageGeometryService);
+  readonly page = inject(CanvasPageManagerService);
+  readonly pageLayout = inject(CanvasPageRenderContextService);
 
   readonly gesture = inject(CanvasGestureService);
-  private readonly pendingProjectFlush = inject(PendingProjectFlushService);
   private readonly hostEl = inject(ElementRef<HTMLElement>);
 
   readonly canvasSceneRef = viewChild<ElementRef<HTMLElement>>('canvasScene');
@@ -588,12 +571,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   // ── API / Generation State ────────────────────────────────
 
   readonly apiError = this.page.apiError;
-  readonly isLoadingDesign = signal(true);
-  readonly loadingMessage = signal('Preparing the editor...');
-  readonly loadingPercent = signal(5);
-  readonly loadingFadingOut = signal(false);
-  readonly isSavingDesign = signal(false);
-  readonly lastSavedAt = signal<string | null>(null);
+  readonly isLoadingDesign = this.canvasPersistenceService.isLoadingDesign;
+  readonly loadingMessage = this.canvasPersistenceService.loadingMessage;
+  readonly loadingPercent = this.canvasPersistenceService.loadingPercent;
+  readonly loadingFadingOut = this.canvasPersistenceService.loadingFadingOut;
+  readonly isSavingDesign = this.canvasPersistenceService.isSavingDesign;
+  readonly lastSavedAt = this.canvasPersistenceService.lastSavedAt;
 
   readonly irPreview = computed<IRNode>(() => {
     const currentPage = this.currentPage();
@@ -608,41 +591,16 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   // ── Persistence State ─────────────────────────────────────
 
-  projectIdAsNumber = NaN;
-  private canPersistDesign = false;
-  private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  private hasQueuedDesignPersist = false;
-  private saveRetryCount = 0;
-  private readonly SAVE_MAX_RETRIES = 4;
-  private readonly SAVE_RETRY_BASE_MS = 2000;
-  private saveRetryTimeoutId: ReturnType<typeof setTimeout> | null = null;
-  private hasTriggeredBrowserExitFlush = false;
-  private lastPersistedThumbnailDataUrl: string | null = null;
-  private pendingThumbnailDataUrl: string | null = null;
-  private pendingInitialPageFocusId: string | null = null;
   private suppressNextWindowMenuClose = false;
-  private _idleThumbnailTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private _lastPointerEventTime = 0;
-  private _isPointerDown = false;
 
   constructor() {
-    this.loadProjectDesign();
+    this.canvasPersistenceService.initialize(this.projectSlug);
 
     // Wire gesture service to canvas DOM
     this.gesture.setCanvasElementGetter(
       () => document.querySelector('.canvas-container') as HTMLElement | null,
     );
-
-    effect(() => {
-      this.pages();
-      this.currentPageId();
-
-      if (!this.canPersistDesign) {
-        return;
-      }
-
-      this.scheduleDesignSave();
-    });
 
     // Invalidate gesture service flow bounds cache whenever elements change.
     effect(() => {
@@ -704,7 +662,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   ngAfterViewChecked(): void {
     this.page.setCanvasElement(this.getCanvasElement());
-    this.restorePendingInitialPageFocus();
+    this.canvasPersistenceService.restorePendingInitialPageFocus();
 
     // Populate the inline text editor with the element's existing text on the
     // first CD cycle after the @if block creates the contenteditable div.
@@ -747,41 +705,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   ngOnDestroy(): void {
-    this.cancelIdleThumbnail();
+    this.canvasPersistenceService.cancelIdleThumbnail();
   }
 
   async flushPendingPersistence(): Promise<boolean> {
-    if (!Number.isInteger(this.projectIdAsNumber)) {
-      return true;
-    }
-
-    if (this.saveTimeoutId) {
-      clearTimeout(this.saveTimeoutId);
-      this.saveTimeoutId = null;
-      this.persistDesign();
-    }
-
-    const deadline = Date.now() + PERSIST_FLUSH_MAX_WAIT_MS;
-    while (Date.now() < deadline) {
-      if (this.saveTimeoutId) {
-        clearTimeout(this.saveTimeoutId);
-        this.saveTimeoutId = null;
-        this.persistDesign();
-      }
-
-      if (!this.isSavingDesign() && !this.hasQueuedDesignPersist) {
-        break;
-      }
-
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, PERSIST_FLUSH_POLL_MS);
-      });
-    }
-
-    // Cancel any pending entry thumbnail — it already saved on entry or hasn't run yet.
-    this.cancelIdleThumbnail();
-
-    return true;
+    return this.canvasPersistenceService.flushPendingPersistence();
   }
 
   // ── Tool Selection ────────────────────────────────────────
@@ -927,26 +855,28 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     // kind === 'image'
-    if (!Number.isInteger(this.projectIdAsNumber)) {
+    if (!Number.isInteger(this.canvasPersistenceService.projectIdAsNumber)) {
       this.showFileToast('error', 'Save the project first');
       return;
     }
     this.showFileToast('importing', 'Uploading image…');
-    this.projectService.uploadImageAsset(this.projectIdAsNumber, file).subscribe({
-      next: ({ assetUrl }) => {
-        const img = new Image();
-        img.onload = () => {
-          this.gesture.importImageAsset(assetUrl, img.naturalWidth, img.naturalHeight);
-          this.showFileToast('done', 'Image imported');
-        };
-        img.onerror = () => {
-          this.gesture.importImageAsset(assetUrl, 400, 400);
-          this.showFileToast('done', 'Image imported');
-        };
-        img.src = assetUrl;
-      },
-      error: () => this.showFileToast('error', 'Upload failed'),
-    });
+    this.projectService
+      .uploadImageAsset(this.canvasPersistenceService.projectIdAsNumber, file)
+      .subscribe({
+        next: ({ assetUrl }) => {
+          const img = new Image();
+          img.onload = () => {
+            this.gesture.importImageAsset(assetUrl, img.naturalWidth, img.naturalHeight);
+            this.showFileToast('done', 'Image imported');
+          };
+          img.onerror = () => {
+            this.gesture.importImageAsset(assetUrl, 400, 400);
+            this.showFileToast('done', 'Image imported');
+          };
+          img.src = assetUrl;
+        },
+        error: () => this.showFileToast('error', 'Upload failed'),
+      });
   }
 
   selectTool(tool: CanvasElementType | 'select'): void {
@@ -1065,7 +995,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   // ── Canvas Events ─────────────────────────────────────────
 
   onCanvasPointerDown(event: MouseEvent): void {
-    this._isPointerDown = true;
+    this.canvasPersistenceService.isPointerDown = true;
     this._lastPointerEventTime = Date.now();
     const target = event.target as HTMLElement;
     if (this.isCanvasBackgroundTarget(target)) {
@@ -1427,9 +1357,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   async navigateToProjectsList(): Promise<void> {
-    const cachedUser = this.currentUser.user();
+    const cachedUser = this.currentUser.currentUser();
     const username =
-      cachedUser?.username ?? (await firstValueFrom(this.currentUser.load()))?.username;
+      cachedUser?.username ?? (await firstValueFrom(this.currentUser.loadCurrentUser()))?.username;
 
     if (!username) {
       return;
@@ -1728,7 +1658,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   @HostListener('window:pointerup', ['$event'])
   onPointerUp(event: MouseEvent): void {
-    this._isPointerDown = false;
+    this.canvasPersistenceService.isPointerDown = false;
     this._lastPointerEventTime = Date.now();
     this.gesture.handlePointerUp(event);
   }
@@ -2164,7 +2094,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   @HostListener('window:beforeunload')
   handleBeforeUnload(): void {
-    this.dispatchBrowserExitFlush();
+    this.canvasPersistenceService.dispatchBrowserExitFlush();
   }
 
   @HostListener('window:pagehide', ['$event'])
@@ -2173,7 +2103,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
-    this.dispatchBrowserExitFlush();
+    this.canvasPersistenceService.dispatchBrowserExitFlush();
   }
 
   // ── Code Generation ───────────────────────────────────────
@@ -2184,338 +2114,20 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   generateCode(): void {
-    this.pendingProjectFlush.clearPendingFlush(this.projectIdAsNumber);
+    this.projectService.clearPendingFlush(this.canvasPersistenceService.projectIdAsNumber);
     this.apiError.set(null);
     this.generation.generate(this.irPages());
   }
 
-  // ── Private: Persistence ──────────────────────────────────
+  // ── Private: Helpers ──────────────────────────────────────
 
-  private loadProjectDesign(): void {
-    if (!this.projectSlug || this.projectSlug === 'new-project') {
-      this.apiError.set('Invalid project.');
-      return;
-    }
-
-    const navState = this.router.getCurrentNavigation()?.extras.state ?? history.state;
-    const fromPreview = navState?.['fromPreview'] === true;
-
-    if (fromPreview) {
-      this.isLoadingDesign.set(false);
-    } else {
-      this.isLoadingDesign.set(true);
-      this.loadingMessage.set('Fetching project details...');
-      this.loadingPercent.set(20);
-    }
-    this.apiError.set(null);
-    this.canPersistDesign = false;
-
-    const loadingStartedAt = Date.now();
-    const hideOverlay = () => {
-      if (fromPreview) {
-        // Thumbnail was already captured on the initial canvas entry; skip re-capture.
-        return;
-      }
-      const elapsed = Date.now() - loadingStartedAt;
-      const remaining = Math.max(0, 1000 - elapsed);
-      // Wait for the minimum display time, then run html2canvas while the
-      // overlay is still fully visible. Only after the thumbnail is saved
-      // (or fails) do we start the fade-out animation.
-      setTimeout(() => {
-        requestAnimationFrame(() => {
-          this.captureAndPersistThumbnailThenHide();
-        });
-      }, remaining);
-    };
-
-    this.projectService.getBySlug(this.projectSlug).subscribe({
-      next: (project) => {
-        const currentUserId = this.currentUser.user()?.userId;
-        if (currentUserId !== undefined && project.userId !== currentUserId) {
-          void this.router.navigate(['/project', this.projectSlug, 'preview'], {
-            replaceUrl: true,
-          });
-          return;
-        }
-
-        this.projectIdAsNumber = project.projectId;
-        this.loadingMessage.set('Loading design...');
-        this.loadingPercent.set(55);
-        this.canvasPersistenceService.loadProjectDesign(this.projectIdAsNumber).subscribe({
-          next: (response) => {
-            const pages = response.pages;
-            const activePageId =
-              response.activePageId && pages.some((page) => page.id === response.activePageId)
-                ? response.activePageId
-                : (pages[0]?.id ?? null);
-
-            this.pages.set(pages);
-            this.currentPageId.set(activePageId);
-            this.selectedElementId.set(null);
-            this.page.clearSelectedPageLayer();
-            this.page.layersFocusedPageId.set(activePageId);
-            this.pendingInitialPageFocusId = activePageId;
-            this.lastSavedAt.set(response.updatedAt ?? null);
-            this.history.resetHistory();
-            this.history.setProjectId(this.projectIdAsNumber);
-            void this.historyPersistence.restore(this.projectIdAsNumber).then((stack) => {
-              if (stack && stack.length > 0) {
-                this.history.restoreStack(stack);
-              }
-            });
-            this.loadingMessage.set('Finishing up...');
-            this.loadingPercent.set(100);
-            this.canPersistDesign = true;
-            hideOverlay();
-          },
-          error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-            this.apiError.set(extractApiErrorMessage(error, 'Failed to load project design.'));
-            this.isLoadingDesign.set(false);
-            this.canPersistDesign = true;
-          },
-        });
-      },
-      error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-        this.apiError.set(extractApiErrorMessage(error, 'Project not found.'));
-        this.isLoadingDesign.set(false);
-        this.canPersistDesign = true;
-      },
-    });
-  }
-
-  private scheduleDesignSave(): void {
-    if (!Number.isInteger(this.projectIdAsNumber)) {
-      return;
-    }
-
-    // A user-driven change resets any retry backoff and cancels any pending retry.
-    this.saveRetryCount = 0;
-    if (this.saveRetryTimeoutId) {
-      clearTimeout(this.saveRetryTimeoutId);
-      this.saveRetryTimeoutId = null;
-    }
-
-    if (this.saveTimeoutId) {
-      clearTimeout(this.saveTimeoutId);
-    }
-
-    this.saveTimeoutId = setTimeout(() => {
-      this.saveTimeoutId = null;
-      this.persistDesign();
-    }, 500);
-  }
-
-  private restorePendingInitialPageFocus(): void {
-    const pageId = this.pendingInitialPageFocusId;
-    if (!pageId) {
-      return;
-    }
-
-    const canvasElement = this.getCanvasElement();
-    if (!canvasElement) {
-      return;
-    }
-
-    if (!this.pages().some((page) => page.id === pageId)) {
-      this.pendingInitialPageFocusId = null;
-      return;
-    }
-
-    this.page.focusPageInstant(pageId, canvasElement);
-    this.pendingInitialPageFocusId = null;
-  }
-
-  private persistDesign(): void {
-    if (!Number.isInteger(this.projectIdAsNumber)) {
-      return;
-    }
-
-    if (this.isSavingDesign()) {
-      this.hasQueuedDesignPersist = true;
-      return;
-    }
-
-    if (this.saveTimeoutId) {
-      clearTimeout(this.saveTimeoutId);
-      this.saveTimeoutId = null;
-    }
-
-    const document = this.buildCurrentProjectDocument();
-    this.hasQueuedDesignPersist = false;
-    this.isSavingDesign.set(true);
-
-    this.canvasPersistenceService.saveProjectDesign(this.projectIdAsNumber, document).subscribe({
-      next: (response) => {
-        this.saveRetryCount = 0;
-        this.lastSavedAt.set(response.updatedAt ?? null);
-        this.finishPersistDesign();
-      },
-      error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-        this.apiError.set(extractApiErrorMessage(error, 'Failed to save project design.'));
-        this.isSavingDesign.set(false);
-
-        if (this.saveRetryCount < this.SAVE_MAX_RETRIES) {
-          const delay = Math.pow(2, this.saveRetryCount) * this.SAVE_RETRY_BASE_MS;
-          this.saveRetryCount++;
-          this.hasQueuedDesignPersist = true;
-          this.saveRetryTimeoutId = setTimeout(() => {
-            this.saveRetryTimeoutId = null;
-            this.persistDesign();
-          }, delay);
-        } else {
-          // Max retries exceeded — give up; reset for the next user-triggered change.
-          this.saveRetryCount = 0;
-          this.hasQueuedDesignPersist = false;
-        }
-      },
-    });
-  }
-
-  private finishPersistDesign(): void {
-    this.isSavingDesign.set(false);
-
-    if (!this.hasQueuedDesignPersist) {
-      return;
-    }
-
-    this.hasQueuedDesignPersist = false;
-    this.persistDesign();
-  }
-
-  /**
-   * Runs html2canvas while the loading overlay is fully visible, saves the
-   * thumbnail, then starts the fade-out animation. This way the animation
-   * never starts before the thumbnail work is done.
-   */
-  private captureAndPersistThumbnailThenHide(): void {
-    const startFade = () => {
-      this.loadingFadingOut.set(true);
-      setTimeout(() => {
-        this.isLoadingDesign.set(false);
-        this.loadingFadingOut.set(false);
-      }, 380);
-    };
-
-    const page = this.currentPage();
-    if (!page || !Number.isInteger(this.projectIdAsNumber)) {
-      startFade();
-      return;
-    }
-
-    generateThumbnailHtml2Canvas(page)
-      .then((thumbnail) => {
-        if (thumbnail) this.persistThumbnailIfDue(thumbnail);
-      })
-      .catch(() => {})
-      .finally(() => startFade());
-  }
-
-  /**
-   * Called only in the rare case where the idle-thumbnail needs to be
-   * rescheduled (e.g. pointer was down during entry capture).
-   */
-  private scheduleIdleThumbnail(): void {
-    if (!Number.isInteger(this.projectIdAsNumber)) return;
-    this.cancelIdleThumbnail();
-    const tryCapture = () => {
-      this._idleThumbnailTimeoutId = null;
-      if (this._isPointerDown) {
-        this._idleThumbnailTimeoutId = setTimeout(tryCapture, 500);
-        return;
-      }
-      const page = this.currentPage();
-      if (!page) return;
-      generateThumbnailHtml2Canvas(page)
-        .then((thumbnail) => {
-          if (thumbnail) this.persistThumbnailIfDue(thumbnail);
-        })
-        .catch(() => {});
-    };
-    this._idleThumbnailTimeoutId = setTimeout(() => requestAnimationFrame(tryCapture), 50);
-  }
-
-  private cancelIdleThumbnail(): void {
-    if (this._idleThumbnailTimeoutId === null) return;
-    clearTimeout(this._idleThumbnailTimeoutId);
-    this._idleThumbnailTimeoutId = null;
-  }
-
-  private generateThumbnailWithDomBounds(): string | null {
-    const domBounds = this.gesture.snapshotAllElementSceneBounds();
-    const bounds = domBounds.size > 0 ? domBounds : this.gesture.getLastKnownSceneBounds();
-    return generateThumbnail(this.currentPage(), bounds.size > 0 ? bounds : null);
-  }
-
-  /** On exit: no thumbnail operation — thumbnail is saved on entry. */
-  private persistThumbnailAsync(): void {}
-
-  private persistThumbnailIfDue(precomputedThumbnail?: string | null): void {
-    if (!Number.isInteger(this.projectIdAsNumber)) {
-      return;
-    }
-
-    const thumbnail =
-      precomputedThumbnail !== undefined
-        ? precomputedThumbnail
-        : this.generateThumbnailWithDomBounds();
-    if (!thumbnail) {
-      return;
-    }
-
-    if (
-      thumbnail === this.lastPersistedThumbnailDataUrl ||
-      thumbnail === this.pendingThumbnailDataUrl
-    ) {
-      return;
-    }
-
-    const thumbnailFile = dataUrlToBlob(thumbnail);
-    if (!thumbnailFile) {
-      return;
-    }
-
-    this.pendingThumbnailDataUrl = thumbnail;
-
-    this.canvasPersistenceService
-      .saveProjectThumbnail(this.projectIdAsNumber, thumbnailFile)
-      .subscribe({
-        next: () => {
-          if (this.pendingThumbnailDataUrl === thumbnail) {
-            this.pendingThumbnailDataUrl = null;
-          }
-          this.lastPersistedThumbnailDataUrl = thumbnail;
-        },
-        error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
-          if (this.pendingThumbnailDataUrl === thumbnail) {
-            this.pendingThumbnailDataUrl = null;
-          }
-          this.apiError.set(extractApiErrorMessage(error, 'Failed to save project thumbnail.'));
-        },
-      });
-  }
-
-  private dispatchBrowserExitFlush(): void {
-    if (this.hasTriggeredBrowserExitFlush || !Number.isInteger(this.projectIdAsNumber)) {
-      return;
-    }
-
-    this.pendingProjectFlush.queueAndDispatch(
-      this.projectIdAsNumber,
-      this.buildCurrentPersistedDesignJson(),
-      this.generateThumbnailWithDomBounds(),
-    );
-    this.hasTriggeredBrowserExitFlush = true;
-  }
-
-  private buildCurrentProjectDocument() {
-    return buildCanvasProjectDocument(this.pages(), this.projectSlug, this.currentPageId());
+  get projectIdAsNumber(): number {
+    return this.canvasPersistenceService.projectIdAsNumber;
   }
 
   buildCurrentPersistedDesignJson(): string {
-    return JSON.stringify(buildPersistedCanvasDesign(this.buildCurrentProjectDocument()));
+    return this.canvasPersistenceService.buildCurrentPersistedDesignJson();
   }
-
-  // ── Private: Helpers ──────────────────────────────────────
 
   private updateCurrentPageElements(updater: (elements: CanvasElement[]) => CanvasElement[]): void {
     this.editorState.updateCurrentPageElements(updater);

@@ -10,7 +10,7 @@ import { DeviceFramePreset, CanvasPageLayout, VIEWPORT_PRESET_OPTIONS } from '..
 import type { Point } from '../canvas.types';
 import { CanvasEditorStateService } from './canvas-editor-state.service';
 import { CanvasElementService } from './canvas-element.service';
-import { CanvasPageGeometryService } from './canvas-page-geometry.service';
+import { CanvasPageRenderContextService } from './canvas-page-render-context.service';
 import { CanvasViewportService } from './canvas-viewport.service';
 import { CanvasHistoryService } from './editor/canvas-history.service';
 
@@ -22,10 +22,10 @@ const PAGE_SHELL_HEADER_HEIGHT = 32;
 const PAGE_SHELL_HEADER_HORIZONTAL_INSET = 8;
 
 @Injectable()
-export class CanvasPageService {
+export class CanvasPageManagerService {
   private readonly editorState = inject(CanvasEditorStateService);
   private readonly el = inject(CanvasElementService);
-  private readonly layout = inject(CanvasPageGeometryService);
+  private readonly layout = inject(CanvasPageRenderContextService);
   private readonly viewport = inject(CanvasViewportService);
   private readonly history = inject(CanvasHistoryService);
   private readonly router = inject(Router);

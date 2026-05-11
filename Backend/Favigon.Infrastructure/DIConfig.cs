@@ -22,11 +22,7 @@ public static class ServiceCollectionExtensions
       options.UseNpgsql(configuration.GetConnectionString("FavigonDb")));
 
     services.AddScoped<IUserRepository, UserRepository>();
-    services.AddScoped<ILinkedAccountRepository, LinkedAccountRepository>();
     services.AddScoped<IProjectRepository, ProjectRepository>();
-    services.AddScoped<IFollowRepository, FollowRepository>();
-    services.AddScoped<IBookmarkRepository, BookmarkRepository>();
-    services.AddScoped<ILikeRepository, LikeRepository>();
     services.AddScoped<IExploreRepository, ExploreRepository>();
     services.AddScoped<ProjectAssetStorage>();
     services.AddScoped<IProjectAssetStorage>(sp => sp.GetRequiredService<ProjectAssetStorage>());

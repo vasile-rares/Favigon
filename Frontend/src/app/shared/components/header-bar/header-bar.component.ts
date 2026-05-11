@@ -20,7 +20,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   AuthService,
   ProjectService,
-  CurrentUserService,
+  UserService,
   extractApiErrorMessage,
   FALLBACK_AVATAR_URL,
 } from '@app/core';
@@ -61,7 +61,7 @@ export class HeaderBarComponent implements OnInit {
   private readonly activatedRoute = inject(ActivatedRoute);
   private readonly authService = inject(AuthService);
   private readonly projectService = inject(ProjectService);
-  private readonly currentUser = inject(CurrentUserService);
+  private readonly currentUser = inject(UserService);
   private readonly injector = inject(Injector);
   private readonly zone = inject(NgZone);
   private readonly fallbackAvatarUrl = FALLBACK_AVATAR_URL;
@@ -114,7 +114,7 @@ export class HeaderBarComponent implements OnInit {
   readonly projectMenuContainer = viewChild<ElementRef<HTMLElement>>('projectMenuContainer');
 
   private readonly syncCurrentUserState = effect(() => {
-    const user = this.currentUser.user();
+    const user = this.currentUser.currentUser();
 
     if (user === undefined) {
       return;
@@ -160,7 +160,7 @@ export class HeaderBarComponent implements OnInit {
     afterNextRender(() => this.setMobileMenuTriggerClosedState(), { injector: this.injector });
 
     this.currentUser
-      .load()
+      .loadCurrentUser()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         error: () => this.resetIdentity(),
@@ -196,7 +196,7 @@ export class HeaderBarComponent implements OnInit {
   onLogout() {
     this.isUserMenuOpen = false;
     this.closeMobileMenu(true);
-    this.currentUser.invalidate();
+    this.currentUser.invalidateCurrentUser();
     this.authService.logout().subscribe();
     void this.router.navigate(['/login'], { replaceUrl: true });
   }

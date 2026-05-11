@@ -14,22 +14,13 @@ namespace Favigon.API.Controllers;
 public class ProjectsController : ControllerBase
 {
   private readonly IProjectService _projectService;
-  private readonly IProjectAssetService _projectAssetService;
-  private readonly IBookmarkService _bookmarkService;
-  private readonly ILikeService _likeService;
   private readonly IProjectRepository _projectRepository;
 
   public ProjectsController(
     IProjectService projectService,
-    IProjectAssetService projectAssetService,
-    IBookmarkService bookmarkService,
-    ILikeService likeService,
     IProjectRepository projectRepository)
   {
     _projectService = projectService;
-    _projectAssetService = projectAssetService;
-    _bookmarkService = bookmarkService;
-    _likeService = likeService;
     _projectRepository = projectRepository;
   }
 
@@ -135,7 +126,7 @@ public class ProjectsController : ControllerBase
     }
 
     await using var stream = file.OpenReadStream();
-    var assetPath = await _projectAssetService.UploadImageAsync(
+    var assetPath = await _projectService.UploadImageAsync(
       id,
       userId,
       new ProjectImageUploadRequest
@@ -303,7 +294,7 @@ public class ProjectsController : ControllerBase
 
     try
     {
-      await _bookmarkService.BookmarkAsync(userId, id);
+      await _projectService.BookmarkAsync(userId, id);
       return Ok();
     }
     catch (InvalidOperationException ex)
@@ -319,7 +310,7 @@ public class ProjectsController : ControllerBase
 
     try
     {
-      await _bookmarkService.UnbookmarkAsync(userId, id);
+      await _projectService.UnbookmarkAsync(userId, id);
       return NoContent();
     }
     catch (InvalidOperationException ex)
@@ -343,7 +334,7 @@ public class ProjectsController : ControllerBase
 
     try
     {
-      await _likeService.LikeAsync(userId, id);
+      await _projectService.LikeAsync(userId, id);
       return Ok();
     }
     catch (InvalidOperationException ex)
@@ -359,7 +350,7 @@ public class ProjectsController : ControllerBase
 
     try
     {
-      await _likeService.UnlikeAsync(userId, id);
+      await _projectService.UnlikeAsync(userId, id);
       return NoContent();
     }
     catch (InvalidOperationException ex)

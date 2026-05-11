@@ -14,17 +14,10 @@ namespace Favigon.API.Controllers;
 public class UsersController : ControllerBase
 {
   private readonly IUserService _userService;
-  private readonly IFollowService _followService;
-  private readonly IBookmarkService _bookmarkService;
 
-  public UsersController(
-    IUserService userService,
-    IFollowService followService,
-    IBookmarkService bookmarkService)
+  public UsersController(IUserService userService)
   {
     _userService = userService;
-    _followService = followService;
-    _bookmarkService = bookmarkService;
   }
 
   [HttpGet]
@@ -190,10 +183,10 @@ public class UsersController : ControllerBase
 
     User.TryGetUserId(out var viewerUserId);
 
-    var followerCount = await _followService.GetFollowerCountAsync(user.Id);
-    var followingCount = await _followService.GetFollowingCountAsync(user.Id);
+    var followerCount = await _userService.GetFollowerCountAsync(user.Id);
+    var followingCount = await _userService.GetFollowingCountAsync(user.Id);
     var isFollowedByCurrentUser = viewerUserId > 0
-      ? await _followService.IsFollowingAsync(viewerUserId, user.Id)
+      ? await _userService.IsFollowingAsync(viewerUserId, user.Id)
       : false;
 
     return Ok(new
@@ -217,7 +210,7 @@ public class UsersController : ControllerBase
 
     try
     {
-      await _followService.FollowAsync(userId, username);
+      await _userService.FollowAsync(userId, username);
       return Ok();
     }
     catch (InvalidOperationException ex)
@@ -233,7 +226,7 @@ public class UsersController : ControllerBase
 
     try
     {
-      await _followService.UnfollowAsync(userId, username);
+      await _userService.UnfollowAsync(userId, username);
       return NoContent();
     }
     catch (InvalidOperationException ex)
@@ -248,7 +241,7 @@ public class UsersController : ControllerBase
     var user = await _userService.GetByUsernameAsync(username);
     if (user == null) return NotFound();
 
-    var followers = await _followService.GetFollowersAsync(user.Id);
+    var followers = await _userService.GetFollowersAsync(user.Id);
     return Ok(followers.Select(u => new
     {
       userId = u.Id,
@@ -264,7 +257,7 @@ public class UsersController : ControllerBase
     var user = await _userService.GetByUsernameAsync(username);
     if (user == null) return NotFound();
 
-    var following = await _followService.GetFollowingAsync(user.Id);
+    var following = await _userService.GetFollowingAsync(user.Id);
     return Ok(following.Select(u => new
     {
       userId = u.Id,
@@ -279,7 +272,7 @@ public class UsersController : ControllerBase
   {
     if (!User.TryGetUserId(out var userId)) return Unauthorized();
 
-    var bookmarks = await _bookmarkService.GetMyBookmarksAsync(userId);
+    var bookmarks = await _userService.GetMyBookmarksAsync(userId);
     return Ok(bookmarks);
   }
 

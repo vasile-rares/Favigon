@@ -1,6 +1,7 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { catchError, tap } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import {
   UserMe,
@@ -14,6 +15,34 @@ import {
 export class UserService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = environment.apiBaseUrl;
+
+  // ── Current user cache ────────────────────────────────────
+
+  private readonly _currentUser = signal<UserMe | null | undefined>(undefined);
+  readonly currentUser = this._currentUser.asReadonly();
+
+  loadCurrentUser(): Observable<UserMe | null> {
+    const cached = this._currentUser();
+    if (cached !== undefined) return of(cached);
+
+    return this.getMe().pipe(
+      tap((user) => this._currentUser.set(user)),
+      catchError(() => {
+        this._currentUser.set(null);
+        return of(null);
+      }),
+    );
+  }
+
+  setCurrentUser(user: UserMe): void {
+    this._currentUser.set(user);
+  }
+
+  invalidateCurrentUser(): void {
+    this._currentUser.set(undefined);
+  }
+
+  // ── HTTP ──────────────────────────────────────────────────
 
   getMe(): Observable<UserMe> {
     return this.http.get<UserMe>(`${this.baseUrl}/users/me`);

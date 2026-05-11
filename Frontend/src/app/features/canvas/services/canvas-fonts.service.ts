@@ -118,13 +118,12 @@ export const GOOGLE_FONTS: GoogleFont[] = [
 ];
 
 @Injectable({ providedIn: 'root' })
-export class GoogleFontsService {
+export class CanvasFontsService {
   private readonly document = inject(DOCUMENT);
   private readonly loadedFonts = new Set<string>();
 
   readonly fontList: GoogleFont[] = GOOGLE_FONTS;
 
-  
   loadFont(family: string): void {
     const font = this.fontList.find((f) => f.family === family);
     if (!font || font.category === 'system') return;
@@ -141,7 +140,6 @@ export class GoogleFontsService {
     this.document.head.appendChild(link);
   }
 
-  
   ensureLoaded(family: string | undefined | null): void {
     if (family) this.loadFont(family);
   }

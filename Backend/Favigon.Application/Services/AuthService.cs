@@ -20,7 +20,6 @@ public class AuthService : IAuthService
   private const string TwoFactorDisablePurpose = "disable";
 
   private readonly IUserRepository _userRepository;
-  private readonly ILinkedAccountRepository _linkedAccountRepository;
   private readonly IGithubOAuthClient _githubOAuthClient;
   private readonly IGoogleOAuthClient _googleOAuthClient;
   private readonly IEmailSender _emailSender;
@@ -30,7 +29,6 @@ public class AuthService : IAuthService
 
   public AuthService(
       IUserRepository userRepository,
-      ILinkedAccountRepository linkedAccountRepository,
       IGithubOAuthClient githubOAuthClient,
       IGoogleOAuthClient googleOAuthClient,
       IEmailSender emailSender,
@@ -39,7 +37,6 @@ public class AuthService : IAuthService
       IAuditLogger audit)
   {
     _userRepository = userRepository;
-    _linkedAccountRepository = linkedAccountRepository;
     _githubOAuthClient = githubOAuthClient;
     _googleOAuthClient = googleOAuthClient;
     _emailSender = emailSender;
@@ -358,7 +355,7 @@ public class AuthService : IAuthService
 
   private async Task LinkProviderAsync(int userId, string provider, string providerUserId, string normalizedEmail, string? profilePictureUrl = null)
   {
-    var existingLink = await _linkedAccountRepository.GetByProviderAsync(provider, providerUserId);
+    var existingLink = await _userRepository.GetLinkedAccountByProviderAsync(provider, providerUserId);
     if (existingLink != null && existingLink.UserId != userId)
       throw new InvalidOperationException($"This {provider} account is already linked to a different Favigon account.");
 
@@ -367,16 +364,16 @@ public class AuthService : IAuthService
       if (!string.Equals(existingLink.ProviderEmail, normalizedEmail, StringComparison.OrdinalIgnoreCase))
       {
         existingLink.ProviderEmail = normalizedEmail;
-        await _linkedAccountRepository.UpdateAsync(existingLink);
+        await _userRepository.UpdateLinkedAccountAsync(existingLink);
       }
       return;
     }
 
-    var existingUserLink = await _linkedAccountRepository.GetByUserIdAndProviderAsync(userId, provider);
+    var existingUserLink = await _userRepository.GetLinkedAccountByUserIdAndProviderAsync(userId, provider);
     if (existingUserLink != null)
       throw new InvalidOperationException($"You already have a {provider} account connected.");
 
-    await _linkedAccountRepository.AddAsync(new LinkedAccount
+    await _userRepository.AddLinkedAccountAsync(new LinkedAccount
     {
       UserId = userId,
       Provider = provider,
@@ -420,7 +417,7 @@ public class AuthService : IAuthService
     string? displayNameCandidate,
     string? profilePictureUrl)
   {
-    var existingProvider = await _linkedAccountRepository.GetByProviderAsync(provider, providerUserId);
+    var existingProvider = await _userRepository.GetLinkedAccountByProviderAsync(provider, providerUserId);
     if (existingProvider?.User is not null)
     {
       var linkedUser = existingProvider.User;
@@ -428,7 +425,7 @@ public class AuthService : IAuthService
       if (!string.Equals(existingProvider.ProviderEmail, normalizedEmail, StringComparison.OrdinalIgnoreCase))
       {
         existingProvider.ProviderEmail = normalizedEmail;
-        await _linkedAccountRepository.UpdateAsync(existingProvider);
+        await _userRepository.UpdateLinkedAccountAsync(existingProvider);
       }
 
       // Only refresh the profile picture from OAuth if the user hasn't uploaded a custom one
@@ -471,7 +468,7 @@ public class AuthService : IAuthService
       await _userRepository.UpdateAsync(user);
     }
 
-    await _linkedAccountRepository.AddAsync(new LinkedAccount
+    await _userRepository.AddLinkedAccountAsync(new LinkedAccount
     {
       UserId = user.Id,
       Provider = provider,

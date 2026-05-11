@@ -29,7 +29,7 @@ import {
   length,
   px,
 } from '@app/core';
-import { gradientToCss } from '../utils/gradient.utils';
+import { gradientToCss } from '../utils/canvas-gradient.util';
 import {
   buildCanvasElementBackfaceVisibility,
   buildCanvasElementTransform,
