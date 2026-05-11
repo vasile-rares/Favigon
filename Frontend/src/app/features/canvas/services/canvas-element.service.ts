@@ -87,9 +87,7 @@ export class CanvasElementService {
 
     // For fit-content text, don't center around the 150px default width — the actual
     // rendered width is near-zero (empty element). Place the left edge at the cursor.
-    let x = roundToTwoDecimals(
-      createdType === 'text' ? pointer.x : pointer.x - defaultWidth / 2,
-    );
+    let x = roundToTwoDecimals(createdType === 'text' ? pointer.x : pointer.x - defaultWidth / 2);
     let y = roundToTwoDecimals(pointer.y - defaultHeight / 2);
     let parentId: string | null = null;
 
@@ -687,7 +685,6 @@ export class CanvasElementService {
 
   // ── Fit-Content Container Sizing ──────────────────────────
 
-  
   private computeContainerFitContentSize(
     container: CanvasElement,
     children: CanvasElement[],
@@ -701,7 +698,6 @@ export class CanvasElementService {
     return this.computeFreeContainerFitContent(children, elements, axis, page);
   }
 
-  
   private computeLayoutContainerFitContent(
     container: CanvasElement,
     children: CanvasElement[],
@@ -755,7 +751,6 @@ export class CanvasElementService {
     return Math.max(contentSize, 1);
   }
 
-  
   private computeFreeContainerFitContent(
     children: CanvasElement[],
     elements: CanvasElement[],
@@ -771,7 +766,6 @@ export class CanvasElementService {
     return Math.max(maxExtent, 1);
   }
 
-  
   private getChildIntrinsicBoxSize(
     child: CanvasElement,
     elements: CanvasElement[],

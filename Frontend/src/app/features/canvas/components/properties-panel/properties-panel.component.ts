@@ -38,6 +38,8 @@ export class PropertiesPanelComponent {
   readonly generatedCss = input('');
   readonly generatedFiles = input<GeneratedFile[]>([]);
   readonly irPreview = input<IRNode | null>(null);
+  readonly designJson = input<string | null>(null);
+  readonly projectName = input<string>('project');
 
   readonly elementPatch = output<Partial<CanvasElement>>();
   readonly numberInputGestureStarted = output<void>();

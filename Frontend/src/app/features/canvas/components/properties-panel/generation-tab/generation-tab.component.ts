@@ -1,12 +1,20 @@
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   effect,
+  ElementRef,
+  inject,
+  Injector,
   input,
+  NgZone,
   OnDestroy,
   output,
+  signal,
+  viewChild,
   ViewEncapsulation,
 } from '@angular/core';
+import gsap from 'gsap';
 import { GeneratedFile, IRNode } from '@app/core';
 import { SupportedFramework } from '../../../canvas.types';
 
@@ -31,15 +39,27 @@ export class GenerationTabComponent implements OnDestroy {
   readonly generatedCss = input('');
   readonly generatedFiles = input<GeneratedFile[]>([]);
   readonly irPreview = input<IRNode | null>(null);
+  readonly designJson = input<string | null>(null);
+  readonly projectName = input<string>('project');
+
+  readonly isViewerOpen = signal(false);
+  readonly showViewer = signal(false);
+  viewerTab: 'code' | 'json' = 'code';
+  highlightedDesignJson = '';
+
+  private readonly viewerDialogRef = viewChild<ElementRef<HTMLElement>>('viewerDialog');
+  private readonly zone = inject(NgZone);
+  private readonly injector = inject(Injector);
 
   readonly frameworkChanged = output<SupportedFramework>();
   readonly validateRequested = output<void>();
   readonly generateRequested = output<void>();
 
   activeFileIndex = 0;
-  copiedKind: CopyKind | null = null;
+  readonly copiedKind = signal<CopyKind | null>(null);
   highlightedCode = '';
   highlightedIr = '';
+  copyDesignJsonLabel = 'Copy JSON';
 
   private copyResetTimer: number | null = null;
 
@@ -55,6 +75,24 @@ export class GenerationTabComponent implements OnDestroy {
       const ir = this.irPreview();
       this.highlightedIr = this.highlightJson(ir ? JSON.stringify(ir, null, 2) : '');
     });
+    effect(() => {
+      const raw = this.designJson() ?? '';
+      let pretty = raw;
+      try {
+        pretty = JSON.stringify(JSON.parse(raw), null, 2);
+      } catch {
+        /* keep raw */
+      }
+      this.highlightedDesignJson = this.highlightJson(pretty);
+    });
+    effect(() => {
+      if (this.isViewerOpen()) {
+        this.showViewer.set(true);
+        afterNextRender(() => this.animateViewerOpen(), { injector: this.injector });
+      } else if (this.showViewer()) {
+        this.animateViewerClose(() => this.showViewer.set(false));
+      }
+    });
   }
 
   readonly frameworkOptions: ReadonlyArray<{
@@ -69,6 +107,9 @@ export class GenerationTabComponent implements OnDestroy {
   ngOnDestroy(): void {
     if (this.copyResetTimer !== null) {
       window.clearTimeout(this.copyResetTimer);
+    }
+    if (this.isViewerOpen()) {
+      document.body.style.overflow = '';
     }
   }
 
@@ -174,7 +215,7 @@ export class GenerationTabComponent implements OnDestroy {
   }
 
   getCopyButtonLabel(kind: CopyKind): string {
-    if (this.copiedKind === kind) {
+    if (this.copiedKind() === kind) {
       return 'Copied';
     }
 
@@ -201,16 +242,84 @@ export class GenerationTabComponent implements OnDestroy {
     }
 
     void this.writeToClipboard(value).then(() => {
-      this.copiedKind = kind;
+      this.copiedKind.set(kind);
 
       if (this.copyResetTimer !== null) {
         window.clearTimeout(this.copyResetTimer);
       }
 
       this.copyResetTimer = window.setTimeout(() => {
-        this.copiedKind = null;
+        this.copiedKind.set(null);
         this.copyResetTimer = null;
       }, 1400);
+    });
+  }
+
+  copyDesignJson(): void {
+    const json = this.designJson();
+    if (!json) return;
+    void this.writeToClipboard(json).then(() => {
+      this.copyDesignJsonLabel = 'Copied!';
+      window.setTimeout(() => {
+        this.copyDesignJsonLabel = 'Copy JSON';
+      }, 1400);
+    });
+  }
+
+  openViewer(tab: 'code' | 'json' = 'code'): void {
+    this.viewerTab = tab;
+    this.isViewerOpen.set(true);
+    document.body.style.overflow = 'hidden';
+  }
+
+  closeViewer(): void {
+    this.isViewerOpen.set(false);
+  }
+
+  onViewerBackdropClick(event: MouseEvent): void {
+    if (event.target === event.currentTarget) this.closeViewer();
+  }
+
+  private animateViewerOpen(): void {
+    const el = this.viewerDialogRef()?.nativeElement;
+    if (!el) return;
+    this.zone.runOutsideAngular(() => {
+      gsap.fromTo(
+        el,
+        { opacity: 0, scale: 0.96, y: 18, transformOrigin: 'center center' },
+        {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          duration: 0.28,
+          ease: 'back.out(1.6)',
+          clearProps: 'transform',
+        },
+      );
+    });
+  }
+
+  private animateViewerClose(onDone: () => void): void {
+    const el = this.viewerDialogRef()?.nativeElement;
+    if (!el) {
+      document.body.style.overflow = '';
+      onDone();
+      return;
+    }
+    this.zone.runOutsideAngular(() => {
+      gsap.to(el, {
+        opacity: 0,
+        scale: 0.96,
+        y: 18,
+        duration: 0.18,
+        ease: 'power2.in',
+        transformOrigin: 'center center',
+        onComplete: () =>
+          this.zone.run(() => {
+            document.body.style.overflow = '';
+            onDone();
+          }),
+      });
     });
   }
 
@@ -246,7 +355,14 @@ export class GenerationTabComponent implements OnDestroy {
     }
 
     const blob = await zip.generateAsync({ type: 'blob' });
-    this.downloadBlob(blob, 'generated-project.zip', 'application/zip');
+    const slug =
+      this.projectName()
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9-_]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'project';
+    const fw = this.selectedFramework();
+    this.downloadBlob(blob, `${slug}-${fw}.zip`, 'application/zip');
   }
 
   /**

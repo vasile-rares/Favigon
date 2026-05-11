@@ -2507,7 +2507,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return buildCanvasProjectDocument(this.pages(), this.projectSlug, this.currentPageId());
   }
 
-  private buildCurrentPersistedDesignJson(): string {
+  buildCurrentPersistedDesignJson(): string {
     return JSON.stringify(buildPersistedCanvasDesign(this.buildCurrentProjectDocument()));
   }
 

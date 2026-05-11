@@ -84,10 +84,40 @@ export function buildCanvasProjectDocumentFromUnknown(
   }
 
   const legacyElements = buildCanvasElementsFromIR(rawDesign as IRNode | null | undefined);
-  const legacyPages =
+  const defaultElements =
     legacyElements.length > 0
-      ? [{ id: crypto.randomUUID(), name: 'Page 1', elements: legacyElements }]
-      : [];
+      ? legacyElements
+      : [
+          {
+            id: crypto.randomUUID(),
+            type: 'frame' as const,
+            name: 'Desktop',
+            x: 0,
+            y: 0,
+            width: DEFAULT_PAGE_VIEWPORT_WIDTH,
+            height: DEFAULT_PAGE_VIEWPORT_HEIGHT,
+            visible: true,
+            fill: '#ffffff',
+            strokeWidth: 1,
+            strokeStyle: 'Solid' as const,
+            opacity: 1,
+            cornerRadius: 0,
+            parentId: null,
+            isPrimary: true,
+          },
+        ];
+  const legacyPages = [
+    {
+      id: crypto.randomUUID(),
+      name: 'Page 1',
+      viewportPreset: 'desktop' as const,
+      viewportWidth: DEFAULT_PAGE_VIEWPORT_WIDTH,
+      viewportHeight: DEFAULT_PAGE_VIEWPORT_HEIGHT,
+      canvasX: 0,
+      canvasY: 0,
+      elements: defaultElements,
+    },
+  ];
   return buildCanvasProjectDocument(legacyPages, projectId, null);
 }
 

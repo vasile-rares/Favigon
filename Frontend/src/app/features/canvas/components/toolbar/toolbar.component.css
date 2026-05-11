@@ -47,8 +47,8 @@
   }
 
   &.is-active {
-    background: rgba(255, 133, 208, 0.1);
-    border: 1px solid rgba(255, 133, 208, 0.5);
+    background: rgba(255, 133, 208, 0.14);
+    border: 1.5px solid #ff85d0;
     color: #ff85d0;
   }
 

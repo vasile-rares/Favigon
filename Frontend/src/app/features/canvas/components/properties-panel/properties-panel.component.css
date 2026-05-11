@@ -17,7 +17,7 @@
   top: var(--canvas-top-chrome-offset, 60px);
   bottom: var(--canvas-edge-gap, 12px);
   width: var(--canvas-properties-panel-width, 280px);
-  z-index: 20;
+  z-index: 50;
   display: flex;
   flex-direction: column;
   pointer-events: none;

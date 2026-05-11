@@ -42,6 +42,8 @@
         [generatedCss]="generatedCss()"
         [generatedFiles]="generatedFiles()"
         [irPreview]="irPreview()"
+        [designJson]="designJson()"
+        [projectName]="projectName()"
         (frameworkChanged)="frameworkChanged.emit($event)"
         (validateRequested)="validateRequested.emit()"
         (generateRequested)="generateRequested.emit()"></app-generation-tab>
