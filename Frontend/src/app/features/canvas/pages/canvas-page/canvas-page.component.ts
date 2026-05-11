@@ -3,6 +3,7 @@ import {
   Component,
   ElementRef,
   HostListener,
+  NgZone,
   OnDestroy,
   viewChild,
   computed,
@@ -156,6 +157,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly frameTitleZoomThreshold = FRAME_TITLE_ZOOM_THRESHOLD;
   private readonly history = inject(CanvasHistoryService);
   private readonly historyPersistence = inject(CanvasHistoryPersistenceService);
+  private readonly ngZone = inject(NgZone);
   private readonly clipboard = inject(CanvasClipboardService);
   readonly element = inject(CanvasElementService);
   private readonly keyboard = inject(CanvasKeyboardService);
@@ -169,6 +171,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private readonly hostEl = inject(ElementRef<HTMLElement>);
 
   readonly canvasSceneRef = viewChild<ElementRef<HTMLElement>>('canvasScene');
+  private readonly deletePageCardRef = viewChild<ElementRef<HTMLElement>>('deletePageCard');
 
   readonly pages = this.editorState.pages;
   readonly currentPageId = this.editorState.currentPageId;
@@ -641,12 +644,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.gesture.invalidateFlowBoundsCache();
     });
 
+    // Wire viewport CSS vars — this callback runs outside Angular's reactive
+    // graph so signal writes during pan/zoom don't schedule CD cycles.
+    this.viewport.onUpdate = () => this.applyViewportCssVars();
+    this.applyViewportCssVars(); // populate initial values
+
     // Sync dot-grid CSS vars so the glow mask can align with the dots.
-    effect(() => {
-      const s = this.hostEl.nativeElement.style;
-      s.setProperty('--dot-size', this.viewport.canvasBackgroundSize());
-      s.setProperty('--dot-pos', this.viewport.canvasBackgroundPosition());
-    });
+    // (Moved to applyViewportCssVars so it runs alongside transform updates,
+    //  avoiding the reactive effect that was triggered on every pan frame.)
 
     // Animate toast in with GSAP when it first appears.
     effect(() => {
@@ -973,6 +978,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     }
 
     this.selectPageFromToolbar(pageId);
+    this.page.selectedPageLayerId.set(pageId);
 
     const layout = this.page.getPageLayoutById(pageId);
     if (!layout) {
@@ -1641,25 +1647,33 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     s.setProperty('--cursor-x', `${event.clientX}px`);
     s.setProperty('--cursor-y', `${event.clientY}px`);
 
-    // Skip hover tracking while a text element is being edited.
-    // Updating hoveredElementId triggers signal-driven CD cycles which can
-    // interfere with the contenteditable focus/caret state causing the text
-    // to momentarily disappear or the editor to lose focus.
-    // Also skip when the pointer is over the layers panel — hover is driven
-    // by layer row mouseenter/mouseleave events instead.
-    const isOverPanel = !!(event.target as Element | null)?.closest('app-project-panel');
-    if (!isOverPanel && !this.editingTextElementId()) {
-      const path = event.composedPath() as Element[];
-      const elementEl = path.find(
-        (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('data-element-id'),
-      );
-      const hoveredId = elementEl?.getAttribute('data-element-id') ?? null;
-      if (hoveredId !== this.gesture.hoveredElementId()) {
-        this.gesture.hoveredElementId.set(hoveredId);
+    // Run the entire hover-detection and gesture handling outside Angular's zone so
+    // Zone.js does not trigger a full change-detection cycle on every pointermove event
+    // (60+ times/sec during pan/resize). Angular signals used inside still propagate
+    // correctly — they are zone-independent.
+    this.ngZone.runOutsideAngular(() => {
+      const isOverPanel = !!(event.target as Element | null)?.closest('app-project-panel');
+      const isInGesture =
+        this.gesture.isDraggingEl() ||
+        this.gesture.isResizing() ||
+        this.gesture.isRotating() ||
+        this.viewport.isPanning();
+      if (!isOverPanel && !this.editingTextElementId() && !isInGesture) {
+        const path = event.composedPath() as Element[];
+        const elementEl = path.find(
+          (el): el is HTMLElement =>
+            el instanceof HTMLElement && el.hasAttribute('data-element-id'),
+        );
+        const hoveredId = elementEl?.getAttribute('data-element-id') ?? null;
+        if (hoveredId !== this.gesture.hoveredElementId()) {
+          this.gesture.hoveredElementId.set(hoveredId);
+        }
+      } else if (isInGesture && this.gesture.hoveredElementId() !== null) {
+        this.gesture.hoveredElementId.set(null);
       }
-    }
 
-    this.gesture.handlePointerMove(event);
+      this.gesture.handlePointerMove(event);
+    });
   }
 
   @HostListener('window:click', ['$event'])
@@ -1700,7 +1714,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
     event.preventDefault();
-    this.viewport.handleWheel(event, canvas.getBoundingClientRect());
+    // Run outside Angular zone so wheel-triggered signal writes don't schedule
+    // a full change-detection cycle. The CSS vars callback (onUpdate) handles
+    // the visual update synchronously.
+    this.ngZone.runOutsideAngular(() => {
+      this.viewport.handleWheel(event, canvas.getBoundingClientRect());
+    });
   }
 
   // ── Touch / Pinch ─────────────────────────────────────────
@@ -1741,24 +1760,28 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   onTouchMove(event: TouchEvent): void {
     if (this.pinchActive && event.touches.length >= 2) {
       event.preventDefault();
-      const dist = this.getTouchDist(event.touches);
-      const center = this.getTouchCenter(event.touches);
+      this.ngZone.runOutsideAngular(() => {
+        const dist = this.getTouchDist(event.touches);
+        const center = this.getTouchCenter(event.touches);
 
-      if (this.pinchStartDist > 0) {
-        const scale = dist / this.pinchStartDist;
-        this.viewport.setZoom(this.pinchStartZoom * scale, this.pinchCenter);
-      }
+        if (this.pinchStartDist > 0) {
+          const scale = dist / this.pinchStartDist;
+          // setZoom already calls notifyUpdate()
+          this.viewport.setZoom(this.pinchStartZoom * scale, this.pinchCenter);
+        }
 
-      // Pan: translate by the delta of the midpoint
-      const dx = center.x - this.pinchLastCenter.x;
-      const dy = center.y - this.pinchLastCenter.y;
-      if (dx !== 0 || dy !== 0) {
-        this.viewport.viewportOffset.update((offset) => ({
-          x: roundToTwoDecimals(offset.x + dx),
-          y: roundToTwoDecimals(offset.y + dy),
-        }));
-      }
-      this.pinchLastCenter = center;
+        // Pan: translate by the delta of the midpoint
+        const dx = center.x - this.pinchLastCenter.x;
+        const dy = center.y - this.pinchLastCenter.y;
+        if (dx !== 0 || dy !== 0) {
+          this.viewport.viewportOffset.update((offset) => ({
+            x: roundToTwoDecimals(offset.x + dx),
+            y: roundToTwoDecimals(offset.y + dy),
+          }));
+          this.viewport.notifyUpdate();
+        }
+        this.pinchLastCenter = center;
+      });
     }
   }
 
@@ -1806,6 +1829,56 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   resetZoom(): void {
     this.viewport.resetZoom(this.getCanvasElement());
+  }
+
+  // ── Delete Page Dialog ────────────────────────────────────
+
+  deletePageRequest(pageId: string): void {
+    this.page.deletePage(pageId);
+    // Animate card in after the @if block renders it
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const card = this.deletePageCardRef()?.nativeElement;
+        if (!card) return;
+        this.ngZone.runOutsideAngular(() => {
+          gsap.fromTo(
+            card,
+            { opacity: 0, scale: 0.92, y: 12, transformOrigin: 'center center' },
+            {
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              duration: 0.25,
+              ease: 'back.out(1.7)',
+              clearProps: 'transform',
+            },
+          );
+        });
+      });
+    });
+  }
+
+  cancelDeletePage(): void {
+    const card = this.deletePageCardRef()?.nativeElement;
+    if (!card) {
+      this.page.cancelDeletePage();
+      return;
+    }
+    this.ngZone.runOutsideAngular(() => {
+      gsap.to(card, {
+        opacity: 0,
+        scale: 0.92,
+        y: 12,
+        duration: 0.17,
+        ease: 'power2.in',
+        transformOrigin: 'center center',
+        onComplete: () => this.ngZone.run(() => this.page.cancelDeletePage()),
+      });
+    });
+  }
+
+  confirmDeletePage(): void {
+    this.page.confirmDeletePage();
   }
 
   zoomPercentage(): number {
@@ -2486,6 +2559,23 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   private getCanvasElement(): HTMLElement | null {
     return document.querySelector('.canvas-container') as HTMLElement | null;
+  }
+
+  /** Write viewport-derived CSS custom properties directly to the host element.
+   *  Called via viewport.onUpdate — runs outside Angular's reactive graph so
+   *  changing the viewport never schedules a change-detection cycle. */
+  private applyViewportCssVars(): void {
+    const offset = this.viewport.viewportOffset();
+    const zoom = this.viewport.zoomLevel();
+    const s = this.hostEl.nativeElement.style;
+    s.setProperty('--vp-x', `${offset.x}px`);
+    s.setProperty('--vp-y', `${offset.y}px`);
+    s.setProperty('--vp-zoom', `${zoom}`);
+    const bgSize = this.viewport.canvasBackgroundSize();
+    s.setProperty('--vp-bg-size', bgSize);
+    // Keep dot-grid vars in sync (used by the glow-mask overlay in CSS).
+    s.setProperty('--dot-size', bgSize);
+    s.setProperty('--dot-pos', this.viewport.canvasBackgroundPosition());
   }
 
   private getTopElementIdAtPoint(x: number, y: number): string | null {

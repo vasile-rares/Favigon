@@ -84,7 +84,7 @@ public sealed class ConverterEngine : IConverterEngine
 
     var files = new List<GeneratedFile>();
 
-    var pageEntries = new List<(string slug, string pascal, string htmlFragment, string css, string debugMap)>();
+    var pageEntries = new List<(string slug, string pascal, string htmlFragment, string css)>();
 
     foreach (var group in grouped)
     {
@@ -111,18 +111,20 @@ public sealed class ConverterEngine : IConverterEngine
 
       var slug = ToKebabCase(group.Key);
       var pascal = ToPascalCase(group.Key);
-      var debugMap = ExportDebugMapBuilder.Build(group.Key, framework, primaryArtifacts.ExportRoot, primaryArtifacts.CssClassMap);
-      pageEntries.Add((slug, pascal, htmlFragment, pageCss, debugMap));
+      pageEntries.Add((slug, pascal, htmlFragment, pageCss));
     }
 
     var fw = framework.ToLowerInvariant();
 
+    // Collect all font families used across all pages for Google Fonts import.
+    var usedFonts = CollectFontFamilies(pageList.Select(p => p.Ir));
+
     if (fw == FrameworkNames.Html)
-      EmitHtmlFiles(pageEntries, files);
+      EmitHtmlFiles(pageEntries, files, usedFonts);
     else if (fw == FrameworkNames.React)
-      EmitReactFiles(pageEntries, files);
+      EmitReactFiles(pageEntries, files, usedFonts);
     else if (fw == FrameworkNames.Angular)
-      EmitAngularFiles(pageEntries, files);
+      EmitAngularFiles(pageEntries, files, usedFonts);
     else
       throw new ArgumentException($"Unsupported framework '{framework}'.");
 
@@ -132,12 +134,14 @@ public sealed class ConverterEngine : IConverterEngine
   // ── Multi-page file emitters ─────────────────────────────
 
   private static void EmitHtmlFiles(
-    List<(string slug, string pascal, string htmlFragment, string css, string debugMap)> entries,
-    List<GeneratedFile> files)
+    List<(string slug, string pascal, string htmlFragment, string css)> entries,
+    List<GeneratedFile> files,
+    IReadOnlySet<string> usedFonts)
   {
-    files.Add(new GeneratedFile("styles.css", SharedCssReset));
+    var fontsImport = BuildGoogleFontsCssImport(usedFonts);
+    files.Add(new GeneratedFile("styles.css", fontsImport + SharedCssReset));
 
-    foreach (var (slug, _, htmlFragment, css, debugMap) in entries)
+    foreach (var (slug, _, htmlFragment, css) in entries)
     {
       var sb = new StringBuilder();
       sb.AppendLine("<!DOCTYPE html>");
@@ -146,6 +150,7 @@ public sealed class ConverterEngine : IConverterEngine
       sb.AppendLine("  <meta charset=\"UTF-8\" />");
       sb.AppendLine("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />");
       sb.Append("  <title>").Append(slug).AppendLine("</title>");
+      sb.Append(BuildGoogleFontsHtmlLinks(usedFonts));
       sb.AppendLine("  <link rel=\"stylesheet\" href=\"styles.css\" />");
       sb.Append("  <link rel=\"stylesheet\" href=\"").Append(slug).AppendLine(".css\" />");
       sb.AppendLine("</head>");
@@ -156,28 +161,51 @@ public sealed class ConverterEngine : IConverterEngine
 
       files.Add(new GeneratedFile($"{slug}.html", sb.ToString()));
       files.Add(new GeneratedFile($"{slug}.css", css));
-      files.Add(new GeneratedFile($"debug/{slug}.class-map.json", debugMap));
     }
+
+    // README
+    var pageList = entries.Select(e => $"- `{e.slug}.html`").ToList();
+    var readme = new StringBuilder();
+    readme.AppendLine("# Generated HTML Project");
+    readme.AppendLine();
+    readme.AppendLine("This project was exported from **Favigon**. No build step is required — open the HTML files directly in a browser.");
+    readme.AppendLine();
+    readme.AppendLine("## Pages");
+    readme.AppendLine();
+    foreach (var line in pageList) readme.AppendLine(line);
+    readme.AppendLine();
+    readme.AppendLine("## Structure");
+    readme.AppendLine();
+    readme.AppendLine("```");
+    readme.AppendLine("styles.css          ← shared reset + Google Fonts import");
+    foreach (var (slug, _, _, _) in entries)
+    {
+      readme.AppendLine($"{slug}.html");
+      readme.AppendLine($"{slug}.css");
+    }
+    readme.AppendLine("```");
+    files.Add(new GeneratedFile("README.md", readme.ToString()));
   }
 
   private static void EmitReactFiles(
-    List<(string slug, string pascal, string htmlFragment, string css, string debugMap)> entries,
-    List<GeneratedFile> files)
+    List<(string slug, string pascal, string htmlFragment, string css)> entries,
+    List<GeneratedFile> files,
+    IReadOnlySet<string> usedFonts)
   {
-    files.Add(new GeneratedFile("styles/shared.css", SharedCssReset));
+    var fontsImport = BuildGoogleFontsCssImport(usedFonts);
+    files.Add(new GeneratedFile("styles.css", fontsImport + SharedCssReset));
 
     var routeImports = new StringBuilder();
     var routeElements = new StringBuilder();
 
     for (var i = 0; i < entries.Count; i++)
     {
-      var (slug, pascal, htmlFragment, css, debugMap) = entries[i];
+      var (slug, pascal, htmlFragment, css) = entries[i];
       var componentName = $"{pascal}Page";
-      var cssPath = $"../styles/{slug}-page.css";
       var routePath = i == 0 ? "/" : $"/{slug}";
 
       var sb = new StringBuilder();
-      sb.Append("import '").Append(cssPath).AppendLine("';");
+      sb.Append("import './").Append(slug).AppendLine(".css';");
       sb.AppendLine();
       sb.Append("export function ").Append(componentName).AppendLine("() {");
       sb.AppendLine("  return (");
@@ -187,11 +215,10 @@ public sealed class ConverterEngine : IConverterEngine
       sb.AppendLine("  );");
       sb.AppendLine("}");
 
-      files.Add(new GeneratedFile($"pages/{componentName}.jsx", sb.ToString()));
-      files.Add(new GeneratedFile($"styles/{slug}-page.css", css));
-      files.Add(new GeneratedFile($"debug/{slug}.class-map.json", debugMap));
+      files.Add(new GeneratedFile($"pages/{slug}/{componentName}.jsx", sb.ToString()));
+      files.Add(new GeneratedFile($"pages/{slug}/{slug}.css", css));
 
-      routeImports.Append("import { ").Append(componentName).Append(" } from './pages/").Append(componentName).AppendLine("';");
+      routeImports.Append("import { ").Append(componentName).Append(" } from './pages/").Append(slug).Append("/").Append(componentName).AppendLine("';");
       routeElements.Append("        <Route path=\"").Append(routePath).Append("\" element={<").Append(componentName).AppendLine(" />} />");
     }
 
@@ -210,20 +237,105 @@ public sealed class ConverterEngine : IConverterEngine
     app.AppendLine("}");
 
     files.Add(new GeneratedFile("App.jsx", app.ToString()));
+
+    // index.html (Vite entry point)
+    var indexHtml = new StringBuilder();
+    indexHtml.AppendLine("<!DOCTYPE html>");
+    indexHtml.AppendLine("<html lang=\"en\">");
+    indexHtml.AppendLine("  <head>");
+    indexHtml.AppendLine("    <meta charset=\"UTF-8\" />");
+    indexHtml.AppendLine("    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />");
+    indexHtml.AppendLine("    <title>App</title>");
+    indexHtml.AppendLine("  </head>");
+    indexHtml.AppendLine("  <body>");
+    indexHtml.AppendLine("    <div id=\"root\"></div>");
+    indexHtml.AppendLine("    <script type=\"module\" src=\"/main.jsx\"></script>");
+    indexHtml.AppendLine("  </body>");
+    indexHtml.AppendLine("</html>");
+    files.Add(new GeneratedFile("index.html", indexHtml.ToString()));
+
+    // main.jsx
+    var mainJsx = new StringBuilder();
+    mainJsx.AppendLine("import { StrictMode } from 'react';");
+    mainJsx.AppendLine("import { createRoot } from 'react-dom/client';");
+    mainJsx.AppendLine("import './styles.css';");
+    mainJsx.AppendLine("import App from './App';");
+    mainJsx.AppendLine();
+    mainJsx.AppendLine("createRoot(document.getElementById('root')).render(");
+    mainJsx.AppendLine("  <StrictMode>");
+    mainJsx.AppendLine("    <App />");
+    mainJsx.AppendLine("  </StrictMode>,");
+    mainJsx.AppendLine(");");
+    files.Add(new GeneratedFile("main.jsx", mainJsx.ToString()));
+
+    // vite.config.js
+    files.Add(new GeneratedFile("vite.config.js",
+      "import { defineConfig } from 'vite';\n" +
+      "import react from '@vitejs/plugin-react';\n\n" +
+      "export default defineConfig({\n" +
+      "  plugins: [react()],\n" +
+      "});\n"));
+
+    // package.json
+    files.Add(new GeneratedFile("package.json",
+      "{\n" +
+      "  \"name\": \"favigon-export\",\n" +
+      "  \"private\": true,\n" +
+      "  \"version\": \"0.0.0\",\n" +
+      "  \"type\": \"module\",\n" +
+      "  \"scripts\": {\n" +
+      "    \"dev\": \"vite\",\n" +
+      "    \"build\": \"vite build\",\n" +
+      "    \"preview\": \"vite preview\"\n" +
+      "  },\n" +
+      "  \"dependencies\": {\n" +
+      "    \"react\": \"^18.3.1\",\n" +
+      "    \"react-dom\": \"^18.3.1\",\n" +
+      "    \"react-router-dom\": \"^6.26.2\"\n" +
+      "  },\n" +
+      "  \"devDependencies\": {\n" +
+      "    \"@vitejs/plugin-react\": \"^4.3.4\",\n" +
+      "    \"vite\": \"^6.0.0\"\n" +
+      "  }\n" +
+      "}\n"));
+
+    // README
+    var readme = new StringBuilder();
+    readme.AppendLine("# Generated React Project");
+    readme.AppendLine();
+    readme.AppendLine("This project was exported from **Favigon**.");
+    readme.AppendLine();
+    readme.AppendLine("## Getting started");
+    readme.AppendLine();
+    readme.AppendLine("```bash");
+    readme.AppendLine("npm install");
+    readme.AppendLine("npm run dev");
+    readme.AppendLine("```");
+    readme.AppendLine();
+    readme.AppendLine("## Build for production");
+    readme.AppendLine();
+    readme.AppendLine("```bash");
+    readme.AppendLine("npm run build");
+    readme.AppendLine("```");
+    readme.AppendLine();
+    readme.AppendLine("Requires **Node.js 18+** and **npm**.");
+    files.Add(new GeneratedFile("README.md", readme.ToString()));
   }
 
   private static void EmitAngularFiles(
-    List<(string slug, string pascal, string htmlFragment, string css, string debugMap)> entries,
-    List<GeneratedFile> files)
+    List<(string slug, string pascal, string htmlFragment, string css)> entries,
+    List<GeneratedFile> files,
+    IReadOnlySet<string> usedFonts)
   {
-    files.Add(new GeneratedFile("styles/shared.css", SharedCssReset));
+    var fontsImport = BuildGoogleFontsCssImport(usedFonts);
+    files.Add(new GeneratedFile("src/styles.css", fontsImport + SharedCssReset));
 
     var routeImports = new StringBuilder();
     var routeEntries = new StringBuilder();
 
     for (var i = 0; i < entries.Count; i++)
     {
-      var (slug, pascal, htmlFragment, css, debugMap) = entries[i];
+      var (slug, pascal, htmlFragment, css) = entries[i];
       var componentClass = $"{pascal}Component";
       var routePath = i == 0 ? "" : slug;
 
@@ -238,10 +350,9 @@ public sealed class ConverterEngine : IConverterEngine
       sb.AppendLine("})");
       sb.Append("export class ").Append(componentClass).AppendLine(" {}");
 
-      files.Add(new GeneratedFile($"pages/{slug}/{slug}.component.ts", sb.ToString()));
-      files.Add(new GeneratedFile($"pages/{slug}/{slug}.component.html", htmlFragment));
-      files.Add(new GeneratedFile($"pages/{slug}/{slug}.component.css", css));
-      files.Add(new GeneratedFile($"debug/{slug}.class-map.json", debugMap));
+      files.Add(new GeneratedFile($"src/app/pages/{slug}/{slug}.component.ts", sb.ToString()));
+      files.Add(new GeneratedFile($"src/app/pages/{slug}/{slug}.component.html", htmlFragment));
+      files.Add(new GeneratedFile($"src/app/pages/{slug}/{slug}.component.css", css));
 
       routeImports.Append("import { ").Append(componentClass).Append(" } from './pages/").Append(slug).Append('/').Append(slug).AppendLine(".component';");
       routeEntries.Append("  { path: '").Append(routePath).Append("', component: ").Append(componentClass).AppendLine(" },");
@@ -267,8 +378,127 @@ public sealed class ConverterEngine : IConverterEngine
     appComp.AppendLine("})");
     appComp.AppendLine("export class AppComponent {}");
 
-    files.Add(new GeneratedFile("app.routes.ts", routes.ToString()));
-    files.Add(new GeneratedFile("app.component.ts", appComp.ToString()));
+    files.Add(new GeneratedFile("src/app/app.routes.ts", routes.ToString()));
+    files.Add(new GeneratedFile("src/app/app.ts", appComp.ToString()));
+
+    // src/main.ts
+    var mainTs = new StringBuilder();
+    mainTs.AppendLine("import { bootstrapApplication } from '@angular/platform-browser';");
+    mainTs.AppendLine("import { provideRouter } from '@angular/router';");
+    mainTs.AppendLine("import { AppComponent } from './app/app';");
+    mainTs.AppendLine("import { routes } from './app/app.routes';");
+    mainTs.AppendLine();
+    mainTs.AppendLine("bootstrapApplication(AppComponent, {");
+    mainTs.AppendLine("  providers: [provideRouter(routes)],");
+    mainTs.AppendLine("}).catch(console.error);");
+    files.Add(new GeneratedFile("src/main.ts", mainTs.ToString()));
+
+    // src/index.html
+    var indexHtml = new StringBuilder();
+    indexHtml.AppendLine("<!DOCTYPE html>");
+    indexHtml.AppendLine("<html lang=\"en\">");
+    indexHtml.AppendLine("<head>");
+    indexHtml.AppendLine("  <meta charset=\"utf-8\" />");
+    indexHtml.AppendLine("  <title>App</title>");
+    indexHtml.AppendLine("  <base href=\"/\" />");
+    indexHtml.AppendLine("  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />");
+    indexHtml.AppendLine("</head>");
+    indexHtml.AppendLine("<body>");
+    indexHtml.AppendLine("  <app-root></app-root>");
+    indexHtml.AppendLine("</body>");
+    indexHtml.AppendLine("</html>");
+    files.Add(new GeneratedFile("src/index.html", indexHtml.ToString()));
+
+    // angular.json (minimal)
+    files.Add(new GeneratedFile("angular.json",
+      "{\n" +
+      "  \"$schema\": \"./node_modules/@angular/cli/lib/config/schema.json\",\n" +
+      "  \"version\": 1,\n" +
+      "  \"projects\": {\n" +
+      "    \"app\": {\n" +
+      "      \"projectType\": \"application\",\n" +
+      "      \"architect\": {\n" +
+      "        \"build\": {\n" +
+      "          \"builder\": \"@angular-devkit/build-angular:application\",\n" +
+      "          \"options\": {\n" +
+      "            \"outputPath\": \"dist/app\",\n" +
+      "            \"index\": \"src/index.html\",\n" +
+      "            \"browser\": \"src/main.ts\",\n" +
+      "            \"styles\": [\"src/styles.css\"]\n" +
+      "          }\n" +
+      "        },\n" +
+      "        \"serve\": {\n" +
+      "          \"builder\": \"@angular-devkit/build-angular:dev-server\",\n" +
+      "          \"configurations\": { \"development\": { \"buildTarget\": \"app:build:development\" } },\n" +
+      "          \"defaultConfiguration\": \"development\"\n" +
+      "        }\n" +
+      "      }\n" +
+      "    }\n" +
+      "  }\n" +
+      "}\n"));
+
+    // tsconfig.json
+    files.Add(new GeneratedFile("tsconfig.json",
+      "{\n" +
+      "  \"compilerOptions\": {\n" +
+      "    \"target\": \"ES2022\",\n" +
+      "    \"lib\": [\"ES2022\", \"dom\"],\n" +
+      "    \"module\": \"ES2022\",\n" +
+      "    \"moduleResolution\": \"bundler\",\n" +
+      "    \"strict\": true,\n" +
+      "    \"experimentalDecorators\": true,\n" +
+      "    \"useDefineForClassFields\": false\n" +
+      "  }\n" +
+      "}\n"));
+
+    // package.json
+    files.Add(new GeneratedFile("package.json",
+      "{\n" +
+      "  \"name\": \"favigon-export\",\n" +
+      "  \"private\": true,\n" +
+      "  \"version\": \"0.0.0\",\n" +
+      "  \"scripts\": {\n" +
+      "    \"start\": \"ng serve\",\n" +
+      "    \"build\": \"ng build\"\n" +
+      "  },\n" +
+      "  \"dependencies\": {\n" +
+      "    \"@angular/common\": \"^19.0.0\",\n" +
+      "    \"@angular/compiler\": \"^19.0.0\",\n" +
+      "    \"@angular/core\": \"^19.0.0\",\n" +
+      "    \"@angular/platform-browser\": \"^19.0.0\",\n" +
+      "    \"@angular/router\": \"^19.0.0\",\n" +
+      "    \"rxjs\": \"~7.8.0\",\n" +
+      "    \"zone.js\": \"~0.15.0\"\n" +
+      "  },\n" +
+      "  \"devDependencies\": {\n" +
+      "    \"@angular/cli\": \"^19.0.0\",\n" +
+      "    \"@angular/compiler-cli\": \"^19.0.0\",\n" +
+      "    \"@angular-devkit/build-angular\": \"^19.0.0\",\n" +
+      "    \"typescript\": \"~5.6.0\"\n" +
+      "  }\n" +
+      "}\n"));
+
+    // README
+    var readme = new StringBuilder();
+    readme.AppendLine("# Generated Angular Project");
+    readme.AppendLine();
+    readme.AppendLine("This project was exported from **Favigon**.");
+    readme.AppendLine();
+    readme.AppendLine("## Getting started");
+    readme.AppendLine();
+    readme.AppendLine("```bash");
+    readme.AppendLine("npm install");
+    readme.AppendLine("npm start");
+    readme.AppendLine("```");
+    readme.AppendLine();
+    readme.AppendLine("## Build for production");
+    readme.AppendLine();
+    readme.AppendLine("```bash");
+    readme.AppendLine("npm run build");
+    readme.AppendLine("```");
+    readme.AppendLine();
+    readme.AppendLine("Requires **Node.js 18+**, **npm**, and **Angular CLI 19+** (`npm i -g @angular/cli`).");
+    files.Add(new GeneratedFile("README.md", readme.ToString()));
   }
 
   // ── Naming helpers ───────────────────────────────────────
@@ -405,7 +635,73 @@ public sealed class ConverterEngine : IConverterEngine
       string.IsNullOrWhiteSpace(line) ? "" : indent + line));
   }
 
+  // ── Google Fonts ─────────────────────────────────────────
+
+  // Fonts that are system-safe and don't need a Google Fonts import.
+  private static readonly HashSet<string> SystemFonts = new(StringComparer.OrdinalIgnoreCase)
+  {
+    "system-ui", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Arial", "Helvetica",
+    "Helvetica Neue", "sans-serif", "serif", "monospace", "cursive", "fantasy",
+    "Times New Roman", "Times", "Georgia", "Trebuchet MS", "Verdana", "Tahoma",
+    "Courier New", "Courier", "Lucida Console", "Comic Sans MS"
+  };
+
+  private static IReadOnlySet<string> CollectFontFamilies(IEnumerable<IRNode> roots)
+  {
+    var families = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+    var queue = new Queue<IRNode>(roots);
+    while (queue.Count > 0)
+    {
+      var node = queue.Dequeue();
+      if (node.Style?.FontFamily is { } ff)
+      {
+        // FontFamily may be a CSS stack like "Inter, sans-serif" — take the first token.
+        var primary = ff.Split(',')[0].Trim().Trim('"').Trim('\'');
+        if (!string.IsNullOrWhiteSpace(primary) && !SystemFonts.Contains(primary))
+          families.Add(primary);
+      }
+      foreach (var variant in node.Variants.Values)
+        if (variant.Style?.FontFamily is { } vff)
+        {
+          var primary = vff.Split(',')[0].Trim().Trim('"').Trim('\'');
+          if (!string.IsNullOrWhiteSpace(primary) && !SystemFonts.Contains(primary))
+            families.Add(primary);
+        }
+      foreach (var child in node.Children)
+        queue.Enqueue(child);
+    }
+    return families;
+  }
+
+  private static string BuildGoogleFontsUrl(IReadOnlySet<string> families)
+  {
+    if (families.Count == 0) return "";
+    // Standard weights used in Favigon.
+    const string weights = "ital,wght@0,300;0,400;0,500;0,600;0,700;1,400";
+    var familyParams = string.Join("&", families
+      .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
+      .Select(f => $"family={Uri.EscapeDataString(f)}:{weights}"));
+    return $"https://fonts.googleapis.com/css2?{familyParams}&display=swap";
+  }
+
+  private static string BuildGoogleFontsHtmlLinks(IReadOnlySet<string> families)
+  {
+    if (families.Count == 0) return "";
+    var url = BuildGoogleFontsUrl(families);
+    return
+      "  <link rel=\"preconnect\" href=\"https://fonts.googleapis.com\" />\n" +
+      "  <link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin />\n" +
+      $"  <link rel=\"stylesheet\" href=\"{url}\" />\n";
+  }
+
+  private static string BuildGoogleFontsCssImport(IReadOnlySet<string> families)
+  {
+    if (families.Count == 0) return "";
+    return $"@import url('{BuildGoogleFontsUrl(families)}');\n\n";
+  }
+
   private const string SharedCssReset = """
+
     *,
     *::before,
     *::after {
@@ -424,6 +720,11 @@ public sealed class ConverterEngine : IConverterEngine
     svg {
       display: block;
       max-width: 100%;
+    }
+
+    a {
+      text-decoration: none;
+      color: inherit;
     }
     """;
 

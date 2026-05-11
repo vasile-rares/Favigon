@@ -54,7 +54,7 @@
         (pageCopyRequested)="page.copyPage($event)"
         (pagePasteRequested)="page.pastePage($event)"
         (pageDuplicateRequested)="page.duplicatePage($event)"
-        (pageDeleteRequested)="page.deletePage($event)"
+        (pageDeleteRequested)="deletePageRequest($event)"
         (layerSelected)="onLayerSelected($event)"
         (layerNameChanged)="onLayerNameChanged($event)"
         (layerMoved)="onLayerMoved($event)"
@@ -86,13 +86,12 @@
       (drop)="onCanvasDrop($event)">
 
       <div class="dom-bg"
-        [style.background-size]="viewport.canvasBackgroundSize()"
-        [style.background-position]="viewport.canvasBackgroundPosition()"></div>
+        style="background-size: var(--vp-bg-size, 10px 10px); background-position: var(--vp-x, 0px) var(--vp-y, 0px)"></div>
 
 
-      <div class="dom-world" [style.transform]="viewport.canvasViewportTransform()">
+      <div class="dom-world" style="transform: translate(var(--vp-x, 0px), var(--vp-y, 0px))">
 
-        <div class="dom-scene canvas-scene" #canvasScene [style.transform]="viewport.canvasSceneTransform()">
+        <div class="dom-scene canvas-scene" #canvasScene style="transform: scale(var(--vp-zoom, 0.5))">
           @for (pg of canvasVisiblePages(); track pg.id) {
             @if (page.getPageLayoutById(pg.id); as pgLayout) {
 
@@ -472,4 +471,19 @@
       (secondaryClicked)="page.closeCustomFrameDialog()"
       (closed)="page.closeCustomFrameDialog()"></app-dialog-box>
   }
+}
+
+@if (page.deletePageConfirmPage(); as confirmPage) {
+  <div class="page-delete-backdrop" (click)="cancelDeletePage()">
+    <div class="page-delete-modal" #deletePageCard (click)="$event.stopPropagation()">
+      <div class="page-delete-modal-head">
+        <h2 class="page-delete-modal-title">Delete "{{ confirmPage.name }}"?</h2>
+        <p class="page-delete-modal-text">This permanently removes the page and all its elements. This action cannot be undone.</p>
+      </div>
+      <div class="page-delete-modal-foot">
+        <button class="page-delete-btn page-delete-btn--quiet" type="button" (click)="cancelDeletePage()">Cancel</button>
+        <button class="page-delete-btn page-delete-btn--danger" type="button" (click)="confirmDeletePage()">Delete page</button>
+      </div>
+    </div>
+  </div>
 }

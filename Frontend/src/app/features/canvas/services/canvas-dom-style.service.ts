@@ -24,18 +24,47 @@ export type DomStyleMap = Record<string, string | null | undefined>;
 export class CanvasDomStyleService {
   private readonly elService = inject(CanvasElementService);
 
+  // WeakMap cache: keyed on element reference so entries are GC'd when elements are removed.
+  // Cache entry is invalidated automatically when the element or its direct parent gets a new
+  // object reference (which happens whenever they are modified via updateCurrentPageElements).
+  // Note: we cache page by its scalar viewport dimensions, NOT by page identity, because
+  // updateCurrentPageElements spreads a new page object on every mutation even when viewport
+  // dimensions are unchanged — causing constant cache misses if we used page reference.
+  private readonly _styleCache = new WeakMap<
+    CanvasElement,
+    {
+      parent: CanvasElement | null;
+      viewportW: number | undefined;
+      viewportH: number | undefined;
+      style: DomStyleMap;
+    }
+  >();
+
   buildStyle(
     element: CanvasElement,
     allElements: CanvasElement[],
     page?: CanvasPageModel | null,
   ): DomStyleMap {
     const parent = this.elService.findElementById(element.parentId ?? null, allElements);
-    return {
+    const vw = page?.viewportWidth;
+    const vh = page?.viewportHeight;
+    const cached = this._styleCache.get(element);
+    if (
+      cached !== undefined &&
+      cached.parent === parent &&
+      cached.viewportW === vw &&
+      cached.viewportH === vh
+    ) {
+      return cached.style;
+    }
+    const style = {
       ...this.buildElementStyle(element, allElements, page),
       ...this.buildPositionStyle(element, parent),
       ...this.buildFlexChildStyle(element, parent),
       ...this.buildGridChildStyle(element, parent),
     };
+    this._styleCache.set(element, { parent, viewportW: vw, viewportH: vh, style });
+    return style;
   }
 
   private buildElementStyle(

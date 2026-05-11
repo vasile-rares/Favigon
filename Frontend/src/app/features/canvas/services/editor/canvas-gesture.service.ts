@@ -27,6 +27,7 @@ import {
   SNAP_THRESHOLD,
 } from '../../utils/interaction/canvas-snap.util';
 import { calculateResizedBounds } from '../../utils/interaction/canvas-resize.util';
+import { getCanvasSizeMode } from '../../utils/element/canvas-sizing.util';
 import {
   getTextFontFamily,
   getTextFontWeight,
@@ -233,7 +234,7 @@ export class CanvasGestureService {
             this.editorState.currentPage(),
           ));
     const parentEl = this.element.findElementById(el.parentId ?? null, this.editorState.elements());
-    const parentAbsoluteBounds = parentEl
+    const rawParentBounds = parentEl
       ? (this.getLiveElementCanvasBounds(parentEl) ??
         this.element.getAbsoluteBounds(
           parentEl,
@@ -241,6 +242,23 @@ export class CanvasGestureService {
           this.editorState.currentPage(),
         ))
       : null;
+    // For fit-content axes on the parent, remove clamping so the child can grow freely.
+    // The parent will expand to fit its children; clamping to the old parent size is wrong.
+    const parentAbsoluteBounds: typeof rawParentBounds =
+      rawParentBounds && parentEl
+        ? {
+            x: rawParentBounds.x,
+            y: rawParentBounds.y,
+            width:
+              getCanvasSizeMode(parentEl, 'width') === 'fit-content'
+                ? Number.POSITIVE_INFINITY
+                : rawParentBounds.width,
+            height:
+              getCanvasSizeMode(parentEl, 'height') === 'fit-content'
+                ? Number.POSITIVE_INFINITY
+                : rawParentBounds.height,
+          }
+        : rawParentBounds;
     this.captureResizeSubtreeSnapshot(id, this.editorState.elements());
     this.editorState.selectOnlyElement(id);
     this.beginGestureHistory();

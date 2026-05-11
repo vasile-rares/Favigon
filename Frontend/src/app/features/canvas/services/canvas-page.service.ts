@@ -36,6 +36,7 @@ export class CanvasPageService {
   readonly layersFocusedPageId = signal<string | null>(null);
   readonly selectedPageLayerId = signal<string | null>(null);
   readonly copiedPageSnapshot = signal<CanvasPageModel | null>(null);
+  readonly deletePageConfirmId = signal<string | null>(null);
   readonly isViewportMenuOpen = signal(false);
   readonly isDeviceMenuOpen = signal(false);
   readonly deviceMenuX = signal(0);
@@ -54,6 +55,11 @@ export class CanvasPageService {
     () => this.layersFocusedPageId() ?? this.selectedPageLayerId(),
   );
   readonly hasCopiedPage = computed(() => this.copiedPageSnapshot() !== null);
+  readonly deletePageConfirmPage = computed<CanvasPageModel | null>(() => {
+    const id = this.deletePageConfirmId();
+    if (!id) return null;
+    return this.editorState.pages().find((p) => p.id === id) ?? null;
+  });
   readonly customFrameDialogFields = computed<DialogBoxField[]>(() => [
     {
       key: 'width',
@@ -260,10 +266,17 @@ export class CanvasPageService {
       return;
     }
 
-    const shouldDelete = window.confirm(`Delete page "${page.name}"?`);
-    if (!shouldDelete) {
-      return;
-    }
+    this.deletePageConfirmId.set(pageId);
+  }
+
+  cancelDeletePage(): void {
+    this.deletePageConfirmId.set(null);
+  }
+
+  confirmDeletePage(): void {
+    const pageId = this.deletePageConfirmId();
+    if (!pageId) return;
+    this.deletePageConfirmId.set(null);
 
     this.apiError.set(null);
     this.runWithHistory(() => {
@@ -675,6 +688,7 @@ export class CanvasPageService {
     if (!target) return;
     this.viewport.zoomLevel.set(target.zoom);
     this.viewport.viewportOffset.set(target.offset);
+    this.viewport.notifyUpdate();
   }
 
   focusPageSmooth(pageId: string, canvasElement: HTMLElement | null): void {
@@ -705,6 +719,7 @@ export class CanvasPageService {
         x: roundToTwoDecimals(x),
         y: roundToTwoDecimals(y),
       });
+      this.viewport.notifyUpdate();
 
       if (t < 1) {
         requestAnimationFrame(animate);

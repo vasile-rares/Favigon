@@ -18,6 +18,15 @@ export class CanvasViewportService {
   readonly isSpacePressed = signal(false);
   readonly frameTemplate = signal({ width: 390, height: 844 });
 
+  // Escape hatch for bypassing Angular CD during pan/zoom. The canvas-page
+  // component registers a callback here that writes CSS custom properties
+  // directly to the host element style — no Angular binding, no CD cycle.
+  onUpdate?: () => void;
+
+  notifyUpdate(): void {
+    this.onUpdate?.();
+  }
+
   private panStartPosition: Point = { x: 0, y: 0 };
   private _panMoved = false;
   private zoomTimer: ReturnType<typeof setTimeout> | null = null;
@@ -66,6 +75,7 @@ export class CanvasViewportService {
     }
 
     this.zoomLevel.set(clampedZoom);
+    this.notifyUpdate();
   }
 
   // ── Pan ───────────────────────────────────────────────────
@@ -89,6 +99,7 @@ export class CanvasViewportService {
         y: roundToTwoDecimals(offset.y + deltaY),
       }));
       this.panStartPosition = { x: event.clientX, y: event.clientY };
+      this.notifyUpdate();
     }
   }
 
@@ -110,6 +121,7 @@ export class CanvasViewportService {
   handleWheel(event: WheelEvent, canvasRect: DOMRect): void {
     if (event.ctrlKey) {
       const factor = event.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR;
+      // setZoom already calls notifyUpdate()
       this.setZoom(this.zoomLevel() * factor, {
         x: event.clientX - canvasRect.left,
         y: event.clientY - canvasRect.top,
@@ -121,6 +133,7 @@ export class CanvasViewportService {
       x: roundToTwoDecimals(offset.x - event.deltaX),
       y: roundToTwoDecimals(offset.y - event.deltaY),
     }));
+    this.notifyUpdate();
   }
 
   // ── Coordinate Transforms ────────────────────────────────
@@ -204,6 +217,7 @@ export class CanvasViewportService {
         (canvasElement.clientHeight - bounds.height * zoom) / 2 - bounds.y * zoom,
       ),
     });
+    this.notifyUpdate();
   }
 
   // ── Private Helpers ───────────────────────────────────────

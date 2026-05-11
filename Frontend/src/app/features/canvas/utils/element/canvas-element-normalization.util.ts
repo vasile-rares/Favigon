@@ -10,6 +10,7 @@ import {
   getCanvasConstraintAxis,
   getCanvasConstraintMode,
   getCanvasConstraintValue,
+  getCanvasSizeMode,
   deriveCanvasSizeValueFromPixels,
   normalizeCanvasConstraintMode,
   normalizeCanvasConstraintValue,
@@ -309,12 +310,18 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
     return;
   }
 
-  const maxWidth = isFlowInLayoutParent
-    ? Math.max(MIN_SIZE, parentSizeRef?.width ?? parent.width)
-    : Math.max(MIN_SIZE, parent.width - element.x);
-  const maxHeight = isFlowInLayoutParent
-    ? Math.max(MIN_SIZE, parentSizeRef?.height ?? parent.height)
-    : Math.max(MIN_SIZE, parent.height - element.y);
+  const parentWidthFit = getCanvasSizeMode(parent, 'width') === 'fit-content';
+  const parentHeightFit = getCanvasSizeMode(parent, 'height') === 'fit-content';
+  const maxWidth = parentWidthFit
+    ? Number.POSITIVE_INFINITY
+    : isFlowInLayoutParent
+      ? Math.max(MIN_SIZE, parentSizeRef?.width ?? parent.width)
+      : Math.max(MIN_SIZE, parent.width - element.x);
+  const maxHeight = parentHeightFit
+    ? Number.POSITIVE_INFINITY
+    : isFlowInLayoutParent
+      ? Math.max(MIN_SIZE, parentSizeRef?.height ?? parent.height)
+      : Math.max(MIN_SIZE, parent.height - element.y);
 
   if (widthMode === 'fill') {
     element.width = resolveCanvasPixelsFromMode(
@@ -368,8 +375,16 @@ export function mutateNormalizeElement(element: CanvasElement, elements: CanvasE
   );
 
   if (!isFlowInLayoutParent) {
-    element.x = clamp(element.x, 0, parent.width - element.width);
-    element.y = clamp(element.y, 0, parent.height - element.height);
+    element.x = clamp(
+      element.x,
+      0,
+      parentWidthFit ? Number.POSITIVE_INFINITY : parent.width - element.width,
+    );
+    element.y = clamp(
+      element.y,
+      0,
+      parentHeightFit ? Number.POSITIVE_INFINITY : parent.height - element.height,
+    );
   }
   if (widthMode === 'relative') {
     element.widthSizingValue = deriveCanvasSizeValueFromPixels(

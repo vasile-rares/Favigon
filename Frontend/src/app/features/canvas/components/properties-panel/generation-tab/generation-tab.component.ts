@@ -224,23 +224,99 @@ export class GenerationTabComponent implements OnDestroy {
         ? 'text/html;charset=utf-8'
         : file.path.endsWith('.json')
           ? 'application/json;charset=utf-8'
-          : 'text/plain;charset=utf-8';
+          : file.path.endsWith('.jsx') || file.path.endsWith('.tsx')
+            ? 'text/javascript;charset=utf-8'
+            : 'text/plain;charset=utf-8';
     this.downloadBlob(file.content, this.getActiveFileName(), mimeType);
   }
 
   async exportAsZip(): Promise<void> {
     if (this.generatedFiles().length === 0) return;
 
-    // Dynamic import — jszip (~100 KiB) is only needed when the user clicks
-    // "Export ZIP", so we keep it out of the initial canvas page chunk.
     const { default: JSZip } = await import('jszip');
     const zip = new JSZip();
-    for (const file of this.generatedFiles()) {
+
+    const { rewrittenFiles, assetEntries } = await this.bundleImageAssets(this.generatedFiles());
+
+    for (const file of rewrittenFiles) {
       zip.file(file.path, file.content);
+    }
+    for (const { zipPath, blob } of assetEntries) {
+      zip.file(zipPath, blob);
     }
 
     const blob = await zip.generateAsync({ type: 'blob' });
     this.downloadBlob(blob, 'generated-project.zip', 'application/zip');
+  }
+
+  /**
+   * Finds every server-hosted image URL (under /project-assets/) in the
+   * generated file contents, fetches the binary data, stores each image
+   * under `assets/` in the ZIP, and rewrites the URLs accordingly.
+   */
+  private async bundleImageAssets(files: GeneratedFile[]): Promise<{
+    rewrittenFiles: GeneratedFile[];
+    assetEntries: { zipPath: string; blob: Blob }[];
+  }> {
+    // Matches absolute URLs and root-relative paths for project assets.
+    const urlPattern = /(?:https?:\/\/[^\s"')]+)?\/project-assets\/[^\s"')]+/g;
+
+    // Collect unique URLs across all files.
+    const urlSet = new Set<string>();
+    for (const file of files) {
+      for (const match of file.content.matchAll(urlPattern)) {
+        urlSet.add(match[0]);
+      }
+    }
+
+    if (urlSet.size === 0) {
+      return { rewrittenFiles: files, assetEntries: [] };
+    }
+
+    // Pre-compute unique asset filenames (synchronous, no races).
+    const urlToAssetPath = new Map<string, string>();
+    const usedNames = new Set<string>();
+    for (const url of urlSet) {
+      const rawName = url.split('/').pop()?.split('?')[0] ?? 'image';
+      let name = rawName;
+      let counter = 1;
+      while (usedNames.has(name)) {
+        const dotIdx = rawName.lastIndexOf('.');
+        const base = dotIdx >= 0 ? rawName.slice(0, dotIdx) : rawName;
+        const ext = dotIdx >= 0 ? rawName.slice(dotIdx) : '';
+        name = `${base}_${counter++}${ext}`;
+      }
+      usedNames.add(name);
+      urlToAssetPath.set(url, `assets/${name}`);
+    }
+
+    // Fetch all images in parallel; skip any that fail.
+    const assetEntries: { zipPath: string; blob: Blob }[] = [];
+    await Promise.all(
+      [...urlToAssetPath.entries()].map(async ([url, zipPath]) => {
+        try {
+          const response = await fetch(url);
+          if (!response.ok) return;
+          assetEntries.push({ zipPath, blob: await response.blob() });
+        } catch {
+          // Leave the URL as-is if unreachable (e.g. offline export).
+          urlToAssetPath.delete(url);
+        }
+      }),
+    );
+
+    // Rewrite URLs in every file, using a depth-relative path to assets/.
+    const rewrittenFiles = files.map((file) => {
+      let content = file.content;
+      for (const [originalUrl, assetPath] of urlToAssetPath) {
+        const depth = file.path.split('/').length - 1;
+        const relPrefix = depth > 0 ? '../'.repeat(depth) : './';
+        content = content.replaceAll(originalUrl, relPrefix + assetPath);
+      }
+      return content === file.content ? file : { ...file, content };
+    });
+
+    return { rewrittenFiles, assetEntries };
   }
 
   private downloadBlob(content: string | Blob, fileName: string, mimeType: string): void {

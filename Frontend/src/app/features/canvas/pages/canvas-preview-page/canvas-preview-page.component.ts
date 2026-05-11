@@ -193,11 +193,23 @@ export class CanvasPreviewPage {
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 body { overflow: auto; }
+a { text-decoration: none; color: inherit; }
 ${css}
 </style>
 </head>
 <body>
 ${html}
+<script>
+document.addEventListener('click', function(e) {
+  var a = e.target.closest('a[href]');
+  if (!a) return;
+  var href = a.getAttribute('href');
+  if (href && href.startsWith('#')) {
+    e.preventDefault();
+    window.parent.postMessage({ type: 'favigon-page-navigate', pageId: href.slice(1) }, '*');
+  }
+});
+</script>
 </body>
 </html>`);
   });
@@ -222,6 +234,22 @@ ${html}
         this.generateForCurrentPage();
       }
     });
+
+    // Handle in-iframe page navigation (page links send postMessage)
+    const onMessage = (event: MessageEvent): void => {
+      if (
+        event.data &&
+        typeof event.data === 'object' &&
+        event.data['type'] === 'favigon-page-navigate'
+      ) {
+        const pageId = event.data['pageId'] as string;
+        if (pageId && this.pages().some((p) => p.id === pageId)) {
+          this.selectPage(pageId);
+        }
+      }
+    };
+    window.addEventListener('message', onMessage);
+    this.destroyRef.onDestroy(() => window.removeEventListener('message', onMessage));
   }
 
   goBack(): void {
