@@ -323,6 +323,15 @@
 
 /* -- Overlays ------------------------------------------------ */
 
+.parent-outline {
+  position: absolute;
+  outline: 1px dashed #3b82f6;
+  outline-offset: 0;
+  pointer-events: none;
+  transform-origin: center center;
+  opacity: 0.6;
+}
+
 .hover-outline {
   position: absolute;
   outline: 1px solid #3b82f6;

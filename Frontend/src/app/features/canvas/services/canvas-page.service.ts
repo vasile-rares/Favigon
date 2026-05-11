@@ -127,14 +127,9 @@ export class CanvasPageService {
   addPage(): void {
     this.runWithHistory(() => {
       const pages = this.editorState.pages;
-      const pagesSnapshot = pages();
       const basePage = this.el.createPage(this.el.getNextPageName(pages()));
       const desktopWidth = this.normalizeViewportSize(basePage.viewportWidth, 1280);
       const desktopHeight = this.normalizeViewportSize(basePage.viewportHeight, 720);
-      const position = this.getNewPageInsertionPosition(
-        this.editorState.currentPageId() ?? pagesSnapshot.at(-1)?.id ?? null,
-        desktopWidth,
-      );
       const desktopFrame = {
         ...this.el.createFrameAtCenter(
           {
@@ -153,21 +148,11 @@ export class CanvasPageService {
       };
       const page = {
         ...basePage,
-        canvasX: position.x,
-        canvasY: position.y,
+        canvasX: 0,
+        canvasY: 0,
         elements: [desktopFrame],
       };
-      pages.update((currentPages) => {
-        const nextPages = currentPages.map((existingPage) => {
-          const shiftedCanvasX = position.shiftedPagePositions.get(existingPage.id);
-          return shiftedCanvasX === undefined
-            ? existingPage
-            : { ...existingPage, canvasX: shiftedCanvasX };
-        });
-
-        nextPages.splice(position.insertIndex, 0, page);
-        return nextPages;
-      });
+      pages.update((currentPages) => [...currentPages, page]);
       this.editorState.currentPageId.set(page.id);
       this.layersFocusedPageId.set(page.id);
       this.editorState.selectedElementId.set(null);
@@ -183,13 +168,12 @@ export class CanvasPageService {
 
     this.apiError.set(null);
     this.runWithHistory(() => {
-      const position = this.getNextPageCanvasPosition();
       const duplicatedPage: CanvasPageModel = {
         ...sourcePage,
         id: crypto.randomUUID(),
         name: this.getNextDuplicatedPageName(sourcePage.name),
-        canvasX: position.x,
-        canvasY: position.y,
+        canvasX: 0,
+        canvasY: 0,
         elements: this.clonePageElements(sourcePage.elements),
       };
 
@@ -229,13 +213,12 @@ export class CanvasPageService {
 
     this.apiError.set(null);
     this.runWithHistory(() => {
-      const position = this.getNextPageCanvasPosition();
       const pastedPage: CanvasPageModel = {
         ...structuredClone(sourcePage),
         id: crypto.randomUUID(),
         name: this.getNextDuplicatedPageName(sourcePage.name),
-        canvasX: position.x,
-        canvasY: position.y,
+        canvasX: 0,
+        canvasY: 0,
         elements: this.clonePageElements(sourcePage.elements),
       };
 

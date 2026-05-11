@@ -1833,7 +1833,7 @@ export class CanvasGestureService {
   private canAutoSizeTextAxis(el: CanvasElement, axis: 'width' | 'height'): boolean {
     if (el.type !== 'text') return false;
     const mode = axis === 'width' ? (el.widthMode ?? 'fixed') : (el.heightMode ?? 'fixed');
-    return mode === 'fixed' || mode === 'fit-content';
+    return mode === 'fit-content';
   }
 
   buildAutoSizedTextPatch(

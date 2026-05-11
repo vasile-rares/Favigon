@@ -79,57 +79,6 @@
 <div class="project-layers-list">
           @for (page of visiblePageLayers; track trackByPageId($index, page)) {
 
-            <div
-              class="project-layer-item project-layer-item--page"
-              [class.active]="page.id === focusedPageId() || page.id === selectedPageLayerId()"
-              [class.is-drop-inside]="isPageRootDropTarget(page.id)"
-              (dragover)="onPageLayerDragOver(page.id, $event)"
-              (drop)="onPageLayerDrop(page.id, $event)"
-              (click)="onLayerPageSelect(page.id)"
-              (contextmenu)="onLayerPageContextMenu(page.id, $event)"
-              (dblclick)="startPageRename(page.id, $event, 'layers')">
-              @if (pageLayerHasChildren(page.id)) {
-<button
-
-                type="button"
-                class="project-layer-expand"
-                [class.is-collapsed]="isPageLayerCollapsed(page.id)"
-                (click)="togglePageLayerCollapse(page.id, $event)"
-                aria-label="Toggle page layers">
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
-              </button>
-}
-              <span class="project-layer-icon" [class.is-layout-active]="pageLayerHasActiveLayout(page.id)" aria-hidden="true">
-                @if (!pageLayerHasActiveLayout(page.id)) {
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
-}
-                @if (pageLayerHasActiveLayout(page.id)) {
-<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 8h18"/><rect x="6" y="11" width="4" height="7" rx="0.8"/><rect x="14" y="11" width="4" height="7" rx="0.8"/></svg>
-}
-              </span>
-              <div class="project-layer-body">
-                @if (isPageRenameActive(page.id, 'layers')) {
-<input
-
-                  type="text"
-                  class="project-layer-input"
-                  [attr.data-page-name-id]="'layers-' + page.id"
-                  [value]="page.name"
-                  (input)="onPageNameInput(page.id, $event)"
-                  (blur)="stopPageRename(page.id)"
-                  (keydown)="onPageNameKeyDown(page.id, $event)"
-                  (click)="$event.stopPropagation()"
-                  (dblclick)="$event.stopPropagation()"
-                  placeholder="Page name" />
-}
-                @if (!isPageRenameActive(page.id, 'layers')) {
-<span class="project-layer-title">{{ page.name }}</span>
-}
-              </div>
-            </div>
-
             @if (shouldShowPageLayerEntries(page.id)) {
 <div class="project-layers-list">
               @for (layer of getLayerEntriesForPage(page.id); track trackByLayerId($index, layer)) {
@@ -142,12 +91,14 @@
                 [class.is-drop-before]="isLayerDropTarget(page.id, layer.id, 'before')"
                 [class.is-drop-after]="isLayerDropTarget(page.id, layer.id, 'after')"
                 [class.is-drop-inside]="isLayerDropTarget(page.id, layer.id, 'inside')"
-                [style.--layer-indent.px]="20 + layer.depth * 20"
+                [style.--layer-indent.px]="layer.depth * 20"
                 draggable="true"
                 (dragstart)="onLayerDragStart(page.id, layer.id, $event)"
                 (dragover)="onLayerDragOver(page.id, layer, $event)"
                 (drop)="onLayerDrop(page.id, layer, $event)"
                 (dragend)="onLayerDragEnd()"
+                (mouseenter)="onLayerMouseEnter(layer.id)"
+                (mouseleave)="onLayerMouseLeave()"
                 (click)="onLayerSelected(page.id, layer.id, $event)"
                 (contextmenu)="onLayerContextMenu(page.id, layer.id, $event)">
                 @if (layer.hasChildren) {

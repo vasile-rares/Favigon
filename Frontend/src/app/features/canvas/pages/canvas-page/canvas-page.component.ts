@@ -74,6 +74,7 @@ import {
 } from '../../canvas.types';
 import { CanvasViewportService } from '../../services/canvas-viewport.service';
 import { CanvasHistoryService } from '../../services/editor/canvas-history.service';
+import { CanvasHistoryPersistenceService } from '../../services/editor/canvas-history-persistence.service';
 import { CanvasClipboardService } from '../../services/editor/canvas-clipboard.service';
 import { CanvasElementService } from '../../services/canvas-element.service';
 import {
@@ -154,6 +155,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   readonly viewport = inject(CanvasViewportService);
   readonly frameTitleZoomThreshold = FRAME_TITLE_ZOOM_THRESHOLD;
   private readonly history = inject(CanvasHistoryService);
+  private readonly historyPersistence = inject(CanvasHistoryPersistenceService);
   private readonly clipboard = inject(CanvasClipboardService);
   readonly element = inject(CanvasElementService);
   private readonly keyboard = inject(CanvasKeyboardService);
@@ -196,6 +198,15 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   );
 
   readonly currentPageName = computed(() => this.currentPage()?.name ?? 'Untitled page');
+
+  /** Pages visible in the canvas — always exactly the current page. */
+  readonly canvasVisiblePages = computed(() => {
+    const id = this.currentPageId();
+    if (!id) return [];
+    const pg = this.pages().find((p) => p.id === id);
+    return pg ? [pg] : [];
+  });
+
   readonly projectPanelWidth = signal(DEFAULT_PROJECT_PANEL_WIDTH);
 
   readonly pageChildrenMaps = computed<Map<string, Map<string | null, CanvasElement[]>>>(() => {
@@ -432,6 +443,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if ((wFill && hFit) || (wFit && hFill)) return 'none';
     if (wFill) return 'ns';
     if (hFill) return 'ew';
+    if (wFit && hFit) return 'none';
+    if (wFit) return 'ns';
+    if (hFit) return 'ew';
     return 'all';
   });
 
@@ -534,6 +548,31 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return els.map((el) => this.gesture.getCachedOverlaySceneBounds(el));
   });
 
+  readonly parentOutlineData = computed<{
+    bounds: Bounds;
+    transform: string | null;
+    transformOrigin: string | null;
+  } | null>(() => {
+    const selected = this.selectedElement();
+    if (!selected?.parentId) return null;
+    if (this.gesture.isDraggingEl() || this.gesture.isResizing() || this.gesture.isRotating())
+      return null;
+    void this.gesture.flowCacheVersion();
+    const elements = this.elements();
+    const parent = this.element.findElementById(selected.parentId, elements);
+    if (!parent || parent.type === 'frame') return null;
+    const bounds = this.gesture.isFlowBoundsDirty()
+      ? this.gesture.getCachedOverlaySceneBounds(parent)
+      : (this.gesture.getLiveOverlaySceneBounds(parent) ??
+        this.gesture.getCachedOverlaySceneBounds(parent));
+    if (!bounds) return null;
+    const transform = this.buildOutlineTransform(parent);
+    const transformOrigin = this.hasOnlyRotation(parent)
+      ? `${parent.transformOriginX ?? 50}% ${parent.transformOriginY ?? 50}%`
+      : null;
+    return { bounds, transform, transformOrigin };
+  });
+
   // ── Exported template helpers ─────────────────────────────
   readonly getFrameTitle = getFrameTitle;
 
@@ -564,6 +603,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private canPersistDesign = false;
   private saveTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private hasQueuedDesignPersist = false;
+  private saveRetryCount = 0;
+  private readonly SAVE_MAX_RETRIES = 4;
+  private readonly SAVE_RETRY_BASE_MS = 2000;
+  private saveRetryTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private hasTriggeredBrowserExitFlush = false;
   private lastPersistedThumbnailDataUrl: string | null = null;
   private pendingThumbnailDataUrl: string | null = null;
@@ -994,7 +1037,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const target = event.target as HTMLElement;
     if (this.isCanvasBackgroundTarget(target)) {
       this.page.clearSelectedPageLayer();
-      this.page.layersFocusedPageId.set(null);
     }
     if (!this.shouldStartPanning(event, target)) {
       if (this.gesture.beginRectangleDraw(event)) {
@@ -1029,7 +1071,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
         }
         this.page.clearSelectedPageLayer();
         this.clearElementSelection();
-        this.page.layersFocusedPageId.set(null);
       }
       return;
     }
@@ -1373,15 +1414,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   }
 
   onLayerSelected(event: { pageId: string; id: string; additive: boolean }): void {
-    const shouldPreserveAllPagesView = this.page.layersFocusedPageId() === null;
-
     if (event.pageId !== this.currentPageId()) {
       this.currentPageId.set(event.pageId);
     }
 
-    if (!shouldPreserveAllPagesView) {
-      this.page.layersFocusedPageId.set(event.pageId);
-    }
+    this.page.layersFocusedPageId.set(event.pageId);
 
     this.page.clearSelectedPageLayer();
     if (event.additive) {
@@ -1563,16 +1600,16 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.contextMenu.open(event.clientX, event.clientY, this.buildContextMenuCallbacks());
   }
 
-  onLayerContextMenuRequested(event: { pageId: string; id: string; x: number; y: number }): void {
-    const shouldPreserveAllPagesView = this.page.layersFocusedPageId() === null;
+  onLayerHovered(id: string | null): void {
+    this.gesture.hoveredElementId.set(id);
+  }
 
+  onLayerContextMenuRequested(event: { pageId: string; id: string; x: number; y: number }): void {
     if (event.pageId !== this.currentPageId()) {
       this.currentPageId.set(event.pageId);
     }
 
-    if (!shouldPreserveAllPagesView) {
-      this.page.layersFocusedPageId.set(event.pageId);
-    }
+    this.page.layersFocusedPageId.set(event.pageId);
 
     this.page.clearSelectedPageLayer();
     if (!this.isElementSelected(event.id)) {
@@ -1608,7 +1645,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     // Updating hoveredElementId triggers signal-driven CD cycles which can
     // interfere with the contenteditable focus/caret state causing the text
     // to momentarily disappear or the editor to lose focus.
-    if (!this.editingTextElementId()) {
+    // Also skip when the pointer is over the layers panel — hover is driven
+    // by layer row mouseenter/mouseleave events instead.
+    const isOverPanel = !!(event.target as Element | null)?.closest('app-project-panel');
+    if (!isOverPanel && !this.editingTextElementId()) {
       const path = event.composedPath() as Element[];
       const elementEl = path.find(
         (el): el is HTMLElement => el instanceof HTMLElement && el.hasAttribute('data-element-id'),
@@ -1825,6 +1865,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   onPageHeaderPointerDown(event: MouseEvent, pageId: string): void {
     if (event.button !== 0) return;
     this.selectPageFromToolbar(pageId);
+    this.page.selectedPageLayerId.set(pageId);
   }
 
   onPageHeaderPlayClick(pageId: string): void {
@@ -1895,15 +1936,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return false;
     }
 
-    const shouldPreserveAllPagesView = this.page.layersFocusedPageId() === null;
     if (targetPageId !== this.currentPageId()) {
       this.currentPageId.set(targetPageId);
     }
 
     this.page.clearSelectedPageLayer();
-    if (!shouldPreserveAllPagesView) {
-      this.page.layersFocusedPageId.set(targetPageId);
-    }
+    this.page.layersFocusedPageId.set(targetPageId);
 
     return true;
   }
@@ -2142,6 +2180,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
             this.pendingInitialPageFocusId = activePageId;
             this.lastSavedAt.set(response.updatedAt ?? null);
             this.history.resetHistory();
+            this.history.setProjectId(this.projectIdAsNumber);
+            void this.historyPersistence.restore(this.projectIdAsNumber).then((stack) => {
+              if (stack && stack.length > 0) {
+                this.history.restoreStack(stack);
+              }
+            });
             this.loadingMessage.set('Finishing up...');
             this.loadingPercent.set(100);
             this.canPersistDesign = true;
@@ -2165,6 +2209,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private scheduleDesignSave(): void {
     if (!Number.isInteger(this.projectIdAsNumber)) {
       return;
+    }
+
+    // A user-driven change resets any retry backoff and cancels any pending retry.
+    this.saveRetryCount = 0;
+    if (this.saveRetryTimeoutId) {
+      clearTimeout(this.saveRetryTimeoutId);
+      this.saveRetryTimeoutId = null;
     }
 
     if (this.saveTimeoutId) {
@@ -2218,12 +2269,27 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
     this.canvasPersistenceService.saveProjectDesign(this.projectIdAsNumber, document).subscribe({
       next: (response) => {
+        this.saveRetryCount = 0;
         this.lastSavedAt.set(response.updatedAt ?? null);
         this.finishPersistDesign();
       },
       error: (error: { error?: { message?: string; title?: string; detail?: string } }) => {
         this.apiError.set(extractApiErrorMessage(error, 'Failed to save project design.'));
-        this.finishPersistDesign();
+        this.isSavingDesign.set(false);
+
+        if (this.saveRetryCount < this.SAVE_MAX_RETRIES) {
+          const delay = Math.pow(2, this.saveRetryCount) * this.SAVE_RETRY_BASE_MS;
+          this.saveRetryCount++;
+          this.hasQueuedDesignPersist = true;
+          this.saveRetryTimeoutId = setTimeout(() => {
+            this.saveRetryTimeoutId = null;
+            this.persistDesign();
+          }, delay);
+        } else {
+          // Max retries exceeded — give up; reset for the next user-triggered change.
+          this.saveRetryCount = 0;
+          this.hasQueuedDesignPersist = false;
+        }
       },
     });
   }

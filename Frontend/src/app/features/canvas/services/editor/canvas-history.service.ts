@@ -1,18 +1,33 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { HistorySnapshot } from '../../canvas.types';
+import { CanvasHistoryPersistenceService } from './canvas-history-persistence.service';
 
 const MAX_HISTORY_STEPS = 50;
 
 @Injectable()
 export class CanvasHistoryService {
+  private readonly persistence = inject(CanvasHistoryPersistenceService);
+
   private undoStack: HistorySnapshot[] = [];
   private redoStack: HistorySnapshot[] = [];
   private pendingGestureSnapshot: HistorySnapshot | null = null;
   private pendingTextEditSnapshot: HistorySnapshot | null = null;
   private isApplying = false;
+  private projectId: number | null = null;
 
   get isApplyingHistory(): boolean {
     return this.isApplying;
+  }
+
+  /** Set the active project so pushes are persisted to IndexedDB. */
+  setProjectId(id: number | null): void {
+    this.projectId = id;
+  }
+
+  /** Restore a previously persisted undo stack (called after project load). */
+  restoreStack(stack: HistorySnapshot[]): void {
+    this.undoStack = stack;
+    this.redoStack = [];
   }
 
   // ── Atomic History ────────────────────────────────────────
@@ -114,6 +129,9 @@ export class CanvasHistoryService {
     this.redoStack = [];
     this.pendingGestureSnapshot = null;
     this.pendingTextEditSnapshot = null;
+    if (this.projectId !== null) {
+      this.persistence.clear(this.projectId);
+    }
   }
 
   // ── Private Helpers ───────────────────────────────────────
@@ -135,6 +153,10 @@ export class CanvasHistoryService {
     this.undoStack.push(before);
     this.trimUndoStack();
     this.redoStack = [];
+
+    if (this.projectId !== null) {
+      this.persistence.persist(this.projectId, [...this.undoStack]);
+    }
   }
 
   private trimUndoStack(): void {

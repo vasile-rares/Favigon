@@ -113,6 +113,7 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     x: number;
     y: number;
   }>();
+  readonly layerHovered = output<string | null>();
 
   // ── AI Chat State ─────────────────────────────────────────
 
@@ -189,10 +190,12 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   }
 
   get visiblePageLayers(): CanvasPageModel[] {
-    if (this.focusedPageId()) {
-      return this.pages().filter((p) => p.id === this.focusedPageId());
+    const targetId = this.focusedPageId() ?? this.selectedPageLayerId() ?? this.currentPageId();
+    if (targetId) {
+      const found = this.pages().find((p) => p.id === targetId);
+      return found ? [found] : [];
     }
-    return this.pages();
+    return this.pages().slice(0, 1);
   }
 
   // ── Lifecycle ─────────────────────────────────────────────
@@ -555,6 +558,14 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
   }
 
   // ── Layer Operations ─────────────────────────────────────
+
+  onLayerMouseEnter(id: string): void {
+    this.layerHovered.emit(id);
+  }
+
+  onLayerMouseLeave(): void {
+    this.layerHovered.emit(null);
+  }
 
   onLayerSelected(pageId: string, id: string, event?: MouseEvent): void {
     this.closePageMenu();

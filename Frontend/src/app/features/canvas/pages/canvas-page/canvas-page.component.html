@@ -60,6 +60,7 @@
         (layerMoved)="onLayerMoved($event)"
         (layerVisibilityToggled)="onLayerVisibilityToggled($event)"
         (layerContextMenuRequested)="onLayerContextMenuRequested($event)"
+        (layerHovered)="onLayerHovered($event)"
         (pageNameChanged)="page.onPageNameChanged($event)"></app-project-panel>
     }
 
@@ -92,7 +93,7 @@
       <div class="dom-world" [style.transform]="viewport.canvasViewportTransform()">
 
         <div class="dom-scene canvas-scene" #canvasScene [style.transform]="viewport.canvasSceneTransform()">
-          @for (pg of pages(); track pg.id) {
+          @for (pg of canvasVisiblePages(); track pg.id) {
             @if (page.getPageLayoutById(pg.id); as pgLayout) {
 
               <div class="dom-page-bg"
@@ -148,11 +149,11 @@
 
 
         <div class="dom-overlay">
-          @for (pg of pages(); track pg.id) {
+          @for (pg of canvasVisiblePages(); track pg.id) {
 
             <div class="page-shell-header"
               [class.page-shell-header--active]="pg.id === currentPageId()"
-              [class.page-shell-header--selected]="pg.id === page.selectedCanvasPageId()"
+              [class.page-shell-header--selected]="pg.id === page.selectedPageLayerId()"
               [class.page-shell-header--hidden]="viewport.isPanning() || viewport.isZooming()"
               [ngStyle]="getPageHeaderStyle(pg.id)"
               (pointerdown)="onPageHeaderPointerDown($event, pg.id)">
@@ -188,6 +189,16 @@
               }
           }
 
+
+          @if (parentOutlineData(); as po) {
+            <div class="parent-outline"
+              [style.left.px]="po.bounds.x * viewport.zoomLevel()"
+              [style.top.px]="po.bounds.y * viewport.zoomLevel()"
+              [style.width.px]="po.bounds.width * viewport.zoomLevel()"
+              [style.height.px]="po.bounds.height * viewport.zoomLevel()"
+              [style.transform]="po.transform"
+              [style.transform-origin]="po.transformOrigin"></div>
+          }
 
           @if (hoveredOverlayBounds(); as hb) {
             <div class="hover-outline"

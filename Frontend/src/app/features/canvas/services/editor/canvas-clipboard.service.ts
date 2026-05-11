@@ -89,6 +89,16 @@ export class CanvasClipboardService {
     }
 
     const sharedOriginalParentId = this.getSharedParentId(rootElements);
+
+    if (selectedContainer) {
+      const clipboardRootIds = new Set(clipboard.rootIds);
+      if (clipboardRootIds.has(selectedContainer.id)) {
+        const parentId = selectedContainer.parentId ?? null;
+        return { parentId, error: null };
+      }
+      return { parentId: selectedContainer.id, error: null };
+    }
+
     if (
       sharedOriginalParentId !== undefined &&
       sharedOriginalParentId !== null &&
@@ -102,10 +112,6 @@ export class CanvasClipboardService {
 
     if (sharedOriginalParentId === null) {
       return { parentId: null, error: null };
-    }
-
-    if (selectedContainer) {
-      return { parentId: selectedContainer.id, error: null };
     }
 
     return {
