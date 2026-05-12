@@ -1,5 +1,6 @@
 import {
   AfterViewChecked,
+  ChangeDetectionStrategy,
   Component,
   ElementRef,
   HostListener,
@@ -63,7 +64,7 @@ import {
   HistorySnapshot,
   FlowDragRenderState,
 } from '../../canvas.types';
-import { CanvasViewportService } from '../../services/canvas-viewport.service';
+import { CANVAS_DEFAULT_ZOOM, CanvasViewportService } from '../../services/canvas-viewport.service';
 import { CanvasHistoryService } from '../../services/editor/canvas-history.service';
 import { CanvasClipboardService } from '../../services/editor/canvas-clipboard.service';
 import { CanvasElementService } from '../../services/canvas-element.service';
@@ -88,10 +89,14 @@ import gsap from 'gsap';
 import { gsapFadeIn, gsapFadeOut } from '../../../../shared/utils/gsap-animations.util';
 
 const DEFAULT_PROJECT_PANEL_WIDTH = 280;
+const PAGE_SHELL_HEADER_HEIGHT = 44;
+const PAGE_SHELL_HEADER_INSET = 25;
+const CORNER_RADIUS_HANDLE_MIN_INSET = 4;
 
 @Component({
   selector: 'app-canvas-page',
   standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     HeaderBarComponent,
     ToolbarComponent,
@@ -143,6 +148,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly gesture = inject(CanvasGestureService);
   private readonly hostEl = inject(ElementRef<HTMLElement>);
+  private readonly zoomCssFactor = `var(--vp-zoom, ${CANVAS_DEFAULT_ZOOM})`;
 
   readonly canvasSceneRef = viewChild<ElementRef<HTMLElement>>('canvasScene');
   private readonly deletePageCardRef = viewChild<ElementRef<HTMLElement>>('deletePageCard');
@@ -229,7 +235,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly selectionOverlayBounds = computed<Bounds | null>(() => {
     const selected = this.selectedElement();
-    if (!selected || this.gesture.isDraggingEl() || this.editingTextElementId()) return null;
+    const elements = this.elements();
+    if (
+      !this.isCanvasElementEffectivelyVisible(selected, elements) ||
+      this.gesture.isDraggingEl() ||
+      this.editingTextElementId()
+    )
+      return null;
     void this.gesture.flowCacheVersion(); // register reactive dependency
 
     // Use stable bounds (captured after ngAfterViewChecked when DOM is fully settled) whenever
@@ -269,20 +281,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.gesture.getCachedOverlaySceneBounds(selected)
     );
   });
-
-  readonly cornerRadiusHandleOffset = computed<number>(() => {
-    const s = this.selectedElement();
-    const zoom = this.viewport.zoomLevel();
-    const radius = s?.cornerRadius ?? 0;
-    // Clamp to half the shortest side so the handle never exits the element boundary
-    const maxRadius = s ? Math.min(s.width, s.height) / 2 : Infinity;
-    const clampedRadius = Math.min(radius, maxRadius);
-    // Enforce a minimum of 8px so the handle never overlaps the NW corner resize handle
-    // (which sits at left:-4px; top:-4px). At radius=0 the handle sits at left:4; top:4.
-    return Math.max(clampedRadius * zoom, 8);
-  });
-
-  readonly showCornerRadiusHandle = computed<boolean>(() => this.viewport.zoomLevel() >= 0.4);
 
   private getRotatedElementOverlayBounds(
     element: CanvasElement,
@@ -337,6 +335,13 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return `rotate(${el.rotation}deg)`;
   }
 
+  private isCanvasElementEffectivelyVisible(
+    element: CanvasElement | null | undefined,
+    elements: CanvasElement[],
+  ): element is CanvasElement {
+    return !!element && this.element.isElementEffectivelyVisible(element.id, elements);
+  }
+
   readonly selectionOutlineTransform = computed<string | null>(() => {
     const el = this.selectedElement();
     if (!el) return null;
@@ -351,7 +356,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly selectionOutlineDisplayBounds = computed<Bounds | null>(() => {
     const selected = this.selectedElement();
-    if (!selected) return null;
+    const elements = this.elements();
+    if (!this.isCanvasElementEffectivelyVisible(selected, elements)) return null;
 
     if (!this.hasNonTrivialTransform(selected)) {
       // No visual transform – use live-DOM-tracking bounds (accurate for flow/flex children).
@@ -447,7 +453,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if (!pageId) return null;
     const elements = this.getPageElementsById(pageId);
     const hovered = this.element.findElementById(hoveredId, elements);
-    if (!hovered || hovered.type === 'frame') return null;
+    if (!this.isCanvasElementEffectivelyVisible(hovered, elements) || hovered.type === 'frame')
+      return null;
 
     // Suppress hover outline on direct parent containers of any selected element.
     // Without this, the parent layout container (type 'rectangle') renders its hover
@@ -486,7 +493,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if (!pageId) return null;
     const elements = this.getPageElementsById(pageId);
     const el = this.element.findElementById(hoveredId, elements);
-    if (!el) return null;
+    if (!this.isCanvasElementEffectivelyVisible(el, elements)) return null;
     return this.buildOutlineTransform(el);
   });
 
@@ -497,7 +504,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if (!pageId) return null;
     const elements = this.getPageElementsById(pageId);
     const el = this.element.findElementById(hoveredId, elements);
-    if (!el || !this.hasOnlyRotation(el)) return null;
+    if (!this.isCanvasElementEffectivelyVisible(el, elements) || !this.hasOnlyRotation(el))
+      return null;
     return `${el.transformOriginX ?? 50}% ${el.transformOriginY ?? 50}%`;
   });
 
@@ -518,9 +526,14 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly multiSelectOverlayBounds = computed<Bounds[]>(() => {
     const selectedElements = this.selectedElements();
+    const elements = this.elements();
     if (selectedElements.length <= 1) return [];
+    const visibleSelectedElements = selectedElements.filter((el) =>
+      this.isCanvasElementEffectivelyVisible(el, elements),
+    );
+    if (visibleSelectedElements.length === 0) return [];
     void this.gesture.flowCacheVersion();
-    return selectedElements.map((el) => this.gesture.getCachedOverlaySceneBounds(el));
+    return visibleSelectedElements.map((el) => this.gesture.getCachedOverlaySceneBounds(el));
   });
 
   readonly syncedSelectionOverlayBounds = computed<Bounds[]>(() => {
@@ -536,11 +549,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     transformOrigin: string | null;
   } | null>(() => {
     const selected = this.selectedElement();
-    if (!selected?.parentId) return null;
+    const elements = this.elements();
+    if (!selected?.parentId || !this.isCanvasElementEffectivelyVisible(selected, elements))
+      return null;
     if (this.gesture.isDraggingEl() || this.gesture.isResizing() || this.gesture.isRotating())
       return null;
     void this.gesture.flowCacheVersion();
-    const elements = this.elements();
     const parent = this.element.findElementById(selected.parentId, elements);
     if (!parent || parent.type === 'frame') return null;
     const bounds = this.gesture.isFlowBoundsDirty()
@@ -1817,6 +1831,56 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   // ── DOM Scene Template Helpers ────────────────────────────
 
+  scaledScenePx(value: number): string {
+    return `calc(${roundToTwoDecimals(value)}px * ${this.zoomCssFactor})`;
+  }
+
+  scaledScenePxWithOffset(value: number, screenOffsetPx: number): string {
+    const operator = screenOffsetPx >= 0 ? '+' : '-';
+    return `calc(${roundToTwoDecimals(value)}px * ${this.zoomCssFactor} ${operator} ${Math.abs(screenOffsetPx)}px)`;
+  }
+
+  scaledScenePxWithCssOffset(value: number, cssVarName: string, fallback: string): string {
+    return `calc(${roundToTwoDecimals(value)}px * ${this.zoomCssFactor} + var(${cssVarName}, ${fallback}))`;
+  }
+
+  viewportScaledScenePx(axis: 'x' | 'y', value: number, screenOffsetPx = 0): string {
+    const axisVar = axis === 'x' ? '--vp-x' : '--vp-y';
+    if (screenOffsetPx === 0) {
+      return `calc(var(${axisVar}, 0px) + ${roundToTwoDecimals(value)}px * ${this.zoomCssFactor})`;
+    }
+
+    const operator = screenOffsetPx >= 0 ? '+' : '-';
+    return `calc(var(${axisVar}, 0px) + ${roundToTwoDecimals(value)}px * ${this.zoomCssFactor} ${operator} ${Math.abs(screenOffsetPx)}px)`;
+  }
+
+  viewportScaledScenePxWithCssOffset(
+    axis: 'x' | 'y',
+    value: number,
+    cssVarName: string,
+    fallback: string,
+    screenOffsetPx = 0,
+  ): string {
+    const axisVar = axis === 'x' ? '--vp-x' : '--vp-y';
+    const offsetPart =
+      screenOffsetPx === 0
+        ? ''
+        : ` ${screenOffsetPx >= 0 ? '+' : '-'} ${Math.abs(screenOffsetPx)}px`;
+    return `calc(var(${axisVar}, 0px) + ${roundToTwoDecimals(value)}px * ${this.zoomCssFactor} + var(${cssVarName}, ${fallback})${offsetPart})`;
+  }
+
+  getCornerRadiusHandleInsetStyle(): string {
+    const selected = this.selectedElement();
+    if (!selected) {
+      return `${CORNER_RADIUS_HANDLE_MIN_INSET}px`;
+    }
+
+    const radius = selected.cornerRadius ?? 0;
+    const maxRadius = Math.min(selected.width, selected.height) / 2;
+    const clampedRadius = roundToTwoDecimals(Math.min(radius, maxRadius));
+    return `max(calc(${clampedRadius}px * ${this.zoomCssFactor} - 4px), ${CORNER_RADIUS_HANDLE_MIN_INSET}px)`;
+  }
+
   getTopLevelElements(pg: CanvasPageModel): CanvasElement[] {
     const cm = this.pageChildrenMaps().get(pg.id) ?? this.emptyChildrenMap;
     return (cm.get(null) ?? []).filter((el) => el.visible !== false);
@@ -1829,31 +1893,32 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   getPageShellStyle(pageId: string): Record<string, string> {
     const layouts = this.page.pageLayouts();
-    const zoom = this.viewport.zoomLevel();
     return {
-      left: this.pageLayout.getPageShellLeft(pageId, layouts) * zoom + 'px',
-      top: this.pageLayout.getPageShellTop(pageId, layouts) * zoom + 'px',
-      width: this.pageLayout.getPageShellWidth(pageId, layouts) * zoom + 'px',
-      height: this.pageLayout.getPageShellHeight(pageId, layouts) * zoom + 'px',
+      left: this.scaledScenePx(this.pageLayout.getPageShellLeft(pageId, layouts)),
+      top: this.scaledScenePx(this.pageLayout.getPageShellTop(pageId, layouts)),
+      width: this.scaledScenePx(this.pageLayout.getPageShellWidth(pageId, layouts)),
+      height: this.scaledScenePx(this.pageLayout.getPageShellHeight(pageId, layouts)),
     };
   }
 
   getPageHeaderStyle(pageId: string): Record<string, string> {
     const layouts = this.page.pageLayouts();
+    const shellLeft = this.pageLayout.getPageShellLeft(pageId, layouts);
+    const shellTop = this.pageLayout.getPageShellTop(pageId, layouts);
+    const shellWidth = this.pageLayout.getPageShellWidth(pageId, layouts);
     return {
-      left: this.pageLayout.getPageShellHeaderScreenLeft(pageId, layouts) + 'px',
-      top: this.pageLayout.getPageShellHeaderScreenTop(pageId, layouts) + 'px',
-      width: this.pageLayout.getPageShellHeaderScreenWidth(pageId, layouts) + 'px',
+      left: this.scaledScenePx(shellLeft + PAGE_SHELL_HEADER_INSET),
+      top: this.scaledScenePxWithCssOffset(shellTop, '--page-shell-header-top-offset', '-34px'),
+      width: this.scaledScenePx(Math.max(shellWidth - PAGE_SHELL_HEADER_INSET * 2, 0)),
     };
   }
 
   getFrameTitleStyle(pageId: string, frame: CanvasElement): Record<string, string> {
     const layout = this.page.getPageLayoutById(pageId);
-    const zoom = this.viewport.zoomLevel();
     if (!layout) return {};
     return {
-      left: (layout.x + frame.x) * zoom + 'px',
-      top: (layout.y + frame.y) * zoom - 19 + 'px',
+      left: this.scaledScenePx(layout.x + frame.x),
+      top: this.scaledScenePxWithOffset(layout.y + frame.y, -19),
     };
   }
 
@@ -1897,26 +1962,32 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   // ── Page name editor positioning ──────────────────────────
 
-  getPageNameEditorLeft(pageId: string): number {
-    const offset = this.viewport.viewportOffset();
+  getPageNameEditorLeftStyle(pageId: string): string {
     const layouts = this.page.pageLayouts();
-    return offset.x + this.pageLayout.getPageShellHeaderScreenLeft(pageId, layouts) + 50;
+    const shellLeft = this.pageLayout.getPageShellLeft(pageId, layouts);
+    return this.viewportScaledScenePx('x', shellLeft + PAGE_SHELL_HEADER_INSET, 50);
   }
 
-  getPageNameEditorTop(pageId: string): number {
-    const offset = this.viewport.viewportOffset();
+  getPageNameEditorTopStyle(pageId: string): string {
     const layouts = this.page.pageLayouts();
-    return offset.y + this.pageLayout.getPageShellHeaderScreenTop(pageId, layouts) + 9;
+    const shellTop = this.pageLayout.getPageShellTop(pageId, layouts);
+    return this.viewportScaledScenePxWithCssOffset(
+      'y',
+      shellTop,
+      '--page-shell-header-top-offset',
+      '-34px',
+      9,
+    );
   }
 
-  getPageNameEditorWidth(pageId: string): number {
-    return Math.max(96, this.getPageShellToolbarWidth(pageId) - 120);
+  getPageNameEditorWidthStyle(pageId: string): string {
+    return `max(96px, calc(${this.getPageShellToolbarSceneWidth(pageId)}px * ${this.zoomCssFactor} - 120px))`;
   }
 
-  private getPageShellToolbarWidth(pageId: string): number {
+  private getPageShellToolbarSceneWidth(pageId: string): number {
     const layouts = this.page.pageLayouts();
-    const shellWidth = this.pageLayout.getPageShellHeaderScreenWidth(pageId, layouts);
-    return roundToTwoDecimals(shellWidth);
+    const shellWidth = this.pageLayout.getPageShellWidth(pageId, layouts);
+    return roundToTwoDecimals(Math.max(shellWidth - PAGE_SHELL_HEADER_INSET * 2, 0));
   }
 
   isElementSelected(id: string): boolean {
@@ -2031,12 +2102,18 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return this.gesture.getTextEditorElement();
   }
 
-  getTextEditorScreenLeft(): number {
-    return this.gesture.getTextEditorScreenLeft();
+  getTextEditorLeftStyle(): string {
+    const bounds = this.gesture.getTextEditorDisplayBounds();
+    const layout = this.page.activePageLayout();
+    if (!bounds || !layout) return '0px';
+    return this.viewportScaledScenePx('x', layout.x + bounds.x);
   }
 
-  getTextEditorScreenTop(): number {
-    return this.gesture.getTextEditorScreenTop();
+  getTextEditorTopStyle(): string {
+    const bounds = this.gesture.getTextEditorDisplayBounds();
+    const layout = this.page.activePageLayout();
+    if (!bounds || !layout) return '0px';
+    return this.viewportScaledScenePx('y', layout.y + bounds.y);
   }
 
   getTextEditorScreenWidth(): number {
@@ -2173,15 +2250,20 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   private applyViewportCssVars(): void {
     const offset = this.viewport.viewportOffset();
     const zoom = this.viewport.zoomLevel();
-    const s = this.hostEl.nativeElement.style;
+    const host = this.hostEl.nativeElement;
+    const s = host.style;
     s.setProperty('--vp-x', `${offset.x}px`);
     s.setProperty('--vp-y', `${offset.y}px`);
     s.setProperty('--vp-zoom', `${zoom}`);
+    const headerGap = zoom >= FRAME_TITLE_ZOOM_THRESHOLD ? -10 : -25;
+    s.setProperty('--page-shell-header-top-offset', `${-PAGE_SHELL_HEADER_HEIGHT - headerGap}px`);
     const bgSize = this.viewport.canvasBackgroundSize();
     s.setProperty('--vp-bg-size', bgSize);
     // Keep dot-grid vars in sync (used by the glow-mask overlay in CSS).
     s.setProperty('--dot-size', bgSize);
     s.setProperty('--dot-pos', this.viewport.canvasBackgroundPosition());
+    host.dataset.frameTitlesHidden = zoom < FRAME_TITLE_ZOOM_THRESHOLD ? '1' : '0';
+    host.dataset.cornerRadiusHandleVisible = zoom >= 0.4 ? '1' : '0';
   }
 
   private getTopElementIdAtPoint(x: number, y: number): string | null {

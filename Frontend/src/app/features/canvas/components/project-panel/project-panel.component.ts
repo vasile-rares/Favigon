@@ -582,8 +582,8 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
 
   // ── Layer Operations ─────────────────────────────────────
 
-  onLayerMouseEnter(id: string): void {
-    this.layerHovered.emit(id);
+  onLayerMouseEnter(layer: LayerEntry): void {
+    this.layerHovered.emit(layer.isEffectivelyHidden ? null : layer.id);
   }
 
   onLayerMouseLeave(): void {

@@ -1644,7 +1644,7 @@ export class CanvasGestureService {
     return this.element.findElementById(id, this.editorState.elements()) ?? null;
   }
 
-  private getTextEditorDisplayBounds(): Bounds | null {
+  getTextEditorDisplayBounds(): Bounds | null {
     const el = this.getTextEditorElement();
     if (!el) return null;
 

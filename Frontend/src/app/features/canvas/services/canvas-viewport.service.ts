@@ -117,6 +117,10 @@ export class CanvasViewportService {
   // ── Scroll / Wheel ────────────────────────────────────────
 
   handleWheel(event: WheelEvent, canvasRect: DOMRect): void {
+    if (this.isPanning()) {
+      return;
+    }
+
     if (event.ctrlKey) {
       const factor = event.deltaY < 0 ? ZOOM_FACTOR : 1 / ZOOM_FACTOR;
       // setZoom already calls notifyUpdate()

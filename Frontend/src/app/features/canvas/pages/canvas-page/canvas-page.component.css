@@ -92,6 +92,14 @@
   }
 }
 
+.canvas-container.canvas-container--interacting .dom-bg::after {
+  display: none;
+}
+
+.canvas-container.canvas-container--interacting .dom-overlay {
+  display: none;
+}
+
 .page-name-editor {
   position: absolute;
   z-index: 50;
@@ -322,6 +330,12 @@
   transition: opacity 0.08s ease;
 }
 
+:host([data-frame-titles-hidden='1']) .frame-title {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.08s ease;
+}
+
 .parent-outline {
   position: absolute;
   outline: 1px dashed #3b82f6;
@@ -508,6 +522,10 @@
   cursor:
     url('/cursor-canvas.svg') 4 2,
     auto !important;
+}
+
+:host([data-corner-radius-handle-visible='0']) .corner-radius-handle {
+  display: none;
 }
 
 .canvas-container.svg-drag-over {

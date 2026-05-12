@@ -76,6 +76,7 @@
       class="canvas-container"
       [class.pan-ready]="isPanReady()"
       [class.panning]="viewport.isPanning()"
+      [class.canvas-container--interacting]="viewport.isPanning() || viewport.isZooming()"
       [class.svg-drag-over]="isFileDragOver()"
       (pointerdown)="onCanvasPointerDown($event)"
       (click)="onCanvasClick($event)"
@@ -180,7 +181,7 @@
               @for (frame of getRootFrames(pg); track frame.id) {
                 <div class="frame-title"
                   [class.frame-title--active]="pg.id === currentPageId()"
-                  [class.frame-title--hidden]="viewport.isPanning() || viewport.isZooming() || viewport.zoomLevel() < frameTitleZoomThreshold"
+                  [class.frame-title--hidden]="viewport.isPanning() || viewport.isZooming()"
                   [ngStyle]="getFrameTitleStyle(pg.id, frame)"
                   (pointerdown)="$event.stopPropagation(); onFrameTitlePointerDown(pg.id, frame.id)">
                   {{ getFrameTitle(frame) }}
@@ -191,20 +192,20 @@
 
           @if (parentOutlineData(); as po) {
             <div class="parent-outline"
-              [style.left.px]="po.bounds.x * viewport.zoomLevel()"
-              [style.top.px]="po.bounds.y * viewport.zoomLevel()"
-              [style.width.px]="po.bounds.width * viewport.zoomLevel()"
-              [style.height.px]="po.bounds.height * viewport.zoomLevel()"
+              [style.left]="scaledScenePx(po.bounds.x)"
+              [style.top]="scaledScenePx(po.bounds.y)"
+              [style.width]="scaledScenePx(po.bounds.width)"
+              [style.height]="scaledScenePx(po.bounds.height)"
               [style.transform]="po.transform"
               [style.transform-origin]="po.transformOrigin"></div>
           }
 
           @if (hoveredOverlayBounds(); as hb) {
             <div class="hover-outline"
-              [style.left.px]="hb.x * viewport.zoomLevel()"
-              [style.top.px]="hb.y * viewport.zoomLevel()"
-              [style.width.px]="hb.width * viewport.zoomLevel()"
-              [style.height.px]="hb.height * viewport.zoomLevel()"
+              [style.left]="scaledScenePx(hb.x)"
+              [style.top]="scaledScenePx(hb.y)"
+              [style.width]="scaledScenePx(hb.width)"
+              [style.height]="scaledScenePx(hb.height)"
               [style.transform]="hoveredOutlineTransform()"
               [style.transform-origin]="hoveredOutlineTransformOrigin()"></div>
           }
@@ -212,28 +213,28 @@
 
           @for (mb of multiSelectOverlayBounds(); track $index) {
             <div class="multi-select-outline"
-              [style.left.px]="mb.x * viewport.zoomLevel()"
-              [style.top.px]="mb.y * viewport.zoomLevel()"
-              [style.width.px]="mb.width * viewport.zoomLevel()"
-              [style.height.px]="mb.height * viewport.zoomLevel()"></div>
+              [style.left]="scaledScenePx(mb.x)"
+              [style.top]="scaledScenePx(mb.y)"
+              [style.width]="scaledScenePx(mb.width)"
+              [style.height]="scaledScenePx(mb.height)"></div>
           }
 
 
           @for (sb of syncedSelectionOverlayBounds(); track $index) {
             <div class="synced-selection-outline"
-              [style.left.px]="sb.x * viewport.zoomLevel()"
-              [style.top.px]="sb.y * viewport.zoomLevel()"
-              [style.width.px]="sb.width * viewport.zoomLevel()"
-              [style.height.px]="sb.height * viewport.zoomLevel()"></div>
+              [style.left]="scaledScenePx(sb.x)"
+              [style.top]="scaledScenePx(sb.y)"
+              [style.width]="scaledScenePx(sb.width)"
+              [style.height]="scaledScenePx(sb.height)"></div>
           }
 
 
           @if (selectionOutlineDisplayBounds(); as sb) {
             <div class="selection-outline"
-              [style.left.px]="sb.x * viewport.zoomLevel()"
-              [style.top.px]="sb.y * viewport.zoomLevel()"
-              [style.width.px]="sb.width * viewport.zoomLevel()"
-              [style.height.px]="sb.height * viewport.zoomLevel()"
+              [style.left]="scaledScenePx(sb.x)"
+              [style.top]="scaledScenePx(sb.y)"
+              [style.width]="scaledScenePx(sb.width)"
+              [style.height]="scaledScenePx(sb.height)"
               [style.transform]="selectionOutlineTransform()"
               [style.transform-origin]="selectionOutlineTransformOrigin()"
               (pointerdown)="onSelectionOutlinePointerDown($event, selectedElementId()!)"
@@ -257,10 +258,10 @@
                   <div class="sel-corner-zone sel-corner-ne" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'ne')"></div>
                   <div class="sel-corner-zone sel-corner-sw" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'sw')"></div>
                   <div class="sel-corner-zone sel-corner-se" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'se')"></div>
-                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text' && showCornerRadiusHandle()) {
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
                     <div class="corner-radius-handle"
-                      [style.left.px]="cornerRadiusHandleOffset() - 4"
-                      [style.top.px]="cornerRadiusHandleOffset() - 4"
+                      [style.left]="getCornerRadiusHandleInsetStyle()"
+                      [style.top]="getCornerRadiusHandleInsetStyle()"
                       (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
                   }
                 }
@@ -268,10 +269,10 @@
 
                   <div class="sel-handle sel-handle-n" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'n')"></div>
                   <div class="sel-handle sel-handle-s" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 's')"></div>
-                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text' && showCornerRadiusHandle()) {
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
                     <div class="corner-radius-handle"
-                      [style.left.px]="cornerRadiusHandleOffset() - 4"
-                      [style.top.px]="cornerRadiusHandleOffset() - 4"
+                      [style.left]="getCornerRadiusHandleInsetStyle()"
+                      [style.top]="getCornerRadiusHandleInsetStyle()"
                       (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
                   }
                 }
@@ -279,10 +280,10 @@
 
                   <div class="sel-handle sel-handle-e" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'e')"></div>
                   <div class="sel-handle sel-handle-w" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'w')"></div>
-                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text' && showCornerRadiusHandle()) {
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
                     <div class="corner-radius-handle"
-                      [style.left.px]="cornerRadiusHandleOffset() - 4"
-                      [style.top.px]="cornerRadiusHandleOffset() - 4"
+                      [style.left]="getCornerRadiusHandleInsetStyle()"
+                      [style.top]="getCornerRadiusHandleInsetStyle()"
                       (pointerdown)="$event.stopPropagation(); onCornerRadiusHandlePointerDown($event, selectedElementId()!)"></div>
                   }
                 }
@@ -295,10 +296,10 @@
             @if (page.activePageLayout(); as layout) {
               @if (line.type === 'vertical') {
                 <div class="snap-line snap-line-v"
-                  [style.left.px]="(layout.x + line.position) * viewport.zoomLevel()"></div>
+                  [style.left]="scaledScenePx(layout.x + line.position)"></div>
               } @else {
                 <div class="snap-line snap-line-h"
-                  [style.top.px]="(layout.y + line.position) * viewport.zoomLevel()"></div>
+                  [style.top]="scaledScenePx(layout.y + line.position)"></div>
               }
             }
           }
@@ -312,9 +313,9 @@
           type="text"
           [attr.data-canvas-page-name-id]="editingPageId"
           [value]="page.editingCanvasHeaderPageName()"
-          [style.left.px]="getPageNameEditorLeft(editingPageId)"
-          [style.top.px]="getPageNameEditorTop(editingPageId)"
-          [style.width.px]="getPageNameEditorWidth(editingPageId)"
+          [style.left]="getPageNameEditorLeftStyle(editingPageId)"
+          [style.top]="getPageNameEditorTopStyle(editingPageId)"
+          [style.width]="getPageNameEditorWidthStyle(editingPageId)"
           (input)="page.onCanvasHeaderPageNameInput($event)"
           (blur)="page.onCanvasHeaderPageNameBlur(editingPageId)"
           (keydown)="page.onCanvasHeaderPageNameKeyDown(editingPageId, $event)"
@@ -331,8 +332,8 @@
           spellcheck="false"
           role="textbox"
           aria-multiline="true"
-          [style.left.px]="getTextEditorScreenLeft()"
-          [style.top.px]="getTextEditorScreenTop()"
+          [style.left]="getTextEditorLeftStyle()"
+          [style.top]="getTextEditorTopStyle()"
           [style.width.px]="getTextEditorScreenWidth()"
           [style.height.px]="getTextEditorScreenHeight()"
           [style.box-sizing]="'border-box'"
@@ -347,7 +348,7 @@
           [style.word-break]="(editEl.widthMode ?? 'fixed') === 'fixed' ? 'break-word' : null"
           [style.color]="editEl.fill"
           [style.white-space]="(editEl.widthMode ?? 'fixed') === 'fixed' ? 'pre-wrap' : 'pre'"
-          [style.transform]="'scale(' + viewport.zoomLevel() + ')'"
+          [style.transform]="'scale(var(--vp-zoom, 0.5))'"
           [style.transform-origin]="'0 0'"
           (pointerdown)="onTextEditorPointerDown($event)"
           (input)="onTextEditorInput(editEl.id, $event)"
