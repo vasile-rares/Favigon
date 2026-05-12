@@ -14,10 +14,6 @@ public class AiPipelineRequest
   [AllowedValues("gpt-5.4", "gpt-5.4-mini", null)]
   public string? Model { get; set; }
 
-  /// <summary>
-  /// Controls how many phases to run. 1 = intent blueprint only, 2 = intent + structure,
-  /// 3 = full pipeline with visual styling (default).
-  /// </summary>
   [Range(1, 3)]
   public int StopAfterPhase { get; set; } = 3;
 }

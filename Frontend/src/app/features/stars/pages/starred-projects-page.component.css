@@ -1,4 +1,4 @@
-/* ===== HOST ===== */
+
 :host {
   display: block;
   position: relative;
@@ -15,13 +15,11 @@
   overflow-x: hidden;
 }
 
-/* ===== WRAPPER ===== */
 .strs-wrap {
   position: relative;
   z-index: 1;
 }
 
-/* ===== SECTION ===== */
 .strs-section {
   padding: 3.5rem 0 5rem;
 }
@@ -32,7 +30,6 @@
   margin: 0 auto;
 }
 
-/* ===== TOOLBAR HEAD ===== */
 .strs-toolbar-head {
   display: flex;
   align-items: center;
@@ -62,7 +59,6 @@
   font-weight: 500;
 }
 
-/* ===== LOADING DOTS ===== */
 .strs-dots {
   display: inline-flex;
   gap: 7px;
@@ -99,7 +95,6 @@
   }
 }
 
-/* ===== STATES ===== */
 .strs-state {
   min-height: calc(100vh - 55px - 3.5rem);
   display: grid;
@@ -138,14 +133,12 @@
   opacity: 0.7;
 }
 
-/* ===== PROJECT GRID ===== */
 .prj-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
   gap: 1.1rem;
 }
 
-/* ===== PROJECT CARD ===== */
 .prj-card {
   position: relative;
   border-radius: 14px;
@@ -167,7 +160,6 @@
   }
 }
 
-/* === CARD VISUAL === */
 .prj-card-visual {
   position: relative;
   width: 100%;
@@ -189,7 +181,6 @@
   background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02), transparent 60%);
 }
 
-/* === CARD BODY === */
 .prj-card-body {
   background-color: #111111;
   border-radius: 0 0 13px 13px;
@@ -260,7 +251,6 @@
   filter: drop-shadow(0 0 4px #ff6b9d88);
 }
 
-/* === STAR ACTION BUTTON === */
 .prj-card-star-btn {
   display: inline-flex;
   align-items: center;

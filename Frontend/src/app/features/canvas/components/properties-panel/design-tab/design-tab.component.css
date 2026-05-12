@@ -22,7 +22,6 @@ app-design-tab-effects-section {
   margin: 0;
 }
 
-/* â”€â”€ Sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .properties-section {
   display: flex;
   flex-direction: column;
@@ -140,7 +139,6 @@ app-design-tab-effects-section {
   line-height: 1.4;
 }
 
-/* â”€â”€ Empty state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .properties-empty-state {
   border: 1px dashed rgba(255, 255, 255, 0.07);
   border-radius: 10px;
@@ -166,14 +164,12 @@ app-design-tab-effects-section {
   justify-content: center;
 }
 
-/* â”€â”€ 2-column grid â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pp-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.45rem;
 }
 
-/* â”€â”€ Compact labeled field â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pp-field {
   display: flex;
   align-items: center;
@@ -236,7 +232,6 @@ app-design-tab-effects-section {
   flex-shrink: 0;
 }
 
-/* â”€â”€ Row (label + right-aligned control) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pp-row-label {
   display: inline-flex;
   align-items: center;
@@ -824,14 +819,12 @@ app-design-tab-effects-section {
   width: 82px;
 }
 
-/* â”€â”€ Divider â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pp-divider {
   height: 1px;
   background: rgba(255, 255, 255, 0.05);
   margin: 0.1rem 0;
 }
 
-/* â”€â”€ Full-width text input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pp-text-input {
   width: 100%;
   min-height: var(--canvas-panel-control-height);
@@ -873,14 +866,12 @@ app-design-tab-effects-section {
   }
 }
 
-/* â”€â”€ Typography rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pp-typo-row {
   display: flex;
   gap: 0.45rem;
   align-items: stretch;
 }
 
-/* â”€â”€ Icon button group â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pp-icon-group {
   display: flex;
   align-items: center;
@@ -945,7 +936,6 @@ app-design-tab-effects-section {
   }
 }
 
-/* â”€â”€ Frame templates â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .frame-template-grid {
   display: flex;
   flex-direction: column;
@@ -984,7 +974,6 @@ app-design-tab-effects-section {
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Removable controls (control + remove btn inline) ─────────── */
 .pp-style-control--removable {
   display: flex;
   align-items: center;
@@ -1004,7 +993,6 @@ app-design-tab-effects-section {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 22px;
 }
 
-/* ── Filter rows ─────────────────────────────────────────────── */
 .pp-style-control--filter {
   display: flex;
   align-items: center;

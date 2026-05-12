@@ -8,7 +8,7 @@ const MAX_HISTORY_STEPS = 50;
 const DB_NAME = 'favigon-canvas-history';
 const DB_VERSION = 1;
 const STORE_NAME = 'undo-stacks';
-const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const DEBOUNCE_MS = 400;
 const MAX_PAYLOAD_CHARS = 10 * 1024 * 1024; // ~10 MB as char count
 
@@ -38,18 +38,15 @@ export class CanvasHistoryService {
     return this.isApplying;
   }
 
-  /** Set the active project so pushes are persisted to IndexedDB. */
   setProjectId(id: number | null): void {
     this.projectId = id;
   }
 
-  /** Restore a previously persisted undo stack (called after project load). */
   restoreStack(stack: HistorySnapshot[]): void {
     this.undoStack = stack;
     this.redoStack = [];
   }
 
-  /** Load the undo stack from IndexedDB and apply it. */
   async restoreFromDb(projectId: number): Promise<void> {
     const stack = await this.restore(projectId);
     if (stack && stack.length > 0) {
@@ -249,9 +246,7 @@ export class CanvasHistoryService {
       try {
         const tx = db.transaction(STORE_NAME, 'readwrite');
         tx.objectStore(STORE_NAME).delete(projectId);
-      } catch {
-        // Ignore — best-effort cleanup.
-      }
+      } catch {}
     });
   }
 

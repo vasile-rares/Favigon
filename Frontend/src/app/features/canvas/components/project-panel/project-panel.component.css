@@ -445,8 +445,6 @@
   color: var(--project-panel-muted-color);
 }
 
-/* ── AI Chat ─────────────────────────────────────────────── */
-
 .ai-chat {
   display: flex;
   flex-direction: column;

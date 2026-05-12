@@ -1,7 +1,8 @@
 ﻿using AutoMapper;
 using Favigon.Application.DTOs.Requests;
+using Favigon.Application.DTOs.Requests.Assets;
 using Favigon.Application.DTOs.Responses;
-using Favigon.Application.Helpers;
+using Favigon.Application.Validators;
 using Favigon.Application.Interfaces;
 using Favigon.Converter.Abstractions;
 using Favigon.Converter.Models;

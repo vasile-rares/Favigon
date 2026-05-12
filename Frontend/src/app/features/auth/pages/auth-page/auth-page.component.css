@@ -23,7 +23,6 @@
   overflow: hidden;
 }
 
-/* ===== BACKGROUND GLOW ===== */
 .auth-bg {
   position: absolute;
   inset: 0;
@@ -71,7 +70,6 @@
   opacity: 0.18;
 }
 
-/* ===== WRAP ===== */
 .auth-wrap {
   position: relative;
   z-index: 10;
@@ -83,7 +81,6 @@
   gap: 3rem;
 }
 
-/* ===== BRAND ===== */
 .auth-brand-logo {
   height: 52px;
   width: auto;
@@ -92,7 +89,6 @@
   margin-bottom: 2rem;
 }
 
-/* ===== CARD ===== */
 .auth-card {
   background: #111111;
   border-radius: 16px;
@@ -104,7 +100,6 @@
   padding: 1.75rem;
 }
 
-/* ===== CARD HEADER ===== */
 .auth-card-header {
   display: flex;
   flex-direction: column;
@@ -137,12 +132,10 @@
   letter-spacing: 0.01em;
 }
 
-/* ===== CARD BODY ===== */
 .auth-card-body {
   margin-top: 1.25rem;
 }
 
-/* ===== CARD FOOTER ===== */
 .auth-card-footer {
   padding: 1rem 1.75rem;
   text-align: center;
@@ -173,7 +166,6 @@
   }
 }
 
-/* ===== FORM FIELDS ===== */
 .auth-fields {
   display: flex;
   flex-direction: column;
@@ -225,7 +217,6 @@
   }
 }
 
-/* ===== INPUT ===== */
 .auth-field__input-wrap {
   position: relative;
   display: flex;
@@ -310,7 +301,6 @@
   margin: 0;
 }
 
-/* ===== STATUS MESSAGES ===== */
 .auth-status {
   font-size: 0.8rem;
   font-weight: 400;
@@ -325,7 +315,6 @@
   color: rgba(100, 220, 150, 0.9);
 }
 
-/* ===== BUTTONS ===== */
 .auth-btn {
   display: inline-flex;
   align-items: center;
@@ -378,7 +367,6 @@
   }
 }
 
-/* ===== SOCIAL BUTTONS ===== */
 .auth-social {
   display: flex;
   flex-direction: column;
@@ -411,7 +399,6 @@
   }
 }
 
-/* ===== DIVIDER ===== */
 .auth-divider {
   display: flex;
   align-items: center;
@@ -432,7 +419,6 @@
   }
 }
 
-/* ===== PASSWORD RULES ===== */
 .auth-password-rules {
   display: flex;
   flex-direction: column;
@@ -446,7 +432,6 @@
   margin: 0;
 }
 
-/* ===== MODALS ===== */
 .auth-modal-backdrop {
   position: fixed;
   inset: 0;

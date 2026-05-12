@@ -216,9 +216,7 @@ export class CanvasGestureService {
     const pointer = this.getActivePageCanvasPoint(event);
     if (!pointer) return;
 
-    // For rotated elements, getLiveElementCanvasBounds returns the AABB (axis-aligned box),
-    // which gives wrong width/height for the rotation-aware resize algorithm.
-    // Use model-based bounds so we always work with the actual unrotated dimensions.
+    // getLiveElementCanvasBounds gives AABB for rotated elements; use model-based bounds for resize.
     const rotation = el.rotation ?? 0;
     const bounds =
       rotation !== 0
@@ -242,8 +240,7 @@ export class CanvasGestureService {
           this.editorState.currentPage(),
         ))
       : null;
-    // For fit-content axes on the parent, remove clamping so the child can grow freely.
-    // The parent will expand to fit its children; clamping to the old parent size is wrong.
+    // Fit-content parent expands to fit children; clamping to its old size is wrong.
     const parentAbsoluteBounds: typeof rawParentBounds =
       rawParentBounds && parentEl
         ? {
@@ -264,8 +261,7 @@ export class CanvasGestureService {
     this.beginGestureHistory();
     this.isDragging = false;
     this.isResizing.set(true);
-    // Seed stable bounds immediately so selectionOverlayBounds is correct on the very first
-    // CD cycle of the gesture (before markFlowBoundsCacheClean fires after ngAfterViewChecked).
+    // Seed stable bounds immediately so outline is correct on the first CD cycle.
     const resizeSnapshot = this.snapshotOverlaySceneBounds(el);
     this.stableSelectionBounds.set(
       resizeSnapshot ? { elementId: id, bounds: resizeSnapshot } : null,
@@ -628,11 +624,8 @@ export class CanvasGestureService {
       return;
     }
 
-    // Build snap candidates from the flow bounds cache (O(1) Map lookup per element) instead
-    // of live DOM reads (querySelector + getBoundingClientRect per element = O(n) DOM work on
-    // every pointer-move event). The cache holds scene-space bounds; we convert to canvas-space
-    // by subtracting the active page layout offset — same conversion as getLiveElementCanvasBounds.
-    // For elements not yet in the cache (e.g. off-screen) we fall back to getAbsoluteBounds.
+    // Snap from cached bounds (O(1) per element) instead of live DOM reads (O(n) per pointer-move);
+    // fall back to getAbsoluteBounds for uncached elements (e.g. off-screen).
     const snapLayout = this.page.activePageLayout();
     const snapLayoutX = snapLayout?.x ?? 0;
     const snapLayoutY = snapLayout?.y ?? 0;
@@ -966,18 +959,10 @@ export class CanvasGestureService {
       const resizedElements = els.map((el) => {
         if (el.id !== start.elementId) return el;
 
-        // Use the parent bounds captured at gesture start (live DOM) rather than
-        // recomputing from model. For flow children inside a flex/grid container,
-        // element.x/y is 0 (position is CSS-determined), so getAbsoluteBounds would
-        // return the wrong parent origin, corrupting both the clamping and the
-        // relative-position calculation below.
+        // Use gesture-start parent bounds: flow children have x/y=0, so getAbsoluteBounds gives wrong origin.
         const parentBounds = start.parentAbsoluteBounds;
 
-        // For flow children in layout containers, the element's canvas position can shift
-        // during resize due to flex/grid reflow (e.g. centered layouts shift the element
-        // left/right as its width changes). The gesture-start absoluteX/Y are then stale,
-        // causing the active edge to lag behind the cursor. Fix: read the current live DOM
-        // bounds each frame and anchor the resize from the element's actual current position.
+        // Read live DOM bounds each frame: flex reflow shifts the element's position during resize.
         let effectiveStart = this.resizeStart;
         if (!start.rotation && parentBounds !== null) {
           const parentEl = els.find((e) => e.id === el.parentId);

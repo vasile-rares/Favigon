@@ -166,7 +166,6 @@
   line-height: 1;
 }
 
-/* Submenu */
 .context-menu__submenu {
   position: absolute;
   left: calc(100% + 0.75rem);

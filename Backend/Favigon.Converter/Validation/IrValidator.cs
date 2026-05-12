@@ -94,11 +94,6 @@ public static class IrValidator
       ValidateNode(node.Children[i], $"{path}.children[{i}]", seenIds, errors, skipLayoutMath);
   }
 
-  /// <summary>
-  /// For a flex-row node whose width is a fixed px value, checks that the sum of all
-  /// children's px widths + gaps does not exceed the available inner width.
-  /// Only fires when ALL children have explicit px widths so the check is unambiguous.
-  /// </summary>
   private static void ValidateFlexRowMath(IRNode node, string path, List<string> errors)
   {
     if (node.Layout?.Mode != LayoutMode.Flex) return;

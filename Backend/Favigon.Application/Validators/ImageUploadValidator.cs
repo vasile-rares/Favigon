@@ -1,6 +1,6 @@
 using Favigon.Application.DTOs.Requests.Assets;
 
-namespace Favigon.Application.Helpers;
+namespace Favigon.Application.Validators;
 
 public static class ImageUploadValidator
 {

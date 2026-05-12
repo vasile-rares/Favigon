@@ -18,9 +18,7 @@ export class CanvasViewportService {
   readonly isSpacePressed = signal(false);
   readonly frameTemplate = signal({ width: 390, height: 844 });
 
-  // Escape hatch for bypassing Angular CD during pan/zoom. The canvas-page
-  // component registers a callback here that writes CSS custom properties
-  // directly to the host element style — no Angular binding, no CD cycle.
+  // Escape hatch: component registers callback to write CSS vars directly, bypassing CD.
   onUpdate?: () => void;
 
   notifyUpdate(): void {

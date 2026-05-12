@@ -124,14 +124,12 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  white-space: pre; /* overridden inline for fixed-width text elements */
+  white-space: pre;
   overflow-wrap: normal;
   text-indent: 0;
   caret-color: currentColor;
   cursor: text;
 }
-
-/* -- DOM Viewport -------------------------------------------- */
 
 .dom-bg {
   position: absolute;
@@ -188,8 +186,6 @@
   pointer-events: none;
   z-index: 10;
 }
-
-/* -- Page shells -------------------------------------------- */
 
 .page-shell-header {
   position: absolute;
@@ -325,8 +321,6 @@
   pointer-events: none;
   transition: opacity 0.08s ease;
 }
-
-/* -- Overlays ------------------------------------------------ */
 
 .parent-outline {
   position: absolute;
@@ -510,14 +504,11 @@
   background: white;
   border: 1.5px solid #3b82f6;
   border-radius: 50%;
-  /* left/top are set dynamically via [style] binding = cornerRadius * zoom - 4 */
   pointer-events: auto;
   cursor:
     url('/cursor-canvas.svg') 4 2,
     auto !important;
 }
-
-/* -- SVG drag-and-drop ---------------------------------------- */
 
 .canvas-container.svg-drag-over {
   outline: 2px dashed rgba(139, 92, 246, 0.7);
@@ -550,8 +541,6 @@
 .svg-drop-overlay__inner svg {
   opacity: 0.75;
 }
-
-/* -- File import toast ---------------------------------------- */
 
 .file-import-toast {
   position: absolute;
@@ -699,8 +688,6 @@
   }
 }
 
-/* -- Snap lines -------------------------------------------- */
-
 .snap-line {
   position: absolute;
   background: #ea47ff;
@@ -717,8 +704,6 @@
   height: 1px;
 }
 
-/* -- Draw / drag previews ---------------------------------- */
-
 .rect-draw-preview {
   position: absolute;
   background: rgba(224, 224, 224, 0.5);
@@ -733,8 +718,6 @@
   border-radius: 4px;
   pointer-events: none;
 }
-
-/* -- Resize size tooltip ----------------------------------- */
 
 .resize-tooltip {
   position: fixed;
@@ -753,7 +736,6 @@
   user-select: none;
 }
 
-/* ===== CUSTOM FRAME DIALOG ===== */
 .custom-frame-backdrop {
   position: fixed;
   inset: 0;
@@ -917,7 +899,6 @@
   }
 }
 
-/* ===== DELETE PAGE CONFIRM MODAL ===== */
 .page-delete-backdrop {
   position: fixed;
   inset: 0;

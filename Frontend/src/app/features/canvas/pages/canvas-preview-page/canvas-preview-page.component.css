@@ -20,8 +20,6 @@
   z-index: 30;
 }
 
-/* ── Social Actions (Like / Star) ────────────────────────── */
-
 .preview-social-actions {
   display: flex;
   align-items: center;
@@ -64,14 +62,12 @@
     }
   }
 
-  /* Like button active: pink */
   &:not(.preview-social-btn--star).preview-social-btn--active {
     color: #fb7185;
     border-color: rgba(251, 113, 133, 0.3);
     background: rgba(251, 113, 133, 0.08);
   }
 
-  /* Star button active: amber */
   &.preview-social-btn--star.preview-social-btn--active {
     color: #fbbf24;
     border-color: rgba(251, 191, 36, 0.3);
@@ -83,7 +79,6 @@
   line-height: 1;
 }
 
-/* Fork active: cyan-blue */
 .preview-social-btn--fork {
   color: #7dd3fc;
   border-color: rgba(125, 211, 252, 0.28);
@@ -102,8 +97,6 @@
   background: rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
 }
-
-/* ── Nav: Left Extra ─────────────────────────────────────── */
 
 .preview-nav-left {
   display: flex;
@@ -235,8 +228,6 @@
   }
 }
 
-/* ── Nav: Center ─────────────────────────────────────────── */
-
 .preview-nav-center {
   display: flex;
   align-items: center;
@@ -267,8 +258,6 @@
     color: var(--color-text-light, #f4f4f5);
   }
 }
-
-/* ── Address / Search Bar ────────────────────────────────── */
 
 .preview-address-bar {
   position: relative;
@@ -330,8 +319,6 @@
   }
 }
 
-/* ── Page Dropdown ───────────────────────────────────────── */
-
 .preview-page-dropdown {
   position: absolute;
   top: calc(100% + 6px);
@@ -376,8 +363,6 @@
     color: var(--color-text-light, #f4f4f5);
   }
 }
-
-/* ── Stage ───────────────────────────────────────────────── */
 
 .preview-stage {
   flex: 1;
@@ -426,8 +411,6 @@
   color: #fca5a5;
 }
 
-/* ── Viewport Wrapper (holds viewport + handles) ────────── */
-
 .preview-viewport-wrapper {
   position: relative;
   display: inline-flex;
@@ -441,8 +424,6 @@
   }
 }
 
-/* ── Viewport ────────────────────────────────────────────── */
-
 .preview-viewport {
   position: relative;
   background: white;
@@ -450,8 +431,6 @@
   overflow: hidden;
   max-width: 100%;
 }
-
-/* ── Iframe ──────────────────────────────────────────────── */
 
 .preview-iframe {
   width: 100%;
@@ -464,8 +443,6 @@
 .is-resizing .preview-iframe {
   pointer-events: none;
 }
-
-/* ── Resize Handles ──────────────────────────────────────── */
 
 .resize-handle {
   position: absolute;
@@ -516,8 +493,6 @@
   opacity: 0.7;
   background: var(--color-text-medium, #a1a1aa);
 }
-
-/* ── Responsive ──────────────────────────────────────────── */
 
 @media (max-width: 720px) {
   .preview-stage {

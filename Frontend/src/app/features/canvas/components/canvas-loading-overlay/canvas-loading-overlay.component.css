@@ -9,7 +9,6 @@
   overflow: hidden;
 }
 
-/* ── Panel ─────────────────────────────────────────────────── */
 .loading-panel {
   display: flex;
   flex-direction: column;
@@ -18,7 +17,6 @@
   width: 280px;
 }
 
-/* ── Logo ──────────────────────────────────────────────────── */
 .loading-logo {
   height: 40px;
   opacity: 0.9;
@@ -27,7 +25,6 @@
   filter: drop-shadow(0 0 18px rgba(13, 153, 255, 0.25));
 }
 
-/* ── Progress bar ──────────────────────────────────────────── */
 .loading-track {
   width: 100%;
   height: 4px;

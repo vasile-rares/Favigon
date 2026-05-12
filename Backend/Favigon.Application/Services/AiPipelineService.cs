@@ -15,12 +15,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Favigon.Application.Services;
 
-/// <summary>
-/// Orchestrates the three-phase AI design pipeline:
-///   Phase 1 — Analyzes the prompt → IntentBlueprint
-///   Phase 2 — Builds the layout wireframe → structural IRNode
-///   Phase 3 — Applies the design system → fully styled IRNode
-/// </summary>
 public sealed class AiPipelineService(
     IAiClient aiClient,
     IConfiguration configuration,
@@ -98,7 +92,7 @@ public sealed class AiPipelineService(
       AiPipelineRequest request,
       [EnumeratorCancellation] CancellationToken ct = default)
   {
-    // ── Phase 1 ────────────────────────────────────────────────────────────
+
     yield return PhaseStart(1, "Analyzing your request...");
 
     var (blueprint, intentError) = await Phase1IntentAsync(request, ct);
@@ -118,7 +112,7 @@ public sealed class AiPipelineService(
       yield break;
     }
 
-    // ── Phase 2 ────────────────────────────────────────────────────────────
+
     yield return PhaseStart(2, "Building page structure...");
 
     var (structure, structureError) = await Phase2StructureAsync(request, blueprint, ct);
@@ -138,7 +132,7 @@ public sealed class AiPipelineService(
       yield break;
     }
 
-    // ── Phase 3 ────────────────────────────────────────────────────────────
+
     yield return PhaseStart(3, "Applying design system...");
 
     var (styledIr, styleError) = await Phase3StyleAsync(request, blueprint, structure, ct);

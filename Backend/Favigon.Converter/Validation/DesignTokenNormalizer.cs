@@ -2,11 +2,6 @@ using Favigon.Converter.Models;
 
 namespace Favigon.Converter.Validation;
 
-/// <summary>
-/// Mechanically snaps AI-generated style values to the design token scale,
-/// eliminating random off-scale values before validation runs.
-/// Phase 1 of deterministic enforcement.
-/// </summary>
 public static class DesignTokenNormalizer
 {
   // Typography scale (px). Matches system prompt: 12 | 14 | 16 | 24 | 32 | 48 | 64
@@ -23,11 +18,6 @@ public static class DesignTokenNormalizer
   // so anything under 64px is safely a snap artifact, not a real layout bug.
   private const double AutoFixOverflowThreshold = 64.0;
 
-  /// <summary>
-  /// Normalizes the full node tree in-place.
-  /// Step 1: snap style values to token scale.
-  /// Step 2: fix small flex-row overflows caused by snapping, without needing AI repair.
-  /// </summary>
   public static void Normalize(IRNode root)
   {
     NormalizeNode(root);
@@ -35,12 +25,6 @@ public static class DesignTokenNormalizer
     FixFlexRowOverflows(root);
   }
 
-  /// <summary>
-  /// Enforces hard constraints on the root Frame that the AI frequently violates:
-  /// - Height MUST be fit-content (AI often sets 100px or other fixed values)
-  /// - Width MUST be 1280px
-  /// - No minHeight / maxHeight (collapsed or clipped pages)
-  /// </summary>
   private static void EnforceFrameConstraints(IRNode root)
   {
     if (root.Type != "Frame") return;
@@ -138,12 +122,6 @@ public static class DesignTokenNormalizer
     return best;
   }
 
-  /// <summary>
-  /// Recursively finds flex-row containers where all children have px widths
-  /// and the total exceeds the available inner width by at most <see cref="AutoFixOverflowThreshold"/>px.
-  /// Shrinks the widest child to close the gap — no AI call needed.
-  /// Overflows larger than the threshold are left for the validator to report to AI repair.
-  /// </summary>
   private static void FixFlexRowOverflows(IRNode node)
   {
     if (node.Layout?.Mode == LayoutMode.Flex &&

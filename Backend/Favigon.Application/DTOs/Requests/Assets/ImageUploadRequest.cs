@@ -1,4 +1,4 @@
-namespace Favigon.Application.Helpers;
+namespace Favigon.Application.DTOs.Requests.Assets;
 
 public record ImageUploadRequest(
     Stream Content,

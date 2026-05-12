@@ -1,4 +1,4 @@
-﻿:host {
+:host {
   --pp-compact-control-width: 136px;
   --pp-row-label-width: 80px;
   --pp-row-gap: 0.7rem;
@@ -23,7 +23,6 @@
   pointer-events: none;
 }
 
-/* â”€â”€ Panel shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .properties-panel {
   width: 100%;
   flex: 1;
@@ -37,8 +36,7 @@
   border-radius: 20px;
   font-size: var(--canvas-panel-font-size);
   background: var(--chrome-panel-background);
-  /* backdrop-filter is applied via ::before so that position:fixed descendants
-     (e.g. context menus) are not trapped inside this element's containing block */
+
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
   border: none;
@@ -76,7 +74,6 @@
   }
 }
 
-/* â”€â”€ Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .properties-panel-header {
   display: flex;
   flex-direction: column;
@@ -84,7 +81,6 @@
   flex-shrink: 0;
 }
 
-/* â”€â”€ Tabs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .properties-tabs {
   min-width: 0;
 }

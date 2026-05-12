@@ -1,4 +1,4 @@
-/* ===== HOST ===== */
+
 :host {
   display: block;
   position: relative;
@@ -16,7 +16,6 @@
   overflow-y: visible;
 }
 
-/* ===== WRAPPER ===== */
 .prf-wrap {
   position: relative;
   z-index: 1;
@@ -31,7 +30,6 @@
   user-select: none;
 }
 
-/* ===== LOADING / ERROR STATE ===== */
 .prf-state {
   min-height: calc(100vh - 55px);
   display: grid;
@@ -45,7 +43,6 @@
   }
 }
 
-/* ===== LOADING DOTS ===== */
 .prf-dots {
   display: inline-flex;
   gap: 7px;
@@ -82,7 +79,6 @@
   }
 }
 
-/* ===== HERO COVER ===== */
 .prf-cover {
   position: relative;
   display: flex;
@@ -102,7 +98,6 @@
   display: none;
 }
 
-/* === AVATAR === */
 .prf-ava {
   display: block;
   width: 110px;
@@ -115,7 +110,6 @@
   box-shadow: 0 0 50px 10px rgb(255 255 255 / 20%);
 }
 
-/* === IDENTITY === */
 .prf-identity {
   display: flex;
   flex-direction: column;
@@ -150,7 +144,6 @@
   max-width: 480px;
 }
 
-/* === STATS ROW === */
 .prf-stats-row {
   display: flex;
   align-items: stretch;
@@ -196,7 +189,6 @@
   color: #ff85d0;
 }
 
-/* === COVER FOOT === */
 .prf-cover-foot {
   display: flex;
   align-items: center;
@@ -259,7 +251,6 @@
   color: rgba(255, 255, 255, 0.54);
 }
 
-/* ===== PROJECTS SECTION ===== */
 .prf-section {
   padding: 2.5rem 0 4rem;
 }
@@ -270,7 +261,6 @@
   margin: 0 auto;
 }
 
-/* === TOOLBAR === */
 .prf-toolbar {
   display: flex;
   flex-direction: column;
@@ -306,7 +296,6 @@
   flex-wrap: wrap;
 }
 
-/* === SEARCH === */
 .prf-search {
   position: relative;
   display: flex;
@@ -379,7 +368,6 @@
   }
 }
 
-/* === FILTER PILLS === */
 .prf-pill-group {
   display: flex;
   align-items: stretch;
@@ -446,7 +434,6 @@
   }
 }
 
-/* === NEW PROJECT BUTTON === */
 .prf-new-btn {
   display: inline-flex;
   align-items: center;
@@ -469,7 +456,6 @@
   }
 }
 
-/* === ERROR BANNER === */
 .prf-err-banner {
   padding: 0.6rem 0.9rem;
   border-radius: 8px;
@@ -480,7 +466,6 @@
   margin-bottom: 1.5rem;
 }
 
-/* === SECTION STATE === */
 .prf-section-state {
   min-height: 280px;
   display: flex;
@@ -497,14 +482,12 @@
   }
 }
 
-/* ===== PROJECT GRID ===== */
 .prj-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
   gap: 1.1rem;
 }
 
-/* ===== PROJECT CARD ===== */
 .prj-card {
   position: relative;
   border-radius: 14px;
@@ -533,7 +516,6 @@
   opacity: 0.55;
 }
 
-/* === CARD VISUAL === */
 .prj-card-visual {
   position: relative;
   width: 100%;
@@ -555,7 +537,6 @@
   background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.02), transparent 60%);
 }
 
-/* === CARD BODY === */
 .prj-card-body {
   background-color: #111111;
   border-radius: 0 0 13px 13px;
@@ -674,7 +655,6 @@
   filter: drop-shadow(0 0 4px #ff85d088);
 }
 
-/* === STAR SAVE BUTTON (non-owner) === */
 .prj-card-star-btn {
   display: inline-flex;
   align-items: center;
@@ -711,7 +691,6 @@
   }
 }
 
-/* === CARD MORE MENU === */
 .prj-card-more {
   position: relative;
   flex-shrink: 0;
@@ -794,7 +773,6 @@
   margin: 0.25rem 0.3rem;
 }
 
-/* ===== PAGINATION ===== */
 .prj-pagination {
   display: flex;
   align-items: center;
@@ -858,7 +836,6 @@
   user-select: none;
 }
 
-/* ===== RENAME MODAL ===== */
 .prj-modal-backdrop {
   position: fixed;
   inset: 0;

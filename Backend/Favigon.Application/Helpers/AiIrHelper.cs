@@ -7,10 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Favigon.Application.Helpers;
 
-/// <summary>
-/// Shared utilities for parsing, validating, and normalising AI-generated IRNode JSON.
-/// Used by all pipeline phase services to avoid duplicating logic.
-/// </summary>
 internal static partial class AiIrHelper
 {
   internal static readonly JsonSerializerOptions JsonOptions = new()
@@ -92,10 +88,6 @@ internal static partial class AiIrHelper
     }
   }
 
-  /// <summary>
-  /// Gracefully handles null / non-object items the AI sometimes generates inside children arrays
-  /// instead of throwing JsonException and losing the entire design.
-  /// </summary>
   internal sealed class SafeIRNodeListConverter : JsonConverter<List<IRNode>>
   {
     public override List<IRNode> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

@@ -2,9 +2,6 @@ using System.Reflection;
 
 namespace Favigon.Converter.Schema;
 
-/// <summary>
-/// Loads the AI-facing IR JSON Schema from either filesystem (dev, hot reload) or embedded resource (prod).
-/// </summary>
 public static class IrSchemaLoader
 {
   private const string ResourceName = "Favigon.Converter.Schema.IrAiSchema.json";
@@ -12,9 +9,6 @@ public static class IrSchemaLoader
   // Cached for production — embedded resource never changes at runtime.
   private static string? _cachedEmbeddedSchema;
 
-  /// <summary>
-  /// Returns the IR AI Schema JSON string.
-  /// </summary>
   /// <param name="overridePath">
   /// Optional file path (absolute or relative to the current working directory).
   /// When set and the file exists, the schema is read from disk on every call,

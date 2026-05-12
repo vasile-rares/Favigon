@@ -239,14 +239,11 @@ export class CanvasPersistenceService {
     const loadingStartedAt = Date.now();
     const hideOverlay = () => {
       if (fromPreview) {
-        // Thumbnail was already captured on the initial canvas entry; skip re-capture.
         return;
       }
       const elapsed = Date.now() - loadingStartedAt;
       const remaining = Math.max(0, 1000 - elapsed);
-      // Wait for the minimum display time, then run html2canvas while the
-      // overlay is still fully visible. Only after the thumbnail is saved
-      // (or fails) do we start the fade-out animation.
+      // Wait for minimum display time, capture thumbnail while overlay is visible, then fade.
       setTimeout(() => {
         requestAnimationFrame(() => {
           this.captureAndPersistThumbnailThenHide();
@@ -346,7 +343,6 @@ export class CanvasPersistenceService {
             this.persistDesign();
           }, delay);
         } else {
-          // Max retries exceeded — give up; reset for the next user-triggered change.
           this.saveRetryCount = 0;
           this.hasQueuedDesignPersist = false;
         }
@@ -366,9 +362,7 @@ export class CanvasPersistenceService {
   }
 
   /**
-   * Runs html2canvas while the loading overlay is fully visible, saves the
-   * thumbnail, then starts the fade-out animation. This way the animation
-   * never starts before the thumbnail work is done.
+   * Capture thumbnail while overlay is fully opaque, then start fade.
    */
   private captureAndPersistThumbnailThenHide(): void {
     const startFade = () => {
@@ -393,10 +387,6 @@ export class CanvasPersistenceService {
       .finally(() => startFade());
   }
 
-  /**
-   * Called only in the rare case where the idle-thumbnail needs to be
-   * rescheduled (e.g. pointer was down during entry capture).
-   */
   private scheduleIdleThumbnail(): void {
     if (!Number.isInteger(this.projectIdAsNumber)) return;
     this.cancelIdleThumbnail();

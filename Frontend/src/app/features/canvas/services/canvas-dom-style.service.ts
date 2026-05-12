@@ -24,12 +24,8 @@ export type DomStyleMap = Record<string, string | null | undefined>;
 export class CanvasDomStyleService {
   private readonly elService = inject(CanvasElementService);
 
-  // WeakMap cache: keyed on element reference so entries are GC'd when elements are removed.
-  // Cache entry is invalidated automatically when the element or its direct parent gets a new
-  // object reference (which happens whenever they are modified via updateCurrentPageElements).
-  // Note: we cache page by its scalar viewport dimensions, NOT by page identity, because
-  // updateCurrentPageElements spreads a new page object on every mutation even when viewport
-  // dimensions are unchanged — causing constant cache misses if we used page reference.
+  // WeakMap keyed on element ref — invalidated automatically when element/parent gets new reference.
+  // Page cached by scalar dimensions, not reference, to survive the page-object spread on every mutation.
   private readonly _styleCache = new WeakMap<
     CanvasElement,
     {
@@ -102,9 +98,6 @@ export class CanvasDomStyleService {
       }
     }
 
-    // Stroke is rendered via a dedicated overlay div (last child of .canvas-el)
-    // that paints ABOVE children. See buildStrokeOverlayStyle() and canvas-dom-element template.
-
     // ── Corner Radius ─────────────────────────────────────
     {
       const effectiveRadius =
@@ -155,8 +148,6 @@ export class CanvasDomStyleService {
     }
 
     // ── Stroke / Border ──────────────────────────────────
-    // Real CSS border on the element: children are constrained to the content
-    // area inside the border (CSS box-model, box-sizing: border-box).
     if (element.type !== 'text' && element.stroke) {
       const strokeStyleCss = (element.strokeStyle ?? 'Solid').toLowerCase();
       if (hasPerSideStrokeWidths(element)) {
@@ -218,8 +209,6 @@ export class CanvasDomStyleService {
       style['margin'] = `${m.top}px ${m.right}px ${m.bottom}px ${m.left}px`;
     }
 
-    // Flex/grid child properties are applied in buildStyle (where parent is available).
-
     // ── Transform ─────────────────────────────────────────
     const transform = buildCanvasElementTransform(element);
     if (transform) style['transform'] = transform;
@@ -259,7 +248,6 @@ export class CanvasDomStyleService {
     }
 
     // ── Text color ────────────────────────────────────────
-    // Gradient on text is handled in buildTextContentStyle() via background-clip:text on the span.
     if (element.type === 'text' && element.fillMode !== 'gradient' && element.fill) {
       style['color'] = element.fill;
     }
@@ -305,11 +293,6 @@ export class CanvasDomStyleService {
       }
     }
 
-    // ── Cursor ────────────────────────────────────────────
-    if (element.cursor) {
-      style['cursor'] = element.cursor;
-    }
-
     return style;
   }
 
@@ -328,18 +311,13 @@ export class CanvasDomStyleService {
     const crossFill = mainIsWidth ? element.heightMode === 'fill' : element.widthMode === 'fill';
 
     if (mainFill) {
-      // Use flex: 1 1 0 semantics: set flex-basis to 0 so all fill siblings start from the
-      // same baseline before distributing available space via flex-grow. Without flex-basis: 0,
-      // flex-basis defaults to `auto` (content size), causing a fill item that contains
-      // children to receive more space than an empty sibling even though both have flex-grow: 1.
+      // flex-basis:0 so all fill siblings share space equally regardless of content size.
       if (mainIsWidth) {
         style['width'] = null;
         style['flex-grow'] = '1';
         style['flex-shrink'] = '1';
         style['flex-basis'] = '0px';
-        // Allow flex to compress below content width (enables text wrapping instead of overflow).
-        // Skip when an explicit minWidth constraint is set — buildElementStyle already applied
-        // it and min-width: 0 must not override it.
+        // min-width:0 allows shrink below content width; skip if explicit minWidth is set.
         if (element.minWidth == null) {
           style['min-width'] = '0';
         }
@@ -359,9 +337,7 @@ export class CanvasDomStyleService {
     }
 
     if (crossFill) {
-      // Remove the explicit cross-axis dimension so align-self: stretch takes effect.
-      // An explicit px value would override stretch, breaking fill when the parent's
-      // cross-axis size differs from the model-computed value (e.g. parent is itself fill).
+      // Remove explicit cross-axis size so align-self:stretch takes effect for fill children.
       if (mainIsWidth) style['height'] = null;
       else style['width'] = null;
       style['align-self'] = 'stretch';
@@ -391,21 +367,15 @@ export class CanvasDomStyleService {
     const pos = element.position;
     const isFlowPosition = !pos || pos === 'static' || pos === 'relative' || pos === 'sticky';
 
-    // Only treat as a flow child when the parent has layout (display) enabled.
-    // Root elements (no parent) and children of non-layout containers are always
-    // positioned absolutely using their stored x/y.
+    // Only flow children; root elements and non-layout container children use absolute x/y.
     if (isFlowPosition && parent?.display) {
-      // Let flex/grid control layout; 'relative' is neutral and allows z-index if needed.
       return { position: 'relative' };
     }
 
     const effectivePos = pos === 'fixed' ? 'fixed' : 'absolute';
     const style: DomStyleMap = { position: effectivePos };
 
-    // element.x/y is measured from the parent's outer edge (border-box origin).
-    // CSS left/top for position:absolute is measured from the parent's padding-box
-    // (inner border edge). Subtract the parent's border width so the stored
-    // coordinates remain outer-edge-based while CSS renders them correctly.
+    // x/y stored from outer edge; CSS left/top from padding-box — subtract parent border.
     const parentWidths = parent ? getStrokeWidths(parent) : null;
     style['left'] = `${element.x - (parentWidths?.left ?? 0)}px`;
     style['top'] = `${element.y - (parentWidths?.top ?? 0)}px`;
@@ -436,18 +406,12 @@ export class CanvasDomStyleService {
       'text-align': element.textAlign ?? 'left',
       'line-height': lineHeightValue,
       'letter-spacing': letterSpacingValue,
-      // For fit-content text, use white-space:pre so the browser never soft-wraps and the
-      // element always sizes to the text's natural width. For all other modes (fixed, fill,
-      // relative etc.) the width is constrained externally, so pre-wrap is correct and the
-      // text should break onto new lines.
+      // pre for fit-content (never wrap); pre-wrap for fixed/fill (break at bounds).
       'white-space': (element.widthMode ?? 'fixed') === 'fit-content' ? 'pre' : 'pre-wrap',
       'word-break': (element.widthMode ?? 'fixed') === 'fit-content' ? null : 'break-word',
-      // Constrain wrapping text to the container width so pre-wrap still breaks lines.
-      // Without this, align-items:flex-start lets the span expand to max-content,
-      // preventing wrapping for multi-line text with a bounded width.
+      // max-width on span prevents flex-start from expanding past container width.
       'max-width': (element.widthMode ?? 'fixed') === 'fit-content' ? null : '100%',
-      // Background fill applied here so it covers only the text content area,
-      // not any empty space below when the container is taller than the text.
+      // Background fill applied here so it covers only the text content area.
       ...(element.fillMode === 'gradient' && element.gradient
         ? {
             'background-color': 'transparent',

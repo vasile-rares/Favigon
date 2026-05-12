@@ -1,8 +1,6 @@
-﻿:host {
+:host {
   display: block;
 }
-
-/* ── Tab wrapper ────────────────────────────────────────── */
 
 .gen-tab {
   display: flex;
@@ -10,8 +8,6 @@
   gap: 0.65rem;
   background: transparent;
 }
-
-/* ── Card ───────────────────────────────────────────────── */
 
 .gen-card {
   display: flex;
@@ -44,8 +40,6 @@
   }
 }
 
-/* ── Kicker ─────────────────────────────────────────────── */
-
 .gen-kicker {
   margin: 0;
   font-size: 0.68rem;
@@ -55,8 +49,6 @@
   color: rgba(255, 255, 255, 0.38);
   line-height: 1;
 }
-
-/* ── Framework selector ─────────────────────────────────── */
 
 .gen-fw-grid {
   display: grid;
@@ -93,8 +85,6 @@
   box-shadow: inset 0 0 0 1.5px #ff85d0;
   color: #ff85d0;
 }
-
-/* ── Status indicator ───────────────────────────────────── */
 
 .gen-status {
   display: flex;
@@ -156,8 +146,6 @@
   background: #f87171;
 }
 
-/* ── Action buttons ─────────────────────────────────────── */
-
 .gen-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -207,8 +195,6 @@
   }
 }
 
-/* ── Code output card ───────────────────────────────────── */
-
 .gen-card__head {
   display: flex;
   align-items: flex-start;
@@ -238,8 +224,6 @@
   flex-shrink: 0;
   margin-top: 2px;
 }
-
-/* ── Icon buttons ───────────────────────────────────────── */
 
 .gen-icon-btn {
   display: inline-flex;
@@ -276,8 +260,6 @@
   box-shadow: inset 0 0 0 1px rgba(255, 133, 208, 0.5);
   color: #ff85d0;
 }
-
-/* ── File list ──────────────────────────────────────────── */
 
 .gen-file-list {
   display: flex;
@@ -379,8 +361,6 @@
   font-weight: 600;
 }
 
-/* ── Code shell ─────────────────────────────────────────── */
-
 .gen-code-shell {
   border-radius: 10px;
   overflow: hidden;
@@ -418,8 +398,6 @@
   flex-shrink: 0;
 }
 
-/* ── Pill button (small) ────────────────────────────────── */
-
 .gen-pill-btn {
   display: inline-flex;
   align-items: center;
@@ -444,8 +422,6 @@
   color: #fff;
 }
 
-/* ── Empty state icon ───────────────────────────────────── */
-
 .gen-empty-icon {
   display: inline-flex;
   align-items: center;
@@ -457,8 +433,6 @@
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.3);
 }
-
-/* ── IR Debug ───────────────────────────────────────────── */
 
 .generation-debug {
   display: flex;
@@ -481,8 +455,6 @@
     display: none;
   }
 }
-
-/* ── Code block (shared: panel + viewer) ────────────────── */
 
 .generation-code {
   margin: 0;
@@ -509,8 +481,6 @@
   background: rgba(5, 5, 7, 0.7);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
-
-/* ── Syntax tokens ──────────────────────────────────────── */
 
 .generation-code__content .token-comment {
   color: #94a3b8;
@@ -547,8 +517,6 @@
   color: #c4b5fd;
   font-weight: 600;
 }
-
-/* ── Code viewer dialog ─────────────────────────────────── */
 
 .gen-viewer-backdrop {
   position: fixed;
