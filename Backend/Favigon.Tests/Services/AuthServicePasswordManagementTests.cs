@@ -13,7 +13,6 @@ namespace Favigon.Tests.Services;
 public class AuthServicePasswordManagementTests
 {
   private readonly Mock<IUserRepository> _userRepo = new();
-  private readonly Mock<ILinkedAccountRepository> _linkedRepo = new();
   private readonly Mock<IGithubOAuthClient> _github = new();
   private readonly Mock<IGoogleOAuthClient> _google = new();
   private readonly Mock<IEmailSender> _email = new();
@@ -29,7 +28,6 @@ public class AuthServicePasswordManagementTests
 
     _sut = new AuthService(
       _userRepo.Object,
-      _linkedRepo.Object,
       _github.Object,
       _google.Object,
       _email.Object,

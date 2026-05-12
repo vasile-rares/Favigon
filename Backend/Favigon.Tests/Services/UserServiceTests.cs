@@ -11,7 +11,6 @@ namespace Favigon.Tests.Services;
 public class UserServiceTests
 {
   private readonly Mock<IUserRepository> _userRepo = new();
-  private readonly Mock<ILinkedAccountRepository> _linkedAccountRepo = new();
   private readonly Mock<IUserProfileImageStorage> _profileImageStorage = new();
   private readonly Mock<IProjectRepository> _projectRepo = new();
   private readonly Mock<IProjectAssetStorage> _projectAssetStorage = new();
@@ -23,7 +22,6 @@ public class UserServiceTests
   {
     _sut = new UserService(
       _userRepo.Object,
-      _linkedAccountRepo.Object,
       _profileImageStorage.Object,
       _projectRepo.Object,
       _projectAssetStorage.Object,
@@ -177,8 +175,8 @@ public class UserServiceTests
     _profileImageStorage
       .Setup(s => s.SaveImageAsync(7, It.IsAny<Stream>(), "avatar.png", "image/png", It.IsAny<CancellationToken>()))
       .ReturnsAsync("/user-profile-assets/7/new-image.png");
-    _linkedAccountRepo
-      .Setup(r => r.GetByUserIdAsync(7))
+    _userRepo
+      .Setup(r => r.GetLinkedAccountsByUserIdAsync(7))
       .ReturnsAsync(Array.Empty<LinkedAccount>());
     _mapper
       .Setup(m => m.Map<UserResponse>(It.IsAny<User>()))

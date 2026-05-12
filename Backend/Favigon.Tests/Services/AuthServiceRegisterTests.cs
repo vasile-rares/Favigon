@@ -13,7 +13,6 @@ namespace Favigon.Tests.Services;
 public class AuthServiceRegisterTests
 {
   private readonly Mock<IUserRepository> _userRepo = new();
-  private readonly Mock<ILinkedAccountRepository> _linkedRepo = new();
   private readonly Mock<IGithubOAuthClient> _github = new();
   private readonly Mock<IGoogleOAuthClient> _google = new();
   private readonly Mock<IEmailSender> _email = new();
@@ -28,7 +27,7 @@ public class AuthServiceRegisterTests
     var config = new MapperConfiguration(configExpr, NullLoggerFactory.Instance);
     _mapper = config.CreateMapper();
     _sut = new AuthService(
-        _userRepo.Object, _linkedRepo.Object,
+        _userRepo.Object,
         _github.Object, _google.Object,
         _email.Object, _mapper,
         TestConfiguration.Build(), _audit.Object);

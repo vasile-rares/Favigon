@@ -12,15 +12,12 @@ namespace Favigon.Tests.Controllers;
 public class ProjectsControllerTests
 {
   private readonly Mock<IProjectService> _projectService = new();
-  private readonly Mock<IProjectAssetService> _projectAssetService = new();
-  private readonly Mock<IBookmarkService> _bookmarkService = new();
-  private readonly Mock<ILikeService> _likeService = new();
   private readonly Mock<IProjectRepository> _projectRepository = new();
   private readonly ProjectsController _controller;
 
   public ProjectsControllerTests()
   {
-    _controller = new ProjectsController(_projectService.Object, _projectAssetService.Object, _bookmarkService.Object, _likeService.Object, _projectRepository.Object)
+    _controller = new ProjectsController(_projectService.Object, _projectRepository.Object)
     {
       ControllerContext = CreateControllerContext(userId: 1)
     };

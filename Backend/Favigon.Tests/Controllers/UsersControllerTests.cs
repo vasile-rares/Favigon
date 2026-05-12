@@ -12,13 +12,11 @@ namespace Favigon.Tests.Controllers;
 public class UsersControllerTests
 {
   private readonly Mock<IUserService> _userService = new();
-  private readonly Mock<IFollowService> _followService = new();
-  private readonly Mock<IBookmarkService> _bookmarkService = new();
   private readonly UsersController _controller;
 
   public UsersControllerTests()
   {
-    _controller = new UsersController(_userService.Object, _followService.Object, _bookmarkService.Object)
+    _controller = new UsersController(_userService.Object)
     {
       ControllerContext = CreateControllerContext(userId: 7)
     };
