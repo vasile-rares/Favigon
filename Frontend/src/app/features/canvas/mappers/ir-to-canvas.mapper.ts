@@ -37,7 +37,7 @@ import { resolveCanvasEffect } from '../utils/element/canvas-effect.util';
 import { parseCanvasTransformStyle } from '../utils/element/canvas-transform.util';
 
 const DEFAULT_POSITION = 24;
-const DEFAULT_FILL = '#e0e0e0';
+const DEFAULT_FILL = 'transparent';
 const DEFAULT_FRAME_FILL = '#3f3f46';
 const DEFAULT_IMAGE_RADIUS = 6;
 const DEFAULT_OPACITY = 1;
@@ -121,7 +121,7 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
   return {
     id: node.id,
     type: mappedType,
-    name: readOptionalStringProp(node.props, 'name'),
+    name: node.meta?.name ?? readOptionalStringProp(node.props, 'name'), // prefer descriptive name from AI meta
     x: readLength(node.position?.left, DEFAULT_POSITION),
     y: readLength(node.position?.top, DEFAULT_POSITION),
     width:
@@ -133,23 +133,37 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     minWidth: readOptionalLength(node.style?.minWidth),
     minWidthMode: readConstraintModeFromLength(node.style?.minWidth),
     minWidthSizingValue: readImportedConstraintValue(node.style?.minWidth),
-    maxWidth: readOptionalLength(node.style?.maxWidth),
-    maxWidthMode: readConstraintModeFromLength(node.style?.maxWidth),
+    // Drop fixed-px maxWidth on fill/relative elements — shows as unwanted "Fixed" constraint in UI
+    maxWidth:
+      node.style?.maxWidth?.unit === 'px' && importedWidthMode !== 'fixed'
+        ? undefined
+        : readOptionalLength(node.style?.maxWidth),
+    maxWidthMode:
+      node.style?.maxWidth?.unit === 'px' && importedWidthMode !== 'fixed'
+        ? undefined
+        : readConstraintModeFromLength(node.style?.maxWidth),
     maxWidthSizingValue: readImportedConstraintValue(node.style?.maxWidth),
     height:
-      importedHeightMode === 'fixed'
-        ? Math.max(
-            1,
-            readLength(
-              node.style?.height,
+      mappedType === 'text'
+        ? defaults.height // text always fit-content — ignore any fixed px from AI
+        : importedHeightMode === 'fixed'
+          ? Math.max(
+              1,
               readLength(
-                node.style?.minHeight?.unit === 'px' ? node.style?.minHeight : undefined,
-                defaults.height,
+                node.style?.height,
+                readLength(
+                  node.style?.minHeight?.unit === 'px' ? node.style?.minHeight : undefined,
+                  defaults.height,
+                ),
               ),
-            ),
-          )
-        : defaults.height,
-    heightMode: importedHeightMode === 'fixed' ? undefined : importedHeightMode,
+            )
+          : defaults.height,
+    heightMode:
+      mappedType === 'text'
+        ? 'fit-content' // text always fit-content
+        : importedHeightMode === 'fixed'
+          ? undefined
+          : importedHeightMode,
     heightSizingValue: readImportedSizeValue(node.style?.height, importedHeightMode),
     minHeight: readOptionalLength(node.style?.minHeight),
     minHeightMode: readConstraintModeFromLength(node.style?.minHeight),
@@ -178,7 +192,14 @@ function mapIRNodeToCanvasElement(node: IRNode): CanvasElement {
     cornerRadii,
     overflow:
       mappedType === 'frame' || mappedType === 'rectangle'
-        ? readOverflow(node.style?.overflow, 'clip')
+        ? (() => {
+            const ov = readOverflow(node.style?.overflow, 'visible');
+            // Never clip a flat container (no borderRadius) — child shadows would be cut off
+            if ((ov === 'clip' || ov === 'hidden') && !((cornerRadius ?? 0) > 0)) {
+              return 'visible';
+            }
+            return ov;
+          })()
         : undefined,
     fillMode: node.style?.gradient
       ? 'gradient'

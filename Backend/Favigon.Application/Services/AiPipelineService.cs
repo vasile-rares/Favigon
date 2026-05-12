@@ -233,10 +233,18 @@ public sealed class AiPipelineService(
 
     Section rules:
     - Every page MUST start with a Navbar (horizontal-bar) and end with a Footer (multi-column-footer).
-    - Landing page: Navbar → Hero (full-width-centered or two-column-split) → Features (card-grid-3) → [Testimonials] → CTA (full-width-centered) → Footer.
-    - Dashboard: Navbar (horizontal-bar) → Dashboard body (dashboard-sidebar).
-    - Auth: Navbar (horizontal-bar) → Form (form-centered) → Footer.
-    - Include only sections relevant to the specific request. Max 8 sections.
+    - Special layouts: Dashboard → dashboard-sidebar body. Auth → form-centered.
+    - For all other pages (landing, marketing, product, etc.): DO NOT follow a fixed template.
+      Think about what genuinely serves this specific product and audience:
+        • What does the visitor need to understand first? (Hero)
+        • What builds trust? (Testimonials, Social Proof, Case Studies)
+        • What drives conversion? (CTA, Pricing, Free Trial)
+        • What differentiates the product? (Features, Benefits, How It Works, Comparison)
+      Mix section types creatively — not every page needs Features + CTA. Use Pricing, FAQ,
+      How It Works, Benefits, Testimonials, or Social Proof when they fit the product.
+    - Hero layout: two-column-split when the product has a visual/screenshot/demo;
+      full-width-centered for bold value-proposition-first statements.
+    - Max 8 sections. Include only sections that genuinely earn their place.
 
     Output ONLY valid JSON — no explanation, no markdown, no code fences.
     """;
@@ -245,39 +253,50 @@ public sealed class AiPipelineService(
       AiPipelineRequest request,
       CancellationToken ct)
   {
-    string raw;
-    try
+    for (var attempt = 1; attempt <= 2; attempt++)
     {
-      raw = await aiClient.ChatCompletionAsync(IntentSystemPrompt, request.Prompt, request.Model, IntentSchema, ct);
+      string raw;
+      try
+      {
+        raw = await aiClient.ChatCompletionAsync(IntentSystemPrompt, request.Prompt, request.Model, null, ct);
+      }
+      catch (Exception ex)
+      {
+        logger.LogError(ex, "[Phase 1] AI call failed (attempt {Attempt}) for prompt: {Prompt}", attempt, request.Prompt);
+        return (null, "AI service is temporarily unavailable.");
+      }
+
+      logger.LogInformation("[Phase 1] Raw response attempt {Attempt} ({Length} chars): {Raw}",
+          attempt, raw.Length, raw[..Math.Min(raw.Length, 800)]);
+
+      var json = AiIrHelper.ExtractJson(raw);
+
+      IntentBlueprint? blueprint;
+      try
+      {
+        blueprint = JsonSerializer.Deserialize<IntentBlueprint>(json, AiIrHelper.JsonOptions);
+      }
+      catch (JsonException ex)
+      {
+        logger.LogError(ex, "[Phase 1] Failed to parse blueprint JSON (attempt {Attempt}): {Json}", attempt, json[..Math.Min(json.Length, 500)]);
+        if (attempt == 2) return (null, "AI returned an invalid intent blueprint.");
+        continue;
+      }
+
+      if (blueprint is null || blueprint.Sections.Count == 0)
+      {
+        logger.LogError("[Phase 1] Blueprint empty or missing sections (attempt {Attempt}). Raw: {Raw}", attempt, raw[..Math.Min(raw.Length, 800)]);
+        if (attempt == 2) return (null, "AI returned an empty intent blueprint.");
+        continue;
+      }
+
+      logger.LogInformation("[Phase 1] Blueprint OK: {PageType}, {Mood}, {Count} sections",
+          blueprint.PageType, blueprint.ColorMood, blueprint.Sections.Count);
+
+      return (blueprint, null);
     }
-    catch (Exception ex)
-    {
-      logger.LogError(ex, "[Phase 1] AI call failed for prompt: {Prompt}", request.Prompt);
-      return (null, "AI service is temporarily unavailable.");
-    }
 
-    logger.LogDebug("[Phase 1] Raw response ({Length} chars): {Raw}", raw.Length, raw[..Math.Min(raw.Length, 500)]);
-
-    var json = AiIrHelper.ExtractJson(raw);
-
-    IntentBlueprint? blueprint;
-    try
-    {
-      blueprint = JsonSerializer.Deserialize<IntentBlueprint>(json, AiIrHelper.JsonOptions);
-    }
-    catch (JsonException ex)
-    {
-      logger.LogError(ex, "[Phase 1] Failed to parse blueprint JSON: {Json}", json[..Math.Min(json.Length, 500)]);
-      return (null, "AI returned an invalid intent blueprint.");
-    }
-
-    if (blueprint is null || blueprint.Sections.Count == 0)
-      return (null, "AI returned an empty intent blueprint.");
-
-    logger.LogInformation("[Phase 1] Blueprint: {PageType}, {Mood}, {Count} sections",
-        blueprint.PageType, blueprint.ColorMood, blueprint.Sections.Count);
-
-    return (blueprint, null);
+    return (null, "AI returned an empty intent blueprint.");
   }
 
   // ── Phase 2: Structure ────────────────────────────────────────────────────────────
@@ -302,18 +321,21 @@ public sealed class AiPipelineService(
         Body:         fontSize 16px fontWeight 400 lineHeight {value:1.6,unit:"em"}  letterSpacing {value:0,unit:"em"}
         Label/Button: fontSize 14px fontWeight 600 lineHeight {value:1,unit:"em"}    letterSpacing {value:0.01,unit:"em"}
         Caption:      fontSize 12px fontWeight 400 lineHeight {value:1.4,unit:"em"}  letterSpacing {value:0,unit:"em"}
-    • Text node height = round(fontSize_px × lineHeight) + 4px:
-        Display→78px  H1→62px  H2→44px  H3→35px  Body→30px  Label→20px  Caption→21px
+    • Text node height: ALWAYS {value:0,unit:"fit-content"} — NEVER use fixed px for Text nodes.
     • style.color on Text nodes: "#0f172a" primary, "#64748b" muted, "#ffffff" on dark bg.
     • position.mode: "relative" on ALL child nodes — never omit.
     • meta.name: a descriptive label that clearly identifies the node type and role.
       Use names like "Hero Section", "Primary CTA Button", "Feature Card", "Nav Logo" — these
       are used by Phase 3 (style) to identify node roles and apply correct visual treatment.
-    • props.text: real, specific copy appropriate to the product/page type.
+    • props.text: write copy that is specific to THIS product, brand voice, and target audience.
+      Headlines must reflect the brand personality — avoid generic filler phrases like "Discover" or "Empower".
+      Use the brand name, domain vocabulary, and the primary CTA from the blueprint.
+      Every section’s text should feel written for this product, not copy-pasted from a generic template.
     • id: set to "1" on all nodes — will be reassigned automatically.
 
     ── WHAT NOT TO SET (FORBIDDEN — STYLE PHASE HANDLES THIS) ─────────────────────────
-    ✗ NO background on any Container or Frame — omit or use "#ffffff" on cards/surfaces only.
+    ✗ Grouping/wrapper containers (button groups, nav link wrappers, card grid wrappers, footer column wrappers): set background: "transparent" — do NOT omit it.
+    ✗ Only card-like containers (padded, visually isolated, with shadow) may use background: "#ffffff".
     ✗ NO shadows.
     ✗ NO borderRadius.
     ✗ NO overflow.
@@ -322,8 +344,11 @@ public sealed class AiPipelineService(
     ✗ NO backgroundImage (image placeholders are allowed).
     ✗ NO fontFamily — set only on Frame in Phase 3.
     ✗ NO border.
+    ✗ NO maxWidth, minWidth, maxHeight, or minHeight — use section padding for horizontal spacing instead.
 
     ── HEIGHT RULES ────────────────────────────────────────────────────────────────────
+    • Text nodes: ALWAYS {value:0,unit:"fit-content"}. NEVER calculate or guess a pixel height.
+      DO NOT use 20px, 24px, 36px, or any fixed value for text — this breaks layout.
     • fit-content {value:0,unit:"fit-content"}: sections, cards, forms, footers, any container with variable content.
     • Fixed px {value:N,unit:"px"}: navbar (64px), button (48px), image containers, hero rows (480–640px).
     • 100% fill: ONLY when parent has fixed px height. NEVER inside a fit-content parent.
@@ -333,11 +358,11 @@ public sealed class AiPipelineService(
     horizontal-bar: flex row, height 64px, padding {left:48px,right:48px}, align:center, justify:spaceBetween.
     full-width-centered: flex column, align:center, justify:center, padding {top:96px,bottom:96px,left:0,right:0}.
     two-column-split: height fixed (480–640px), flex row, gap:48px, padding {left:80px,right:80px}. Left col width=(viewportWidth-160-gap)/2, height:100%. Right col: remaining width, height:100%.
-    card-grid-3: section flex column gap:48px padding:96px 0. Inner wrapper maxWidth:1200px flex row wrap gap:32px. Card width:360px.
-    card-grid-2: similar but 2 cards, width:576px each.
-    card-grid-4: similar but 4 cards, width:264px each.
-    single-column: flex column, align:center, gap:32px, padding:80px 0.
-    multi-column-footer: flex row, justify:spaceBetween, padding {top:80px,bottom:80px,left:0,right:0}. Inner wrapper maxWidth:1200px.
+    card-grid-3: section flex column align:center gap:48px padding:{top:96px,right:80px,bottom:96px,left:80px}. Card grid wrapper: flex row wrap gap:32px width:100%. Card width:360px.
+    card-grid-2: same layout but 2 cards, width:576px each.
+    card-grid-4: same layout but 4 cards, width:264px each.
+    single-column: flex column, align:center, gap:32px, padding:{top:80px,right:80px,bottom:80px,left:80px}.
+    multi-column-footer: flex row, justify:spaceBetween, padding:{top:80px,right:80px,bottom:80px,left:80px}. No inner wrapper needed.
     dashboard-sidebar: flex row, height:fit-content. Sidebar width:240px. Main: fill remaining width.
     form-centered: flex column, align:center, padding:80px 0. Form card width:480px.
     testimonial-row: flex row, gap:32px, padding:80px 0. Testimonial card width:360px.
@@ -419,7 +444,16 @@ public sealed class AiPipelineService(
     sb.AppendLine();
     sb.AppendLine($"Page type: {blueprint.PageType}");
     sb.AppendLine($"Brand: {blueprint.BrandPersonality}");
+    sb.AppendLine($"Target audience: {blueprint.TargetAudience}");
+    sb.AppendLine($"Color mood: {blueprint.ColorMood}");
     sb.AppendLine($"Primary CTA text: \"{blueprint.PrimaryCta}\"");
+
+    if (request.ExistingIr is not null)
+    {
+      sb.AppendLine();
+      sb.AppendLine("Current design on canvas (modify or extend it as needed):");
+      sb.AppendLine(JsonSerializer.Serialize(request.ExistingIr, AiIrHelper.JsonOptions));
+    }
 
     return sb.ToString();
   }
@@ -455,7 +489,8 @@ public sealed class AiPipelineService(
     ✓ style.color (text color on nodes where it is wrong for the new background)
     ✓ style.shadows (add elevation to cards, navbar, buttons)
     ✓ style.borderRadius (cards, buttons, images, inputs)
-    ✓ style.overflow (add "hidden" on containers with borderRadius that clip content)
+    ✓ style.overflow — containers WITH borderRadius: set "hidden" to clip content properly.
+      Containers WITHOUT borderRadius (flat wrappers, grid wrappers, sections): set "visible" so child shadows are not clipped.
     ✓ style.cursor (add "pointer" on all clickable elements)
     ✓ style.border (add 2px border on secondary/outline buttons and form inputs)
     ✓ style.fontFamily — set ONLY on the root Frame node.
@@ -509,12 +544,14 @@ public sealed class AiPipelineService(
       shadows: [{inset:false,x:0,y:4,blur:16,spread:0,color:"rgba(0,0,0,0.08)"}].
 
     PRIMARY BUTTON (meta.name contains "Primary" and "Button" or "CTA"):
-      background: brand. color "#ffffff" on text. borderRadius: {value:8,unit:"px"}.
-      shadows: [{inset:false,x:0,y:2,blur:4,spread:0,color:"rgba(0,0,0,0.12)"}]. cursor: "pointer".
+      On light/white section backgrounds: background: brand, color "#ffffff" on text.
+      On gradient or dark section backgrounds (Hero, CTA with gradient, dark sections): background: "#ffffff", color: brand on text.
+      borderRadius: {value:8,unit:"px"}. shadows: [{inset:false,x:0,y:2,blur:4,spread:0,color:"rgba(0,0,0,0.12)"}]. cursor: "pointer".
 
-    SECONDARY / OUTLINE BUTTON (meta.name contains "Secondary" and "Button"):
-      background: "transparent". border: {width:{value:2,unit:"px"},color:brand,style:"solid"}.
-      color: brand on text. borderRadius: {value:8,unit:"px"}. cursor: "pointer".
+    SECONDARY / OUTLINE BUTTON (meta.name contains "Secondary" or "Outline"):
+      background: "transparent". borderRadius: {value:8,unit:"px"}. cursor: "pointer".
+      On light sections (Features, Pricing, Auth, white/light bg): border-color: brand, text color: brand.
+      On dark/colored sections (Hero gradient, CTA gradient, dark Footer): border-color: "#ffffff", text color: "#ffffff".
 
     IMAGE CONTAINERS (meta.name contains "Image" or "Thumbnail" or "Cover"):
       borderRadius: {value:12,unit:"px"}. overflow: "hidden".

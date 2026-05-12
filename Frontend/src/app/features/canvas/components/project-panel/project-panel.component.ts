@@ -207,6 +207,29 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     });
 
     effect(() => {
+      const selectedId = this.selectedElementId();
+      const elements = this.elements();
+      if (!selectedId || elements.length === 0) return;
+
+      // Build a quick parentId lookup
+      const parentMap = new Map<string, string | null>();
+      for (const el of elements) parentMap.set(el.id, el.parentId ?? null);
+
+      // Walk up the ancestor chain and expand any collapsed ancestor
+      let expanded = false;
+      let current = parentMap.get(selectedId) ?? null;
+      while (current !== null) {
+        if (this.collapsedLayers.has(current)) {
+          this.collapsedLayers.delete(current);
+          expanded = true;
+        }
+        current = parentMap.get(current) ?? null;
+      }
+
+      if (expanded) this.rebuildLayerEntriesByPage();
+    });
+
+    effect(() => {
       this.aiMessagesContainer();
       this.aiMessages();
       queueMicrotask(() => {
@@ -255,7 +278,7 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
     // Add a streaming assistant message
     const streamingMsg: AiChatMessage = {
       role: 'assistant',
-      content: '',
+      content: 'Analyzing your request...',
       isStreaming: true,
       timestamp: Date.now(),
     };
@@ -269,15 +292,15 @@ export class ProjectPanelComponent implements OnInit, OnDestroy {
       model: this.aiSelectedModel(),
     };
 
-    this.aiDesignService.generateDesignStream(
+    this.aiDesignService.generatePipelineStream(
       request,
       {
-        onChunk: (text) => {
+        onPhaseStart: (_phase, label) => {
           this.aiMessages.update((msgs) => {
             const updated = [...msgs];
             const last = updated[updated.length - 1];
             if (last?.isStreaming) {
-              updated[updated.length - 1] = { ...last, content: last.content + text };
+              updated[updated.length - 1] = { ...last, content: label };
             }
             return updated;
           });

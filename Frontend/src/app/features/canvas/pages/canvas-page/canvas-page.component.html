@@ -257,7 +257,7 @@
                   <div class="sel-corner-zone sel-corner-ne" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'ne')"></div>
                   <div class="sel-corner-zone sel-corner-sw" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'sw')"></div>
                   <div class="sel-corner-zone sel-corner-se" (pointerdown)="$event.stopPropagation(); onCornerZonePointerDown($event, selectedElementId()!, 'se')"></div>
-                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text' && showCornerRadiusHandle()) {
                     <div class="corner-radius-handle"
                       [style.left.px]="cornerRadiusHandleOffset() - 4"
                       [style.top.px]="cornerRadiusHandleOffset() - 4"
@@ -268,7 +268,7 @@
 
                   <div class="sel-handle sel-handle-n" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'n')"></div>
                   <div class="sel-handle sel-handle-s" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 's')"></div>
-                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text' && showCornerRadiusHandle()) {
                     <div class="corner-radius-handle"
                       [style.left.px]="cornerRadiusHandleOffset() - 4"
                       [style.top.px]="cornerRadiusHandleOffset() - 4"
@@ -279,7 +279,7 @@
 
                   <div class="sel-handle sel-handle-e" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'e')"></div>
                   <div class="sel-handle sel-handle-w" (pointerdown)="$event.stopPropagation(); onResizeHandlePointerDown($event, selectedElementId()!, 'w')"></div>
-                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text') {
+                  @if (selectedElement()?.type !== 'svg' && selectedElement()?.type !== 'text' && showCornerRadiusHandle()) {
                     <div class="corner-radius-handle"
                       [style.left.px]="cornerRadiusHandleOffset() - 4"
                       [style.top.px]="cornerRadiusHandleOffset() - 4"

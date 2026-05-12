@@ -513,7 +513,7 @@
 
 .ai-chat__message--user {
   align-self: flex-end;
-  background: linear-gradient(135deg, #1a8fff 0%, #0d7de6 100%);
+  background: #ff85d0;
   color: #fff;
   box-shadow: 0 2px 8px rgba(13, 153, 255, 0.25);
   border-bottom-right-radius: 0.25rem;

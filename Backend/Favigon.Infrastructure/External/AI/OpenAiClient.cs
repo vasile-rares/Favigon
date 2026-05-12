@@ -43,7 +43,7 @@ public class OpenAiClient : IAiClient
         new ChatMessage { Role = "user", Content = userMessage }
       ],
       Temperature = 0.7,
-      MaxCompletionTokens = 12000
+      MaxCompletionTokens = 32000
     };
 
     var response = await _httpClient.PostAsJsonAsync("v1/chat/completions", payload, ct);
@@ -81,7 +81,7 @@ public class OpenAiClient : IAiClient
         new ChatMessage { Role = "user", Content = userMessage }
       ],
       Temperature = 0.7,
-      MaxCompletionTokens = 12000,
+      MaxCompletionTokens = 32000,
       Stream = true
     };
 

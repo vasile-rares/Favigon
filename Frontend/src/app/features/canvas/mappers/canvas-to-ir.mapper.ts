@@ -516,13 +516,14 @@ function buildNodeStyle(element: CanvasElement): IRStyle {
       style.textWrap = 'balance';
     }
 
-    // For fixed-width text, ensure the browser wraps long lines — mirrors canvas behaviour.
+    // fit-content text expands to content width → no wrapping needed.
+    // fixed or fill text has a bounded width → must wrap, matching canvas renderer behaviour.
     const widthMode = element.widthMode ?? 'fixed';
-    if (widthMode === 'fixed') {
+    if (widthMode === 'fit-content') {
+      style.whiteSpace = 'pre';
+    } else {
       style.whiteSpace = 'pre-wrap';
       style.wordBreak = 'break-word';
-    } else {
-      style.whiteSpace = 'pre';
     }
     if (element.textDecorationLine) {
       style.textDecorationLine = element.textDecorationLine;

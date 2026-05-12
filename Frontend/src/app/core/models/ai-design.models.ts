@@ -17,6 +17,7 @@ export interface AiDesignResponse {
 
 export interface AiPipelineRequest {
   prompt: string;
+  existingIr?: IRNode;
   viewportWidth?: number;
   model?: string;
   /** 1 = intent only, 2 = intent + structure, 3 = full pipeline (default) */

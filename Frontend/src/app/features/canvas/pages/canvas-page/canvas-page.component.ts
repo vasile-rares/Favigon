@@ -197,6 +197,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return result;
   });
 
+  /** O(1) element-id → page-id index. Rebuilt only when pages/elements change. */
   private readonly elementPageIdMap = computed<ReadonlyMap<string, string>>(() => {
     const map = new Map<string, string>();
     for (const pg of this.pages()) {
@@ -228,24 +229,35 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly selectionOverlayBounds = computed<Bounds | null>(() => {
     const selected = this.selectedElement();
-    if (
-      !selected ||
-      selected.visible === false ||
-      this.gesture.isDraggingEl() ||
-      this.editingTextElementId()
-    )
-      return null;
-    void this.gesture.flowCacheVersion();
+    if (!selected || this.gesture.isDraggingEl() || this.editingTextElementId()) return null;
+    void this.gesture.flowCacheVersion(); // register reactive dependency
 
-    // Stable pre-gesture bounds prevent outline flicker during resize/rotate and teleport on flow children (x=0).
+    // Use stable bounds (captured after ngAfterViewChecked when DOM is fully settled) whenever
+    // they belong to the currently selected element. This covers two cases:
+    //
+    // • resize/rotate: model is updated every pointer-move frame. Live-DOM read during CD
+    //   is stale (child components haven't painted yet), causing the dirty/clean oscillation
+    //   that made the outline flicker/teleport for all element types.
+    //
+    // • dirty phase (e.g. property change from Design Tab): invalidateFlowBoundsCache fires,
+    //   dirty=true, getCachedOverlaySceneBounds uses model-based getAbsoluteBounds (wrong for
+    //   flow children where x=0). stableSelectionBounds still holds the last settled position,
+    //   so we use it to avoid the 1-frame teleport before markFlowBoundsCacheClean fires.
+    //
+    // The element ID guard prevents using stale bounds from a previously selected element.
     const stable = this.gesture.stableSelectionBounds();
     const stableBounds = stable?.elementId === selected.id ? stable.bounds : null;
 
     if (this.gesture.isRotating()) {
+      // Rotate: keep the pre-gesture AABB stable so the outline doesn't jump while the
+      // element visually spins (the CSS transform handles the visible rotation).
       return stableBounds ?? this.gesture.getCachedOverlaySceneBounds(selected);
     }
 
     if (this.gesture.isResizing()) {
+      // Resize: use the flow-bounds cache directly. With getCachedOverlaySceneBounds now
+      // always preferring real DOM cache over the model-based fallback (x=0 for flow
+      // children), this gives accurate bounds every frame without teleporting.
       return this.gesture.getCachedOverlaySceneBounds(selected);
     }
 
@@ -262,6 +274,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const s = this.selectedElement();
     const zoom = this.viewport.zoomLevel();
     const radius = s?.cornerRadius ?? 0;
+    // Clamp to half the shortest side so the handle never exits the element boundary
     const maxRadius = s ? Math.min(s.width, s.height) / 2 : Infinity;
     const clampedRadius = Math.min(radius, maxRadius);
     // Enforce a minimum of 8px so the handle never overlaps the NW corner resize handle
@@ -269,14 +282,19 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     return Math.max(clampedRadius * zoom, 8);
   });
 
+  readonly showCornerRadiusHandle = computed<boolean>(() => this.viewport.zoomLevel() >= 0.4);
+
   private getRotatedElementOverlayBounds(
     element: CanvasElement,
     elements: CanvasElement[],
     aabb: Bounds | null,
   ): Bounds | null {
     if (!aabb) return null;
+    // CSS transforms keep the transform-origin fixed; with default 50%/50%, AABB center
+    // equals the element center regardless of rotation, skew, or 3D transform.
     const centerX = aabb.x + aabb.width / 2;
     const centerY = aabb.y + aabb.height / 2;
+    // Model dimensions are correct (getAbsoluteBounds handles fill/relative sizing).
     const absolute = this.element.getAbsoluteBounds(
       element,
       elements,
@@ -333,16 +351,21 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
   readonly selectionOutlineDisplayBounds = computed<Bounds | null>(() => {
     const selected = this.selectedElement();
-    if (!selected || selected.visible === false) return null;
+    if (!selected) return null;
 
     if (!this.hasNonTrivialTransform(selected)) {
+      // No visual transform – use live-DOM-tracking bounds (accurate for flow/flex children).
       return this.selectionOverlayBounds();
     }
 
+    // Transformed element: skip live DOM (gives AABB), derive center from AABB then place
+    // model dimensions around it. This is correct even for flow children (x/y = 0).
     if (this.gesture.isDraggingEl() || this.editingTextElementId()) return null;
 
+    // Register reactive dependency so bounds update while isRotating() / isResizing().
     void this.gesture.flowCacheVersion();
 
+    // Use the same stable/cached/live strategy as selectionOverlayBounds.
     const stable = this.gesture.stableSelectionBounds();
     const stableBounds = stable?.elementId === selected.id ? stable.bounds : null;
 
@@ -350,6 +373,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     if (this.gesture.isRotating() || this.gesture.isFlowBoundsDirty()) {
       aabb = stableBounds ?? this.gesture.getCachedOverlaySceneBounds(selected);
     } else if (this.gesture.isResizing()) {
+      // Transformed elements: DOM AABB cache lags 1 RAF behind each model write → teleport.
+      // Model-based bounds are always synchronised with the current model state.
+      // • Pure rotation: model center = CSS transform-origin center (50%/50%) → exact.
+      // • Skew / scale / 3D: un-skewed rect at the correct model position → no teleport.
       aabb = this.gesture.getModelBasedOverlaySceneBounds(selected);
     } else {
       aabb =
@@ -357,7 +384,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
         this.gesture.getCachedOverlaySceneBounds(selected);
     }
 
-    // Pure 2D rotation: model-sized rotated box; AABB for skew/3D/scale.
+    // For pure 2D rotation: show model-sized rotated box (outline is rotated via CSS).
+    // For skew / 3D / scale: use the AABB directly so handles are never stretched/distorted.
     if (this.hasOnlyRotation(selected)) {
       return this.getRotatedElementOverlayBounds(selected, this.editorState.elements(), aabb);
     }
@@ -379,7 +407,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
         (wMode === 'fit-content' && hMode === 'fill')
       )
         return 'none';
+      // width is fit-content or fill → only height is manually sized
       if (wMode === 'fit-content' || wMode === 'fill') return 'ns';
+      // height is fit-content or fill → only width is manually sized
       if (hMode === 'fit-content' || hMode === 'fill') return 'ew';
       return 'all';
     }
@@ -412,17 +442,21 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     ) {
       return null;
     }
-    void this.gesture.flowCacheVersion();
+    void this.gesture.flowCacheVersion(); // register reactive dependency
     const pageId = this.findPageIdByElementId(hoveredId);
     if (!pageId) return null;
     const elements = this.getPageElementsById(pageId);
     const hovered = this.element.findElementById(hoveredId, elements);
     if (!hovered || hovered.type === 'frame') return null;
-    if (hovered.visible === false) return null;
 
-    // Suppress hover on selected element's direct parent to avoid ghost outline.
+    // Suppress hover outline on direct parent containers of any selected element.
+    // Without this, the parent layout container (type 'rectangle') renders its hover
+    // outline on top of the selected child — visible as a ghost rectangle after rotate.
     if (this.selectedElements().some((sel) => sel.parentId === hoveredId)) return null;
 
+    // For transformed elements, live DOM gives the AABB.
+    // Pure 2D rotation: derive model-sized rotated box (outline rotated via CSS).
+    // Skew / 3D / scale: use AABB directly so the hover outline is never distorted.
     if (this.hasNonTrivialTransform(hovered)) {
       const aabb = this.gesture.isFlowBoundsDirty()
         ? this.gesture.getCachedOverlaySceneBounds(hovered)
@@ -434,7 +468,8 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return aabb;
     }
 
-    // dirty → cached bounds; clean → live DOM.
+    // Same two-pass strategy as selectionOverlayBounds:
+    // dirty → cached bounds (avoids stale DOM); clean → live DOM (accurate after render).
     if (this.gesture.isFlowBoundsDirty()) {
       return this.gesture.getCachedOverlaySceneBounds(hovered);
     }
@@ -552,18 +587,27 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
   constructor() {
     this.canvasPersistenceService.initialize(this.projectSlug);
 
+    // Wire gesture service to canvas DOM
     this.gesture.setCanvasElementGetter(
       () => document.querySelector('.canvas-container') as HTMLElement | null,
     );
 
+    // Invalidate gesture service flow bounds cache whenever elements change.
     effect(() => {
       this.elements();
       this.gesture.invalidateFlowBoundsCache();
     });
 
+    // Wire viewport CSS vars — this callback runs outside Angular's reactive
+    // graph so signal writes during pan/zoom don't schedule CD cycles.
     this.viewport.onUpdate = () => this.applyViewportCssVars();
-    this.applyViewportCssVars();
+    this.applyViewportCssVars(); // populate initial values
 
+    // Sync dot-grid CSS vars so the glow mask can align with the dots.
+    // (Moved to applyViewportCssVars so it runs alongside transform updates,
+    //  avoiding the reactive effect that was triggered on every pan frame.)
+
+    // Animate custom frame modal with settings-page pattern.
     effect(() => {
       if (this.page.isCustomFrameDialogOpen()) {
         this.showCustomFrameDialog.set(true);
@@ -584,6 +628,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       }
     });
 
+    // Animate toast in with GSAP when it first appears.
     effect(() => {
       const toast = this.fileImportToast();
       if (toast && this.wasToastNull) {
@@ -609,7 +654,12 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.page.setCanvasElement(this.getCanvasElement());
     this.canvasPersistenceService.restorePendingInitialPageFocus();
 
-    // textContent set synchronously; focus/caret deferred to avoid Zone.js mid-CD focus events.
+    // Populate the inline text editor with the element's existing text on the
+    // first CD cycle after the @if block creates the contenteditable div.
+    // textContent is set synchronously so the browser paints it on the first frame.
+    // focus + caret are deferred to setTimeout(0) so they don't run inside the
+    // Angular CD cycle — calling focus() synchronously here can trigger Zone.js
+    // focus events mid-cycle, causing an extra CD pass that resets the editor view.
     const editingId = this.editingTextElementId();
     if (editingId && editingId !== this.textEditorInitializedId) {
       const editor = document.querySelector(
@@ -637,7 +687,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       this.textEditorInitializedId = null;
     }
 
-    // rAF in invalidateFlowBoundsCache() handles refresh; no work needed here.
+    // Flow bounds cache is now refreshed in requestAnimationFrame inside
+    // invalidateFlowBoundsCache() (canvas-gesture.service.ts), so no work is
+    // needed here. The rAF fires after Angular paints, giving the same settled-DOM
+    // guarantee as the previous setTimeout(0) + ngAfterViewChecked approach but
+    // throttled to ≤60 refreshes/s regardless of pointermove frequency.
   }
 
   ngOnDestroy(): void {
@@ -790,6 +844,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
+    // kind === 'image'
     if (!Number.isInteger(this.canvasPersistenceService.projectIdAsNumber)) {
       this.showFileToast('error', 'Save the project first');
       return;
@@ -1016,6 +1071,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
 
+    // Exit text editing if clicking a different element
     const editingId = this.editingTextElementId();
     if (editingId && editingId !== id) {
       this.gesture.finalizeTextEditing(editingId);
@@ -1087,6 +1143,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     this.gesture.captureDragSelection(id);
     const isGroupDrag = this.gesture.getDragSelectionCount() > 1;
 
+    // Detect flow child inside layout container — use visual position from cache
     const parent = this.element.findElementById(element.parentId ?? null, this.elements());
     if (
       !isGroupDrag &&
@@ -1604,7 +1661,9 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       return;
     }
     event.preventDefault();
-    // Outside zone: CSS vars callback handles visuals without triggering CD.
+    // Run outside Angular zone so wheel-triggered signal writes don't schedule
+    // a full change-detection cycle. The CSS vars callback (onUpdate) handles
+    // the visual update synchronously.
     this.ngZone.runOutsideAngular(() => {
       this.viewport.handleWheel(event, canvas.getBoundingClientRect());
     });
@@ -1654,9 +1713,11 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
 
         if (this.pinchStartDist > 0) {
           const scale = dist / this.pinchStartDist;
+          // setZoom already calls notifyUpdate()
           this.viewport.setZoom(this.pinchStartZoom * scale, this.pinchCenter);
         }
 
+        // Pan: translate by the delta of the midpoint
         const dx = center.x - this.pinchLastCenter.x;
         const dy = center.y - this.pinchLastCenter.y;
         if (dx !== 0 || dy !== 0) {
@@ -1684,6 +1745,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     const newElements = buildCanvasElementsFromIR(ir);
     if (newElements.length === 0) return;
 
+    // Remap IDs to guarantee uniqueness
     const idMap = new Map(newElements.map((el) => [el.id, crypto.randomUUID()]));
     const remapped = newElements.map((el) => ({
       ...el,
@@ -1691,7 +1753,10 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       parentId: el.parentId ? (idMap.get(el.parentId) ?? el.parentId) : el.parentId,
     }));
 
-    // Normalize elements in document order so parent sizes are resolved before children.
+    // Normalize every element so fill/relative sizes are resolved to pixels,
+    // sizing modes are validated, and text properties are sanitized.
+    // Must iterate in document order (parents before children) so parent sizes
+    // are already resolved when children run.
     for (const el of remapped) {
       mutateNormalizeElement(el, remapped);
     }
@@ -2114,6 +2179,7 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     s.setProperty('--vp-zoom', `${zoom}`);
     const bgSize = this.viewport.canvasBackgroundSize();
     s.setProperty('--vp-bg-size', bgSize);
+    // Keep dot-grid vars in sync (used by the glow-mask overlay in CSS).
     s.setProperty('--dot-size', bgSize);
     s.setProperty('--dot-pos', this.viewport.canvasBackgroundPosition());
   }

@@ -137,7 +137,8 @@ export class CanvasPreviewPage {
     for (const frame of rootFrames) {
       // frame.width is already border-box (content + padding)
       const w = Math.round(frame.width);
-      const h = Math.round(frame.height);
+      // fit-content frames store a placeholder height — default to 720 so preview starts at a usable size
+      const h = frame.heightMode === 'fit-content' ? 720 : Math.round(frame.height);
       options.push({ label: frame.name || `Frame ${w}×${h}`, width: w, height: h });
     }
 
@@ -192,7 +193,7 @@ export class CanvasPreviewPage {
 <link href="${GOOGLE_FONTS_URL}" rel="stylesheet">
 <style>
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
-body { overflow: auto; }
+body { overflow-x: hidden; overflow-y: auto; }
 a { text-decoration: none; color: inherit; }
 ${css}
 </style>

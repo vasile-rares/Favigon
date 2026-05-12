@@ -428,10 +428,9 @@ public class AuthService : IAuthService
         await _userRepository.UpdateLinkedAccountAsync(existingProvider);
       }
 
-      // Only refresh the profile picture from OAuth if the user hasn't uploaded a custom one
-      var hasCustomAvatar = !string.IsNullOrWhiteSpace(linkedUser.ProfilePictureUrl)
-        && linkedUser.ProfilePictureUrl.Contains("/avatar/", StringComparison.OrdinalIgnoreCase);
-      if (!hasCustomAvatar && !string.IsNullOrWhiteSpace(profilePictureUrl) && linkedUser.ProfilePictureUrl != profilePictureUrl)
+      // Only set the profile picture if the user doesn't already have one
+      // (avoids overwriting a GitHub avatar when logging in via Google, or vice-versa)
+      if (string.IsNullOrWhiteSpace(linkedUser.ProfilePictureUrl) && !string.IsNullOrWhiteSpace(profilePictureUrl))
       {
         linkedUser.ProfilePictureUrl = profilePictureUrl;
         await _userRepository.UpdateAsync(linkedUser);

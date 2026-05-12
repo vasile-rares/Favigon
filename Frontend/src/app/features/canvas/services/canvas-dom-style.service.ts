@@ -94,7 +94,12 @@ export class CanvasDomStyleService {
       } else if (element.fillMode === 'gradient' && element.gradient) {
         style['background'] = gradientToCss(element.gradient);
       } else if (element.fill) {
-        style['background-color'] = element.fill;
+        const fillStr = element.fill;
+        if (fillStr.startsWith('linear-gradient') || fillStr.startsWith('radial-gradient')) {
+          style['background'] = fillStr;
+        } else {
+          style['background-color'] = fillStr;
+        }
       }
     }
 

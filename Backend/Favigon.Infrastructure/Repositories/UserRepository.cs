@@ -115,7 +115,9 @@ public class UserRepository : IUserRepository
   // ── Linked Accounts ────────────────────────────────────────────────────────
 
   public Task<LinkedAccount?> GetLinkedAccountByProviderAsync(string provider, string providerUserId)
-    => _context.LinkedAccounts.FirstOrDefaultAsync(a => a.Provider == provider && a.ProviderUserId == providerUserId);
+    => _context.LinkedAccounts
+      .Include(a => a.User)
+      .FirstOrDefaultAsync(a => a.Provider == provider && a.ProviderUserId == providerUserId);
 
   public Task<IReadOnlyList<LinkedAccount>> GetLinkedAccountsByUserIdAsync(int userId)
     => _context.LinkedAccounts

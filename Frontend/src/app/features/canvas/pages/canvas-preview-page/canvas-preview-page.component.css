@@ -367,7 +367,8 @@
 .preview-stage {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   padding: 1.5rem;
   display: flex;
   justify-content: center;
