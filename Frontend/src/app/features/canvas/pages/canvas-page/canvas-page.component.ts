@@ -61,7 +61,6 @@ import {
   Point,
   Bounds,
   HistorySnapshot,
-  CanvasPageLayout,
   FlowDragRenderState,
 } from '../../canvas.types';
 import { CanvasViewportService } from '../../services/canvas-viewport.service';
@@ -88,18 +87,7 @@ import { firstValueFrom } from 'rxjs';
 import gsap from 'gsap';
 import { gsapFadeIn, gsapFadeOut } from '../../../../shared/utils/gsap-animations.util';
 
-const ROOT_FRAME_INSERT_GAP = 48;
-const ELEMENT_DRAG_START_THRESHOLD = 3;
-const CONTAINER_DROP_TOLERANCE = 4;
 const DEFAULT_PROJECT_PANEL_WIDTH = 280;
-type RectangleDrawTool = 'rectangle' | 'image';
-
-interface RectangleDrawState {
-  tool: RectangleDrawTool;
-  startPoint: Point;
-  currentPoint: Point;
-  containerId: string | null;
-}
 
 @Component({
   selector: 'app-canvas-page',
@@ -2409,30 +2397,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
     });
   }
 
-  private flipHorizontal(elementId: string): void {
-    this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) =>
-        elements.map((el) => {
-          if (el.id !== elementId) return el;
-          const currentScale = el.scaleX ?? 1;
-          return { ...el, scaleX: currentScale === -1 ? 1 : -1 };
-        }),
-      );
-    });
-  }
-
-  private flipVertical(elementId: string): void {
-    this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) =>
-        elements.map((el) => {
-          if (el.id !== elementId) return el;
-          const currentScale = el.scaleY ?? 1;
-          return { ...el, scaleY: currentScale === -1 ? 1 : -1 };
-        }),
-      );
-    });
-  }
-
   // ── Private: Callback Builders ────────────────────────────
 
   private buildKeyboardCallbacks(): KeyboardActionCallbacks {
@@ -2512,8 +2476,6 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       bringToFront: (id) => this.bringToFront(id),
       sendToBack: (id) => this.sendToBack(id),
       moveToPage: (id, pageId) => this.moveToPage(id, pageId),
-      flipHorizontal: (id) => this.flipHorizontal(id),
-      flipVertical: (id) => this.flipVertical(id),
       rename: (id) => {
         window.dispatchEvent(new CustomEvent('canvas:rename-request', { detail: { id } }));
       },
@@ -2527,15 +2489,5 @@ export class CanvasPage implements OnDestroy, AfterViewChecked {
       },
       setAsPrimary: (id) => this.gesture.setPrimaryFrame(id),
     };
-  }
-
-  private setPrimaryFrame(elementId: string): void {
-    this.runWithHistory(() => {
-      this.updateCurrentPageElements((elements) =>
-        elements.map((el) =>
-          el.type === 'frame' && !el.parentId ? { ...el, isPrimary: el.id === elementId } : el,
-        ),
-      );
-    });
   }
 }

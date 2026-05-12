@@ -10,8 +10,6 @@ export interface ContextMenuActionCallbacks {
   bringToFront: (elementId: string) => void;
   sendToBack: (elementId: string) => void;
   moveToPage: (elementId: string, targetPageId: string) => void;
-  flipHorizontal: (elementId: string) => void;
-  flipVertical: (elementId: string) => void;
   rename: (elementId: string) => void;
   toggleVisibility: (elementId: string) => void;
   setAsPrimary: (elementId: string) => void;
