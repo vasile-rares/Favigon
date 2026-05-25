@@ -1,7 +1,7 @@
 # Favigon ![Angular](https://img.shields.io/badge/Angular-20-DD0031?style=flat&logo=angular&logoColor=white) ![.NET](https://img.shields.io/badge/.NET-9-512BD4?style=flat&logo=dotnet&logoColor=white) ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat&logo=postgresql&logoColor=white) ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white)
 
-**Favigon** is a full-stack **AI-assisted design-to-code platform** built for creating, editing, sharing, and exporting web page designs.
-It combines a visual canvas editor, a social/explore layer, and a conversion engine that can turn structured design data into **HTML**, **React**, or **Angular** output.
+**Favigon** is a full-stack **web creation and discovery platform** built with Angular and ASP.NET Core.
+It combines a visual site editor, public project sharing and explore features, plus AI-assisted generation and export to **HTML**, **React**, or **Angular**.
 
 ![Showcase](./.github/docs/showcase_poster.jpg)
 
@@ -9,11 +9,11 @@ It combines a visual canvas editor, a social/explore layer, and a conversion eng
 
 ## Highlights ✨
 
-- **Visual canvas editor** for building page layouts, editing properties, previewing pages, and persisting design state.
+- **Visual site editor** for building page layouts, editing properties, previewing pages, and persisting design state.
+- **Discovery and sharing features** like public profiles, explore feed, trending projects, likes, stars, follows, and forks.
 - **AI-assisted generation** with direct prompt-based design generation and a **3-phase pipeline**:
   intent -> structure -> style.
-- **Design-to-code export** for **HTML**, **React**, and **Angular**, including multi-page output support.
-- **Social product features** like public profiles, explore feed, trending projects, likes, stars, follows, and forks.
+- **Code export** for **HTML**, **React**, and **Angular**, including multi-page output support.
 - **Production-oriented backend** with layered architecture, JWT auth from cookies, refresh tokens, email-based 2FA, rate limiting, and structured logging.
 - **Containerized deployment path** with PostgreSQL, ASP.NET Core API, Angular frontend served through Nginx, and optional Cloudflare tunnel integration.
 
@@ -29,7 +29,7 @@ It combines a visual canvas editor, a social/explore layer, and a conversion eng
 - Project likes, stars, views, forks, and public previews
 - Explore page with trending projects, recommended projects, and suggested people
 
-### Canvas & Generation
+### Creation & Canvas
 
 - Standalone Angular canvas experience with feature-scoped services and signal-heavy state management
 - Project design persistence plus thumbnail and asset uploads
@@ -255,13 +255,14 @@ GitHub Actions are already configured:
 
 Favigon sits at the intersection of:
 
-- visual editing tools
+- web creation tools
+- social discovery for creative projects
+- visual editing
 - AI-assisted UI generation
 - design system reasoning
 - code generation
-- social discovery features for creative work
 
-It is both a product experiment and a technical portfolio project focused on solving the path from **idea -> design -> code** inside one system.
+It is both a product experiment and a technical portfolio project focused on helping people **create, share, discover, and export** web projects inside one system.
 
 ## Contributing
 
