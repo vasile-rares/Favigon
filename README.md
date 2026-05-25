@@ -7,7 +7,7 @@ It combines a visual canvas editor, a social/explore layer, and a conversion eng
 
 ---
 
-## Highlights
+## Highlights ✨
 
 - **Visual canvas editor** for building page layouts, editing properties, previewing pages, and persisting design state.
 - **AI-assisted generation** with direct prompt-based design generation and a **3-phase pipeline**:
@@ -17,7 +17,7 @@ It combines a visual canvas editor, a social/explore layer, and a conversion eng
 - **Production-oriented backend** with layered architecture, JWT auth from cookies, refresh tokens, email-based 2FA, rate limiting, and structured logging.
 - **Containerized deployment path** with PostgreSQL, ASP.NET Core API, Angular frontend served through Nginx, and optional Cloudflare tunnel integration.
 
-## Feature Overview
+## Feature Overview 🧩
 
 ### Product Features
 
@@ -46,7 +46,7 @@ It combines a visual canvas editor, a social/explore layer, and a conversion eng
 - Multi-page export support
 - Responsive breakpoint diff generation inside the converter engine
 
-## Tech Stack
+## Tech Stack 🛠️
 
 ### Frontend
 
@@ -71,7 +71,7 @@ It combines a visual canvas editor, a social/explore layer, and a conversion eng
 - **Cloudflare Tunnel**
 - **OpenAI API**
 
-## Architecture
+## Architecture 🏗️
 
 The repository is split into a frontend app and a layered .NET backend:
 
@@ -119,7 +119,7 @@ Main API areas:
 - `api/ai` - design generation and streaming AI pipeline endpoints
 - `api/converter` - validation and code generation endpoints
 
-## Local Development
+## Local Development 🚀
 
 ### Prerequisites
 
@@ -186,7 +186,7 @@ The application seeds a few users automatically. The main default accounts are:
 
 Additional demo profiles are also seeded for explore/social flows.
 
-## Docker Setup
+## Docker Setup 🐳
 
 The root `docker-compose.yml` defines:
 
@@ -209,7 +209,7 @@ Important notes:
 - The `cloudflared` service requires a valid `CLOUDFLARE_TUNNEL_TOKEN`.
 - Compose also expects `POSTGRES_USER` and `POSTGRES_PASSWORD` in the environment.
 
-## Testing
+## Testing ✅
 
 ### Backend
 
@@ -251,7 +251,7 @@ GitHub Actions are already configured:
 - **CD** builds and pushes container images to **GHCR**
 - production deployment workflow is scaffolded, but currently disabled
 
-## Why This Project
+## Why This Project 💡
 
 Favigon sits at the intersection of:
 
