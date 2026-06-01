@@ -10,9 +10,9 @@ Rezultatul este o aplicație în care modulele sunt diferite ca rol, dar strâns
 
 \section{Rutare și pornirea aplicației frontend}
 
-Pe partea de client, aplicația este configurată prin \texttt{ApplicationConfig}, folosind \texttt{provideRouter}, \texttt{provideHttpClient} cu interceptori și \texttt{provideAnimations}. Această alegere este în linie cu stilul modern Angular bazat pe componente standalone. Din punct de vedere practic, ea reduce necesitatea unor module centrale voluminoase și face mai clară relația dintre rutare, infrastructura HTTP și comportamentul global al aplicației.
+Configurația frontend-ului este definită în \texttt{ApplicationConfig}, prin \texttt{provideRouter}, \texttt{provideHttpClient} cu interceptori și \texttt{provideAnimations}. Alegerea este în linie cu stilul modern Angular bazat pe componente standalone. Din punct de vedere practic, ea reduce nevoia unor module centrale voluminoase și face mai clară relația dintre rutare, infrastructura HTTP și comportamentul global al aplicației.
 
-Un detaliu util este activarea \texttt{provideZoneChangeDetection} cu \texttt{eventCoalescing}. Pentru un produs cu editor vizual, acest tip de optimizare este relevant deoarece reduce numărul de actualizări declanșate de evenimente succesive și ajută la păstrarea unei interfețe mai fluide în scenarii de drag, selecție sau input repetat.
+Un alt detaliu util este activarea \texttt{provideZoneChangeDetection} cu \texttt{eventCoalescing}. Pentru un produs cu editor vizual, optimizarea este relevantă deoarece reduce numărul de actualizări declanșate de evenimente succesive și ajută la păstrarea unei interfețe mai fluide în scenarii de drag, selecție sau input repetat.
 
 Rutarea este organizată astfel încât paginile principale să fie încărcate lazy și protejate diferențiat. Ruta rădăcină nu trimite utilizatorul într-o pagină statică, ci încearcă să încarce utilizatorul curent și redirecționează dinamic fie spre profilul acestuia, fie spre \texttt{/login}. În plus, editorul canvas folosește un \textit{canDeactivate guard} care forțează flush-ul persistenței înainte de părăsirea paginii, ceea ce leagă direct infrastructura de navigare de cerința de robusteză a autosave-ului.
 
@@ -21,18 +21,18 @@ Rutarea este organizată astfel încât paginile principale să fie încărcate 
   \caption{Rute frontend principale și rolul lor în aplicație}
   \label{tab:rute-frontend}
   \renewcommand{\arraystretch}{1.15}
-  \begin{tabularx}{\textwidth}{>{\RaggedRight\arraybackslash}p{3.4cm}YY}
+  \begin{tabularx}{\textwidth}{>{\RaggedRight\arraybackslash}p{4.2cm}>{\RaggedRight\arraybackslash}p{4.1cm}Y}
     \toprule
     \textbf{Rută} & \textbf{Scop} & \textbf{Observații de acces / navigare} \\
     \midrule
-    \texttt{/login} & autentificare și intrare în sistem & protejată de \texttt{loginEntryGuard}, pentru a evita revenirea inutilă după login \\
-    \texttt{/reset-password} & recuperare acces și setare parolă nouă & rută publică, separată de fluxul clasic de autentificare \\
-    \texttt{/project/:slug} & editorul canvas principal & protejată cu \texttt{authGuard} și cu \texttt{canDeactivate} pentru flush de persistență \\
-    \texttt{/project/:slug/preview} & preview HTML al proiectului & necesită autentificare și reutilizează datele de proiect pentru randare separată \\
-    \texttt{/explore} & descoperire de proiecte și utilizatori & accesibilă ca punct de intrare în componenta socială \\
-    \texttt{/settings} & configurări de profil și cont & protejată pentru utilizatorul autentificat \\
-    \texttt{/stars} & proiecte salvate de utilizator & afișează bookmark-urile proprii \\
-    \texttt{/:username} & profilul utilizatorului curent & folosit și ca destinație implicită după încărcarea sesiunii \\
+    \path{/login} & autentificare în sistem & \texttt{loginEntryGuard}; evită revenirea inutilă la login \\
+    \path{/reset-password} & recuperare acces & rută publică pentru resetarea parolei \\
+    \path{/project/:slug} & editorul canvas & \texttt{authGuard} și \texttt{canDeactivate} pentru flush \\
+    \path{/project/:slug/preview} & previzualizare HTML & necesită autentificare și randare separată \\
+    \path{/explore} & descoperire de proiecte & punct de intrare în zona socială \\
+    \path{/settings} & configurări de profil & disponibilă doar utilizatorului autentificat \\
+    \path{/stars} & proiecte salvate & afișează bookmark-urile proprii \\
+    \path{/:username} & profil public / propriu & destinație implicită după încărcarea sesiunii \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -93,7 +93,7 @@ Un detaliu important, mai puțin vizibil în interfață, este ciclul de viață
 
 \section{Funcționalități sociale și explorare}
 
-Componenta socială este implementată prin controllerele `ExploreController`, `ProjectsController` și `UsersController`, împreună cu serviciile și repository-urile aferente. Utilizatorii pot vizualiza proiecte populare sau recomandate, pot descoperi alți utilizatori, pot aprecia proiecte, le pot salva și le pot fork-ui.
+Componenta socială este construită peste fluxurile de explorare, proiecte și utilizatori, împreună cu serviciile și repository-urile aferente. În această zonă, utilizatorii pot vedea proiecte populare sau recomandate, pot descoperi alți utilizatori, pot aprecia proiecte, le pot salva și le pot reutiliza prin fork.
 
 Deși această zonă nu este nucleul tehnic al lucrării, ea schimbă semnificativ caracterul produsului. Fără ea, Favigon ar fi rămas un editor personal. Cu ea, proiectul capătă logică de comunitate: există autori, conținut public, indicatori de interes și relații între utilizatori.
 
@@ -103,7 +103,7 @@ Operația de fork este deosebit de interesantă deoarece leagă partea socială 
 
 \section{Suprafața API și distribuția responsabilităților}
 
-Din perspectiva backend-ului, aplicația expune o suprafață REST suficient de largă încât să merite descrisă separat. În forma actuală, există șase controllere principale: \texttt{AccountController}, \texttt{ProjectsController}, \texttt{UsersController}, \texttt{ExploreController}, \texttt{AiDesignController} și \texttt{ConverterController}. Împreună, acestea acoperă autentificarea, datele de profil, proiectele, funcțiile sociale, generarea asistată de AI și exportul în cod.
+Din perspectiva backend-ului, aplicația expune o suprafață REST suficient de largă încât să merite descrisă separat. În forma actuală, API-ul este împărțit în șase controllere principale. Unele acoperă autentificarea și profilul, altele gestionează proiectele și componenta socială, iar cele rămase tratează generarea asistată de AI și exportul în cod.
 
 Distribuția responsabilităților pe controllere are un rol important în claritatea implementării. Zonele costisitoare sau sensibile, precum AI-ul și convertorul, sunt separate de ciclul de viață al proiectelor. În același timp, controllerele de produs, cum sunt cele pentru proiecte și utilizatori, pot rămâne focalizate pe resursele pe care le gestionează. Astfel, API-ul nu devine o colecție arbitrară de endpoint-uri, ci o hartă destul de coerentă a capabilităților aplicației.
 
@@ -112,16 +112,16 @@ Distribuția responsabilităților pe controllere are un rol important în clari
   \caption{Controllere API și responsabilitățile lor dominante}
   \label{tab:controllere-api}
   \renewcommand{\arraystretch}{1.15}
-  \begin{tabularx}{\textwidth}{>{\RaggedRight\arraybackslash}p{3.5cm}YY}
+  \begin{tabularx}{\textwidth}{>{\RaggedRight\arraybackslash}p{3.8cm}>{\RaggedRight\arraybackslash}p{4.8cm}Y}
     \toprule
     \textbf{Controller} & \textbf{Resurse / operații principale} & \textbf{Observații utile} \\
     \midrule
-    \texttt{AccountController} & register, login, logout, refresh, resetare parolă, OAuth, 2FA & concentrează logica de sesiune și intrarea în sistem \\
-    \texttt{ProjectsController} & CRUD proiecte, design, thumbnail, asset-uri, like, star, fork, view & este controllerul cel mai bogat funcțional din zona de produs \\
-    \texttt{UsersController} & profil curent, profil public, follow/unfollow, linked accounts, imagine profil & leagă identitatea utilizatorului de componenta socială \\
+    \texttt{AccountController} & autentificare, sesiune, parole, OAuth, 2FA & concentrează logica de intrare în sistem \\
+    \texttt{ProjectsController} & CRUD proiecte, design, asset-uri, reacții, fork & controllerul cel mai bogat din zona de produs \\
+    \texttt{UsersController} & profil curent/public, follow, linked accounts & leagă identitatea utilizatorului de zona socială \\
     \texttt{ExploreController} & trending, recomandări și sugestii de utilizatori & pune în valoare date agregate și filtrate, nu doar resurse brute \\
-    \texttt{AiDesignController} & generare AI clasică, streaming, pipeline pe faze & include atât răspuns sincron, cât și SSE incremental \\
-    \texttt{ConverterController} & validare IR, generare HTML/React/Angular, fișiere multi-page & separă clar validarea de generarea finală \\
+    \texttt{AiDesignController} & generare directă, streaming, pipeline pe faze & include atât răspuns sincron, cât și SSE incremental \\
+    \texttt{ConverterController} & validare IR, export HTML/React/Angular, multi-page & separă clar validarea de generarea finală \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -211,6 +211,3 @@ A patra este integrarea atentă dintre proiecte, thumbnail-uri și asset-uri. F�
 Implementarea platformei arată că Favigon este mai mult decât un proof of concept pentru generare AI. Autentificarea, proiectele, profilurile, funcțiile sociale și editorul canvas formează împreună baza produsului. În această bază, editorul este modulul cel mai complex, dar el nu ar avea aceeași valoare fără restul infrastructurii de produs.
 
 Capitolul următor tratează componenta care diferențiază cel mai mult proiectul din punct de vedere tehnic: generarea asistată de AI și conversia interfețelor în cod.
-
-
-

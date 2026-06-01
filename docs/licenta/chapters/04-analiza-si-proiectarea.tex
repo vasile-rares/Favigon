@@ -54,12 +54,12 @@ Aceste cerințe nefuncționale au influențat puternic structura aplicației. Ne
     \toprule
     \textbf{Obiectiv} & \textbf{Module principale} & \textbf{Formă de validare} \\
     \midrule
-    Autentificare și administrare cont & `AccountController`, `AuthService`, `UsersController` & teste backend pentru autentificare și scenarii funcționale de login / 2FA \\
-    Editor vizual multi-page & `CanvasPage`, `CanvasEditorStateService`, `CanvasPageManagerService` & scenarii de editare, autosave și restaurare de stare \\
-    Reprezentare intermediară reutilizabilă & mapper-e canvas $\leftrightarrow$ IR, `IRNode`, `ConverterService` & validare structurală înainte de export și teste pentru convertor \\
-    Generare asistată de AI controlabilă & `AiDesignController`, `AiDesignService`, `AiPipelineService`, `OpenAiClient` & validare structurală, mecanism de auto-reparare și scenarii funcționale AI \\
-    Export multi-framework & `ConverterController`, `ConverterService`, `ConverterEngine` & teste pentru HTML / React / Angular, responsive și multi-page \\
-    Componentă socială și reutilizare & `ProjectsController`, `UsersController`, `ExploreController`, `ProjectService` & teste service/controller și scenarii de publicare, like, star și fork \\
+    Autentificare și administrare cont & `AccountController`, `AuthService`, zona de profil utilizator & teste backend și scenarii de login / 2FA \\
+    Editor vizual multi-page & `CanvasPage` și serviciile principale ale editorului & scenarii de editare, autosave și restaurare \\
+    Reprezentare intermediară reutilizabilă & mapper-e canvas $\leftrightarrow$ IR, `IRNode`, `ConverterService` & validare IR și teste pentru convertor \\
+    Generare asistată de AI controlabilă & `AiDesignController`, `AiDesignService`, `AiPipelineService` & validare structurală, auto-reparare și scenarii AI \\
+    Export multi-framework & `ConverterController`, `ConverterService`, `ConverterEngine` & teste HTML / React / Angular, responsive și multi-page \\
+    Componentă socială și reutilizare & `ProjectsController`, `UsersController`, `ExploreController` & teste service/controller și scenarii sociale \\
     \bottomrule
   \end{tabularx}
 \end{table}
@@ -203,7 +203,6 @@ A patra decizie a fost folosirea unei baze relaționale pentru metadate și a un
 În urma analizei și proiectării, sistemul rezultat are o formă coerentă atât la nivel de produs, cât și la nivel tehnic. Cerințele au fost traduse într-o arhitectură cu straturi clare, actori bine definiți, fluxuri importante și un model de date adaptat problemei.
 
 Capitolul următor trece de la această vedere de ansamblu la implementarea concretă a platformei: autentificare, proiecte, funcții sociale și editorul canvas.
-
 
 
 

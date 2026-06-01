@@ -79,14 +79,14 @@ Mai precis, există teste pentru:
   \renewcommand{\arraystretch}{1.15}
   \begin{tabularx}{\textwidth}{>{\RaggedRight\arraybackslash}p{6.2cm}Y>{\RaggedLeft\arraybackslash}p{2cm}}
     \toprule
-    \textbf{Fișier / zonă} & \textbf{Ce verifică în principal} & \textbf{Nr. teste} \\
+    \textbf{Zonă testată} & \textbf{Ce verifică în principal} & \textbf{Nr. teste} \\
     \midrule
-    AuthServiceLoginTests, Register, Refresh, PasswordManagement, TwoFactor & fluxurile esențiale de autentificare și recuperare cont & 25 \\
-    ProjectServiceTests & gestionare proiecte, fork, bookmark, like, upload logic & 20 \\
-    ProjectsControllerTests & comportamentul endpoint-urilor pentru proiecte & 11 \\
-    UsersControllerTests și UserServiceTests & profil, follow, search, stele și operații auxiliare pe utilizatori & 17 \\
-    ConverterControllerTests și ConverterEngineTests & validare IR, export, responsive, multi-page & 19 \\
-    ExceptionHandlerMiddlewareTests și SecurityHeadersMiddlewareTests & tratarea erorilor și antetele HTTP & 16 \\
+    Autentificare și cont & login, register, refresh, parole, 2FA, recuperare cont & 25 \\
+    Servicii pentru proiecte & gestionare proiecte, fork, bookmark, like și upload logic & 20 \\
+    Endpoint-uri pentru proiecte & comportamentul controllerului pentru proiecte & 11 \\
+    Utilizatori și profil & profil, follow, search, stele și operații auxiliare & 17 \\
+    Convertor și export & validare IR, export, responsive și multi-page & 19 \\
+    Middleware și securitate & tratarea erorilor și antetele HTTP & 16 \\
     \midrule
     \textbf{Total} & \textbf{teste backend automate trecute} & \textbf{108} \\
     \bottomrule

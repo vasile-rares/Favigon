@@ -6,7 +6,7 @@ Această anexă sintetizează endpoint-urile principale ale aplicației. Nu urm�
 
 \section{Endpoint-uri pentru cont și autentificare}
 
-\begin{longtable}{>{\RaggedRight\arraybackslash}p{2cm}>{\RaggedRight\arraybackslash}p{5.7cm}>{\RaggedRight\arraybackslash}p{6.2cm}}
+\begin{longtable}{>{\RaggedRight\arraybackslash}p{1.7cm}>{\RaggedRight\arraybackslash}p{6.1cm}>{\RaggedRight\arraybackslash}p{5.8cm}}
   \caption{Endpoint-uri principale din zona de autentificare} \\
   \toprule
   \textbf{Metodă} & \textbf{Rută} & \textbf{Rol} \\
@@ -16,29 +16,29 @@ Această anexă sintetizează endpoint-urile principale ale aplicației. Nu urm�
   \textbf{Metodă} & \textbf{Rută} & \textbf{Rol} \\
   \midrule
   \endhead
-  POST & `/api/account/register` & creare cont nou \\
-  POST & `/api/account/login` & autentificare clasică \\
-  POST & `/api/account/oauth2/github` & autentificare prin GitHub \\
-  POST & `/api/account/oauth2/google` & autentificare prin Google \\
-  POST & `/api/account/two-factor/verify-login` & finalizarea login-ului cu 2FA \\
-  POST & `/api/account/oauth2/github/link` & legare cont GitHub la utilizatorul curent \\
-  POST & `/api/account/oauth2/google/link` & legare cont Google la utilizatorul curent \\
-  POST & `/api/account/forgot-password` & inițiere resetare parolă \\
-  POST & `/api/account/reset-password` & setarea noii parole prin token \\
-  POST & `/api/account/set-password` & adăugarea unei parole pentru cont OAuth \\
-  POST & `/api/account/change-password` & schimbarea parolei \\
-  POST & `/api/account/two-factor/enable/request` & trimiterea codului pentru activare 2FA \\
-  POST & `/api/account/two-factor/enable/confirm` & confirmarea activării 2FA \\
-  POST & `/api/account/two-factor/disable/request` & trimiterea codului pentru dezactivare 2FA \\
-  POST & `/api/account/two-factor/disable/confirm` & confirmarea dezactivării 2FA \\
-  POST & `/api/account/refresh` & reînnoirea token-ului de acces \\
-  POST & `/api/account/logout` & încheierea sesiunii \\
+  POST & \path{/api/account/register} & creare cont nou \\
+  POST & \path{/api/account/login} & autentificare clasică \\
+  POST & \path{/api/account/oauth2/github} & autentificare prin GitHub \\
+  POST & \path{/api/account/oauth2/google} & autentificare prin Google \\
+  POST & \path{/api/account/two-factor/verify-login} & finalizarea login-ului cu 2FA \\
+  POST & \path{/api/account/oauth2/github/link} & legare cont GitHub la utilizatorul curent \\
+  POST & \path{/api/account/oauth2/google/link} & legare cont Google la utilizatorul curent \\
+  POST & \path{/api/account/forgot-password} & inițiere resetare parolă \\
+  POST & \path{/api/account/reset-password} & setarea noii parole prin token \\
+  POST & \path{/api/account/set-password} & adăugarea unei parole pentru cont OAuth \\
+  POST & \path{/api/account/change-password} & schimbarea parolei \\
+  POST & \path{/api/account/two-factor/enable/request} & trimiterea codului pentru activare 2FA \\
+  POST & \path{/api/account/two-factor/enable/confirm} & confirmarea activării 2FA \\
+  POST & \path{/api/account/two-factor/disable/request} & trimiterea codului pentru dezactivare 2FA \\
+  POST & \path{/api/account/two-factor/disable/confirm} & confirmarea dezactivării 2FA \\
+  POST & \path{/api/account/refresh} & reînnoirea token-ului de acces \\
+  POST & \path{/api/account/logout} & încheierea sesiunii \\
   \bottomrule
 \end{longtable}
 
 \section{Endpoint-uri pentru proiecte}
 
-\begin{longtable}{>{\RaggedRight\arraybackslash}p{2cm}>{\RaggedRight\arraybackslash}p{5.7cm}>{\RaggedRight\arraybackslash}p{6.2cm}}
+\begin{longtable}{>{\RaggedRight\arraybackslash}p{1.7cm}>{\RaggedRight\arraybackslash}p{6.1cm}>{\RaggedRight\arraybackslash}p{5.8cm}}
   \caption{Endpoint-uri principale pentru proiecte} \\
   \toprule
   \textbf{Metodă} & \textbf{Rută} & \textbf{Rol} \\
@@ -48,30 +48,30 @@ Această anexă sintetizează endpoint-urile principale ale aplicației. Nu urm�
   \textbf{Metodă} & \textbf{Rută} & \textbf{Rol} \\
   \midrule
   \endhead
-  GET & `/api/projects` & lista proiectelor utilizatorului curent \\
-  GET & `/api/projects/{id}` & proiect după identificator \\
-  GET & `/api/projects/by-slug/{slug}` & proiect după slug \\
-  POST & `/api/projects` & creare proiect \\
-  PUT & `/api/projects/{id}` & actualizare metadate proiect \\
-  DELETE & `/api/projects/{id}` & ștergere proiect \\
-  POST & `/api/projects/{id}/assets/images` & upload imagine pentru canvas \\
-  GET & `/api/projects/{id}/design` & încărcare design salvat \\
-  PUT & `/api/projects/{id}/design` & salvare design \\
-  POST & `/api/projects/{id}/flush` & salvare combinată design + thumbnail \\
-  PUT & `/api/projects/{id}/thumbnail` & actualizare thumbnail \\
-  GET & `/api/projects/user/{userId}` & proiecte publice ale unui utilizator \\
-  POST & `/api/projects/{id}/star` & bookmark / star \\
-  DELETE & `/api/projects/{id}/star` & eliminare bookmark \\
-  POST & `/api/projects/{id}/view` & înregistrare vizualizare \\
-  POST & `/api/projects/{id}/like` & apreciere proiect \\
-  DELETE & `/api/projects/{id}/like` & eliminare apreciere \\
-  POST & `/api/projects/{id}/fork` & creare fork după proiect public \\
+  GET & \path{/api/projects} & lista proiectelor utilizatorului curent \\
+  GET & \path{/api/projects/{id}} & proiect după identificator \\
+  GET & \path{/api/projects/by-slug/{slug}} & proiect după slug \\
+  POST & \path{/api/projects} & creare proiect \\
+  PUT & \path{/api/projects/{id}} & actualizare metadate proiect \\
+  DELETE & \path{/api/projects/{id}} & ștergere proiect \\
+  POST & \path{/api/projects/{id}/assets/images} & upload imagine pentru canvas \\
+  GET & \path{/api/projects/{id}/design} & încărcare design salvat \\
+  PUT & \path{/api/projects/{id}/design} & salvare design \\
+  POST & \path{/api/projects/{id}/flush} & salvare combinată design + thumbnail \\
+  PUT & \path{/api/projects/{id}/thumbnail} & actualizare thumbnail \\
+  GET & \path{/api/projects/user/{userId}} & proiecte publice ale unui utilizator \\
+  POST & \path{/api/projects/{id}/star} & bookmark / star \\
+  DELETE & \path{/api/projects/{id}/star} & eliminare bookmark \\
+  POST & \path{/api/projects/{id}/view} & înregistrare vizualizare \\
+  POST & \path{/api/projects/{id}/like} & apreciere proiect \\
+  DELETE & \path{/api/projects/{id}/like} & eliminare apreciere \\
+  POST & \path{/api/projects/{id}/fork} & creare fork după proiect public \\
   \bottomrule
 \end{longtable}
 
 \section{Endpoint-uri pentru utilizatori și profiluri}
 
-\begin{longtable}{>{\RaggedRight\arraybackslash}p{2cm}>{\RaggedRight\arraybackslash}p{5.7cm}>{\RaggedRight\arraybackslash}p{6.2cm}}
+\begin{longtable}{>{\RaggedRight\arraybackslash}p{1.7cm}>{\RaggedRight\arraybackslash}p{6.1cm}>{\RaggedRight\arraybackslash}p{5.8cm}}
   \caption{Endpoint-uri principale pentru utilizatori} \\
   \toprule
   \textbf{Metodă} & \textbf{Rută} & \textbf{Rol} \\
@@ -81,24 +81,24 @@ Această anexă sintetizează endpoint-urile principale ale aplicației. Nu urm�
   \textbf{Metodă} & \textbf{Rută} & \textbf{Rol} \\
   \midrule
   \endhead
-  GET & `/api/users/me` & profilul utilizatorului curent \\
-  PUT & `/api/users/me` & actualizare profil propriu \\
-  POST & `/api/users/me/profile-image` & upload imagine de profil \\
-  DELETE & `/api/users/me` & ștergere cont propriu \\
-  DELETE & `/api/users/me/linked-accounts/{provider}` & deconectare provider OAuth \\
-  GET & `/api/users/search?q=...` & căutare de utilizatori \\
-  GET & `/api/users/{username}` & profil public după username \\
-  POST & `/api/users/{username}/follow` & urmărire utilizator \\
-  DELETE & `/api/users/{username}/follow` & oprire urmărire \\
-  GET & `/api/users/{username}/followers` & lista urmăritorilor \\
-  GET & `/api/users/{username}/following` & lista utilizatorilor urmăriți \\
-  GET & `/api/users/me/stars` & proiectele salvate de utilizatorul curent \\
+  GET & \path{/api/users/me} & profilul utilizatorului curent \\
+  PUT & \path{/api/users/me} & actualizare profil propriu \\
+  POST & \path{/api/users/me/profile-image} & upload imagine de profil \\
+  DELETE & \path{/api/users/me} & ștergere cont propriu \\
+  DELETE & \path{/api/users/me/linked-accounts/{provider}} & deconectare provider OAuth \\
+  GET & \path{/api/users/search?q=...} & căutare de utilizatori \\
+  GET & \path{/api/users/{username}} & profil public după username \\
+  POST & \path{/api/users/{username}/follow} & urmărire utilizator \\
+  DELETE & \path{/api/users/{username}/follow} & oprire urmărire \\
+  GET & \path{/api/users/{username}/followers} & lista urmăritorilor \\
+  GET & \path{/api/users/{username}/following} & lista utilizatorilor urmăriți \\
+  GET & \path{/api/users/me/stars} & proiectele salvate de utilizatorul curent \\
   \bottomrule
 \end{longtable}
 
 \section{Endpoint-uri pentru explore și recomandări}
 
-\begin{longtable}{>{\RaggedRight\arraybackslash}p{2cm}>{\RaggedRight\arraybackslash}p{5.7cm}>{\RaggedRight\arraybackslash}p{6.2cm}}
+\begin{longtable}{>{\RaggedRight\arraybackslash}p{1.7cm}>{\RaggedRight\arraybackslash}p{6.1cm}>{\RaggedRight\arraybackslash}p{5.8cm}}
   \caption{Endpoint-uri din zona explore} \\
   \toprule
   \textbf{Metodă} & \textbf{Rută} & \textbf{Rol} \\
@@ -108,15 +108,15 @@ Această anexă sintetizează endpoint-urile principale ale aplicației. Nu urm�
   \textbf{Metodă} & \textbf{Rută} & \textbf{Rol} \\
   \midrule
   \endhead
-  GET & `/api/explore/trending` & proiecte populare \\
-  GET & `/api/explore/recommended` & recomandări de proiecte, eventual personalizate \\
-  GET & `/api/explore/people` & sugestii de utilizatori \\
+  GET & \path{/api/explore/trending} & proiecte populare \\
+  GET & \path{/api/explore/recommended} & recomandări de proiecte, eventual personalizate \\
+  GET & \path{/api/explore/people} & sugestii de utilizatori \\
   \bottomrule
 \end{longtable}
 
 \section{Endpoint-uri pentru AI și conversie}
 
-\begin{longtable}{>{\RaggedRight\arraybackslash}p{2cm}>{\RaggedRight\arraybackslash}p{5.7cm}>{\RaggedRight\arraybackslash}p{6.2cm}}
+\begin{longtable}{>{\RaggedRight\arraybackslash}p{1.7cm}>{\RaggedRight\arraybackslash}p{6.1cm}>{\RaggedRight\arraybackslash}p{5.8cm}}
   \caption{Endpoint-uri pentru AI și converter} \\
   \toprule
   \textbf{Metodă} & \textbf{Rută} & \textbf{Rol} \\
@@ -126,13 +126,13 @@ Această anexă sintetizează endpoint-urile principale ale aplicației. Nu urm�
   \textbf{Metodă} & \textbf{Rută} & \textbf{Rol} \\
   \midrule
   \endhead
-  POST & `/api/ai/design` & generare design într-o singură cerere \\
-  POST & `/api/ai/design/stream` & generare design în regim SSE \\
-  POST & `/api/ai/design/pipeline` & rulare pipeline AI în trei faze \\
-  POST & `/api/ai/design/pipeline/stream` & rulare pipeline AI cu streaming \\
-  POST & `/api/converter/generate` & export pentru o pagină sau set responsive \\
-  POST & `/api/converter/validate` & validare structură IR \\
-  POST & `/api/converter/generate-files` & generare fișiere pentru export multi-page \\
+  POST & \path{/api/ai/design} & generare design într-o singură cerere \\
+  POST & \path{/api/ai/design/stream} & generare design în regim SSE \\
+  POST & \path{/api/ai/design/pipeline} & rulare pipeline AI în trei faze \\
+  POST & \path{/api/ai/design/pipeline/stream} & rulare pipeline AI cu streaming \\
+  POST & \path{/api/converter/generate} & export pentru o pagină sau set responsive \\
+  POST & \path{/api/converter/validate} & validare structură IR \\
+  POST & \path{/api/converter/generate-files} & generare fișiere pentru export multi-page \\
   \bottomrule
 \end{longtable}
 
